@@ -25,14 +25,20 @@ The concept of MetaFold is inspired by the excellent **RDM-Desktop Tool**, devel
 * GitHub Repository: [tomio13/RDM-Desktop](https://github.com/tomio13/RDM-Desktop)
 * License: The RDM-Desktop Tool is licensed under the [CC BY 4.0 License](https://creativecommons.org/licenses/by/4.0/). We thank T. Haraszti for providing this tool and the inspiration.
 
-MetaFold aims to offer similar functionalities in a modern design with a bit more flexibility and some other functions.
+MetaFold aims to offer similar functionalities in a modern design and with enhanced flexibility.
+
+---
+
+## Technology Stack
+
+MetaFold is built as a desktop application using **Node.js** and **Electron**. This allows for a cross-platform user interface developed with web technologies.
 
 ---
 
 ## Future Ideas and Planned Features
 
 * **Compatibility with Electronic Lab Notebooks (ELNs)**: Creation of metadata files that can be directly used in various ELNs like eLabFTW.
-* **Direct Upload to ELNs**: Implementation of a feature to directly upload JSON files to platforms suchs as eLabFTW, OpenBis, or RSpace.
+* **Direct Upload to ELNs**: Implementation of a feature to directly upload JSON files to platforms such as eLabFTW, OpenBis, or RSpace.
 * **OMERO Integration**: Sending JSON metadata to OMERO Projects/Datasets.
 * **Automated README Creation**: Generation of a README file with project descriptions based on the metadata.
 * **RO-Crates as Outcome**: Generation of **RO-Crates** for packaging research objects and their metadata.
