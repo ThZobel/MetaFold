@@ -46,7 +46,7 @@ MetaFold is built as a desktop application using **Node.js** and **Electron**. T
 ---
 # 🚀 How to Install MetaFold
 
-## 📆 Prerequisites
+## Prerequisites
 
 * **Node.js** must be installed
   → Download: [https://nodejs.org](https://nodejs.org)
@@ -105,25 +105,6 @@ npm run build
 ```
 
 This will generate platform-specific executables in the `dist/` folder (depending on your configuration in `package.json`).
-
----
-
-## 🧰 Tip: Scripts Overview (Example)
-
-Here’s a typical `"scripts"` section in your `package.json`:
-
-```json
-"scripts": {
-  "start": "electron .",
-  "build": "electron-builder"
-}
-```
-
-Make sure `electron-builder` is installed:
-
-```bash
-npm install electron-builder --save-dev
-```
 
 ---
 
