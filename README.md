@@ -44,7 +44,94 @@ MetaFold is built as a desktop application using **Node.js** and **Electron**. T
 * **RO-Crates as Outcome**: Generation of **RO-Crates** for packaging research objects and their metadata.
 
 ---
+# 🚀 How to Install MetaFold
 
+## 📆 Prerequisites
+
+* **Node.js** must be installed
+  → Download: [https://nodejs.org](https://nodejs.org)
+
+---
+
+## 🔧 Setting Up the Project
+
+1. **Create a new folder for your project**
+
+   ```bash
+   mkdir my-electron-app
+   cd my-electron-app
+   ```
+
+2. **Copy project files from GitHub**
+
+   * Download or clone the contents of the `src` folder from the GitHub repository:
+
+     ```bash
+     git clone https://github.com/ThZobel/MetaFold.git
+     cp -r MetaFold/src/* ./
+     ```
+   * Alternatively, download the files manually from GitHub and place them into your new folder.
+
+3. **Initialize the project (if needed)**
+
+   ```bash
+   npm init -y
+   ```
+
+4. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+---
+
+## ▶️ Run the App
+
+To start the Electron app in development mode, run:
+
+```bash
+npm start
+```
+
+---
+
+## 🛠️ Build the App (Windows, macOS, Linux)
+
+If the project is already configured with [electron-builder](https://www.electron.build/) or a similar tool, you can simply run:
+
+```bash
+npm run build
+```
+
+This will generate platform-specific executables in the `dist/` folder (depending on your configuration in `package.json`).
+
+---
+
+## 🧰 Tip: Scripts Overview (Example)
+
+Here’s a typical `"scripts"` section in your `package.json`:
+
+```json
+"scripts": {
+  "start": "electron .",
+  "build": "electron-builder"
+}
+```
+
+Make sure `electron-builder` is installed:
+
+```bash
+npm install electron-builder --save-dev
+```
+
+---
+
+## ✅ Done!
+
+Your Electron app is now ready to use and build! 🎉
+
+---
 ## Development Note
 
 This program was developed with the assistance of [claude.ai](https://claude.ai/).
