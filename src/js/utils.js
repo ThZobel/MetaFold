@@ -1,20 +1,20 @@
-// Utility-Funktionen für die Anwendung
+// Utility functions for the application
 
 const appUtils = {
-    // Sichere ID-Generierung für HTML-Elemente
+    // Safe ID generation for HTML elements
     createSafeId(fieldName) {
         return fieldName.replace(/[^a-zA-Z0-9]/g, '_');
     },
 
-    // Standard-Pfad basierend auf Plattform
+    // Default path based on platform
     getDefaultPath() {
         if (window.utils) {
             return window.utils.getDefaultBasePath();
         }
-        return 'C:\\Projekte\\';
+        return 'C:\\Projects\\';
     },
 
-    // Default-Werte für verschiedene Feld-Typen
+    // Default values for different field types
     getDefaultValueForType(type) {
         switch (type) {
             case 'number': return 0;
@@ -24,7 +24,7 @@ const appUtils = {
         }
     },
 
-    // Default-Werte für Schema-Typen
+    // Default values for schema types
     getDefaultValueForSchemaType(type) {
         switch (type) {
             case 'string': return '';
@@ -37,7 +37,7 @@ const appUtils = {
         }
     },
 
-    // Pfad-Vorschau aktualisieren
+    // Update path preview
     updatePathPreview() {
         const basePath = document.getElementById('targetPath').value.trim();
         const projectName = document.getElementById('projectName').value.trim();
@@ -48,59 +48,59 @@ const appUtils = {
             preview.textContent = basePath + separator + projectName;
             preview.style.color = '#10b981';
         } else {
-            preview.textContent = 'Wähle Verzeichnis und Projekt-Name';
+            preview.textContent = 'Choose directory and project name';
             preview.style.color = '#9ca3af';
         }
     },
 
-    // Error-Nachricht anzeigen
+    // Show error message
     showError(message) {
         const errorMessage = document.getElementById('errorMessage');
-        errorMessage.innerHTML = `<strong>❌ Fehler!</strong><br>${message}`;
+        errorMessage.innerHTML = `<strong>❌ Error!</strong><br>${message}`;
         errorMessage.style.display = 'block';
         
-        // Nach 8 Sekunden ausblenden
+        // Hide after 8 seconds
         setTimeout(() => {
             errorMessage.style.display = 'none';
         }, 8000);
     },
 
-    // Success-Nachricht anzeigen
+    // Show success message
     showSuccess(message) {
         const successMessage = document.getElementById('successMessage');
         successMessage.innerHTML = message;
         successMessage.style.display = 'block';
         
-        // Nach 8 Sekunden ausblenden
+        // Hide after 8 seconds
         setTimeout(() => {
             successMessage.style.display = 'none';
         }, 8000);
     },
 
-    // Nachrichten ausblenden
+    // Hide messages
     hideMessages() {
         document.getElementById('successMessage').style.display = 'none';
         document.getElementById('errorMessage').style.display = 'none';
     },
 
-    // Plattform-spezifische Anpassungen
+    // Platform-specific adjustments
     applyPlatformStyles() {
         if (window.electronAPI && window.electronAPI.platform === 'darwin') {
             document.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
         }
     },
 
-    // Ordner öffnen (falls möglich)
+    // Open folder (if possible)
     async openCreatedFolder(folderPath) {
         if (window.electronAPI) {
             try {
                 await window.electronAPI.openFolder(folderPath);
             } catch (error) {
-                console.error('Fehler beim Öffnen des Ordners:', error);
+                console.error('Error opening folder:', error);
             }
         }
     }
 };
 
-// Global verfügbar machen als appUtils (um Konflikt zu vermeiden)
+// Make globally available as appUtils (to avoid conflicts)
 window.appUtils = appUtils;

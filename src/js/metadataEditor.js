@@ -1,9 +1,9 @@
-// Metadata-Editor für Experiment-Templates
+// Metadata Editor for Experiment Templates
 
 const metadataEditor = {
     fieldCounter: 0,
 
-    // Metadata-Feld hinzufügen
+    // Add metadata field
     addField() {
         const container = document.getElementById('metadataFields');
         const fieldId = 'field_' + (++this.fieldCounter);
@@ -12,7 +12,7 @@ const metadataEditor = {
         fieldDiv.className = 'metadata-field';
         fieldDiv.innerHTML = `
             <div class="metadata-field-header">
-                <input type="text" placeholder="Feld-Name" onchange="metadataEditor.updateJsonPreview()" style="flex: 1; margin-right: 10px;">
+                <input type="text" placeholder="Field Name" onchange="metadataEditor.updateJsonPreview()" style="flex: 1; margin-right: 10px;">
                 <div class="metadata-field-controls">
                     <label style="display: flex; align-items: center; margin-right: 10px; font-size: 12px;">
                         <input type="checkbox" onchange="metadataEditor.updateJsonPreview()" style="margin-right: 5px; width: auto;">
@@ -20,19 +20,19 @@ const metadataEditor = {
                     </label>
                     <select class="field-type-selector" onchange="metadataEditor.updateFieldType(this); metadataEditor.updateJsonPreview()">
                         <option value="text">Text</option>
-                        <option value="number">Zahl</option>
-                        <option value="date">Datum</option>
-                        <option value="textarea">Textbereich</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                        <option value="textarea">Text Area</option>
                         <option value="dropdown">Dropdown</option>
                         <option value="checkbox">Checkbox</option>
-                        <option value="group">Gruppe</option>
+                        <option value="group">Group</option>
                     </select>
                     <button class="btn btn-danger btn-small" onclick="metadataEditor.removeField(this)">×</button>
                 </div>
             </div>
             <div class="field-options">
                 <input type="text" placeholder="Label" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
-                <input type="text" placeholder="Beschreibung (optional)" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
+                <input type="text" placeholder="Description (optional)" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
                 <div class="field-specific-options"></div>
             </div>
         `;
@@ -41,13 +41,13 @@ const metadataEditor = {
         this.updateJsonPreview();
     },
 
-    // Metadata-Feld entfernen
+    // Remove metadata field
     removeField(button) {
         button.closest('.metadata-field').remove();
         this.updateJsonPreview();
     },
 
-    // Field-Type aktualisieren
+    // Update field type
     updateFieldType(select) {
         const fieldDiv = select.closest('.metadata-field');
         const optionsDiv = fieldDiv.querySelector('.field-specific-options');
@@ -57,7 +57,7 @@ const metadataEditor = {
         
         if (type === 'dropdown') {
             optionsDiv.innerHTML = `
-                <input type="text" placeholder="Optionen (komma-getrennt): Option1, Option2, Option3" 
+                <input type="text" placeholder="Options (comma-separated): Option1, Option2, Option3" 
                        onchange="metadataEditor.updateJsonPreview()" style="width: 100%;">
             `;
         } else if (type === 'number') {
@@ -70,15 +70,15 @@ const metadataEditor = {
         }
     },
 
-    // JSON-Vorschau aktualisieren
+    // Update JSON preview
     updateJsonPreview() {
         const fields = document.querySelectorAll('.metadata-field');
         const metadata = {};
         
         fields.forEach(field => {
-            const nameInput = field.querySelector('input[placeholder="Feld-Name"]');
+            const nameInput = field.querySelector('input[placeholder="Field Name"]');
             const labelInput = field.querySelector('input[placeholder="Label"]');
-            const descInput = field.querySelector('input[placeholder*="Beschreibung"]');
+            const descInput = field.querySelector('input[placeholder*="Description"]');
             const typeSelect = field.querySelector('.field-type-selector');
             const requiredCheckbox = field.querySelector('input[type="checkbox"]');
             
@@ -96,14 +96,14 @@ const metadataEditor = {
                     required: required
                 };
                 
-                // Beschreibung hinzufügen falls vorhanden
+                // Add description if present
                 if (description) {
                     fieldData.description = description;
                 }
                 
-                // Type-spezifische Optionen
+                // Type-specific options
                 if (type === 'dropdown') {
-                    const optionsInput = field.querySelector('input[placeholder*="Optionen"]');
+                    const optionsInput = field.querySelector('input[placeholder*="Options"]');
                     if (optionsInput && optionsInput.value) {
                         fieldData.options = optionsInput.value.split(',').map(s => s.trim());
                     }
@@ -121,7 +121,7 @@ const metadataEditor = {
         document.getElementById('jsonPreview').textContent = JSON.stringify(metadata, null, 2);
     },
 
-    // Default-Werte für verschiedene Feld-Typen (lokale Kopie)
+    // Default values for different field types (local copy)
     getDefaultValueForType(type) {
         switch (type) {
             case 'number': return 0;
@@ -131,7 +131,7 @@ const metadataEditor = {
         }
     },
 
-    // Default-Werte für Schema-Typen (lokale Kopie)
+    // Default values for schema types (local copy)
     getDefaultValueForSchemaType(type) {
         switch (type) {
             case 'string': return '';
@@ -144,13 +144,13 @@ const metadataEditor = {
         }
     },
 
-    // Alle Metadata-Felder löschen
+    // Clear all metadata fields
     clearFields() {
         document.getElementById('metadataFields').innerHTML = '';
         this.updateJsonPreview();
     },
 
-    // JSON-Template laden
+    // Load JSON template
     loadFromJson() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -163,20 +163,27 @@ const metadataEditor = {
                     try {
                         const jsonData = JSON.parse(e.target.result);
                         
-                        // Prüfen ob es ein JSON Schema ist
-                        if (jsonData.$schema || (jsonData.type === 'object' && jsonData.properties)) {
-                            // JSON Schema konvertieren
+                        // Check if it's an elabFTW export
+                        if (jsonData.elabftw && jsonData.extra_fields) {
+                            // Convert elabFTW format
+                            const metadata = this.convertElabFTWToMetadata(jsonData);
+                            this.loadMetadataIntoEditor(metadata);
+                            
+                            // Info message
+                            alert(`elabFTW export loaded successfully!\nFields: ${Object.keys(metadata).length}`);
+                        } else if (jsonData.$schema || (jsonData.type === 'object' && jsonData.properties)) {
+                            // Convert JSON Schema
                             const metadata = this.convertJsonSchemaToMetadata(jsonData);
                             this.loadMetadataIntoEditor(metadata);
                             
-                            // Info-Nachricht
-                            alert(`JSON Schema erfolgreich geladen!\nTitel: ${jsonData.title || 'Unbekannt'}\nFelder: ${Object.keys(metadata).length}`);
+                            // Info message
+                            alert(`JSON Schema loaded successfully!\nTitle: ${jsonData.title || 'Unknown'}\nFields: ${Object.keys(metadata).length}`);
                         } else {
-                            // Normales Metadaten JSON
+                            // Normal metadata JSON
                             this.loadMetadataIntoEditor(jsonData);
                         }
                     } catch (error) {
-                        alert('Fehler beim Laden der JSON-Datei: ' + error.message);
+                        alert('Error loading JSON file: ' + error.message);
                     }
                 };
                 reader.readAsText(file);
@@ -185,92 +192,101 @@ const metadataEditor = {
         input.click();
     },
 
-    // JSON Schema zu internem Format konvertieren
-    convertJsonSchemaToMetadata(schema) {
+    // Convert elabFTW format to internal format
+    convertElabFTWToMetadata(elabftwData) {
         const metadata = {};
         
-        if (!schema.properties) {
-            console.warn('Schema hat keine properties');
+        if (!elabftwData.extra_fields) {
+            console.warn('No extra_fields found');
             return metadata;
         }
         
-        // Flache Struktur für verschachtelte Properties erstellen
-        const processProperties = (properties, requiredFields = [], prefix = '') => {
-            Object.entries(properties).forEach(([key, prop]) => {
-                const fullKey = prefix ? `${prefix}.${key}` : key;
-                const isRequired = requiredFields.includes(key);
-                
-                if (prop.type === 'object' && prop.properties) {
-                    // Verschachtelte Objekte: Group Header + einzelne Felder
-                    metadata[fullKey + '_group'] = {
-                        type: 'group',
-                        label: prop.title || key,
-                        description: prop.description || '',
-                        value: '',
-                        required: false
-                    };
-                    
-                    // Rekursiv verschachtelte Properties verarbeiten
-                    processProperties(prop.properties, prop.required || [], fullKey);
-                } else {
-                    // Normale Felder
-                    let fieldType = 'text';
-                    const fieldData = {
-                        type: fieldType,
-                        label: prop.title || key,
-                        description: prop.description || '',
-                        value: this.getDefaultValueForSchemaType(prop.type),
-                        required: isRequired
-                    };
-                    
-                    // Type Mapping
-                    switch (prop.type) {
-                        case 'string':
-                            fieldType = 'text';
-                            break;
-                        case 'number':
-                        case 'integer':
-                            fieldType = 'number';
-                            if (prop.minimum !== undefined) fieldData.min = prop.minimum;
-                            if (prop.maximum !== undefined) fieldData.max = prop.maximum;
-                            break;
-                        case 'boolean':
-                            fieldType = 'checkbox';
-                            break;
-                    }
-                    
-                    // Enum als Dropdown
-                    if (prop.enum && Array.isArray(prop.enum)) {
-                        fieldType = 'dropdown';
-                        fieldData.options = prop.enum;
-                    }
-                    
-                    fieldData.type = fieldType;
-                    metadata[fullKey] = fieldData;
-                }
+        // Process groups (if present)
+        const groups = {};
+        if (elabftwData.elabftw && elabftwData.elabftw.extra_fields_groups) {
+            elabftwData.elabftw.extra_fields_groups.forEach(group => {
+                groups[group.id] = group.name;
             });
-        };
+        }
         
-        processProperties(schema.properties, schema.required || []);
+        // Convert fields
+        Object.entries(elabftwData.extra_fields).forEach(([fieldName, fieldData]) => {
+            // Map type from elabFTW to internal format
+            let internalType = 'text';
+            switch (fieldData.type) {
+                case 'select':
+                    internalType = 'dropdown';
+                    break;
+                case 'checkbox':
+                    internalType = 'checkbox';
+                    break;
+                case 'number':
+                    internalType = 'number';
+                    break;
+                case 'date':
+                    internalType = 'date';
+                    break;
+                case 'text':
+                    internalType = fieldData.multiline ? 'textarea' : 'text';
+                    break;
+            }
+            
+            // Convert value
+            let value = fieldData.value;
+            if (internalType === 'checkbox') {
+                value = fieldData.value === 'on';
+            } else if (internalType === 'number') {
+                value = parseFloat(fieldData.value) || 0;
+            }
+            
+            // Create metadata object
+            const metaField = {
+                type: internalType,
+                label: fieldName,
+                value: value,
+                required: fieldData.required || false
+            };
+            
+            // Add description
+            if (fieldData.description) {
+                metaField.description = fieldData.description;
+            }
+            
+            // Dropdown options
+            if (internalType === 'dropdown' && fieldData.options) {
+                metaField.options = fieldData.options;
+            }
+            
+            // Number limits
+            if (internalType === 'number') {
+                if (fieldData.min !== undefined) metaField.min = fieldData.min;
+                if (fieldData.max !== undefined) metaField.max = fieldData.max;
+            }
+            
+            // Add field with safe name
+            const safeName = fieldName.replace(/[^a-zA-Z0-9_-]/g, '_');
+            metadata[safeName] = metaField;
+        });
+        
         return metadata;
     },
 
-    // Metadata in Editor laden
+    // Load metadata into editor
     loadMetadataIntoEditor(metadata) {
         this.clearFields();
         
         Object.entries(metadata).forEach(([key, fieldData]) => {
             if (fieldData.type === 'group') {
-                // Group Header hinzufügen
+                // Add group header
                 this.addGroupHeader(key, fieldData);
             } else {
-                // Normales Feld hinzufügen
+                // Add normal field
                 this.addField();
                 
                 const lastField = document.querySelector('.metadata-field:last-child');
-                const nameInput = lastField.querySelector('input[placeholder="Feld-Name"]');
+                const nameInput = lastField.querySelector('input[placeholder="Field Name"]');
                 const labelInput = lastField.querySelector('input[placeholder="Label"]');
-                const descInput = lastField.querySelector('input[placeholder*="Beschreibung"]');
+                const descInput = lastField.querySelector('input[placeholder*="Description"]');
                 const typeSelect = lastField.querySelector('.field-type-selector');
                 const requiredCheckbox = lastField.querySelector('input[type="checkbox"]');
                 
@@ -279,16 +295,16 @@ const metadataEditor = {
                 typeSelect.value = fieldData.type || 'text';
                 requiredCheckbox.checked = fieldData.required || false;
                 
-                // Beschreibung hinzufügen
+                // Add description
                 if (descInput && fieldData.description) {
                     descInput.value = fieldData.description;
                 }
                 
                 this.updateFieldType(typeSelect);
                 
-                // Type-spezifische Werte setzen
+                // Set type-specific values
                 if (fieldData.type === 'dropdown' && fieldData.options) {
-                    const optionsInput = lastField.querySelector('input[placeholder*="Optionen"]');
+                    const optionsInput = lastField.querySelector('input[placeholder*="Options"]');
                     if (optionsInput) {
                         optionsInput.value = fieldData.options.join(', ');
                     }
@@ -304,7 +320,7 @@ const metadataEditor = {
         this.updateJsonPreview();
     },
 
-    // Group Header hinzufügen
+    // Add group header
     addGroupHeader(key, fieldData) {
         const container = document.getElementById('metadataFields');
         
@@ -321,15 +337,15 @@ const metadataEditor = {
         container.appendChild(groupDiv);
     },
 
-    // Alle Felder sammeln und als Metadata-Objekt zurückgeben
+    // Collect all fields and return as metadata object
     collectMetadata() {
         const fields = document.querySelectorAll('.metadata-field');
         const metadata = {};
         
         fields.forEach(field => {
-            const nameInput = field.querySelector('input[placeholder="Feld-Name"]');
+            const nameInput = field.querySelector('input[placeholder="Field Name"]');
             const labelInput = field.querySelector('input[placeholder="Label"]');
-            const descInput = field.querySelector('input[placeholder*="Beschreibung"]');
+            const descInput = field.querySelector('input[placeholder*="Description"]');
             const typeSelect = field.querySelector('.field-type-selector');
             const requiredCheckbox = field.querySelector('input[type="checkbox"]');
             
@@ -347,14 +363,14 @@ const metadataEditor = {
                     required: required
                 };
                 
-                // Beschreibung hinzufügen falls vorhanden
+                // Add description if present
                 if (description) {
                     fieldData.description = description;
                 }
                 
-                // Type-spezifische Optionen
+                // Type-specific options
                 if (fieldType === 'dropdown') {
-                    const optionsInput = field.querySelector('input[placeholder*="Optionen"]');
+                    const optionsInput = field.querySelector('input[placeholder*="Options"]');
                     if (optionsInput && optionsInput.value) {
                         fieldData.options = optionsInput.value.split(',').map(s => s.trim());
                     }

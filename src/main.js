@@ -54,11 +54,11 @@ app.on('window-all-closed', () => {
 
 // IPC Handlers
 
-// Ordner-Dialog
+// Folder Dialog
 ipcMain.handle('select-folder', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory'],
-        title: 'Zielordner auswählen'
+        title: 'Select Target Folder'
     });
     
     if (!result.canceled && result.filePaths.length > 0) {
@@ -67,52 +67,71 @@ ipcMain.handle('select-folder', async () => {
     return null;
 });
 
-// Projekt erstellen (Haupt-API) - KORRIGIERT
+// Create Project (Main API) - EXTENDED for optional folder structure
 ipcMain.handle('create-project', async (event, basePath, projectName, structure, metadata = null) => {
     try {
-        // Pfad korrekt konstruieren - path.join normalisiert automatisch
+        // Construct path correctly - path.join normalizes automatically
         const projectPath = path.join(basePath, projectName);
         
-        console.log(`📁 Erstelle Projekt: ${projectPath}`);
+        console.log(`📁 Creating project: ${projectPath}`);
         
-        // Projekt-Hauptordner erstellen
+        // Create main project folder
         await fs.mkdir(projectPath, { recursive: true });
-        console.log(`📁 Projekt-Ordner erstellt: ${projectPath}`);
+        console.log(`📁 Project folder created: ${projectPath}`);
         
-        // Ordnerstruktur erstellen
-        await createFolderStructure(projectPath, structure);
+        // Only create folder structure if present
+        if (structure && structure.trim() !== '') {
+            await createFolderStructure(projectPath, structure);
+        } else {
+            console.log(`📋 No folder structure defined - skipping structure creation`);
+        }
         
         // Metadaten-JSON erstellen (falls vorhanden)
         if (metadata && Object.keys(metadata).length > 0) {
-            await createMetadataFiles(projectPath, metadata);
+            await createMetadataFiles(projectPath, metadata, projectName);
         }
         
-        // Pfad normalisieren für konsistente Rückgabe
+        // Adjust success message based on created content
+        let message = 'Project created successfully!';
+        const hasStructure = structure && structure.trim() !== '';
+        const hasMetadata = metadata && Object.keys(metadata).length > 0;
+        
+        if (!hasStructure && hasMetadata) {
+            message = 'Project with metadata created successfully!';
+        } else if (hasStructure && hasMetadata) {
+            message = 'Project with folder structure and metadata created successfully!';
+        } else if (hasStructure && !hasMetadata) {
+            message = 'Project with folder structure created successfully!';
+        }
+        
+        // Normalize path for consistent return
         const normalizedPath = path.resolve(projectPath);
         
         return { 
             success: true, 
-            message: 'Projekt erfolgreich erstellt!',
-            projectPath: normalizedPath
+            message: message,
+            projectPath: normalizedPath,
+            hasStructure: hasStructure,
+            hasMetadata: hasMetadata
         };
     } catch (error) {
-        console.error('Fehler beim Erstellen des Projekts:', error);
-        return { success: false, message: `Fehler: ${error.message}` };
+        console.error('Error creating project:', error);
+        return { success: false, message: `Error: ${error.message}` };
     }
 });
 
-// Legacy-Support: Alte create-folders API
+// Legacy Support: Old create-folders API
 ipcMain.handle('create-folders', async (event, targetPath, structure) => {
     try {
         await createFolderStructure(targetPath, structure);
-        return { success: true, message: 'Ordnerstruktur erfolgreich erstellt!' };
+        return { success: true, message: 'Folder structure created successfully!' };
     } catch (error) {
-        console.error('Fehler beim Erstellen der Ordner:', error);
-        return { success: false, message: `Fehler: ${error.message}` };
+        console.error('Error creating folders:', error);
+        return { success: false, message: `Error: ${error.message}` };
     }
 });
 
-// Ordner im Explorer öffnen
+// Open folder in explorer
 ipcMain.handle('open-folder', async (event, folderPath) => {
     try {
         await shell.openPath(folderPath);
@@ -122,14 +141,14 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
     }
 });
 
-// JSON-Datei laden (für Metadaten-Import)
+// Load JSON file (for metadata import)
 ipcMain.handle('load-json-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openFile'],
         filters: [
             { name: 'JSON Files', extensions: ['json'] }
         ],
-        title: 'JSON-Datei auswählen'
+        title: 'Select JSON File'
     });
     
     if (!result.canceled && result.filePaths.length > 0) {
@@ -137,93 +156,93 @@ ipcMain.handle('load-json-file', async () => {
             const content = await fs.readFile(result.filePaths[0], 'utf8');
             return { success: true, content: JSON.parse(content) };
         } catch (error) {
-            return { success: false, message: `Fehler beim Laden der JSON-Datei: ${error.message}` };
+            return { success: false, message: `Error loading JSON file: ${error.message}` };
         }
     }
-    return { success: false, message: 'Keine Datei ausgewählt' };
+    return { success: false, message: 'No file selected' };
 });
 
-// JSON-Datei speichern (für Metadaten-Export)
+// Save JSON file (for metadata export)
 ipcMain.handle('save-json-file', async (event, data) => {
     const result = await dialog.showSaveDialog(mainWindow, {
         filters: [
             { name: 'JSON Files', extensions: ['json'] }
         ],
-        title: 'JSON-Datei speichern'
+        title: 'Save JSON File'
     });
     
     if (!result.canceled && result.filePath) {
         try {
             await fs.writeFile(result.filePath, JSON.stringify(data, null, 2), 'utf8');
-            return { success: true, message: 'JSON-Datei erfolgreich gespeichert!' };
+            return { success: true, message: 'JSON file saved successfully!' };
         } catch (error) {
-            return { success: false, message: `Fehler beim Speichern der JSON-Datei: ${error.message}` };
+            return { success: false, message: `Error saving JSON file: ${error.message}` };
         }
     }
-    return { success: false, message: 'Speichern abgebrochen' };
+    return { success: false, message: 'Save cancelled' };
 });
 
 // Helper Functions
 
-// Verbesserte Ordnerstruktur-Erstellung
+// Improved folder structure creation
 async function createFolderStructure(basePath, structure) {
     const lines = structure.split('\n').filter(line => line.trim() !== '');
     const pathStack = [basePath];
     
-    console.log(`📋 Erstelle Struktur in: ${basePath}`);
-    console.log(`📋 Struktur:\n${structure}`);
+    console.log(`📋 Creating structure in: ${basePath}`);
+    console.log(`📋 Structure:\n${structure}`);
     
     for (const line of lines) {
         if (!line.trim()) continue;
         
-        // Indentation bestimmen (2 Leerzeichen = 1 Ebene)
+        // Determine indentation (2 spaces = 1 level)
         const indentMatch = line.match(/^(\s*)/);
         const indent = indentMatch ? indentMatch[1].length : 0;
         const depth = Math.floor(indent / 2);
         const name = line.trim();
         
-        console.log(`📝 Verarbeite: "${line}" (depth: ${depth}, name: "${name}")`);
+        console.log(`📝 Processing: "${line}" (depth: ${depth}, name: "${name}")`);
         
-        // Stack auf korrekte Tiefe anpassen
+        // Adjust stack to correct depth
         pathStack.splice(depth + 1);
         
-        console.log(`📚 Stack nach Anpassung: [${pathStack.join(', ')}]`);
+        console.log(`📚 Stack after adjustment: [${pathStack.join(', ')}]`);
         
         if (name.endsWith('/')) {
-            // Ordner erstellen
+            // Create folder
             const folderName = name.slice(0, -1);
             const folderPath = path.join(...pathStack, folderName);
             
             try {
                 await fs.mkdir(folderPath, { recursive: true });
-                console.log(`📁 Ordner erstellt: ${folderPath}`);
+                console.log(`📁 Folder created: ${folderPath}`);
                 
                 pathStack.push(folderName);
-                console.log(`📚 Stack nach Ordner-Hinzufügung: [${pathStack.join(', ')}]`);
+                console.log(`📚 Stack after folder addition: [${pathStack.join(', ')}]`);
                 
             } catch (error) {
                 if (error.code !== 'EEXIST') {
                     throw error;
                 }
-                console.log(`📁 Ordner existiert bereits: ${folderPath}`);
+                console.log(`📁 Folder already exists: ${folderPath}`);
                 pathStack.push(folderName);
             }
         } else {
-            // Datei erstellen
+            // Create file
             const filePath = path.join(...pathStack, name);
             const dir = path.dirname(filePath);
             
             try {
                 await fs.mkdir(dir, { recursive: true });
                 
-                // Prüfen ob Datei bereits existiert
+                // Check if file already exists
                 try {
                     await fs.access(filePath);
-                    console.log(`📄 Datei existiert bereits: ${filePath}`);
+                    console.log(`📄 File already exists: ${filePath}`);
                 } catch {
-                    // Datei existiert nicht, erstellen
+                    // File doesn't exist, create it
                     await fs.writeFile(filePath, '', 'utf8');
-                    console.log(`📄 Datei erstellt: ${filePath}`);
+                    console.log(`📄 File created: ${filePath}`);
                 }
             } catch (error) {
                 throw error;
@@ -231,63 +250,239 @@ async function createFolderStructure(basePath, structure) {
         }
     }
     
-    console.log(`✅ Ordnerstruktur-Erstellung abgeschlossen`);
+    console.log(`✅ Folder structure creation completed`);
 }
 
-// Metadaten-Dateien erstellen
-async function createMetadataFiles(projectPath, metadata) {
-    // Haupt-Metadaten-Datei
-    const metadataPath = path.join(projectPath, 'metadata.json');
-    const metadataContent = {};
+// Create metadata files - ONLY ELABFTW FORMAT + ENHANCED README
+async function createMetadataFiles(projectPath, metadata, projectName = null) {
+    // 1. elabftw-metadata.json (elabFTW-compatible format)
+    const elabftwPath = path.join(projectPath, 'elabftw-metadata.json');
+    const elabftwContent = convertToElabFTWFormat(metadata);
     
-    // Metadata-Template in ausfüllbares Format konvertieren
-    Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        metadataContent[key] = {
-            label: fieldInfo.label,
-            type: fieldInfo.type,
-            value: fieldInfo.value || getDefaultValueForType(fieldInfo.type)
-        };
-        
-        // Zusätzliche Eigenschaften übernehmen
-        if (fieldInfo.options) metadataContent[key].options = fieldInfo.options;
-        if (fieldInfo.min !== undefined) metadataContent[key].min = fieldInfo.min;
-        if (fieldInfo.max !== undefined) metadataContent[key].max = fieldInfo.max;
-        if (fieldInfo.description) metadataContent[key].description = fieldInfo.description;
-    });
+    await fs.writeFile(elabftwPath, JSON.stringify(elabftwContent, null, 2), 'utf8');
+    console.log(`📄 elabFTW metadata created: ${elabftwPath}`);
     
-    await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2), 'utf8');
-    console.log(`📄 Metadaten erstellt: ${metadataPath}`);
-    
-    // Zusätzlich: README mit Metadaten-Info erstellen (falls nicht vorhanden)
+    // 2. Create enhanced README with metadata info - ALWAYS CREATE/OVERWRITE for experiments
     const readmePath = path.join(projectPath, 'README.md');
-    try {
-        await fs.access(readmePath);
-        console.log(`📄 README.md existiert bereits`);
-    } catch {
-        const readmeContent = generateReadmeWithMetadata(metadata);
-        await fs.writeFile(readmePath, readmeContent, 'utf8');
-        console.log(`📄 README.md mit Metadaten erstellt: ${readmePath}`);
-    }
+    const readmeContent = generateReadmeWithMetadata(metadata, projectName);
+    await fs.writeFile(readmePath, readmeContent, 'utf8');
+    console.log(`📄 Enhanced README.md with experiment metadata created: ${readmePath}`);
 }
 
-// README mit Metadaten generieren
-function generateReadmeWithMetadata(metadata) {
-    const date = new Date().toISOString().split('T')[0];
-    let content = `# Projekt\n\n*Erstellt am: ${date}*\n\n## Metadaten\n\n`;
+// Convert to elabFTW format
+function convertToElabFTWFormat(metadata) {
+    const elabftwData = {
+        extra_fields: {},
+        elabftw: {
+            display_main_text: true
+        }
+    };
     
+    const groups = new Map(); // Collect all groups
+    let groupIdCounter = 1;
+    let positionCounter = 1;
+    
+    // First pass: identify groups
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        if (fieldInfo.type !== 'group') {
-            const value = fieldInfo.value || '_Nicht ausgefüllt_';
-            content += `- **${fieldInfo.label}**: ${value}\n`;
+        if (fieldInfo.type === 'group') {
+            const groupId = groupIdCounter++;
+            groups.set(key, {
+                id: groupId,
+                name: fieldInfo.label || key
+            });
         }
     });
     
-    content += `\n## Beschreibung\n\n*Hier kannst du eine Beschreibung deines Projekts hinzufügen.*\n`;
+    // Add groups to elabftw.extra_fields_groups
+    if (groups.size > 0) {
+        elabftwData.elabftw.extra_fields_groups = [];
+        groups.forEach(group => {
+            elabftwData.elabftw.extra_fields_groups.push(group);
+        });
+    }
+    
+    // Second pass: convert fields
+    Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        // Skip group headers (handled separately)
+        if (fieldInfo.type === 'group') {
+            return;
+        }
+        
+        // IMPORTANT: ensure value
+        let safeValue = fieldInfo.value;
+        
+        // Base field properties
+        const elabField = {
+            type: mapFieldTypeToElabFTW(fieldInfo.type)
+        };
+        
+        // Adjust value by type
+        switch (fieldInfo.type) {
+            case 'checkbox':
+                // elabFTW expects "on" for true, "" for false
+                elabField.value = safeValue ? "on" : "";
+                break;
+            case 'number':
+                // Save numbers as string
+                elabField.value = String(safeValue || 0);
+                break;
+            case 'dropdown':
+                // Dropdown value as string
+                elabField.value = String(safeValue || '');
+                break;
+            default:
+                // All others as string
+                elabField.value = String(safeValue || '');
+        }
+        
+        // Position only if needed
+        if (positionCounter > 1) {
+            elabField.position = positionCounter;
+        }
+        positionCounter++;
+        
+        // Add description
+        if (fieldInfo.description) {
+            elabField.description = fieldInfo.description;
+        }
+        
+        // Optional properties
+        if (fieldInfo.required) {
+            elabField.required = true;
+        }
+        
+        // Mark textarea as multiline
+        if (fieldInfo.type === 'textarea') {
+            elabField.multiline = true;
+        }
+        
+        // Dropdown options - IMPORTANT: as simple string array!
+        if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
+            elabField.options = fieldInfo.options.map(opt => String(opt));
+        }
+        
+        // Number constraints
+        if (fieldInfo.type === 'number') {
+            if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
+            if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
+        }
+        
+        // Assign to group (if field belongs to a group)
+        if (key.includes('.')) {
+            // Extract group name from nested field name
+            const parts = key.split('.');
+            const possibleGroupKey = parts[0] + '_group';
+            
+            if (groups.has(possibleGroupKey)) {
+                elabField.group_id = groups.get(possibleGroupKey).id;
+            }
+        }
+        
+        // Add field (use label as key if available)
+        const fieldKey = fieldInfo.label || key;
+        elabftwData.extra_fields[fieldKey] = elabField;
+    });
+    
+    return elabftwData;
+}
+
+// Map field types to elabFTW types
+function mapFieldTypeToElabFTW(type) {
+    const typeMap = {
+        'text': 'text',
+        'number': 'number',
+        'date': 'date',
+        'textarea': 'text', // elabFTW has no separate textarea
+        'dropdown': 'select',
+        'checkbox': 'checkbox'
+    };
+    
+    return typeMap[type] || 'text';
+}
+
+// Generate README with metadata - ENHANCED for experiments
+function generateReadmeWithMetadata(metadata, projectName = null) {
+    const date = new Date().toISOString().split('T')[0];
+    const formattedDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    // Start with project header
+    let content = '';
+    if (projectName) {
+        content += `# ${projectName}\n\n`;
+    } else {
+        content += `# Project\n\n`;
+    }
+    
+    content += `**Created:** ${formattedDate}\n\n`;
+    
+    // Add metadata section
+    content += `## Experiment Metadata\n\n`;
+    
+    let hasMetadata = false;
+    Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        if (fieldInfo.type !== 'group') {
+            hasMetadata = true;
+            const value = fieldInfo.value || '_Not filled_';
+            const label = fieldInfo.label || key;
+            
+            // Format different types appropriately
+            let formattedValue = value;
+            if (fieldInfo.type === 'checkbox') {
+                // Fix checkbox display: check the actual boolean value
+                formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
+            } else if (fieldInfo.type === 'date' && value) {
+                try {
+                    const dateObj = new Date(value);
+                    formattedValue = dateObj.toLocaleDateString('en-US');
+                } catch (e) {
+                    formattedValue = value;
+                }
+            } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+                // For long text, use blockquote format
+                formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+            }
+            
+            content += `- **${label}**: ${formattedValue}\n`;
+            
+            // Add description if available
+            if (fieldInfo.description) {
+                content += `  - *${fieldInfo.description}*\n`;
+            }
+        }
+    });
+    
+    if (!hasMetadata) {
+        content += `*No metadata fields defined.*\n\n`;
+    } else {
+        content += `\n`;
+    }
+    
+    // Add project description section
+    content += `## Project Description\n\n`;
+    content += `*Add your project description here. Describe the purpose, methodology, expected outcomes, and any important notes about this experiment.*\n\n`;
+    
+    // Add sections for experiment documentation
+    content += `## Methodology\n\n`;
+    content += `*Describe your experimental methodology, procedures, and protocols here.*\n\n`;
+    
+    content += `## Results\n\n`;
+    content += `*Document your findings, observations, and results here.*\n\n`;
+    
+    content += `## Notes\n\n`;
+    content += `*Add any additional notes, observations, or important information here.*\n\n`;
+    
+    // Add footer with generation info
+    content += `---\n`;
+    content += `*This README was automatically generated by MetaFold on ${formattedDate}*\n`;
     
     return content;
 }
 
-// Default-Wert für Metadaten-Typen
+// Default value for metadata types
 function getDefaultValueForType(type) {
     switch (type) {
         case 'number': return 0;

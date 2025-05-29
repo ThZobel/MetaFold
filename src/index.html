@@ -1,27 +1,27 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ordnerstruktur & Experiment Manager</title>
+    <title>MetaFold - Folder Structure & Experiment Manager</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
             <div class="header">
-                <h1>📁 Manager</h1>
+                <h1>📁 MetaFold</h1>
                 
                 <div class="template-type-selector">
                     <button class="template-type-btn active" onclick="templateTypeManager.switchType('folders')" id="foldersTypeBtn">
-                        📂 Ordner
+                        📂 Folders
                     </button>
                     <button class="template-type-btn" onclick="templateTypeManager.switchType('experiments')" id="experimentsTypeBtn">
-                        🧪 Experimente
+                        🧪 Experiments
                     </button>
                 </div>
                 
-                <button class="btn" onclick="templateModal.show()">Neue Vorlage</button>
+                <button class="btn" onclick="templateModal.show()">New Template</button>
             </div>
             
             <div id="templateList">
@@ -29,88 +29,103 @@
                     <svg fill="currentColor" viewBox="0 0 20 20">
                         <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
                     </svg>
-                    <p>Noch keine Vorlagen vorhanden.<br>Erstelle deine erste Vorlage!</p>
+                    <p>No templates available yet.<br>Create your first template!</p>
                 </div>
             </div>
         </div>
 
         <div class="main-content">
             <div class="header">
-                <h1>🚀 Projekt Manager</h1>
-                <p>Erstelle und verwalte deine Projekt-Vorlagen für eine bessere Organisation</p>
+                <h1>🚀 Project Manager</h1>
+                <p>Create and manage your project templates for better organization</p>
             </div>
 
             <div id="templateDetails" style="display: none;">
+                <!-- Template Info Section -->
+                <div id="templateInfoSection" style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #6b7280;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: 500; color: #374151;">Template:</span>
+                        <span id="templateInfo" class="template-info">No template selected</span>
+                    </div>
+                </div>
+
                 <div class="project-setup">
-                    <h3>🎯 Projekt Setup</h3>
+                    <h3>🎯 Project Setup</h3>
                     <div class="project-input-group">
                         <div>
-                            <label for="targetPath">📂 Basis-Verzeichnis:</label>
-                            <input type="text" id="targetPath" placeholder="Pfad eingeben oder durchsuchen...">
+                            <label for="targetPath">📂 Base Directory:</label>
+                            <input type="text" id="targetPath" placeholder="Enter path or browse...">
                         </div>
                         <div>
-                            <label for="projectName">📝 Projekt Name:</label>
-                            <input type="text" id="projectName" placeholder="MeinProjekt">
+                            <label for="projectName">📝 Project Name:</label>
+                            <input type="text" id="projectName" placeholder="MyProject">
                         </div>
-                        <button class="btn btn-secondary" onclick="projectManager.browsePath()">Durchsuchen</button>
+                        <button class="btn btn-secondary" onclick="projectManager.browsePath()">Browse</button>
                     </div>
                     <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
-                        Das Projekt wird in: <span id="fullPathPreview">Wähle Verzeichnis und Projekt-Name</span>
+                        Project will be created in: <span id="fullPathPreview">Choose directory and project name</span>
                     </p>
                 </div>
 
                 <div class="folder-structure">
-                    <h3>📋 Vorschau der Struktur:</h3>
+                    <h3>📋 Structure Preview:</h3>
                     <div id="folderPreview" class="folder-tree"></div>
                 </div>
 
-                <!-- Metadaten-Formular für Experimente -->
+                <!-- Metadata Form for Experiments -->
                 <div id="experimentForm" class="metadata-editor" style="display: none;">
-                    <h3>🧪 Experiment-Metadaten ausfüllen:</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>🧪 Fill Experiment Metadata:</h3>
+                        <button class="btn btn-secondary btn-small" onclick="experimentForm.saveTemplate()" style="padding: 6px 12px;">
+                            💾 Save Template
+                        </button>
+                    </div>
                     <div id="experimentFields"></div>
                 </div>
 
                 <div class="actions">
-                    <button class="btn" onclick="projectManager.createProject()">🎯 Projekt erstellen</button>
-                    <button class="btn btn-secondary" onclick="templateManager.editCurrent()">✏️ Bearbeiten</button>
-                    <button class="btn btn-danger" onclick="templateManager.deleteCurrent()">🗑️ Löschen</button>
+                    <button class="btn" onclick="projectManager.createProject()">🎯 Create Project</button>
+                    <button class="btn btn-secondary" onclick="templateManager.editCurrent()">✏️ Edit</button>
+                    <button class="btn btn-danger" onclick="templateManager.deleteCurrent()">🗑️ Delete</button>
                 </div>
 
+                <!-- Info Message for additional information -->
+                <div id="infoMessage" class="message info-message" style="display: none;"></div>
                 <div id="successMessage" class="success-message"></div>
                 <div id="errorMessage" class="error-message"></div>
             </div>
         </div>
     </div>
 
-    <!-- Modal für neue/bearbeitete Vorlage -->
+    <!-- Modal for new/edited template -->
     <div id="templateModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="templateModal.close()">&times;</span>
-            <h2 id="modalTitle">Neue Vorlage erstellen</h2>
+            <h2 id="modalTitle">Create New Template</h2>
             
             <div class="form-group">
-                <label for="templateName">Vorlagenname:</label>
-                <input type="text" id="templateName" placeholder="z.B. Webprojekt, Photoshoot, etc.">
+                <label for="templateName">Template Name:</label>
+                <input type="text" id="templateName" placeholder="e.g. Web Project, Photo Shoot, etc.">
             </div>
 
             <div class="form-group">
-                <label for="templateDescription">Beschreibung (optional):</label>
-                <input type="text" id="templateDescription" placeholder="Kurze Beschreibung der Vorlage">
+                <label for="templateDescription">Description (optional):</label>
+                <input type="text" id="templateDescription" placeholder="Brief description of the template">
             </div>
 
             <div class="form-group">
-                <label for="templateType">Vorlagen-Typ:</label>
+                <label for="templateType">Template Type:</label>
                 <select id="templateType" onchange="templateModal.toggleTypeContent()">
-                    <option value="folders">📂 Ordnerstruktur</option>
-                    <option value="experiment">🧪 Experiment (Ordner + Metadaten)</option>
+                    <option value="folders">📂 Folder Structure</option>
+                    <option value="experiment">🧪 Experiment (Folders + Metadata)</option>
                 </select>
             </div>
 
-            <!-- Ordnerstruktur Tab -->
+            <!-- Folder Structure Tab -->
             <div id="folderTab" class="tab-content active">
                 <div class="form-group">
-                    <label for="folderStructure">Ordnerstruktur:</label>
-                    <textarea id="folderStructure" placeholder="Gib die Ordnerstruktur ein (2 Leerzeichen = eine Ebene tiefer):
+                    <label for="folderStructure">Folder Structure:</label>
+                    <textarea id="folderStructure" placeholder="Enter folder structure (2 spaces = one level deeper):
 src/
   components/
   assets/
@@ -126,14 +141,14 @@ README.md"></textarea>
             <!-- Experiment Tab -->
             <div id="experimentTab" class="tab-content">
                 <div class="tabs">
-                    <div class="tab active" onclick="templateModal.switchTab('structure')">Struktur</div>
-                    <div class="tab" onclick="templateModal.switchTab('metadata')">Metadaten</div>
+                    <div class="tab active" onclick="templateModal.switchTab('structure')">Structure</div>
+                    <div class="tab" onclick="templateModal.switchTab('metadata')">Metadata</div>
                 </div>
 
                 <div id="structureContent" class="tab-content active">
                     <div class="form-group">
-                        <label for="experimentStructure">Ordnerstruktur:</label>
-                        <textarea id="experimentStructure" placeholder="Experiment Ordnerstruktur:
+                        <label for="experimentStructure">Folder Structure (optional):</label>
+                        <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
 data/
   raw/
   processed/
@@ -143,33 +158,36 @@ results/
   reports/
 README.md
 experiment_log.md"></textarea>
+                        <small style="color: #6b7280; margin-top: 5px; display: block;">
+                            💡 Tip: Leave this field empty if you only want to create metadata files.
+                        </small>
                     </div>
                 </div>
 
                 <div id="metadataContent" class="tab-content">
                     <div class="form-group">
-                        <label>Metadaten-Felder:</label>
-                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.addField()">+ Feld hinzufügen</button>
-                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.loadFromJson()" style="margin-left: 10px;">📂 JSON laden</button>
+                        <label>Metadata Fields:</label>
+                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.addField()">+ Add Field</button>
+                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.loadFromJson()" style="margin-left: 10px;">📂 Load JSON</button>
                     </div>
                     
                     <div id="metadataFields"></div>
 
                     <div class="metadata-preview">
-                        <h4>JSON Vorschau:</h4>
+                        <h4>JSON Preview:</h4>
                         <pre id="jsonPreview">{}</pre>
                     </div>
                 </div>
             </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="templateModal.close()">Abbrechen</button>
-                <button class="btn" onclick="templateModal.save()">Speichern</button>
+                <button class="btn btn-secondary" onclick="templateModal.close()">Cancel</button>
+                <button class="btn" onclick="templateModal.save()">Save</button>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Module - Reihenfolge ist wichtig! -->
+    <!-- JavaScript Modules - Order is important! -->
     <script src="js/utils.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/templateManager.js"></script>

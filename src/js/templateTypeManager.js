@@ -1,9 +1,9 @@
-// Template-Type-Manager für Folder/Experiment-Modi
+// Template Type Manager for Folder/Experiment modes
 
 const templateTypeManager = {
     currentType: 'folders',
 
-    // Template-Typ wechseln
+    // Switch template type
     switchType(type) {
         this.currentType = type;
         
@@ -12,25 +12,26 @@ const templateTypeManager = {
         document.getElementById('experimentsTypeBtn').classList.remove('active');
         document.getElementById(type + 'TypeBtn').classList.add('active');
         
-        // Nur rendern wenn templateManager bereits initialisiert ist
+        // Only render if templateManager is already initialized
         if (typeof templateManager !== 'undefined' && templateManager.templates) {
             templateManager.renderList();
         }
     },
 
-    // Aktuellen Typ zurückgeben
+    // Return current type
     getCurrentType() {
         return this.currentType;
     },
 
-    // Prüfen ob aktueller Typ Experiments ist
+    // Check if current type is Experiments
     isExperimentMode() {
         return this.currentType === 'experiments';
     },
 
-    // Prüfen ob aktueller Typ Folders ist
+    // Check if current type is Folders
     isFolderMode() {
         return this.currentType === 'folders';
     }
 };
+
 window.templateTypeManager = templateTypeManager;

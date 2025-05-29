@@ -1,54 +1,54 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Sichere API für den Renderer-Prozess
+// Secure API for renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
-    // Ordner-Dialog öffnen
+    // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
     
-    // Projekt erstellen (Haupt-API)
+    // Create project (Main API)
     createProject: (basePath, projectName, structure, metadata = null) => 
         ipcRenderer.invoke('create-project', basePath, projectName, structure, metadata),
     
-    // Ordnerstruktur erstellen (Legacy für Kompatibilität)
+    // Create folder structure (Legacy for compatibility)
     createFolders: (targetPath, structure) => 
         ipcRenderer.invoke('create-folders', targetPath, structure),
     
-    // Ordner im Explorer öffnen
+    // Open folder in explorer
     openFolder: (folderPath) => 
         ipcRenderer.invoke('open-folder', folderPath),
     
-    // JSON-Datei laden
+    // Load JSON file
     loadJsonFile: () => ipcRenderer.invoke('load-json-file'),
     
-    // JSON-Datei speichern
+    // Save JSON file
     saveJsonFile: (data) => ipcRenderer.invoke('save-json-file', data),
     
-    // Plattform-Info
+    // Platform info
     platform: process.platform
 });
 
-// Erweiterte Utilities
+// Extended utilities
 contextBridge.exposeInMainWorld('utils', {
-    // Pfad-Utilities
+    // Path utilities
     joinPath: (...paths) => {
         return paths.join(process.platform === 'win32' ? '\\' : '/');
     },
     
-    // Pfad normalisieren
+    // Normalize path
     normalizePath: (inputPath) => {
         return inputPath.replace(/[/\\]+/g, process.platform === 'win32' ? '\\' : '/');
     },
     
-    // Pfad-Separator für aktuelle Plattform
+    // Path separator for current platform
     getPathSeparator: () => {
         return process.platform === 'win32' ? '\\' : '/';
     },
     
-    // Basis-Pfad für Plattform
+    // Base path for platform
     getDefaultBasePath: () => {
         switch (process.platform) {
             case 'win32':
-                return 'C:\\Projekte';
+                return 'C:\\Projects';
             case 'darwin':
                 return process.env.HOME + '/Projects';
             default:
@@ -56,16 +56,16 @@ contextBridge.exposeInMainWorld('utils', {
         }
     },
     
-    // Vollständigen Pfad konstruieren
+    // Construct full path
     buildFullPath: (basePath, projectName) => {
         const separator = process.platform === 'win32' ? '\\' : '/';
         return basePath + separator + projectName;
     },
     
-    // Prüfen ob Pfad absolut ist
+    // Check if path is absolute
     isAbsolutePath: (inputPath) => {
         if (process.platform === 'win32') {
-            // Windows: C:\ oder \\server\share
+            // Windows: C:\ or \\server\share
             return /^[a-zA-Z]:\\/.test(inputPath) || /^\\\\/.test(inputPath);
         } else {
             // Unix-like: /path
@@ -73,14 +73,14 @@ contextBridge.exposeInMainWorld('utils', {
         }
     },
     
-    // Aktuelles Datum in verschiedenen Formaten
+    // Current date in various formats
     getCurrentDate: (format = 'iso') => {
         const now = new Date();
         switch (format) {
             case 'iso':
                 return now.toISOString().split('T')[0]; // YYYY-MM-DD
-            case 'de':
-                return now.toLocaleDateString('de-DE'); // DD.MM.YYYY
+            case 'us':
+                return now.toLocaleDateString('en-US'); // MM/DD/YYYY
             case 'timestamp':
                 return now.toISOString();
             default:
@@ -88,50 +88,50 @@ contextBridge.exposeInMainWorld('utils', {
         }
     },
     
-    // String-Utilities für Template-Namen
+    // String utilities for template names
     sanitizeProjectName: (name) => {
-        // Ungültige Zeichen für Ordnernamen entfernen/ersetzen
+        // Remove/replace invalid characters for folder names
         return name
-            .replace(/[<>:"/\\|?*]/g, '_') // Ungültige Zeichen durch _ ersetzen
-            .replace(/\s+/g, '_') // Leerzeichen durch _ ersetzen
-            .replace(/_+/g, '_') // Mehrfache _ reduzieren
-            .replace(/^_+|_+$/g, ''); // _ am Anfang/Ende entfernen
+            .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid chars with _
+            .replace(/\s+/g, '_') // Replace spaces with _
+            .replace(/_+/g, '_') // Reduce multiple _ 
+            .replace(/^_+|_+$/g, ''); // Remove _ at start/end
     },
     
-    // Validate ob ein Projekt-Name gültig ist
+    // Validate if a project name is valid
     isValidProjectName: (name) => {
         if (!name || name.trim().length === 0) return false;
         
-        // Reservierte Namen prüfen (Windows)
+        // Check reserved names (Windows)
         const reserved = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
         if (reserved.includes(name.toUpperCase())) return false;
         
-        // Ungültige Zeichen prüfen
+        // Check invalid characters
         const invalidChars = /[<>:"/\\|?*]/;
         if (invalidChars.test(name)) return false;
         
-        // Zu lange Namen vermeiden
+        // Avoid overly long names
         if (name.length > 100) return false;
         
         return true;
     },
 
-    // Erweiterte Projekt-Utilities
+    // Extended project utilities
     generateProjectId: () => {
         return 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     },
 
-    // Datei-Extension prüfen
+    // Check file extension
     getFileExtension: (filename) => {
         return filename.split('.').pop().toLowerCase();
     },
 
-    // Prüfen ob Pfad ein Ordner ist (anhand der Endung)
+    // Check if path is a folder (based on ending)
     isFolder: (pathName) => {
         return pathName.endsWith('/') || pathName.endsWith('\\') || !pathName.includes('.');
     },
 
-    // Template-Statistiken
+    // Template statistics
     getTemplateStats: (templates) => {
         return {
             total: templates.length,
