@@ -1,12 +1,12 @@
-// Storage-Manager für Vorlagen und Einstellungen
+// Storage manager for templates and settings
 
 const storage = {
-    // Beispielvorlagen für ersten Start
+    // Example templates for first start
     getDefaultTemplates() {
         return [
             {
-                name: "Webprojekt",
-                description: "Standard Webentwicklung Struktur",
+                name: "Web Project",
+                description: "Standard web development structure",
                 type: "folders",
                 structure: `src/
   components/
@@ -24,7 +24,7 @@ README.md`
             },
             {
                 name: "Data Science Experiment",
-                description: "Datenanalyse mit Metadaten",
+                description: "Data analysis with metadata",
                 type: "experiment", 
                 structure: `data/
   raw/
@@ -39,22 +39,22 @@ README.md
 experiment_log.md`,
                 metadata: {
                     "experiment_name": { "type": "text", "label": "Experiment Name", "value": "", "required": true },
-                    "researcher": { "type": "text", "label": "Forscher", "value": "", "required": true },
-                    "start_date": { "type": "date", "label": "Start Datum", "value": "", "required": false },
-                    "hypothesis": { "type": "textarea", "label": "Hypothese", "value": "", "required": true },
-                    "data_source": { "type": "dropdown", "label": "Datenquelle", "options": ["Internal", "External", "Survey", "API"], "value": "", "required": false }
+                    "researcher": { "type": "text", "label": "Researcher", "value": "", "required": true },
+                    "start_date": { "type": "date", "label": "Start Date", "value": "", "required": false },
+                    "hypothesis": { "type": "textarea", "label": "Hypothesis", "value": "", "required": true },
+                    "data_source": { "type": "dropdown", "label": "Data Source", "options": ["Internal", "External", "Survey", "API"], "value": "", "required": false }
                 }
             }
         ];
     },
 
-    // Vorlagen laden
+    // Load templates
     loadTemplates() {
         let stored = null;
         try {
             stored = localStorage.getItem('folderTemplates');
         } catch (e) {
-            console.log('LocalStorage nicht verfügbar, nutze temporären Speicher');
+            console.log('LocalStorage not available, using temporary storage');
         }
         
         if (stored) {
@@ -64,24 +64,24 @@ experiment_log.md`,
         }
     },
 
-    // Vorlagen speichern
+    // Save templates
     saveTemplates(templates) {
         try {
             localStorage.setItem('folderTemplates', JSON.stringify(templates));
             return true;
         } catch (e) {
-            console.log('Konnte Vorlagen nicht dauerhaft speichern');
+            console.log('Could not save templates permanently');
             return false;
         }
     },
 
-    // Einzelne Vorlage hinzufügen
+    // Add single template
     addTemplate(template, templates) {
         templates.push(template);
         return this.saveTemplates(templates);
     },
 
-    // Vorlage aktualisieren
+    // Update template
     updateTemplate(index, template, templates) {
         if (index >= 0 && index < templates.length) {
             templates[index] = template;
@@ -90,7 +90,7 @@ experiment_log.md`,
         return false;
     },
 
-    // Vorlage löschen
+    // Delete template
     deleteTemplate(index, templates) {
         if (index >= 0 && index < templates.length) {
             templates.splice(index, 1);

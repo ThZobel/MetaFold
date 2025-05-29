@@ -1,34 +1,34 @@
-// Haupt-App-Controller
+// Main App Controller
 
 const app = {
     initialized: false,
     
-    // App-Initialisierung
+    // App initialization
     init() {
         if (this.initialized) return;
         
-        console.log('Starte App-Initialisierung...');
+        console.log('Starting app initialization...');
         
         try {
-            // Prüfen ob grundlegende Module verfügbar sind
+            // Check if basic modules are available
             if (typeof templateManager === 'undefined') {
-                console.log('templateManager noch nicht verfügbar, warte...');
+                console.log('templateManager not yet available, waiting...');
                 setTimeout(() => this.init(), 50);
                 return;
             }
             
-            // Module initialisieren
+            // Initialize modules
             if (templateManager && typeof templateManager.init === 'function') {
                 templateManager.init();
-                console.log('templateManager initialisiert');
+                console.log('templateManager initialized');
             }
             
             if (projectManager && typeof projectManager.init === 'function') {
                 projectManager.init();
-                console.log('projectManager initialisiert');
+                console.log('projectManager initialized');
             }
             
-            // Plattform-spezifische Anpassungen
+            // Platform-specific adjustments
             if (appUtils && typeof appUtils.applyPlatformStyles === 'function') {
                 appUtils.applyPlatformStyles();
             }
@@ -37,17 +37,17 @@ const app = {
             this.setupEventListeners();
             
             this.initialized = true;
-            console.log('✅ App erfolgreich initialisiert');
+            console.log('✅ App successfully initialized');
             
         } catch (error) {
-            console.error('❌ Fehler bei App-Initialisierung:', error);
+            console.error('❌ Error during app initialization:', error);
             setTimeout(() => this.init(), 100);
         }
     },
 
-    // Event Listeners einrichten
+    // Setup event listeners
     setupEventListeners() {
-        // Modal schließen bei Klick außerhalb
+        // Close modal on click outside
         window.onclick = (event) => {
             const modal = document.getElementById('templateModal');
             if (event.target === modal && typeof templateModal !== 'undefined') {
@@ -55,7 +55,7 @@ const app = {
             }
         };
 
-        // Keyboard-Shortcuts
+        // Keyboard shortcuts
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && typeof templateModal !== 'undefined') {
                 templateModal.close();
@@ -67,16 +67,16 @@ const app = {
             }
         });
         
-        console.log('Event Listeners eingerichtet');
+        console.log('Event listeners set up');
     }
 };
 
-// Warten bis DOM vollständig geladen ist
+// Wait until DOM is fully loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => app.init(), 200);
     });
 } else {
-    // DOM bereits geladen
+    // DOM already loaded
     setTimeout(() => app.init(), 200);
 }

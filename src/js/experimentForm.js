@@ -1,9 +1,9 @@
-// Experiment-Form für das Ausfüllen der Metadaten
+// Experiment Form for filling in metadata
 
 const experimentForm = {
     savedFieldValues: {},
 
-    // Gespeicherte Feldwerte verwalten
+    // Manage saved field values
     getSavedFieldValue(fieldName) {
         return this.savedFieldValues[fieldName];
     },
@@ -16,14 +16,14 @@ const experimentForm = {
         this.savedFieldValues = {};
     },
 
-    // Experiment-Formular rendern
+    // Render experiment form
     render(metadata) {
         const container = document.getElementById('experimentFields');
         container.innerHTML = '';
         
-        // Sortiere Felder, damit Gruppen richtig positioniert sind
+        // Sort fields so groups are positioned correctly
         const sortedEntries = Object.entries(metadata).sort(([a], [b]) => {
-            // Gruppen-Header sollten vor ihren Unterfeldern kommen
+            // Group headers should come before their sub-fields
             if (a.endsWith('_group') && b.startsWith(a.replace('_group', '.'))) return -1;
             if (b.endsWith('_group') && a.startsWith(b.replace('_group', '.'))) return 1;
             return a.localeCompare(b);
@@ -31,17 +31,17 @@ const experimentForm = {
         
         sortedEntries.forEach(([fieldName, fieldInfo]) => {
             if (fieldInfo.type === 'group') {
-                // Group Header rendern
+                // Render group header
                 this.renderGroupHeader(container, fieldName, fieldInfo);
                 return;
             }
             
-            // Normale Felder
+            // Normal fields
             this.renderField(container, fieldName, fieldInfo);
         });
     },
 
-    // Group Header rendern
+    // Render group header
     renderGroupHeader(container, fieldName, fieldInfo) {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'form-group-header';
@@ -55,12 +55,12 @@ const experimentForm = {
         container.appendChild(groupDiv);
     },
 
-    // Einzelnes Feld rendern
+    // Render single field
     renderField(container, fieldName, fieldInfo) {
         const fieldDiv = document.createElement('div');
         fieldDiv.className = 'form-group';
         
-        // Prüfe ob das Feld zu einer Gruppe gehört (verschachtelt)
+        // Check if field belongs to a group (nested)
         if (fieldName.includes('.')) {
             fieldDiv.classList.add('nested-field');
         }
@@ -68,7 +68,7 @@ const experimentForm = {
         const isRequired = fieldInfo.required || false;
         const requiredMark = isRequired ? ' <span style="color: #ef4444;">*</span>' : '';
         
-        // Erstelle sichere ID für das Feld
+        // Create safe ID for the field
         const safeFieldId = 'field_' + this.createSafeId(fieldName);
         
         let inputHtml = '';
@@ -95,7 +95,7 @@ const experimentForm = {
                     `<option value="${opt}" ${opt === savedValue ? 'selected' : ''}>${opt}</option>`
                 ).join('');
                 inputHtml = `<select id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''}>
-                    <option value="">-- Auswählen --</option>
+                    <option value="">-- Select --</option>
                     ${optionsHtml}
                 </select>`;
                 break;
@@ -105,7 +105,7 @@ const experimentForm = {
                 break;
         }
         
-        // Label mit optionaler Beschreibung 
+        // Label with optional description 
         const labelHtml = fieldInfo.description ? 
             `${fieldInfo.label}${requiredMark} <small style="color: #9ca3af; font-weight: normal;">(${fieldInfo.description})</small>` :
             `${fieldInfo.label}${requiredMark}`;
@@ -117,7 +117,7 @@ const experimentForm = {
         
         container.appendChild(fieldDiv);
         
-        // Event Listener für Werte speichern
+        // Event listener for saving values
         const input = fieldDiv.querySelector(`#${safeFieldId}`);
         if (input) {
             input.addEventListener('change', () => {
@@ -127,12 +127,12 @@ const experimentForm = {
         }
     },
 
-    // Sichere ID-Generierung für HTML-Elemente (lokale Kopie)
+    // Safe ID generation for HTML elements (local copy)
     createSafeId(fieldName) {
         return fieldName.replace(/[^a-zA-Z0-9]/g, '_');
     },
 
-    // Experiment-Felder validieren
+    // Validate experiment fields
     validate() {
         if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
             return { valid: true };
@@ -151,9 +151,9 @@ const experimentForm = {
                     value = input.checked;
                 }
                 
-                // Validierung je nach Typ
+                // Validation by type
                 if (fieldInfo.type === 'checkbox') {
-                    // Checkboxen sind immer gültig
+                    // Checkboxes are always valid
                 } else if (!value || value.toString().trim() === '') {
                     missingFields.push(fieldInfo.label || fieldName);
                 }
@@ -163,24 +163,148 @@ const experimentForm = {
         if (missingFields.length > 0) {
             return {
                 valid: false,
-                message: `Bitte fülle alle Pflichtfelder aus: ${missingFields.join(', ')}`
+                message: `Please fill in all required fields: ${missingFields.join(', ')}`
             };
         }
         
         return { valid: true };
     },
 
-    // Experiment-Daten sammeln
+    // Save current form values back to template - NEW FUNCTION
+    saveTemplate() {
+        if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
+            alert('No template selected or no metadata available to save.');
+            return;
+        }
+
+        // Collect current form data
+        const currentData = this.collectFormValues();
+        
+        if (!currentData || Object.keys(currentData).length === 0) {
+            alert('No data to save.');
+            return;
+        }
+
+        // Update the template's metadata with current form values
+        const updatedTemplate = { ...templateManager.currentTemplate };
+        
+        // Merge current form values into template metadata
+        Object.entries(currentData).forEach(([fieldName, value]) => {
+            if (updatedTemplate.metadata[fieldName]) {
+                updatedTemplate.metadata[fieldName].value = value;
+            }
+        });
+
+        // Update template in templateManager
+        const templateIndex = templateManager.templates.indexOf(templateManager.currentTemplate);
+        if (templateIndex >= 0) {
+            templateManager.update(templateIndex, updatedTemplate);
+            
+            // Show success message
+            this.showSaveMessage('✅ Template values saved successfully!');
+            
+            // Re-render form to show updated values
+            setTimeout(() => {
+                this.render(updatedTemplate.metadata);
+            }, 100);
+        } else {
+            alert('Error: Could not find template to update.');
+        }
+    },
+
+    // Collect current form values (similar to collectData but simpler) - NEW FUNCTION
+    collectFormValues() {
+        if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
+            return null;
+        }
+
+        const formValues = {};
+
+        Object.entries(templateManager.currentTemplate.metadata).forEach(([fieldName, fieldInfo]) => {
+            if (fieldInfo.type === 'group') return; // Skip groups
+
+            const safeFieldId = 'field_' + this.createSafeId(fieldName);
+            const input = document.getElementById(safeFieldId);
+            if (!input) return;
+
+            let value = input.value;
+            if (input.type === 'checkbox') {
+                value = input.checked;
+            } else if (input.type === 'number') {
+                value = parseFloat(value) || 0;
+            } else if (input.tagName === 'SELECT') {
+                value = input.value || '';
+            }
+
+            formValues[fieldName] = value;
+        });
+
+        return formValues;
+    },
+
+    // Show save message - NEW FUNCTION
+    showSaveMessage(message) {
+        // Create or get save message element
+        let saveMessage = document.getElementById('saveMessage');
+        if (!saveMessage) {
+            saveMessage = document.createElement('div');
+            saveMessage.id = 'saveMessage';
+            saveMessage.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-weight: 500;
+                animation: slideIn 0.3s ease-out;
+            `;
+            document.body.appendChild(saveMessage);
+            
+            // Add CSS animation if not exists
+            if (!document.getElementById('saveMessageCSS')) {
+                const style = document.createElement('style');
+                style.id = 'saveMessageCSS';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+        
+        saveMessage.textContent = message;
+        saveMessage.style.display = 'block';
+        
+        // Hide after 3 seconds with animation
+        setTimeout(() => {
+            saveMessage.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                saveMessage.style.display = 'none';
+            }, 300);
+        }, 3000);
+    },
+
+    // Collect experiment data
     collectData() {
         if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
             return null;
         }
-        
+    
         const metadata = {};
-        
+    
         Object.entries(templateManager.currentTemplate.metadata).forEach(([fieldName, fieldInfo]) => {
-            if (fieldInfo.type === 'group') return; // Gruppen überspringen
-            
+            if (fieldInfo.type === 'group') return; // Skip groups
+        
             const safeFieldId = 'field_' + this.createSafeId(fieldName);
             const input = document.getElementById(safeFieldId);
             if (!input) return;
@@ -191,6 +315,10 @@ const experimentForm = {
             } else if (input.type === 'number') {
                 value = parseFloat(value) || 0;
             }
+            // IMPORTANT: Ensure value is a primitive value
+            else if (input.tagName === 'SELECT') {
+                value = input.value || ''; // Ensure it's a string
+            }
             
             metadata[fieldName] = {
                 label: fieldInfo.label,
@@ -199,7 +327,7 @@ const experimentForm = {
                 required: fieldInfo.required || false
             };
             
-            // Zusätzliche Eigenschaften übernehmen
+            // Carry over additional properties
             if (fieldInfo.options) metadata[fieldName].options = fieldInfo.options;
             if (fieldInfo.min !== undefined) metadata[fieldName].min = fieldInfo.min;
             if (fieldInfo.max !== undefined) metadata[fieldName].max = fieldInfo.max;
@@ -210,5 +338,5 @@ const experimentForm = {
     }
 };
 
-// Global verfügbar machen
+// Make globally available
 window.experimentForm = experimentForm;

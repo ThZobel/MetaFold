@@ -1,7 +1,7 @@
 {
-  "name": "folder-structure-manager",
+  "name": "metafold",
   "version": "1.1.0",
-  "description": "A comprehensive template manager for folder structures and experiment metadata",
+  "description": "MetaFold - A comprehensive template manager for folder structures and experiment metadata",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -19,7 +19,8 @@
     "structure",
     "project-management",
     "metadata",
-    "experiments"
+    "experiments",
+    "metafold"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -29,8 +30,8 @@
   },
   "dependencies": {},
   "build": {
-    "appId": "com.yourcompany.folderstructuremanager",
-    "productName": "Folder Structure Manager",
+    "appId": "com.yourcompany.metafold",
+    "productName": "MetaFold",
     "directories": {
       "output": "dist"
     },
@@ -38,7 +39,9 @@
       "main.js",
       "preload.js", 
       "index.html",
-      "assets/**/*"
+      "assets/**/*",
+      "css/**/*",
+      "js/**/*"
     ],
     "win": {
       "target": "nsis",

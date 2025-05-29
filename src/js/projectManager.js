@@ -1,7 +1,7 @@
-// Project-Manager für das Erstellen von Projekten
+// Project Manager for creating projects
 
 const projectManager = {
-    // Pfad durchsuchen
+    // Browse path
     async browsePath() {
         if (window.electronAPI) {
             try {
@@ -11,11 +11,11 @@ const projectManager = {
                     this.updatePathPreview();
                 }
             } catch (error) {
-                console.error('Fehler beim Ordner auswählen:', error);
-                alert('Fehler beim Öffnen des Datei-Dialogs');
+                console.error('Error selecting folder:', error);
+                alert('Error opening file dialog');
             }
         } else {
-            const path = prompt('Gib den gewünschten Pfad ein:', this.getDefaultPath());
+            const path = prompt('Enter the desired path:', this.getDefaultPath());
             if (path) {
                 document.getElementById('targetPath').value = path;
                 this.updatePathPreview();
@@ -23,7 +23,7 @@ const projectManager = {
         }
     },
 
-    // Projekt erstellen
+    // Create project - EXTENDED for metadata-only support
     async createProject() {
         if (!templateManager.currentTemplate) return;
         
@@ -31,13 +31,18 @@ const projectManager = {
         const projectName = document.getElementById('projectName').value.trim();
         
         if (!basePath || !projectName) {
-            this.showError('Bitte wähle ein Basis-Verzeichnis und gib einen Projekt-Namen ein!');
+            this.showError('Please choose a base directory and enter a project name!');
             return;
         }
 
-        // Experiment-Felder validieren (falls vorhanden)
+        // Evaluate template information
+        const template = templateManager.currentTemplate;
+        const hasStructure = template.structure && template.structure.trim() !== '';
+        const hasMetadata = template.type === 'experiment' && template.metadata && Object.keys(template.metadata).length > 0;
+
+        // Validate experiment fields (if present)
         let experimentMetadata = null;
-        if (templateManager.currentTemplate.type === 'experiment' && templateManager.currentTemplate.metadata) {
+        if (template.type === 'experiment' && hasMetadata) {
             const validationResult = experimentForm.validate();
             if (!validationResult.valid) {
                 this.showError(validationResult.message);
@@ -46,7 +51,12 @@ const projectManager = {
             experimentMetadata = experimentForm.collectData();
         }
 
-        // Vorherige Nachrichten ausblenden
+        // Inform user if only metadata will be created
+        if (!hasStructure && hasMetadata) {
+            this.showInfo('ℹ️ This template creates only metadata files (no folder structure).');
+        }
+
+        // Hide previous messages
         this.hideMessages();
         
         if (window.electronAPI) {
@@ -54,21 +64,33 @@ const projectManager = {
                 const result = await window.electronAPI.createProject(
                     basePath, 
                     projectName, 
-                    templateManager.currentTemplate.structure,
+                    template.structure || '',
                     experimentMetadata
                 );
                 
                 if (result.success) {
-                    // Pfad für Button escapen (doppelte Backslashes für Windows)
+                    // Escape path for button (double backslashes for Windows)
                     const escapedPath = result.projectPath.replace(/\\/g, '\\\\');
+                    
+                    // Extended success message with content info
+                    let contentInfo = '';
+                    if (result.hasStructure && result.hasMetadata) {
+                        contentInfo = '<br><small>📁 Folder structure + 📄 Metadata created</small>';
+                    } else if (result.hasStructure && !result.hasMetadata) {
+                        contentInfo = '<br><small>📁 Folder structure created</small>';
+                    } else if (!result.hasStructure && result.hasMetadata) {
+                        contentInfo = '<br><small>📄 Only metadata created</small>';
+                    }
+                    
                     const successMessage = `
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div>
-                                <strong>✅ Erfolgreich!</strong><br>
-                                Projekt "${projectName}" wurde in "${basePath}" erstellt.
+                                <strong>✅ Success!</strong><br>
+                                ${result.message}<br>
+                                Project "${projectName}" in "${basePath}"${contentInfo}
                             </div>
                             <button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-left: 15px; padding: 8px 16px;">
-                                📂 Öffnen
+                                📂 Open
                             </button>
                         </div>
                     `;
@@ -77,30 +99,76 @@ const projectManager = {
                     this.showError(result.message);
                 }
             } catch (error) {
-                console.error('Fehler beim Erstellen des Projekts:', error);
-                this.showError('Unerwarteter Fehler beim Erstellen des Projekts.');
+                console.error('Error creating project:', error);
+                this.showError('Unexpected error creating project.');
             }
         } else {
-            // Browser-Fallback
+            // Browser fallback
             const fullPath = basePath + (window.electronAPI && window.electronAPI.platform === 'win32' ? '\\' : '/') + projectName;
+            let contentInfo = '';
+            if (!hasStructure && hasMetadata) {
+                contentInfo = ' (metadata only)';
+            }
+            
             const successMessage = `
-                <strong>ℹ️ Browser-Modus</strong><br>
-                Projekt würde in "${fullPath}" erstellt werden.<br>
-                <small>Nutze die Desktop-App für echte Projekterstellung.</small>
+                <strong>ℹ️ Browser Mode</strong><br>
+                Project would be created in "${fullPath}"${contentInfo}.<br>
+                <small>Use the desktop app for actual project creation.</small>
             `;
             this.showSuccess(successMessage);
         }
     },
 
-    // Standard-Pfad basierend auf Plattform (lokale Kopie)
+    // Show template information - NEW FUNCTION
+    updateTemplateInfo() {
+        const template = templateManager.currentTemplate;
+        const infoElement = document.getElementById('templateInfo');
+        
+        if (!template || !infoElement) return;
+        
+        const hasStructure = template.structure && template.structure.trim() !== '';
+        const hasMetadata = template.type === 'experiment' && template.metadata && Object.keys(template.metadata).length > 0;
+        
+        let infoText = '';
+        let infoClass = 'template-info';
+        
+        if (template.type === 'experiment') {
+            if (hasStructure && hasMetadata) {
+                infoText = '📁 Folder structure + 📄 Metadata';
+                infoClass = 'template-info success';
+            } else if (hasStructure && !hasMetadata) {
+                infoText = '📁 Folder structure only';
+                infoClass = 'template-info warning';
+            } else if (!hasStructure && hasMetadata) {
+                infoText = '📄 Metadata only (no folders)';
+                infoClass = 'template-info info';
+            } else {
+                infoText = '⚠️ Empty template';
+                infoClass = 'template-info error';
+            }
+        } else {
+            if (hasStructure) {
+                infoText = '📁 Folder structure';
+                infoClass = 'template-info success';
+            } else {
+                infoText = '⚠️ No structure defined';
+                infoClass = 'template-info error';
+            }
+        }
+        
+        infoElement.textContent = infoText;
+        infoElement.className = infoClass;
+    },
+
+    // Default path based on platform (local copy)
     getDefaultPath() {
         if (window.utils) {
             return window.utils.getDefaultBasePath();
         }
-        return 'C:\\Projekte\\';
+        return 'C:\\Projects\\';
     },
 
-    // Pfad-Vorschau aktualisieren (lokale Kopie)
+    // Update path preview (local copy)
     updatePathPreview() {
         const basePath = document.getElementById('targetPath').value.trim();
         const projectName = document.getElementById('projectName').value.trim();
@@ -111,55 +179,75 @@ const projectManager = {
             preview.textContent = basePath + separator + projectName;
             preview.style.color = '#10b981';
         } else {
-            preview.textContent = 'Wähle Verzeichnis und Projekt-Name';
+            preview.textContent = 'Choose directory and project name';
             preview.style.color = '#9ca3af';
         }
     },
 
-    // Error-Nachricht anzeigen (lokale Kopie)
+    // Show info message - NEW FUNCTION
+    showInfo(message) {
+        const infoMessage = document.getElementById('infoMessage');
+        if (infoMessage) {
+            infoMessage.innerHTML = message;
+            infoMessage.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                infoMessage.style.display = 'none';
+            }, 5000);
+        }
+    },
+
+    // Show error message (local copy)
     showError(message) {
         const errorMessage = document.getElementById('errorMessage');
-        errorMessage.innerHTML = `<strong>❌ Fehler!</strong><br>${message}`;
+        errorMessage.innerHTML = `<strong>❌ Error!</strong><br>${message}`;
         errorMessage.style.display = 'block';
         
-        // Nach 8 Sekunden ausblenden
+        // Hide after 8 seconds
         setTimeout(() => {
             errorMessage.style.display = 'none';
         }, 8000);
     },
 
-    // Success-Nachricht anzeigen (lokale Kopie)
+    // Show success message (local copy)
     showSuccess(message) {
         const successMessage = document.getElementById('successMessage');
         successMessage.innerHTML = message;
         successMessage.style.display = 'block';
         
-        // Nach 8 Sekunden ausblenden
+        // Hide after 8 seconds
         setTimeout(() => {
             successMessage.style.display = 'none';
         }, 8000);
     },
 
-    // Nachrichten ausblenden (lokale Kopie)
+    // Hide messages (local copy)
     hideMessages() {
         document.getElementById('successMessage').style.display = 'none';
         document.getElementById('errorMessage').style.display = 'none';
+        
+        // Also hide info message if present
+        const infoMessage = document.getElementById('infoMessage');
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+        }
     },
 
-    // Ordner öffnen (lokale Kopie)
+    // Open folder (local copy)
     async openCreatedFolder(folderPath) {
         if (window.electronAPI) {
             try {
                 await window.electronAPI.openFolder(folderPath);
             } catch (error) {
-                console.error('Fehler beim Öffnen des Ordners:', error);
+                console.error('Error opening folder:', error);
             }
         }
     },
 
-    // Initialisierung
+    // Initialization
     init() {
-        // Standard-Pfad setzen wenn Electron verfügbar
+        // Set default path if Electron is available
         if (window.utils) {
             document.getElementById('targetPath').value = window.utils.getDefaultBasePath();
         }
@@ -167,6 +255,22 @@ const projectManager = {
         // Path Preview Update Event Listeners
         document.getElementById('targetPath').addEventListener('input', () => this.updatePathPreview());
         document.getElementById('projectName').addEventListener('input', () => this.updatePathPreview());
+        
+        // Template Info Update Event Listener
+        // This will be called by templateManager when a template is selected
+        if (window.templateManager) {
+            // Monkey-patch the select method to update template info
+            const originalSelect = window.templateManager.select;
+            window.templateManager.select = function(index) {
+                const result = originalSelect.call(this, index);
+                if (window.projectManager) {
+                    window.projectManager.updateTemplateInfo();
+                }
+                return result;
+            };
+        }
     }
 };
+
+// Make globally available
 window.projectManager = projectManager;

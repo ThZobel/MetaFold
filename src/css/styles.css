@@ -387,3 +387,50 @@ body {
     font-size: 12px;
     color: #9ca3af;
 }
+
+.info-message {
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+}
+
+/* Template-Info Styling */
+.template-info {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.template-info.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+
+.template-info.warning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+}
+
+.template-info.info {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #60a5fa;
+}
+
+.template-info.error {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #f87171;
+}
+
+/* Template-Info-Section Styling */
+#templateInfoSection {
+    display: none; /* Standardmäßig ausgeblendet, wird von JavaScript gezeigt */
+}
+
+#templateInfoSection.active {
+    display: block;
+}
