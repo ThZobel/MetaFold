@@ -70,7 +70,7 @@ MetaFold is built as a desktop application using **Node.js** and **Electron**. T
      git clone https://github.com/ThZobel/MetaFold.git
      cp -r MetaFold/src/* ./
      ```
-   * Alternatively, download the files manually from GitHub and place them into your new folder.
+   * Alternatively, download the files manually from GitHub (click on the green Code Button and select download as zip) and place them into your new folder.
 
 3. **Initialize the project (if needed)**
 
