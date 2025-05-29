@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordnerstruktur & Experiment Manager</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>📁 Manager</h1>
+                
+                <div class="template-type-selector">
+                    <button class="template-type-btn active" onclick="templateTypeManager.switchType('folders')" id="foldersTypeBtn">
+                        📂 Ordner
+                    </button>
+                    <button class="template-type-btn" onclick="templateTypeManager.switchType('experiments')" id="experimentsTypeBtn">
+                        🧪 Experimente
+                    </button>
+                </div>
+                
+                <button class="btn" onclick="templateModal.show()">Neue Vorlage</button>
+            </div>
+            
+            <div id="templateList">
+                <div class="empty-state">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                    </svg>
+                    <p>Noch keine Vorlagen vorhanden.<br>Erstelle deine erste Vorlage!</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <h1>🚀 Projekt Manager</h1>
+                <p>Erstelle und verwalte deine Projekt-Vorlagen für eine bessere Organisation</p>
+            </div>
+
+            <div id="templateDetails" style="display: none;">
+                <div class="project-setup">
+                    <h3>🎯 Projekt Setup</h3>
+                    <div class="project-input-group">
+                        <div>
+                            <label for="targetPath">📂 Basis-Verzeichnis:</label>
+                            <input type="text" id="targetPath" placeholder="Pfad eingeben oder durchsuchen...">
+                        </div>
+                        <div>
+                            <label for="projectName">📝 Projekt Name:</label>
+                            <input type="text" id="projectName" placeholder="MeinProjekt">
+                        </div>
+                        <button class="btn btn-secondary" onclick="projectManager.browsePath()">Durchsuchen</button>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
+                        Das Projekt wird in: <span id="fullPathPreview">Wähle Verzeichnis und Projekt-Name</span>
+                    </p>
+                </div>
+
+                <div class="folder-structure">
+                    <h3>📋 Vorschau der Struktur:</h3>
+                    <div id="folderPreview" class="folder-tree"></div>
+                </div>
+
+                <!-- Metadaten-Formular für Experimente -->
+                <div id="experimentForm" class="metadata-editor" style="display: none;">
+                    <h3>🧪 Experiment-Metadaten ausfüllen:</h3>
+                    <div id="experimentFields"></div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn" onclick="projectManager.createProject()">🎯 Projekt erstellen</button>
+                    <button class="btn btn-secondary" onclick="templateManager.editCurrent()">✏️ Bearbeiten</button>
+                    <button class="btn btn-danger" onclick="templateManager.deleteCurrent()">🗑️ Löschen</button>
+                </div>
+
+                <div id="successMessage" class="success-message"></div>
+                <div id="errorMessage" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für neue/bearbeitete Vorlage -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="templateModal.close()">&times;</span>
+            <h2 id="modalTitle">Neue Vorlage erstellen</h2>
+            
+            <div class="form-group">
+                <label for="templateName">Vorlagenname:</label>
+                <input type="text" id="templateName" placeholder="z.B. Webprojekt, Photoshoot, etc.">
+            </div>
+
+            <div class="form-group">
+                <label for="templateDescription">Beschreibung (optional):</label>
+                <input type="text" id="templateDescription" placeholder="Kurze Beschreibung der Vorlage">
+            </div>
+
+            <div class="form-group">
+                <label for="templateType">Vorlagen-Typ:</label>
+                <select id="templateType" onchange="templateModal.toggleTypeContent()">
+                    <option value="folders">📂 Ordnerstruktur</option>
+                    <option value="experiment">🧪 Experiment (Ordner + Metadaten)</option>
+                </select>
+            </div>
+
+            <!-- Ordnerstruktur Tab -->
+            <div id="folderTab" class="tab-content active">
+                <div class="form-group">
+                    <label for="folderStructure">Ordnerstruktur:</label>
+                    <textarea id="folderStructure" placeholder="Gib die Ordnerstruktur ein (2 Leerzeichen = eine Ebene tiefer):
+src/
+  components/
+  assets/
+    images/
+    css/
+  js/
+docs/
+tests/
+README.md"></textarea>
+                </div>
+            </div>
+
+            <!-- Experiment Tab -->
+            <div id="experimentTab" class="tab-content">
+                <div class="tabs">
+                    <div class="tab active" onclick="templateModal.switchTab('structure')">Struktur</div>
+                    <div class="tab" onclick="templateModal.switchTab('metadata')">Metadaten</div>
+                </div>
+
+                <div id="structureContent" class="tab-content active">
+                    <div class="form-group">
+                        <label for="experimentStructure">Ordnerstruktur:</label>
+                        <textarea id="experimentStructure" placeholder="Experiment Ordnerstruktur:
+data/
+  raw/
+  processed/
+analysis/
+results/
+  plots/
+  reports/
+README.md
+experiment_log.md"></textarea>
+                    </div>
+                </div>
+
+                <div id="metadataContent" class="tab-content">
+                    <div class="form-group">
+                        <label>Metadaten-Felder:</label>
+                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.addField()">+ Feld hinzufügen</button>
+                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.loadFromJson()" style="margin-left: 10px;">📂 JSON laden</button>
+                    </div>
+                    
+                    <div id="metadataFields"></div>
+
+                    <div class="metadata-preview">
+                        <h4>JSON Vorschau:</h4>
+                        <pre id="jsonPreview">{}</pre>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="templateModal.close()">Abbrechen</button>
+                <button class="btn" onclick="templateModal.save()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Module - Reihenfolge ist wichtig! -->
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/templateManager.js"></script>
+    <script src="js/templateTypeManager.js"></script>
+    <script src="js/metadataEditor.js"></script>
+    <script src="js/experimentForm.js"></script>
+    <script src="js/templateModal.js"></script>
+    <script src="js/projectManager.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
