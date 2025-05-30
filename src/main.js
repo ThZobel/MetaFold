@@ -182,6 +182,17 @@ ipcMain.handle('save-json-file', async (event, data) => {
     return { success: false, message: 'Save cancelled' };
 });
 
+// Open URL
+ipcMain.handle('open-external', async (event, url) => {
+    try {
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (error) {
+        console.error('Error opening external URL:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // Helper Functions
 
 // Improved folder structure creation
@@ -318,14 +329,14 @@ function convertToElabFTWFormat(metadata) {
         
         // Adjust value by type
         switch (fieldInfo.type) {
-            case 'checkbox':
-                // elabFTW expects "on" for true, "" for false
-                elabField.value = safeValue ? "on" : "";
-                break;
-            case 'number':
-                // Save numbers as string
-                elabField.value = String(safeValue || 0);
-                break;
+			case 'checkbox':
+				// elabFTW expects "on" for true, "" for false
+				elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
+				break;
+			case 'number':
+				// Save numbers as string
+				elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
+				break;
             case 'dropdown':
                 // Dropdown value as string
                 elabField.value = String(safeValue || '');
@@ -429,25 +440,28 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
             const value = fieldInfo.value || '_Not filled_';
             const label = fieldInfo.label || key;
             
-            // Format different types appropriately
-            let formattedValue = value;
-            if (fieldInfo.type === 'checkbox') {
-                // Fix checkbox display: check the actual boolean value
-                formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
-            } else if (fieldInfo.type === 'date' && value) {
-                try {
-                    const dateObj = new Date(value);
-                    formattedValue = dateObj.toLocaleDateString('en-US');
-                } catch (e) {
-                    formattedValue = value;
-                }
-            } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
-                // For long text, use blockquote format
-                formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
-            }
-            
-            content += `- **${label}**: ${formattedValue}\n`;
-            
+			// Format different types appropriately
+			let formattedValue = value;
+			if (fieldInfo.type === 'checkbox') {
+				// Fix checkbox display: check the actual boolean value
+				formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
+			} else if (fieldInfo.type === 'date' && value) {
+				try {
+					const dateObj = new Date(value);
+					if (!isNaN(dateObj.getTime())) {
+						formattedValue = dateObj.toLocaleDateString('en-US');
+					} else {
+						formattedValue = value || '_Not filled_';
+					}
+				} catch (e) {
+					formattedValue = value || '_Not filled_';
+				}
+			} else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+				// For long text, use blockquote format
+				formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+			} else {
+				formattedValue = value || '_Not filled_';
+			}
             // Add description if available
             if (fieldInfo.description) {
                 content += `  - *${fieldInfo.description}*\n`;

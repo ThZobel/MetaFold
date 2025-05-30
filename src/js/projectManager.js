@@ -1,9 +1,30 @@
-// Project Manager for creating projects
+// Project Manager - Handles project creation
 
 const projectManager = {
-    // Browse path
+    // Initialize project manager
+    init() {
+        this.updatePathPreview();
+        this.setupEventListeners();
+        console.log('ProjectManager initialized');
+    },
+
+    // Setup event listeners
+    setupEventListeners() {
+        // Listen for path and name changes
+        const targetPath = document.getElementById('targetPath');
+        const projectName = document.getElementById('projectName');
+        
+        if (targetPath) {
+            targetPath.addEventListener('input', () => this.updatePathPreview());
+        }
+        if (projectName) {
+            projectName.addEventListener('input', () => this.updatePathPreview());
+        }
+    },
+
+    // Browse for target directory
     async browsePath() {
-        if (window.electronAPI) {
+        if (window.electronAPI && window.electronAPI.selectFolder) {
             try {
                 const selectedPath = await window.electronAPI.selectFolder();
                 if (selectedPath) {
@@ -11,19 +32,32 @@ const projectManager = {
                     this.updatePathPreview();
                 }
             } catch (error) {
-                console.error('Error selecting folder:', error);
-                alert('Error opening file dialog');
+                this.showError('Error selecting folder: ' + error.message);
             }
         } else {
-            const path = prompt('Enter the desired path:', this.getDefaultPath());
-            if (path) {
-                document.getElementById('targetPath').value = path;
-                this.updatePathPreview();
+            this.showError('Folder selection not available in browser mode');
+        }
+    },
+
+    // Update path preview
+    updatePathPreview() {
+        const basePath = document.getElementById('targetPath').value.trim();
+        const projectName = document.getElementById('projectName').value.trim();
+        const preview = document.getElementById('fullPathPreview');
+        
+        if (preview) {
+            if (basePath && projectName) {
+                // Use platform-appropriate path separator
+                const separator = window.utils && window.utils.getPathSeparator ? 
+                    window.utils.getPathSeparator() : '/';
+                preview.textContent = basePath + separator + projectName;
+            } else {
+                preview.textContent = 'Choose directory and project name';
             }
         }
     },
 
-    // Create project - EXTENDED for metadata-only support
+    // Create project - EXTENDED for metadata-only support + elabFTW integration
     async createProject() {
         if (!templateManager.currentTemplate) return;
         
@@ -69,205 +103,190 @@ const projectManager = {
                 );
                 
                 if (result.success) {
-                    // Escape path for button (double backslashes for Windows)
-                    const escapedPath = result.projectPath.replace(/\\/g, '\\\\');
-                    
-                    // Extended success message with content info
-                    let contentInfo = '';
-                    if (result.hasStructure && result.hasMetadata) {
-                        contentInfo = '<br><small>📁 Folder structure + 📄 Metadata created</small>';
-                    } else if (result.hasStructure && !result.hasMetadata) {
-                        contentInfo = '<br><small>📁 Folder structure created</small>';
-                    } else if (!result.hasStructure && result.hasMetadata) {
-                        contentInfo = '<br><small>📄 Only metadata created</small>';
+                    // Handle elabFTW integration for experiments
+                    let elabFTWResult = null;
+                    if (template.type === 'experiment' && hasMetadata && settingsManager.get('elabftw.enabled')) {
+                        // Check for existing experiment ID
+                        const existingExpId = document.getElementById('existingExperimentId')?.value?.trim();
+                        
+                        if (existingExpId) {
+                            // Update existing experiment
+                            elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
+                                existingExpId,
+                                experimentMetadata
+                            );
+                        } else if (settingsManager.get('elabftw.auto_sync')) {
+                            // Auto-sync to elabFTW (create new)
+                            elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                projectName, 
+                                experimentMetadata, 
+                                template.structure
+                            );
+                        } else {
+                            // Check manual checkbox
+                            const sendToElabFTW = document.getElementById('sendToElabFTW');
+                            if (sendToElabFTW && sendToElabFTW.checked) {
+                                // Manual sync selected
+                                elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                    projectName, 
+                                    experimentMetadata, 
+                                    template.structure
+                                );
+                            }
+                        }
                     }
-                    
-                    const successMessage = `
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <strong>✅ Success!</strong><br>
-                                ${result.message}<br>
-                                Project "${projectName}" in "${basePath}"${contentInfo}
-                            </div>
-                            <button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-left: 15px; padding: 8px 16px;">
-                                📂 Open
-                            </button>
-                        </div>
-                    `;
-                    this.showSuccess(successMessage);
+
+                    // Show success message with elabFTW link
+                    let successMessage = result.message;
+                    if (elabFTWResult && elabFTWResult.success) {
+                        successMessage += ' Experiment also created in elabFTW!';
+                        this.showSuccess(successMessage, result.projectPath, elabFTWResult.url);
+                    } else if (elabFTWResult && !elabFTWResult.success) {
+                        successMessage += ` (elabFTW sync failed: ${elabFTWResult.message})`;
+                        this.showSuccess(successMessage, result.projectPath);
+                    } else {
+                        this.showSuccess(successMessage, result.projectPath);
+                    }
                 } else {
                     this.showError(result.message);
                 }
             } catch (error) {
-                console.error('Error creating project:', error);
-                this.showError('Unexpected error creating project.');
+                this.showError('Error creating project: ' + error.message);
             }
         } else {
-            // Browser fallback
-            const fullPath = basePath + (window.electronAPI && window.electronAPI.platform === 'win32' ? '\\' : '/') + projectName;
-            let contentInfo = '';
-            if (!hasStructure && hasMetadata) {
-                contentInfo = ' (metadata only)';
-            }
+            this.showError('Project creation not available in browser mode');
+        }
+    },
+
+    // Show error message
+    showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
             
-            const successMessage = `
-                <strong>ℹ️ Browser Mode</strong><br>
-                Project would be created in "${fullPath}"${contentInfo}.<br>
-                <small>Use the desktop app for actual project creation.</small>
-            `;
-            this.showSuccess(successMessage);
-        }
-    },
-
-    // Show template information - NEW FUNCTION
-    updateTemplateInfo() {
-        const template = templateManager.currentTemplate;
-        const infoElement = document.getElementById('templateInfo');
-        
-        if (!template || !infoElement) return;
-        
-        const hasStructure = template.structure && template.structure.trim() !== '';
-        const hasMetadata = template.type === 'experiment' && template.metadata && Object.keys(template.metadata).length > 0;
-        
-        let infoText = '';
-        let infoClass = 'template-info';
-        
-        if (template.type === 'experiment') {
-            if (hasStructure && hasMetadata) {
-                infoText = '📁 Folder structure + 📄 Metadata';
-                infoClass = 'template-info success';
-            } else if (hasStructure && !hasMetadata) {
-                infoText = '📁 Folder structure only';
-                infoClass = 'template-info warning';
-            } else if (!hasStructure && hasMetadata) {
-                infoText = '📄 Metadata only (no folders)';
-                infoClass = 'template-info info';
-            } else {
-                infoText = '⚠️ Empty template';
-                infoClass = 'template-info error';
-            }
-        } else {
-            if (hasStructure) {
-                infoText = '📁 Folder structure';
-                infoClass = 'template-info success';
-            } else {
-                infoText = '⚠️ No structure defined';
-                infoClass = 'template-info error';
-            }
-        }
-        
-        infoElement.textContent = infoText;
-        infoElement.className = infoClass;
-    },
-
-    // Default path based on platform (local copy)
-    getDefaultPath() {
-        if (window.utils) {
-            return window.utils.getDefaultBasePath();
-        }
-        return 'C:\\Projects\\';
-    },
-
-    // Update path preview (local copy)
-    updatePathPreview() {
-        const basePath = document.getElementById('targetPath').value.trim();
-        const projectName = document.getElementById('projectName').value.trim();
-        const preview = document.getElementById('fullPathPreview');
-        
-        if (basePath && projectName) {
-            const separator = window.electronAPI && window.electronAPI.platform === 'win32' ? '\\' : '/';
-            preview.textContent = basePath + separator + projectName;
-            preview.style.color = '#10b981';
-        } else {
-            preview.textContent = 'Choose directory and project name';
-            preview.style.color = '#9ca3af';
-        }
-    },
-
-    // Show info message - NEW FUNCTION
-    showInfo(message) {
-        const infoMessage = document.getElementById('infoMessage');
-        if (infoMessage) {
-            infoMessage.innerHTML = message;
-            infoMessage.style.display = 'block';
+            // Hide other messages
+            this.hideOtherMessages('errorMessage');
             
-            // Hide after 5 seconds
+            // Auto-hide after 5 seconds
             setTimeout(() => {
-                infoMessage.style.display = 'none';
+                errorDiv.style.display = 'none';
             }, 5000);
         }
     },
 
-    // Show error message (local copy)
-    showError(message) {
-        const errorMessage = document.getElementById('errorMessage');
-        errorMessage.innerHTML = `<strong>❌ Error!</strong><br>${message}`;
-        errorMessage.style.display = 'block';
-        
-        // Hide after 8 seconds
-        setTimeout(() => {
-            errorMessage.style.display = 'none';
-        }, 8000);
-    },
-
-    // Show success message (local copy)
-    showSuccess(message) {
-        const successMessage = document.getElementById('successMessage');
-        successMessage.innerHTML = message;
-        successMessage.style.display = 'block';
-        
-        // Hide after 8 seconds
-        setTimeout(() => {
-            successMessage.style.display = 'none';
-        }, 8000);
-    },
-
-    // Hide messages (local copy)
-    hideMessages() {
-        document.getElementById('successMessage').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'none';
-        
-        // Also hide info message if present
-        const infoMessage = document.getElementById('infoMessage');
-        if (infoMessage) {
-            infoMessage.style.display = 'none';
+    // Show success message with optional elabFTW link
+    showSuccess(message, projectPath = null, elabFTWUrl = null) {
+        const successDiv = document.getElementById('successMessage');
+        if (successDiv) {
+            let content = message;
+            
+            // Add action buttons container
+            let buttonsHtml = '';
+            
+            // Add "Open Folder" button if path is provided
+            if (projectPath) {
+                const escapedPath = projectPath.replace(/\\/g, '\\\\');
+                buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-top: 8px; margin-right: 8px;">📂 Open Folder</button>`;
+            }
+            
+            // Add "Open in elabFTW" button if URL is provided
+            if (elabFTWUrl) {
+                buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openElabFTWExperiment('${elabFTWUrl}')" style="margin-top: 8px;">🧪 Open in elabFTW</button>`;
+            }
+            
+            if (buttonsHtml) {
+                content += `<br>${buttonsHtml}`;
+            }
+            
+            successDiv.innerHTML = content;
+            successDiv.style.display = 'block';
+            
+            // Hide other messages
+            this.hideOtherMessages('successMessage');
+            
+            // Auto-hide after 15 seconds (longer for success with buttons)
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 15000);
         }
     },
 
-    // Open folder (local copy)
+    // Show info message
+    showInfo(message) {
+        const infoDiv = document.getElementById('infoMessage');
+        if (infoDiv) {
+            infoDiv.textContent = message;
+            infoDiv.style.display = 'block';
+            
+            // Hide other messages
+            this.hideOtherMessages('infoMessage');
+            
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                infoDiv.style.display = 'none';
+            }, 4000);
+        }
+    },
+
+    // Hide all messages
+    hideMessages() {
+        const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
+        messageIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.display = 'none';
+            }
+        });
+    },
+
+    // Hide other messages except the specified one
+    hideOtherMessages(keepVisible) {
+        const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
+        messageIds.forEach(id => {
+            if (id !== keepVisible) {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.display = 'none';
+                }
+            }
+        });
+    },
+
+    // Open created folder in explorer
     async openCreatedFolder(folderPath) {
-        if (window.electronAPI) {
+        if (window.electronAPI && window.electronAPI.openFolder) {
             try {
                 await window.electronAPI.openFolder(folderPath);
             } catch (error) {
-                console.error('Error opening folder:', error);
+                this.showError('Error opening folder: ' + error.message);
             }
+        } else {
+            this.showError('Cannot open folder in browser mode');
         }
     },
 
-    // Initialization
-    init() {
-        // Set default path if Electron is available
-        if (window.utils) {
-            document.getElementById('targetPath').value = window.utils.getDefaultBasePath();
-        }
-        
-        // Path Preview Update Event Listeners
-        document.getElementById('targetPath').addEventListener('input', () => this.updatePathPreview());
-        document.getElementById('projectName').addEventListener('input', () => this.updatePathPreview());
-        
-        // Template Info Update Event Listener
-        // This will be called by templateManager when a template is selected
-        if (window.templateManager) {
-            // Monkey-patch the select method to update template info
-            const originalSelect = window.templateManager.select;
-            window.templateManager.select = function(index) {
-                const result = originalSelect.call(this, index);
-                if (window.projectManager) {
-                    window.projectManager.updateTemplateInfo();
+    // Open elabFTW experiment in browser
+    async openElabFTWExperiment(url) {
+        try {
+            console.log('Attempting to open URL:', url);
+            
+            if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+                // Use Electron's openExternal via IPC
+                console.log('Using Electron openExternal via IPC');
+                const result = await window.electronAPI.openExternal(url);
+                if (result && !result.success) {
+                    throw new Error(result.error || 'Failed to open URL');
                 }
-                return result;
-            };
+            } else {
+                // Fallback to window.open for browser
+                console.log('Using fallback window.open');
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+        } catch (error) {
+            console.error('Error opening elabFTW experiment:', error);
+            // Final fallback - copy URL to clipboard or show it to user
+            this.showError(`Cannot open elabFTW experiment automatically. Please open this URL manually: ${url}`);
         }
     }
 };

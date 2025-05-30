@@ -13,15 +13,15 @@
                 <h1>📁 MetaFold</h1>
                 
                 <div class="template-type-selector">
-                    <button class="template-type-btn active" onclick="templateTypeManager.switchType('folders')" id="foldersTypeBtn">
+                    <button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
                         📂 Folders
                     </button>
-                    <button class="template-type-btn" onclick="templateTypeManager.switchType('experiments')" id="experimentsTypeBtn">
+                    <button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
                         🧪 Experiments
                     </button>
                 </div>
                 
-                <button class="btn" onclick="templateModal.show()">New Template</button>
+                <button class="btn" onclick="showTemplateModal()">New Template</button>
             </div>
             
             <div id="templateList">
@@ -60,11 +60,41 @@
                             <label for="projectName">📝 Project Name:</label>
                             <input type="text" id="projectName" placeholder="MyProject">
                         </div>
-                        <button class="btn btn-secondary" onclick="projectManager.browsePath()">Browse</button>
+                        <button class="btn btn-secondary" onclick="browsePath()">Browse</button>
                     </div>
                     <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
                         Project will be created in: <span id="fullPathPreview">Choose directory and project name</span>
                     </p>
+
+                    <!-- elabFTW Integration Option -->
+					<div id="elabftwOption" style="display: none; margin-top: 15px; padding: 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;">
+						<!-- Auto-sync info message -->
+						<div id="elabftwAutoInfo" style="display: none; color: #0369a1; font-weight: 500; margin-bottom: 10px;">
+							<span style="color: #059669;">✅</span> Auto-sync to elabFTW is enabled - experiments will be created automatically
+						</div>
+						
+						<!-- Manual sync checkbox -->
+						<div id="elabftwManualOption">
+							<label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #0369a1;">
+								<input type="checkbox" id="sendToElabFTW" style="width: auto;">
+								🧪 Send to elabFTW
+							</label>
+							<small style="color: #0369a1; margin-left: 24px; display: block; margin-top: 4px;">
+								Create this experiment in elabFTW with metadata and structure
+							</small>
+						</div>
+						
+						<!-- Existing experiment ID field -->
+						<div id="elabftwExperimentId" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+							<label for="existingExperimentId" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
+								📝 Update Existing Experiment (optional):
+							</label>
+							<input type="text" id="existingExperimentId" placeholder="Enter experiment ID (e.g., 149)" style="width: 100%; padding: 6px 10px; border: 1px solid #0ea5e9; border-radius: 4px;">
+							<small style="color: #0369a1; display: block; margin-top: 4px;">
+								If provided, metadata will be added to this existing experiment instead of creating a new one
+							</small>
+						</div>
+					</div>
                 </div>
 
                 <div class="folder-structure">
@@ -76,7 +106,7 @@
                 <div id="experimentForm" class="metadata-editor" style="display: none;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3>🧪 Fill Experiment Metadata:</h3>
-                        <button class="btn btn-secondary btn-small" onclick="experimentForm.saveTemplate()" style="padding: 6px 12px;">
+                        <button class="btn btn-secondary btn-small" onclick="saveExperimentTemplate()" style="padding: 6px 12px;">
                             💾 Save Template
                         </button>
                     </div>
@@ -84,15 +114,15 @@
                 </div>
 
                 <div class="actions">
-                    <button class="btn" onclick="projectManager.createProject()">🎯 Create Project</button>
-                    <button class="btn btn-secondary" onclick="templateManager.editCurrent()">✏️ Edit</button>
-                    <button class="btn btn-danger" onclick="templateManager.deleteCurrent()">🗑️ Delete</button>
+                    <button class="btn" onclick="createProject()">🎯 Create Project</button>
+                    <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
+                    <button class="btn btn-danger" onclick="deleteCurrentTemplate()">🗑️ Delete</button>
                 </div>
 
                 <!-- Info Message for additional information -->
                 <div id="infoMessage" class="message info-message" style="display: none;"></div>
-                <div id="successMessage" class="success-message"></div>
-                <div id="errorMessage" class="error-message"></div>
+                <div id="successMessage" class="success-message" style="display: none;"></div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -100,7 +130,7 @@
     <!-- Modal for new/edited template -->
     <div id="templateModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="templateModal.close()">&times;</span>
+            <span class="close" onclick="closeTemplateModal()">&times;</span>
             <h2 id="modalTitle">Create New Template</h2>
             
             <div class="form-group">
@@ -115,7 +145,7 @@
 
             <div class="form-group">
                 <label for="templateType">Template Type:</label>
-                <select id="templateType" onchange="templateModal.toggleTypeContent()">
+                <select id="templateType" onchange="toggleTemplateTypeContent()">
                     <option value="folders">📂 Folder Structure</option>
                     <option value="experiment">🧪 Experiment (Folders + Metadata)</option>
                 </select>
@@ -141,8 +171,8 @@ README.md"></textarea>
             <!-- Experiment Tab -->
             <div id="experimentTab" class="tab-content">
                 <div class="tabs">
-                    <div class="tab active" onclick="templateModal.switchTab('structure')">Structure</div>
-                    <div class="tab" onclick="templateModal.switchTab('metadata')">Metadata</div>
+                    <div class="tab active" onclick="switchModalTab('structure')">Structure</div>
+                    <div class="tab" onclick="switchModalTab('metadata')">Metadata</div>
                 </div>
 
                 <div id="structureContent" class="tab-content active">
@@ -167,8 +197,8 @@ experiment_log.md"></textarea>
                 <div id="metadataContent" class="tab-content">
                     <div class="form-group">
                         <label>Metadata Fields:</label>
-                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.addField()">+ Add Field</button>
-                        <button class="btn btn-secondary btn-small" onclick="metadataEditor.loadFromJson()" style="margin-left: 10px;">📂 Load JSON</button>
+                        <button class="btn btn-secondary btn-small" onclick="addMetadataField()">+ Add Field</button>
+                        <button class="btn btn-secondary btn-small" onclick="loadJsonMetadata()" style="margin-left: 10px;">📂 Load JSON</button>
                     </div>
                     
                     <div id="metadataFields"></div>
@@ -181,8 +211,8 @@ experiment_log.md"></textarea>
             </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="templateModal.close()">Cancel</button>
-                <button class="btn" onclick="templateModal.save()">Save</button>
+                <button class="btn btn-secondary" onclick="closeTemplateModal()">Cancel</button>
+                <button class="btn" onclick="saveTemplate()">Save</button>
             </div>
         </div>
     </div>
@@ -190,6 +220,7 @@ experiment_log.md"></textarea>
     <!-- JavaScript Modules - Order is important! -->
     <script src="js/utils.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/settingsManager.js"></script>
     <script src="js/templateManager.js"></script>
     <script src="js/templateTypeManager.js"></script>
     <script src="js/metadataEditor.js"></script>
@@ -197,5 +228,273 @@ experiment_log.md"></textarea>
     <script src="js/templateModal.js"></script>
     <script src="js/projectManager.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Global Function Wrappers -->
+    <script>
+        // Wait for modules to load before setting up global functions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Template Type Management
+            window.switchTemplateType = function(type) {
+                if (window.templateTypeManager && window.templateTypeManager.switchType) {
+                    window.templateTypeManager.switchType(type);
+                }
+            };
+
+            // Template Modal Management
+            window.showTemplateModal = function() {
+                if (window.templateModal && window.templateModal.show) {
+                    window.templateModal.show();
+                }
+            };
+
+            window.closeTemplateModal = function() {
+                if (window.templateModal && window.templateModal.close) {
+                    window.templateModal.close();
+                }
+            };
+
+            window.toggleTemplateTypeContent = function() {
+                if (window.templateModal && window.templateModal.toggleTypeContent) {
+                    window.templateModal.toggleTypeContent();
+                }
+            };
+
+            window.switchModalTab = function(tab) {
+                if (window.templateModal && window.templateModal.switchTab) {
+                    window.templateModal.switchTab(tab);
+                }
+            };
+
+            window.saveTemplate = function() {
+                if (window.templateModal && window.templateModal.save) {
+                    window.templateModal.save();
+                }
+            };
+
+            // Metadata Editor Management
+            window.addMetadataField = function() {
+                if (window.metadataEditor && window.metadataEditor.addField) {
+                    window.metadataEditor.addField();
+                }
+            };
+
+            window.loadJsonMetadata = function() {
+                if (window.metadataEditor && window.metadataEditor.loadFromJson) {
+                    window.metadataEditor.loadFromJson();
+                }
+            };
+
+            // Project Management
+            window.browsePath = function() {
+                if (window.projectManager && window.projectManager.browsePath) {
+                    window.projectManager.browsePath();
+                }
+            };
+
+            window.createProject = function() {
+                if (window.projectManager && window.projectManager.createProject) {
+                    window.projectManager.createProject();
+                }
+            };
+
+            // Template Management
+            window.editCurrentTemplate = function() {
+                if (window.templateManager && window.templateManager.editCurrent) {
+                    window.templateManager.editCurrent();
+                }
+            };
+
+            window.deleteCurrentTemplate = function() {
+                if (window.templateManager && window.templateManager.deleteCurrent) {
+                    window.templateManager.deleteCurrent();
+                }
+            };
+
+            // Experiment Form Management
+            window.saveExperimentTemplate = function() {
+                if (window.experimentForm && window.experimentForm.saveTemplate) {
+                    window.experimentForm.saveTemplate();
+                }
+            };
+
+            // Update elabFTW options based on settings
+            window.updateElabFTWOptions = function() {
+                if (window.settingsManager) {
+                    const elabftwOption = document.getElementById('elabftwOption');
+                    const elabftwAutoInfo = document.getElementById('elabftwAutoInfo');
+                    const elabftwManualOption = document.getElementById('elabftwManualOption');
+                    
+                    if (elabftwOption && elabftwAutoInfo && elabftwManualOption) {
+                        const enabled = window.settingsManager.get('elabftw.enabled');
+                        const autoSync = window.settingsManager.get('elabftw.auto_sync');
+                        
+                        if (enabled) {
+                            elabftwOption.style.display = 'block';
+                            
+                            if (autoSync) {
+                                elabftwAutoInfo.style.display = 'block';
+                                elabftwManualOption.style.display = 'none';
+                            } else {
+                                elabftwAutoInfo.style.display = 'none';
+                                elabftwManualOption.style.display = 'block';
+                            }
+                        } else {
+                            elabftwOption.style.display = 'none';
+                        }
+                    }
+                }
+            };
+
+            // Setup path preview updates
+            const targetPath = document.getElementById('targetPath');
+            const projectName = document.getElementById('projectName');
+            
+            if (targetPath && projectName) {
+                targetPath.addEventListener('input', function() {
+                    if (window.projectManager && window.projectManager.updatePathPreview) {
+                        window.projectManager.updatePathPreview();
+                    }
+                });
+                
+                projectName.addEventListener('input', function() {
+                    if (window.projectManager && window.projectManager.updatePathPreview) {
+                        window.projectManager.updatePathPreview();
+                    }
+                });
+            }
+
+            // Initialize elabFTW options on load
+            setTimeout(function() {
+                window.updateElabFTWOptions();
+            }, 500);
+        });
+
+        // Debug function to check module loading
+        window.checkModules = function() {
+            const modules = [
+                'appUtils', 'storage', 'settingsManager', 'templateManager', 
+                'templateTypeManager', 'metadataEditor', 'experimentForm', 
+                'templateModal', 'projectManager'
+            ];
+            
+            modules.forEach(module => {
+                console.log(`${module}:`, typeof window[module]);
+            });
+        };
+    </script>
+
+    <!-- Settings Modal Styles -->
+    <style>
+        .settings-tabs {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .settings-tab {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .settings-tab.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .settings-tab:hover {
+            color: #3b82f6;
+            background: #f8fafc;
+        }
+
+        .settings-tab-content {
+            display: none;
+        }
+
+        .settings-tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-group input[type="url"],
+        .form-group input[type="password"],
+        .form-group input[type="text"],
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group small {
+            display: block;
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        #connectionStatus {
+            font-size: 14px;
+            padding: 8px;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+
+        .nested-field {
+            margin-left: 20px;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 15px;
+        }
+
+        .form-group-header {
+            margin: 20px 0 10px 0;
+        }
+
+        .error-message, .success-message, .info-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .success-message {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .info-message {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+    </style>
 </body>
 </html>

@@ -24,7 +24,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveJsonFile: (data) => ipcRenderer.invoke('save-json-file', data),
     
     // Platform info
-    platform: process.platform
+    platform: process.platform,
+    
+    // Open external URL in default browser
+    openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });
 
 // Extended utilities
