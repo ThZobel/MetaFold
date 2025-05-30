@@ -4,48 +4,56 @@ const app = {
     initialized: false,
     
     // App initialization
-    init() {
-        if (this.initialized) return;
-        
-        console.log('Starting app initialization...');
-        
-        try {
-            // Check if basic modules are available
-            if (typeof templateManager === 'undefined') {
-                console.log('templateManager not yet available, waiting...');
-                setTimeout(() => this.init(), 50);
-                return;
-            }
-            
-            // Initialize modules
-            if (templateManager && typeof templateManager.init === 'function') {
-                templateManager.init();
-                console.log('templateManager initialized');
-            }
-            
-            if (projectManager && typeof projectManager.init === 'function') {
-                projectManager.init();
-                console.log('projectManager initialized');
-            }
-            
-            // Platform-specific adjustments
-            if (appUtils && typeof appUtils.applyPlatformStyles === 'function') {
-                appUtils.applyPlatformStyles();
-            }
-            
-            // Event Listeners
-            this.setupEventListeners();
-            
-            this.initialized = true;
-            console.log('✅ App successfully initialized');
-            
-        } catch (error) {
-            console.error('❌ Error during app initialization:', error);
-            setTimeout(() => this.init(), 100);
+   // App initialization
+init() {
+    if (this.initialized) return;
+    
+    console.log('Starting app initialization...');
+    
+    try {
+        // Check if basic modules are available
+        if (typeof templateManager === 'undefined') {
+            console.log('templateManager not yet available, waiting...');
+            setTimeout(() => this.init(), 50);
+            return;
         }
-    },
+        
+        // Initialize modules
+        if (templateManager && typeof templateManager.init === 'function') {
+            templateManager.init();
+            console.log('templateManager initialized');
+        }
+        
+        // Only initialize projectManager if it exists and has init method
+        if (typeof projectManager !== 'undefined' && projectManager && typeof projectManager.init === 'function') {
+            projectManager.init();
+            console.log('projectManager initialized');
+        }
 
-    // Setup event listeners
+        // Initialize settings manager
+        if (typeof settingsManager !== 'undefined' && settingsManager && typeof settingsManager.init === 'function') {
+            settingsManager.init();
+            console.log('settingsManager initialized');
+        }
+        
+        // Platform-specific adjustments
+        if (typeof appUtils !== 'undefined' && appUtils && typeof appUtils.applyPlatformStyles === 'function') {
+            appUtils.applyPlatformStyles();
+        }
+        
+        // Event Listeners
+        this.setupEventListeners();
+        
+        this.initialized = true;
+        console.log('✅ App successfully initialized');
+        
+    } catch (error) {
+        console.error('❌ Error during app initialization:', error);
+        setTimeout(() => this.init(), 100);
+    }
+},
+    
+	// Setup event listeners
     setupEventListeners() {
         // Close modal on click outside
         window.onclick = (event) => {

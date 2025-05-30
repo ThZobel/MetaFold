@@ -151,46 +151,128 @@ const metadataEditor = {
     },
 
     // Load JSON template
-    loadFromJson() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const jsonData = JSON.parse(e.target.result);
-                        
-                        // Check if it's an elabFTW export
-                        if (jsonData.elabftw && jsonData.extra_fields) {
-                            // Convert elabFTW format
-                            const metadata = this.convertElabFTWToMetadata(jsonData);
-                            this.loadMetadataIntoEditor(metadata);
-                            
-                            // Info message
-                            alert(`elabFTW export loaded successfully!\nFields: ${Object.keys(metadata).length}`);
-                        } else if (jsonData.$schema || (jsonData.type === 'object' && jsonData.properties)) {
-                            // Convert JSON Schema
-                            const metadata = this.convertJsonSchemaToMetadata(jsonData);
-                            this.loadMetadataIntoEditor(metadata);
-                            
-                            // Info message
-                            alert(`JSON Schema loaded successfully!\nTitle: ${jsonData.title || 'Unknown'}\nFields: ${Object.keys(metadata).length}`);
-                        } else {
-                            // Normal metadata JSON
-                            this.loadMetadataIntoEditor(jsonData);
-                        }
-                    } catch (error) {
-                        alert('Error loading JSON file: ' + error.message);
-                    }
-                };
-                reader.readAsText(file);
-            }
-        };
-        input.click();
-    },
+	async loadFromJson() {
+		// Check if we're in Electron environment
+		if (window.electronAPI && window.electronAPI.loadJsonFile) {
+			try {
+				const result = await window.electronAPI.loadJsonFile();
+				if (result.success) {
+					this.processJsonData(result.content);
+				} else {
+					alert(result.message || 'Failed to load JSON file');
+				}
+			} catch (error) {
+				alert('Error loading JSON file: ' + error.message);
+			}
+		} else {
+			// Browser fallback
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = '.json';
+			input.onchange = (e) => {
+				const file = e.target.files[0];
+				if (file) {
+					const reader = new FileReader();
+					reader.onload = (e) => {
+						try {
+							const jsonData = JSON.parse(e.target.result);
+							this.processJsonData(jsonData);
+						} catch (error) {
+							alert('Error parsing JSON file: ' + error.message);
+						}
+					};
+					reader.readAsText(file);
+				}
+			};
+			input.click();
+		}
+	},
+
+	// Process loaded JSON data
+	processJsonData(jsonData) {
+		try {
+			// Check if it's an elabFTW export
+			if (jsonData.elabftw && jsonData.extra_fields) {
+				// Convert elabFTW format
+				const metadata = this.convertElabFTWToMetadata(jsonData);
+				this.loadMetadataIntoEditor(metadata);
+				
+				// Info message
+				alert(`elabFTW export loaded successfully!\nFields: ${Object.keys(metadata).length}`);
+			} else if (jsonData.$schema || (jsonData.type === 'object' && jsonData.properties)) {
+				// Convert JSON Schema
+				const metadata = this.convertJsonSchemaToMetadata(jsonData);
+				this.loadMetadataIntoEditor(metadata);
+				
+				// Info message
+				alert(`JSON Schema loaded successfully!\nTitle: ${jsonData.title || 'Unknown'}\nFields: ${Object.keys(metadata).length}`);
+			} else {
+				// Normal metadata JSON
+				this.loadMetadataIntoEditor(jsonData);
+			}
+		} catch (error) {
+			alert('Error processing JSON file: ' + error.message);
+		}
+	},
+
+	// Convert JSON Schema to internal metadata format
+	convertJsonSchemaToMetadata(schema) {
+		const metadata = {};
+		
+		if (schema.properties) {
+			Object.entries(schema.properties).forEach(([key, prop]) => {
+				// Map JSON Schema types to our internal types
+				let internalType = 'text';
+				switch (prop.type) {
+					case 'string':
+						if (prop.format === 'date') {
+							internalType = 'date';
+						} else if (prop.enum) {
+							internalType = 'dropdown';
+						} else {
+							internalType = 'text';
+						}
+						break;
+					case 'number':
+					case 'integer':
+						internalType = 'number';
+						break;
+					case 'boolean':
+						internalType = 'checkbox';
+						break;
+					default:
+						internalType = 'text';
+				}
+				
+				const metaField = {
+					type: internalType,
+					label: prop.title || key,
+					value: prop.default || this.getDefaultValueForSchemaType(prop.type),
+					required: schema.required && schema.required.includes(key)
+				};
+				
+				// Add description if available
+				if (prop.description) {
+					metaField.description = prop.description;
+				}
+				
+				// Handle enum for dropdowns
+				if (prop.enum) {
+					metaField.options = prop.enum;
+				}
+				
+				// Handle number constraints
+				if (internalType === 'number') {
+					if (prop.minimum !== undefined) metaField.min = prop.minimum;
+					if (prop.maximum !== undefined) metaField.max = prop.maximum;
+				}
+				
+				metadata[key] = metaField;
+			});
+		}
+		
+		return metadata;
+	},
 
     // Convert elabFTW format to internal format
     convertElabFTWToMetadata(elabftwData) {
