@@ -426,6 +426,198 @@ body {
     border: 1px solid #f87171;
 }
 
+/* ===== USER SYSTEM STYLES ===== */
+
+/* Login Modal */
+.login-modal {
+    max-width: 400px;
+    padding: 2rem;
+}
+
+.login-modal h2 {
+    color: var(--primary-color, #007bff);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.autocomplete-container {
+    position: relative;
+}
+
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: none;
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.suggestion-item {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.suggestion-item:hover {
+    background-color: #f0f0f0;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.error-message {
+    background-color: #fee;
+    color: #c33;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+    display: none;
+}
+
+/* Template Avatar */
+.template-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+.template-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+
+.template-info {
+    flex: 1;
+}
+
+.template-info small {
+    color: #666;
+    display: block;
+}
+
+/* Copy Button and Shared Templates */
+.copy-template-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.copy-template-btn:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+.shared-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    margin-left: 0.5rem;
+    font-weight: normal;
+}
+
+.shared-indicator {
+    color: #007bff;
+    font-weight: bold;
+}
+
+/* Template Item States */
+.template-item[data-is-own="false"] {
+    border-left: 3px solid #007bff;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+}
+
+.template-item[data-is-own="false"]:hover {
+    background: linear-gradient(135deg, #f0f0f0 0%, #f0f2ff 100%);
+}
+
+.template-info-text {
+    background: #fff3e0;
+    border: 1px solid #ffcc02;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin: 1rem 0;
+    color: #e65100;
+}
+
+.template-info-text em {
+    font-style: normal;
+}
+
+/* Template Details */
+.template-header-details {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.template-header-details .template-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1rem;
+    margin-right: 1rem;
+}
+
+.template-header-details h3 {
+    margin: 0 0 0.5rem 0;
+    color: #007bff;
+}
+
+.template-meta {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .template-header {
+        flex-wrap: wrap;
+    }
+    
+    .copy-template-btn {
+        margin: 0.5rem 0 0 0;
+        align-self: flex-start;
+    }
+    
+    .template-header-details {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .template-header-details .template-avatar {
+        margin: 0 auto 1rem auto;
+    }
+}
+
 /* Template-Info-Section Styling */
 #templateInfoSection {
     display: none; /* Standardmäßig ausgeblendet, wird von JavaScript gezeigt */

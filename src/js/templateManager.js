@@ -1,47 +1,201 @@
-// Template Manager for managing templates
+// Template Manager (with unified styling - COMPLETE)
 
 const templateManager = {
     templates: [],
     currentTemplate: null,
+    selectedIndex: -1,
+    allTemplates: [],
 
-    // Initialization
+    // Initialize template manager
     init() {
-        this.templates = storage.loadTemplates();
-        storage.saveTemplates(this.templates); // For initial save of default templates
-        this.renderList();
+        console.log('🔧 Initializing templateManager...');
+        try {
+            this.templates = window.storage ? window.storage.loadTemplates() : [];
+            this.renderList();
+            console.log('✅ templateManager initialized with', this.templates.length, 'templates');
+        } catch (error) {
+            console.error('❌ Error in templateManager.init:', error);
+            this.templates = [];
+            this.renderList();
+        }
     },
 
-    // Render template list
+    // Add new template
+    add(template) {
+        console.log('➕ Adding template:', template);
+        
+        const enhancedTemplate = {
+            ...template,
+            createdBy: window.userManager?.currentUser || 'Unknown',
+            createdByGroup: window.userManager?.currentGroup || 'Unknown',
+            createdAt: new Date().toISOString()
+        };
+        
+        this.templates.push(enhancedTemplate);
+        
+        if (window.storage) {
+            const saved = window.storage.saveTemplates(this.templates);
+            console.log('💾 Save result:', saved);
+        }
+        
+        this.renderList();
+        console.log('✅ Template added successfully');
+    },
+
+    // Update template
+    update(index, template) {
+        if (index >= 0 && index < this.templates.length) {
+            const existingTemplate = this.templates[index];
+            const updatedTemplate = {
+                ...template,
+                createdBy: existingTemplate.createdBy,
+                createdByGroup: existingTemplate.createdByGroup,
+                createdAt: existingTemplate.createdAt
+            };
+            
+            this.templates[index] = updatedTemplate;
+            
+            if (window.storage) {
+                window.storage.saveTemplates(this.templates);
+            }
+            
+            this.renderList();
+            console.log('✅ Template updated:', template.name);
+        }
+    },
+
+    // Get current type safely
+    getCurrentType() {
+        // Safe fallback if templateTypeManager is not available
+        if (window.templateTypeManager && window.templateTypeManager.currentType) {
+            return window.templateTypeManager.currentType;
+        }
+        // Default fallback
+        return 'folders';
+    },
+
+    // Get all templates (including group templates) - FIXED VERSION
+    getAllTemplates() {
+        const currentType = this.getCurrentType();
+        
+        const ownTemplates = this.templates.filter(t => 
+            (currentType === 'folders' && t.type !== 'experiment') ||
+            (currentType === 'experiments' && t.type === 'experiment')
+        );
+
+        // Load group templates but exclude system templates and own templates
+        let groupTemplates = [];
+        try {
+            if (window.storage && window.storage.loadGroupTemplates && window.userManager?.currentGroup) {
+                groupTemplates = window.storage.loadGroupTemplates(window.userManager.currentGroup)
+                    .filter(t => 
+                        ((currentType === 'folders' && t.type !== 'experiment') ||
+                        (currentType === 'experiments' && t.type === 'experiment')) &&
+                        t.createdBy !== window.userManager?.currentUser &&
+                        t.createdBy !== 'System' // Exclude system templates
+                    );
+            }
+        } catch (error) {
+            console.warn('Could not load group templates:', error);
+            groupTemplates = [];
+        }
+
+        // Mark templates with proper indices
+        const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
+            ...t, 
+            isOwn: true, 
+            originalIndex: i
+        }));
+        
+        const groupTemplatesMarked = groupTemplates.map(t => ({ 
+            ...t, 
+            isOwn: false, 
+            originalIndex: -1
+        }));
+
+        this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
+        return this.allTemplates;
+    },
+
+    // Safe user color generation
+    getUserColor(username) {
+        if (window.userManager && window.userManager.generateUserColor) {
+            return window.userManager.generateUserColor(username);
+        }
+        // Fallback color
+        return '#666';
+    },
+
+    // Safe user initials
+    getUserInitials(username) {
+        if (window.userManager && window.userManager.getUserInitials) {
+            return window.userManager.getUserInitials(username);
+        }
+        // Fallback initials
+        return username ? username.substring(0, 2).toUpperCase() : '??';
+    },
+
+    // Render template list - FIXED VERSION
     renderList() {
         const listContainer = document.getElementById('templateList');
-        const filteredTemplates = this.templates.filter(t => 
-            (templateTypeManager.currentType === 'folders' && t.type !== 'experiment') ||
-            (templateTypeManager.currentType === 'experiments' && t.type === 'experiment')
-        );
+        if (!listContainer) {
+            console.warn('templateList element not found');
+            return;
+        }
+
+        const allTemplates = this.getAllTemplates();
+        const currentType = this.getCurrentType();
         
-        if (filteredTemplates.length === 0) {
-            const typeLabel = templateTypeManager.currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
+        if (allTemplates.length === 0) {
+            const typeLabel = currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
             listContainer.innerHTML = `
                 <div class="empty-state">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-                    </svg>
-                    <p>No ${typeLabel} available yet.<br>Create your first template!</p>
+                    <p>Noch keine ${typeLabel} vorhanden.<br>Erstellen Sie Ihr erstes Template!</p>
                 </div>
             `;
             return;
         }
 
-        listContainer.innerHTML = filteredTemplates.map(template => {
-            const index = this.templates.indexOf(template);
+        listContainer.innerHTML = allTemplates.map((template, index) => {
             const badge = template.type === 'experiment' ? 
                 '<span class="template-badge experiment">Exp</span>' : 
                 '<span class="template-badge">Folder</span>';
             
+            // Use normal colors for all templates
+            const color = this.getUserColor(template.createdBy);
+            const initials = this.getUserInitials(template.createdBy);
+            
             return `
-                <div class="template-item ${this.currentTemplate === template ? 'active' : ''}" 
+                <div class="template-item ${this.selectedIndex === index ? 'active' : ''}" 
+                     data-is-own="${template.isOwn}"
                      onclick="templateManager.select(${index})">
-                    <h3>${template.name} ${badge}</h3>
+                    <div class="template-header">
+                        <div class="template-avatar" style="background-color: ${color}">
+                            ${initials}
+                        </div>
+                        <div class="template-info">
+                            <h3>${template.name} ${badge}</h3>
+                            <small>von ${template.createdBy || 'Unknown'} (${template.createdByGroup || 'Unknown'})</small>
+                            ${!template.isOwn ? '<span class="shared-badge">📋 Geteilt</span>' : ''}
+                        </div>
+                        ${!template.isOwn ? `
+                            <button class="copy-template-btn" 
+                                    onclick="event.stopPropagation(); templateManager.copyTemplate(${index})"
+                                    title="Template kopieren"
+                                    style="
+                                        background: #28a745;
+                                        color: white;
+                                        border: none;
+                                        padding: 0.25rem 0.5rem;
+                                        border-radius: 3px;
+                                        cursor: pointer;
+                                        font-size: 0.8rem;
+                                        margin-left: auto;
+                                    ">
+                                📋 Kopieren
+                            </button>
+                        ` : ''}
+                    </div>
                     <p style="color: #9ca3af; font-size: 12px; margin-top: 5px;">
                         ${template.description || 'No description'}
                     </p>
@@ -50,105 +204,124 @@ const templateManager = {
         }).join('');
     },
 
+    // Copy template (safe version)
+    copyTemplate(index) {
+        const template = this.allTemplates[index];
+        if (!template || template.isOwn) return;
+
+        const copiedTemplate = {
+            ...template,
+            name: `${template.name} (Kopie)`,
+            createdBy: window.userManager?.currentUser || 'Unknown',
+            createdByGroup: window.userManager?.currentGroup || 'Unknown',
+            createdAt: new Date().toISOString(),
+            originalCreatedBy: template.createdBy,
+            originalCreatedByGroup: template.createdByGroup,
+            copiedFrom: `${template.createdBy} (${template.createdByGroup})`,
+            isOwn: true
+        };
+
+        // Clean up UI properties
+        delete copiedTemplate.userColor;
+        delete copiedTemplate.userInitials;
+        delete copiedTemplate.originalIndex;
+
+        this.templates.push(copiedTemplate);
+        
+        if (window.storage) {
+            window.storage.saveTemplates(this.templates);
+        }
+        
+        this.renderList();
+        console.log(`✅ Template "${template.name}" copied`);
+    },
+
     // Select template
     select(index) {
-        // Clear field values when new template is chosen
-        if (this.currentTemplate !== this.templates[index]) {
-            experimentForm.clearSavedFieldValues();
+        const allTemplates = this.getAllTemplates();
+        const template = allTemplates[index];
+        
+        if (!template) return;
+
+        this.selectedIndex = index;
+        this.currentTemplate = template;
+        
+        this.renderList();
+        
+        // Safe DOM updates
+        const detailsElement = document.getElementById('templateDetails');
+        if (detailsElement) {
+            detailsElement.style.display = 'block';
         }
         
-        this.currentTemplate = this.templates[index];
-        document.getElementById('templateDetails').style.display = 'block';
-        
-        // Update folder structure preview
         const preview = document.getElementById('folderPreview');
-        preview.textContent = this.currentTemplate.structure;
+        if (preview) {
+            preview.textContent = this.currentTemplate.structure || 'No structure defined';
+        }
         
-        // Show/hide experiment form
+        // Handle experiment form safely
         const experimentFormDiv = document.getElementById('experimentForm');
-        if (this.currentTemplate.type === 'experiment' && this.currentTemplate.metadata) {
-            experimentFormDiv.style.display = 'block';
-            experimentForm.render(this.currentTemplate.metadata);
-        } else {
-            experimentFormDiv.style.display = 'none';
+        if (experimentFormDiv) {
+            if (this.currentTemplate.type === 'experiment' && this.currentTemplate.metadata) {
+                experimentFormDiv.style.display = 'block';
+                if (window.experimentForm && window.experimentForm.render) {
+                    window.experimentForm.render(this.currentTemplate.metadata);
+                }
+            } else {
+                experimentFormDiv.style.display = 'none';
+            }
         }
         
-        this.renderList();
-    },
-
-    // Add template
-    add(template) {
-        this.templates.push(template);
-        storage.saveTemplates(this.templates);
-        this.renderList();
-    },
-
-    // Update template
-    update(index, template) {
-        if (index >= 0 && index < this.templates.length) {
-            this.templates[index] = template;
-            if (this.currentTemplate === this.templates[index]) {
-                this.currentTemplate = template;
-                const templateInfoSection = document.getElementById('templateInfoSection');
-                if (templateInfoSection) {
-                    templateInfoSection.classList.add('active');
-                }
-                if (window.projectManager && window.projectManager.updateTemplateInfo) {
-                    window.projectManager.updateTemplateInfo();
-                }
-            }
-            storage.saveTemplates(this.templates);
-            this.renderList();
-            
-            // If edited, update details
-            if (this.currentTemplate === template) {
-                const preview = document.getElementById('folderPreview');
-                preview.textContent = this.currentTemplate.structure;
-                
-                // Re-render experiment form if needed
-                if (this.currentTemplate.type === 'experiment' && this.currentTemplate.metadata) {
-                    experimentForm.render(this.currentTemplate.metadata);
-                }
-            }
-        }
+        console.log('✅ Template selected:', template.name);
     },
 
     // Edit current template
     editCurrent() {
-        if (!this.currentTemplate) return;
+        if (!this.currentTemplate || !this.currentTemplate.isOwn) return;
         
-        const editingIndex = this.templates.indexOf(this.currentTemplate);
-        templateModal.openForEdit(editingIndex, this.currentTemplate);
+        if (window.templateModal) {
+            const editingIndex = this.templates.findIndex(t => 
+                t.name === this.currentTemplate.name && 
+                t.createdBy === this.currentTemplate.createdBy
+            );
+            
+            if (editingIndex >= 0) {
+                window.templateModal.openForEdit(editingIndex, this.templates[editingIndex]);
+            }
+        }
     },
 
     // Delete current template
     deleteCurrent() {
-        if (!this.currentTemplate) return;
+        if (!this.currentTemplate || !this.currentTemplate.isOwn) return;
         
-        if (confirm(`Do you really want to delete the template "${this.currentTemplate.name}"?`)) {
-            const index = this.templates.indexOf(this.currentTemplate);
-            this.templates.splice(index, 1);
-            storage.saveTemplates(this.templates);
+        if (confirm(`Template "${this.currentTemplate.name}" löschen?`)) {
+            const index = this.templates.findIndex(t => 
+                t.name === this.currentTemplate.name && 
+                t.createdBy === this.currentTemplate.createdBy
+            );
             
-            this.currentTemplate = null;
-            document.getElementById('templateDetails').style.display = 'none';
-            this.renderList();
-        }
-    },
-
-    // Delete template by index
-    delete(index) {
-        if (index >= 0 && index < this.templates.length) {
-            if (this.currentTemplate === this.templates[index]) {
+            if (index >= 0) {
+                this.templates.splice(index, 1);
+                
+                if (window.storage) {
+                    window.storage.saveTemplates(this.templates);
+                }
+                
                 this.currentTemplate = null;
-                document.getElementById('templateDetails').style.display = 'none';
+                this.selectedIndex = -1;
+                
+                const detailsElement = document.getElementById('templateDetails');
+                if (detailsElement) {
+                    detailsElement.style.display = 'none';
+                }
+                
+                this.renderList();
+                console.log('✅ Template deleted');
             }
-            this.templates.splice(index, 1);
-            storage.saveTemplates(this.templates);
-            this.renderList();
         }
     }
 };
 
-// Make globally available
 window.templateManager = templateManager;
+console.log('✅ templateManager loaded (complete)');
