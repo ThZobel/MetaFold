@@ -97,59 +97,88 @@ const templateModal = {
         }
     },
 
-    // Save template
-    save() {
-        const name = document.getElementById('templateName').value.trim();
-        const description = document.getElementById('templateDescription').value.trim();
-        const type = document.getElementById('templateType').value;
+    // Verbesserte save() Methode
+   save() {
+    console.log('🔧 Save method called');
+    
+    const name = document.getElementById('templateName').value.trim();
+    const description = document.getElementById('templateDescription').value.trim();
+    const type = document.getElementById('templateType').value;
 
-        if (!name) {
-            alert('Please enter a template name!');
-            return;
-        }
+    console.log('Form values:', { name, description, type });
 
-        let structure = '';
-        let metadata = null;
-
-        if (type === 'experiment') {
-            structure = document.getElementById('experimentStructure').value.trim();
-            
-            // Collect metadata from editor
-            if (window.metadataEditor && window.metadataEditor.collectMetadata) {
-                metadata = window.metadataEditor.collectMetadata();
-            }
-        } else {
-            structure = document.getElementById('folderStructure').value.trim();
-        }
-
-        const template = {
-            name: name,
-            description: description,
-            type: type,
-            structure: structure
-        };
-
-        // Add metadata if it's an experiment
-        if (type === 'experiment' && metadata) {
-            template.metadata = metadata;
-        }
-
-        // Save or update template
-        if (this.editingIndex >= 0) {
-            // Update existing template
-            if (window.templateManager && window.templateManager.update) {
-                window.templateManager.update(this.editingIndex, template);
-            }
-        } else {
-            // Add new template
-            if (window.templateManager && window.templateManager.add) {
-                window.templateManager.add(template);
-            }
-        }
-
-        this.close();
+    if (!name) {
+        alert('Please enter a template name!');
+        return;
     }
+
+    let structure = '';
+    if (type === 'experiment') {
+        structure = document.getElementById('experimentStructure').value.trim();
+    } else {
+        structure = document.getElementById('folderStructure').value.trim();
+    }
+
+    console.log('Structure:', structure);
+
+    const template = {
+        name: name,
+        description: description,
+        type: type,
+        structure: structure,
+        createdBy: window.userManager?.currentUser || 'Unknown',
+        createdByGroup: window.userManager?.currentGroup || 'Unknown',
+        createdAt: new Date().toISOString()
+    };
+
+    console.log('Final template object:', template);
+
+    // Direct storage save test
+    console.log('Testing direct storage save...');
+    
+    try {
+        // Get current templates
+        const currentTemplates = window.storage ? window.storage.loadTemplates() : [];
+        console.log('Current templates count:', currentTemplates.length);
+        
+        // Add new template
+        currentTemplates.push(template);
+        
+        // Save directly
+        if (window.storage && window.storage.saveTemplates) {
+            const saveResult = window.storage.saveTemplates(currentTemplates);
+            console.log('Direct save result:', saveResult);
+            
+            if (saveResult) {
+                console.log('✅ Template saved successfully!');
+                
+                // Refresh template list
+                if (window.templateManager && window.templateManager.renderList) {
+                    window.templateManager.templates = currentTemplates;
+                    window.templateManager.renderList();
+                }
+                
+                // Close modal
+                this.close();
+                
+                // Show success
+                alert(`Template "${name}" wurde gespeichert!`);
+            } else {
+                console.error('❌ Save returned false');
+                alert('Fehler beim Speichern!');
+            }
+        } else {
+            console.error('❌ storage.saveTemplates not available');
+            alert('Storage nicht verfügbar!');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in save process:', error);
+        alert('Fehler beim Speichern: ' + error.message);
+    }
+}
 };
 
 // Make globally available
 window.templateModal = templateModal;
+console.log('✅ templateModal loaded (with fixed save)');

@@ -1,8 +1,28 @@
-// Storage manager for templates and settings
+// Storage manager with user support (backward compatible)
 
 const storage = {
-    // Example templates for first start
+    userPrefix: 'default',
+    isAvailable: true,
+
+    // Set user prefix for storage keys
+    setUserPrefix(prefix) {
+        this.userPrefix = prefix;
+        console.log(`📦 Storage prefix set to: ${prefix}`);
+    },
+
+    // Get storage key with user prefix
+    getStorageKey(key) {
+        return `metafold_${this.userPrefix}_${key}`;
+    },
+
+    // Example templates for first start - FIXED VERSION
     getDefaultTemplates() {
+        // Only return default templates for the very first user ever
+        const hasAnyUsers = localStorage.getItem('metafold_global_users');
+        if (hasAnyUsers && JSON.parse(hasAnyUsers).length > 0) {
+            return []; // No default templates for existing users
+        }
+        
         return [
             {
                 name: "Web Project",
@@ -20,7 +40,10 @@ public/
 docs/
 tests/
 package.json
-README.md`
+README.md`,
+                createdBy: 'System',
+                createdByGroup: 'System',
+                createdAt: new Date().toISOString()
             },
             {
                 name: "Data Science Experiment",
@@ -43,45 +66,111 @@ experiment_log.md`,
                     "start_date": { "type": "date", "label": "Start Date", "value": "", "required": false },
                     "hypothesis": { "type": "textarea", "label": "Hypothesis", "value": "", "required": true },
                     "data_source": { "type": "dropdown", "label": "Data Source", "options": ["Internal", "External", "Survey", "API"], "value": "", "required": false }
-                }
+                },
+                createdBy: 'System',
+                createdByGroup: 'System',
+                createdAt: new Date().toISOString()
             }
         ];
     },
 
-    // Load templates
+    // Load templates (backward compatible)
     loadTemplates() {
-        let stored = null;
+        if (!this.isAvailable) return this.getDefaultTemplates();
+        
         try {
-            stored = localStorage.getItem('folderTemplates');
-        } catch (e) {
-            console.log('LocalStorage not available, using temporary storage');
+            // Try new user-specific storage first
+            const userKey = this.getStorageKey('templates');
+            let stored = localStorage.getItem(userKey);
+            
+            // If no user-specific templates, try legacy storage
+            if (!stored && this.userPrefix === 'default') {
+                stored = localStorage.getItem('folderTemplates');
+                if (stored) {
+                    console.log('📦 Migrating legacy templates to new format');
+                    const templates = JSON.parse(stored);
+                    const migratedTemplates = this.addTemplateMetadata(templates);
+                    this.saveTemplates(migratedTemplates);
+                    return migratedTemplates;
+                }
+            }
+            
+            if (stored) {
+                const templates = JSON.parse(stored);
+                return this.addTemplateMetadata(templates);
+            }
+        } catch (error) {
+            console.warn('Error loading templates:', error);
         }
         
-        if (stored) {
-            return JSON.parse(stored);
-        } else {
-            return this.getDefaultTemplates();
-        }
+        return this.getDefaultTemplates();
     },
 
     // Save templates
     saveTemplates(templates) {
+        if (!this.isAvailable) return false;
+        
         try {
-            localStorage.setItem('folderTemplates', JSON.stringify(templates));
+            const templatesWithMeta = templates.map(template => ({
+                ...template,
+                createdBy: template.createdBy || window.userManager?.currentUser || 'Unknown',
+                createdByGroup: template.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+                createdAt: template.createdAt || new Date().toISOString()
+            }));
+            
+            localStorage.setItem(
+                this.getStorageKey('templates'), 
+                JSON.stringify(templatesWithMeta)
+            );
             return true;
-        } catch (e) {
-            console.log('Could not save templates permanently');
+        } catch (error) {
+            console.warn('Error saving templates:', error);
             return false;
         }
     },
 
-    // Add single template
+    // Add metadata to templates
+    addTemplateMetadata(templates) {
+        return templates.map(template => ({
+            ...template,
+            createdBy: template.createdBy || 'Unknown',
+            createdByGroup: template.createdByGroup || 'Unknown',
+            createdAt: template.createdAt || new Date().toISOString()
+        }));
+    },
+
+    // Load group templates (placeholder for now)
+    loadGroupTemplates(groupName) {
+        if (!this.isAvailable || !groupName) return [];
+        
+        const allKeys = Object.keys(localStorage);
+        const groupTemplates = [];
+        
+        allKeys.forEach(key => {
+            // Look for templates from same group but different users
+            if (key.startsWith(`metafold_${groupName}_`) && 
+                key.endsWith('_templates') && 
+                key !== this.getStorageKey('templates')) {
+                try {
+                    const templates = JSON.parse(localStorage.getItem(key));
+                    if (templates && Array.isArray(templates)) {
+                        groupTemplates.push(...this.addTemplateMetadata(templates));
+                    }
+                } catch (error) {
+                    console.warn('Error loading group templates:', error);
+                }
+            }
+        });
+        
+        return groupTemplates;
+    },
+
+    // Legacy compatibility methods
     addTemplate(template, templates) {
         templates.push(template);
         return this.saveTemplates(templates);
     },
 
-    // Update template
     updateTemplate(index, template, templates) {
         if (index >= 0 && index < templates.length) {
             templates[index] = template;
@@ -90,7 +179,6 @@ experiment_log.md`,
         return false;
     },
 
-    // Delete template
     deleteTemplate(index, templates) {
         if (index >= 0 && index < templates.length) {
             templates.splice(index, 1);
@@ -101,3 +189,4 @@ experiment_log.md`,
 };
 
 window.storage = storage;
+console.log('✅ storage loaded (with user support)');
