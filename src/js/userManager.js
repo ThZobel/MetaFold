@@ -1,139 +1,165 @@
-// User and Group Management (with group mappings)
+// User Manager (respects user management setting)
+
+// Remove existing userManager if already defined
+if (window.userManager) {
+    console.log('🔧 Removing existing userManager');
+    delete window.userManager;
+}
 
 const userManager = {
     currentUser: null,
     currentGroup: null,
     users: [],
-    groups: [],
-    userGroupMappings: {}, // Neue Eigenschaft für User-Group Zuordnungen
 
     async init() {
-        console.log('🔧 userManager.init() called');
-        this.loadUsersAndGroups();
+        console.log('🔧 Initializing userManager...');
         
-        const result = await this.showLoginModal();
-        console.log('Login result:', result);
+        // Check if user management is enabled in settings
+        const userManagementEnabled = window.settingsManager?.isUserManagementEnabled();
         
-        // Use mapped group if available, otherwise use provided group
-        const mappedGroup = this.userGroupMappings[result.username] || result.groupname;
-        this.setCurrentUser(result.username, mappedGroup);
+        if (!userManagementEnabled) {
+            console.log('📝 User management disabled - using simple mode');
+            // Use default user without prompting
+            this.currentUser = 'User';
+            this.currentGroup = 'Default';
+            return { username: this.currentUser, groupname: this.currentGroup };
+        }
+
+        console.log('👥 User management enabled - checking for existing user...');
         
-        return result;
+        // Load user history
+        this.loadUserHistory();
+        
+        // Check if we have a current user stored
+        const lastUser = this.getLastUser();
+        if (lastUser && lastUser.username) {
+            console.log('📋 Found last user:', lastUser.username);
+            this.currentUser = lastUser.username;
+            this.currentGroup = lastUser.groupname || 'Default';
+            return lastUser;
+        }
+
+        // No user found, show login modal
+        console.log('❓ No user found, showing login...');
+        try {
+            const userInfo = await this.showLoginModal();
+            this.setCurrentUser(userInfo.username, userInfo.groupname);
+            return userInfo;
+        } catch (error) {
+            console.warn('Login cancelled or failed, using default user');
+            this.currentUser = 'User';
+            this.currentGroup = 'Default';
+            return { username: this.currentUser, groupname: this.currentGroup };
+        }
     },
 
     async showLoginModal() {
-        return new Promise((resolve, reject) => {
-            if (window.loginModal) {
-                window.loginModal.show().then(resolve).catch(reject);
-            } else {
-                setTimeout(() => {
-                    this.showLoginModal().then(resolve).catch(reject);
-                }, 100);
-            }
-        });
+        if (!window.loginModal) {
+            throw new Error('loginModal not available');
+        }
+        return await window.loginModal.show();
     },
 
     setCurrentUser(username, groupname) {
-        console.log(`🔧 Setting user: "${username}" in group: "${groupname}"`);
-        
-        if (!username) {
-            console.error('❌ Invalid username!');
-            return;
-        }
-        
-        if (!groupname) {
-            groupname = 'Default';
-        }
-        
         this.currentUser = username;
-        this.currentGroup = groupname;
+        this.currentGroup = groupname || 'Default';
+        
+        // Add to history
         this.addUserToHistory(username, groupname);
-        this.updateStoragePrefix();
-        console.log(`✅ User set: ${username} (${groupname})`);
+        
+        // Store as last user
+        try {
+            localStorage.setItem('metafold_last_user', JSON.stringify({
+                username: username,
+                groupname: groupname,
+                timestamp: new Date().toISOString()
+            }));
+        } catch (error) {
+            console.warn('Could not store last user:', error);
+        }
+
+        console.log(`✅ Current user set: ${username} (${groupname})`);
+    },
+
+    getLastUser() {
+        try {
+            const stored = localStorage.getItem('metafold_last_user');
+            return stored ? JSON.parse(stored) : null;
+        } catch (error) {
+            console.warn('Could not load last user:', error);
+            return null;
+        }
+    },
+
+    loadUserHistory() {
+        try {
+            const stored = localStorage.getItem('metafold_user_history');
+            this.users = stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.warn('Could not load user history:', error);
+            this.users = [];
+        }
     },
 
     addUserToHistory(username, groupname) {
         if (!this.users.includes(username)) {
-            this.users.push(username);
-            console.log(`➕ Added user to history: ${username}`);
-        }
-        
-        if (!this.groups.includes(groupname)) {
-            this.groups.push(groupname);
-            console.log(`➕ Added group to history: ${groupname}`);
-        }
-        
-        // Update user-group mapping
-        this.userGroupMappings[username] = groupname;
-        
-        this.saveUsersAndGroups();
-    },
-
-    updateStoragePrefix() {
-        if (window.storage && window.storage.setUserPrefix) {
-            const prefix = `${this.currentGroup}_${this.currentUser}`;
-            window.storage.setUserPrefix(prefix);
-            console.log(`📦 Storage prefix updated: ${prefix}`);
-        }
-    },
-
-    loadUsersAndGroups() {
-        try {
-            const users = JSON.parse(localStorage.getItem('metafold_global_users') || '[]');
-            const groups = JSON.parse(localStorage.getItem('metafold_global_groups') || '[]');
-            const mappings = JSON.parse(localStorage.getItem('metafold_global_user_group_mappings') || '{}');
+            this.users.unshift(username);
             
-            this.users = users;
-            this.groups = groups;
-            this.userGroupMappings = mappings;
+            // Keep only last 10 users
+            if (this.users.length > 10) {
+                this.users = this.users.slice(0, 10);
+            }
             
-            console.log(`📊 Loaded ${users.length} users, ${groups.length} groups, ${Object.keys(mappings).length} mappings`);
-        } catch (error) {
-            console.warn('Error loading users/groups:', error);
-            this.users = [];
-            this.groups = [];
-            this.userGroupMappings = {};
+            try {
+                localStorage.setItem('metafold_user_history', JSON.stringify(this.users));
+                
+                // Also store group mapping for userManagementModal
+                if (window.userManagementModal && window.userManagementModal.userGroupMap) {
+                    window.userManagementModal.userGroupMap[username] = groupname;
+                    window.userManagementModal.saveUserGroupMapping();
+                }
+            } catch (error) {
+                console.warn('Could not save user history:', error);
+            }
         }
     },
 
-    saveUsersAndGroups() {
-        try {
-            localStorage.setItem('metafold_global_users', JSON.stringify(this.users));
-            localStorage.setItem('metafold_global_groups', JSON.stringify(this.groups));
-            localStorage.setItem('metafold_global_user_group_mappings', JSON.stringify(this.userGroupMappings));
-            console.log('💾 Saved users, groups and mappings to localStorage');
-        } catch (error) {
-            console.warn('Error saving users/groups:', error);
-        }
-    },
-
-    // Get group for user
     getUserGroup(username) {
-        return this.userGroupMappings[username] || 'Default';
-    },
-
-    // Update user group mapping
-    updateUserGroup(username, groupname) {
-        this.userGroupMappings[username] = groupname;
-        this.saveUsersAndGroups();
-        console.log(`🔧 Updated mapping: ${username} -> ${groupname}`);
+        // Try to get from userManagementModal first
+        if (window.userManagementModal && window.userManagementModal.userGroupMap) {
+            return window.userManagementModal.userGroupMap[username] || 'Default';
+        }
+        return 'Default';
     },
 
     generateUserColor(username) {
-        if (!username) return '#666';
+        // Generate consistent color from username
         let hash = 0;
         for (let i = 0; i < username.length; i++) {
             hash = username.charCodeAt(i) + ((hash << 5) - hash);
         }
+        
+        // Convert to HSL for better colors
         const hue = Math.abs(hash) % 360;
         return `hsl(${hue}, 70%, 50%)`;
     },
 
     getUserInitials(username) {
         if (!username) return '??';
-        return username.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
+        
+        const words = username.trim().split(/\s+/);
+        if (words.length === 1) {
+            return words[0].substring(0, 2).toUpperCase();
+        } else {
+            return (words[0][0] + words[1][0]).toUpperCase();
+        }
+    },
+
+    // Check if user management is enabled
+    isEnabled() {
+        return window.settingsManager?.isUserManagementEnabled() || false;
     }
 };
 
 window.userManager = userManager;
-console.log('✅ userManager loaded (with group mappings)');
+console.log('✅ userManager loaded (with settings integration)');
