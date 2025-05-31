@@ -1,4 +1,4 @@
-// Test App with userManager (Step 2)
+// App with userManager and Settings Modal Loading (Fixed)
 
 const app = {
     initialized: false,
@@ -6,9 +6,12 @@ const app = {
     async init() {
         if (this.initialized) return;
         
-        console.log('🚀 Starting MetaFold (Step 2: with userManager)...');
+        console.log('🚀 Starting MetaFold (with userManager)...');
         
         try {
+            // Load settings modal HTML first
+            await this.loadSettingsModal();
+            
             // Check what modules are available
             console.log('=== AVAILABLE MODULES ===');
             const modules = ['storage', 'userManager', 'templateManager', 'templateTypeManager', 'templateModal', 'projectManager', 'settingsManager'];
@@ -40,18 +43,39 @@ const app = {
             }
             
             this.initialized = true;
-            console.log('✅ MetaFold started successfully (Step 2)!');
+            console.log('✅ MetaFold started successfully!');
             
             // Show current user info
             if (window.userManager) {
-                this.showSuccess(`App gestartet! Benutzer: ${window.userManager.currentUser} (${window.userManager.currentGroup})`);
+                this.showSuccess(`App started! User: ${window.userManager.currentUser} (${window.userManager.currentGroup})`);
             } else {
-                this.showSuccess('App gestartet! (ohne User-System)');
+                this.showSuccess('App started! (without user system)');
             }
             
         } catch (error) {
             console.error('❌ Error during app initialization:', error);
-            this.showError('Fehler beim Starten: ' + error.message);
+            this.showError('Error starting app: ' + error.message);
+        }
+    },
+
+    // Load settings modal HTML
+    async loadSettingsModal() {
+        try {
+            const response = await fetch('settingsModal.html');
+            if (response.ok) {
+                const html = await response.text();
+                const container = document.getElementById('settingsModalContainer');
+                if (container) {
+                    container.innerHTML = html;
+                    console.log('✅ Settings modal loaded');
+                } else {
+                    console.warn('❌ Settings modal container not found');
+                }
+            } else {
+                console.warn('❌ Could not load settings modal');
+            }
+        } catch (error) {
+            console.warn('❌ Error loading settings modal:', error);
         }
     },
 
@@ -183,11 +207,11 @@ const app = {
         `;
         
         messageDiv.innerHTML = `
-            <strong>${isError ? '⚠️' : '✅'} ${isError ? 'Fehler' : 'Erfolgreich'}</strong><br>
+            <strong>${isError ? '⚠️' : '✅'} ${isError ? 'Error' : 'Success'}</strong><br>
             ${message}
             <br><br>
             <button onclick="this.parentElement.remove()" style="background: ${isError ? '#c33' : '#363'}; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer;">
-                Schließen
+                Close
             </button>
         `;
         

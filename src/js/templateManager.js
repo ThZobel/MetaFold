@@ -1,4 +1,4 @@
-// Template Manager (with unified styling - COMPLETE)
+// Template Manager (with unified styling and English translation)
 
 const templateManager = {
     templates: [],
@@ -135,7 +135,7 @@ const templateManager = {
         return username ? username.substring(0, 2).toUpperCase() : '??';
     },
 
-    // Render template list - FIXED VERSION
+    // Render template list - FIXED VERSION with unified colors and English
     renderList() {
         const listContainer = document.getElementById('templateList');
         if (!listContainer) {
@@ -150,7 +150,7 @@ const templateManager = {
             const typeLabel = currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
             listContainer.innerHTML = `
                 <div class="empty-state">
-                    <p>Noch keine ${typeLabel} vorhanden.<br>Erstellen Sie Ihr erstes Template!</p>
+                    <p>No ${typeLabel} available yet.<br>Create your first template!</p>
                 </div>
             `;
             return;
@@ -161,7 +161,7 @@ const templateManager = {
                 '<span class="template-badge experiment">Exp</span>' : 
                 '<span class="template-badge">Folder</span>';
             
-            // Use normal colors for all templates
+            // Use normal colors for ALL templates (no differentiation between own/shared)
             const color = this.getUserColor(template.createdBy);
             const initials = this.getUserInitials(template.createdBy);
             
@@ -175,13 +175,13 @@ const templateManager = {
                         </div>
                         <div class="template-info">
                             <h3>${template.name} ${badge}</h3>
-                            <small>von ${template.createdBy || 'Unknown'} (${template.createdByGroup || 'Unknown'})</small>
-                            ${!template.isOwn ? '<span class="shared-badge">📋 Geteilt</span>' : ''}
+                            <small>by ${template.createdBy || 'Unknown'} (${template.createdByGroup || 'Unknown'})</small>
+                            ${!template.isOwn ? '<span class="shared-badge">📋 Shared</span>' : ''}
                         </div>
                         ${!template.isOwn ? `
                             <button class="copy-template-btn" 
                                     onclick="event.stopPropagation(); templateManager.copyTemplate(${index})"
-                                    title="Template kopieren"
+                                    title="Copy template"
                                     style="
                                         background: #28a745;
                                         color: white;
@@ -192,7 +192,7 @@ const templateManager = {
                                         font-size: 0.8rem;
                                         margin-left: auto;
                                     ">
-                                📋 Kopieren
+                                📋 Copy
                             </button>
                         ` : ''}
                     </div>
@@ -211,7 +211,7 @@ const templateManager = {
 
         const copiedTemplate = {
             ...template,
-            name: `${template.name} (Kopie)`,
+            name: `${template.name} (Copy)`,
             createdBy: window.userManager?.currentUser || 'Unknown',
             createdByGroup: window.userManager?.currentGroup || 'Unknown',
             createdAt: new Date().toISOString(),
@@ -295,7 +295,7 @@ const templateManager = {
     deleteCurrent() {
         if (!this.currentTemplate || !this.currentTemplate.isOwn) return;
         
-        if (confirm(`Template "${this.currentTemplate.name}" löschen?`)) {
+        if (confirm(`Delete template "${this.currentTemplate.name}"?`)) {
             const index = this.templates.findIndex(t => 
                 t.name === this.currentTemplate.name && 
                 t.createdBy === this.currentTemplate.createdBy
@@ -324,4 +324,4 @@ const templateManager = {
 };
 
 window.templateManager = templateManager;
-console.log('✅ templateManager loaded (complete)');
+console.log('✅ templateManager loaded (unified colors + English)');

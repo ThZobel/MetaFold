@@ -1,6 +1,6 @@
 const userManagementModal = {
     modal: null,
-    userGroupMap: {}, // Speichert User -> Group Zuordnung
+    userGroupMap: {}, // Stores User -> Group mapping
 
     show() {
         this.loadUserGroupMapping();
@@ -60,7 +60,7 @@ const userManagementModal = {
                     box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h2 style="margin: 0; color: #007bff;">👥 Benutzer-Verwaltung</h2>
+                        <h2 style="margin: 0; color: #007bff;">👥 User Management</h2>
                         <button onclick="userManagementModal.close()" style="
                             background: none;
                             border: none;
@@ -71,11 +71,11 @@ const userManagementModal = {
                     </div>
                     
                     <div style="margin-bottom: 1.5rem;">
-                        <h3 style="margin: 0 0 1rem 0; color: #333;">➕ Neuen Benutzer hinzufügen</h3>
+                        <h3 style="margin: 0 0 1rem 0; color: #333;">➕ Add New User</h3>
                         <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: end;">
                             <div>
                                 <label style="display: block; margin-bottom: 0.25rem; font-size: 0.9rem;">Name:</label>
-                                <input type="text" id="newUserName" placeholder="Max Mustermann" style="
+                                <input type="text" id="newUserName" placeholder="John Doe" style="
                                     width: 100%;
                                     padding: 0.5rem;
                                     border: 1px solid #ddd;
@@ -84,8 +84,8 @@ const userManagementModal = {
                                 ">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 0.25rem; font-size: 0.9rem;">Gruppe:</label>
-                                <input type="text" id="newUserGroup" placeholder="Labor A" style="
+                                <label style="display: block; margin-bottom: 0.25rem; font-size: 0.9rem;">Group:</label>
+                                <input type="text" id="newUserGroup" placeholder="Lab A" style="
                                     width: 100%;
                                     padding: 0.5rem;
                                     border: 1px solid #ddd;
@@ -101,12 +101,12 @@ const userManagementModal = {
                                 border-radius: 4px;
                                 cursor: pointer;
                                 white-space: nowrap;
-                            ">➕ Hinzufügen</button>
+                            ">➕ Add</button>
                         </div>
                     </div>
                     
                     <div>
-                        <h3 style="margin: 0 0 1rem 0; color: #333;">📋 Vorhandene Benutzer</h3>
+                        <h3 style="margin: 0 0 1rem 0; color: #333;">📋 Existing Users</h3>
                         <div id="userList" style="
                             max-height: 300px;
                             overflow-y: auto;
@@ -123,7 +123,7 @@ const userManagementModal = {
                             padding: 0.75rem 2rem;
                             border-radius: 4px;
                             cursor: pointer;
-                        ">Schließen</button>
+                        ">Close</button>
                     </div>
                 </div>
             </div>
@@ -149,8 +149,8 @@ const userManagementModal = {
         if (users.length === 0) {
             listContainer.innerHTML = `
                 <div style="padding: 1rem; text-align: center; color: #666;">
-                    Noch keine Benutzer vorhanden.<br>
-                    Fügen Sie den ersten Benutzer hinzu!
+                    No users available yet.<br>
+                    Add the first user!
                 </div>
             `;
             return;
@@ -185,8 +185,8 @@ const userManagementModal = {
                     ">${initials}</div>
                     <div style="flex: 1;">
                         <strong>${user}</strong><br>
-                        <small style="color: #666;">Gruppe: ${group}</small>
-                        ${isCurrent ? '<span style="color: #007bff; font-size: 0.8rem;"> (aktuell)</span>' : ''}
+                        <small style="color: #666;">Group: ${group}</small>
+                        ${isCurrent ? '<span style="color: #007bff; font-size: 0.8rem;"> (current)</span>' : ''}
                     </div>
                     <button onclick="userManagementModal.switchToUser('${user.replace(/'/g, "\\'")}', '${group.replace(/'/g, "\\'")}')" style="
                         background: #007bff;
@@ -197,7 +197,7 @@ const userManagementModal = {
                         cursor: pointer;
                         font-size: 0.8rem;
                         ${isCurrent ? 'opacity: 0.5; cursor: not-allowed;' : ''}
-                    " ${isCurrent ? 'disabled' : ''}>Wechseln</button>
+                    " ${isCurrent ? 'disabled' : ''}>Switch</button>
                 </div>
             `;
         }).join('');
@@ -211,12 +211,12 @@ const userManagementModal = {
         const group = groupInput.value.trim();
         
         if (!name || !group) {
-            alert('Bitte geben Sie sowohl Namen als auch Gruppe ein.');
+            alert('Please enter both name and group.');
             return;
         }
         
         if (window.userManager.users.includes(name)) {
-            alert('Dieser Benutzer existiert bereits.');
+            alert('This user already exists.');
             return;
         }
         
@@ -240,7 +240,7 @@ const userManagementModal = {
     switchToUser(username, group) {
         if (username === window.userManager?.currentUser) return;
         
-        if (confirm(`Zu Benutzer "${username}" (${group}) wechseln?`)) {
+        if (confirm(`Switch to user "${username}" (${group})?`)) {
             window.userManager.setCurrentUser(username, group);
             this.close();
             
@@ -251,7 +251,7 @@ const userManagementModal = {
             
             // Show success message
             if (window.app && window.app.showSuccess) {
-                window.app.showSuccess(`Zu Benutzer "${username}" (${group}) gewechselt!`);
+                window.app.showSuccess(`Switched to user "${username}" (${group})!`);
             }
         }
     },
@@ -265,4 +265,4 @@ const userManagementModal = {
 };
 
 window.userManagementModal = userManagementModal;
-console.log('✅ userManagementModal loaded (with group mapping)');
+console.log('✅ userManagementModal loaded (English translation)');

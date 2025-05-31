@@ -1,4 +1,4 @@
-// Login Modal (with group display in suggestions)
+// Login Modal (English translation)
 
 // Remove existing loginModal if already defined
 if (window.loginModal) {
@@ -57,7 +57,7 @@ const loginModal = {
                     box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h2 style="margin: 0; color: #007bff;">🚀 Willkommen bei MetaFold</h2>
+                        <h2 style="margin: 0; color: #007bff;">🚀 Welcome to MetaFold</h2>
                         <button onclick="loginModal.showUserManagement()" style="
                             background: #28a745;
                             color: white;
@@ -66,14 +66,14 @@ const loginModal = {
                             border-radius: 3px;
                             cursor: pointer;
                             font-size: 0.8rem;
-                        ">👥 Verwalten</button>
+                        ">👥 Manage</button>
                     </div>
-                    <p style="margin: 0 0 1.5rem 0; color: #666; text-align: center;">Geben Sie Ihren Namen ein:</p>
+                    <p style="margin: 0 0 1.5rem 0; color: #666; text-align: center;">Enter your name:</p>
                     
                     <div style="margin-bottom: 1.5rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">👤 Ihr Name:</label>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">👤 Your Name:</label>
                         <div style="position: relative;">
-                            <input type="text" id="usernameInput" placeholder="z.B. Max Mustermann" 
+                            <input type="text" id="usernameInput" placeholder="e.g. John Doe" 
                                    autocomplete="off" style="
                                 width: 100%;
                                 padding: 0.75rem;
@@ -98,7 +98,7 @@ const loginModal = {
                             "></div>
                         </div>
                         <small style="color: #666; margin-top: 0.5rem; display: block;">
-                            Gruppen können in der Benutzerverwaltung zugeordnet werden.
+                            Groups can be assigned in user management.
                         </small>
                     </div>
                     
@@ -114,7 +114,7 @@ const loginModal = {
                             transition: background 0.2s;
                         " onmouseover="this.style.background='#0056b3'" 
                            onmouseout="this.style.background='#007bff'">
-                            🚀 Los geht's!
+                            🚀 Let's Go!
                         </button>
                     </div>
                 </div>
@@ -128,31 +128,31 @@ const loginModal = {
     },
 
     setupEventListeners() {
-        // Auto-complete für Benutzername
+        // Auto-complete for username
         this.usernameInput.addEventListener('input', (e) => {
             this.showUserSuggestions(e.target.value);
         });
 
-        // Bestätigen
+        // Confirm button
         document.getElementById('loginConfirm').addEventListener('click', () => {
             this.handleConfirm();
         });
 
-        // Enter-Taste
+        // Enter key
         this.usernameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.handleConfirm();
         });
 
-        // Focus auf Feld
+        // Focus on input field
         setTimeout(() => this.usernameInput.focus(), 100);
     },
 
     loadSuggestions() {
-        // Setze letzten verwendeten User wenn verfügbar
+        // Set last used user if available
         const users = window.userManager?.users || [];
         
         if (users.length > 0) {
-            this.usernameInput.placeholder = `z.B. ${users[0]}`;
+            this.usernameInput.placeholder = `e.g. ${users[0]}`;
         }
     },
 
@@ -246,7 +246,7 @@ const loginModal = {
         const username = this.usernameInput.value.trim();
 
         if (!username) {
-            this.showError('Bitte geben Sie Ihren Namen ein.');
+            this.showError('Please enter your name.');
             return;
         }
 
@@ -286,4 +286,4 @@ const loginModal = {
 };
 
 window.loginModal = loginModal;
-console.log('✅ loginModal loaded (with group display)');
+console.log('✅ loginModal loaded (English translation)');

@@ -353,6 +353,135 @@ body {
     display: block;
 }
 
+/* ===== SETTINGS MODAL STYLES ===== */
+.settings-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-tab {
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.settings-tab.active {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: #7c3aed;
+    color: #a855f7;
+}
+
+.settings-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Settings Form Styling */
+.settings-tab-content .form-group {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-tab-content .form-group label {
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.settings-tab-content .form-group small {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+.settings-tab-content input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    transform: scale(1.2);
+}
+
+.settings-tab-content input[type="url"],
+.settings-tab-content input[type="password"],
+.settings-tab-content input[type="number"] {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.settings-tab-content input[type="url"]:focus,
+.settings-tab-content input[type="password"]:focus,
+.settings-tab-content input[type="number"]:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.settings-tab-content select {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+/* Connection Status */
+#connectionStatus {
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#connectionStatus.success-message {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #34d399;
+}
+
+#connectionStatus.error-message {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #f87171;
+}
+
+/* Settings Messages */
+.info-message {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid #3b82f6;
+    color: #60a5fa;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
 /* JSON Schema Support Styles */
 .metadata-group {
     margin-bottom: 15px;
@@ -386,12 +515,6 @@ body {
 .field-options input[placeholder*="Beschreibung"] {
     font-size: 12px;
     color: #9ca3af;
-}
-
-.info-message {
-    background: #dbeafe;
-    border: 1px solid #93c5fd;
-    color: #1e40af;
 }
 
 /* Template-Info Styling */
@@ -473,15 +596,6 @@ body {
     border-bottom: none;
 }
 
-.error-message {
-    background-color: #fee;
-    color: #c33;
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin: 1rem 0;
-    display: none;
-}
-
 /* Template Avatar */
 .template-avatar {
     width: 32px;
@@ -546,16 +660,7 @@ body {
     font-weight: bold;
 }
 
-/* Template Item States */
-.template-item[data-is-own="false"] {
-    border-left: 3px solid #007bff;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-}
-
-.template-item[data-is-own="false"]:hover {
-    background: linear-gradient(135deg, #f0f0f0 0%, #f0f2ff 100%);
-}
-
+/* Template Info Text for light themes */
 .template-info-text {
     background: #fff3e0;
     border: 1px solid #ffcc02;
@@ -616,11 +721,21 @@ body {
     .template-header-details .template-avatar {
         margin: 0 auto 1rem auto;
     }
+    
+    .settings-tabs {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .settings-tab {
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
 }
 
 /* Template-Info-Section Styling */
 #templateInfoSection {
-    display: none; /* Standardmäßig ausgeblendet, wird von JavaScript gezeigt */
+    display: none;
 }
 
 #templateInfoSection.active {
