@@ -733,6 +733,173 @@ body {
     }
 }
 
+/* ===== SIMPLIFIED TEMPLATE STYLES ===== */
+
+.template-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.template-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(3px);
+}
+
+.template-item.active {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: #7c3aed;
+}
+
+/* Simplified Header Layout */
+.template-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.template-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.template-info {
+    flex: 1;
+    min-width: 0; /* Allow text truncation */
+}
+
+.template-info h3 {
+    margin: 0 0 2px 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.2;
+}
+
+/* Simplified badges */
+.template-badge {
+    display: inline-block;
+    background: #059669;
+    color: white;
+    padding: 1px 4px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    line-height: 1;
+    margin-left: 4px;
+}
+
+.template-badge.experiment {
+    background: #dc2626;
+}
+
+.shared-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    margin-left: 4px;
+    font-weight: normal;
+}
+
+/* Simplified meta info */
+.template-meta {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.template-meta .creator-info {
+    display: block;
+    margin-bottom: 2px;
+}
+
+.template-meta .date-info {
+    display: block;
+    color: #6b7280;
+    font-size: 0.7rem;
+}
+
+/* Copy link styling */
+.copy-link {
+    color: #10b981;
+    font-size: 0.7rem;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-top: 2px;
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+.copy-link:hover {
+    color: #059669;
+    text-decoration: none;
+}
+
+/* Description styling */
+.template-description {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin: 6px 0 0 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Owner indicator */
+.owner-indicator {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    opacity: 0.7;
+}
+
+/* Responsive adjustments for very narrow sidebars */
+@media (max-width: 768px) {
+    .template-header {
+        gap: 6px;
+    }
+    
+    .template-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+    
+    .template-info h3 {
+        font-size: 0.85rem;
+    }
+    
+    .template-badge {
+        font-size: 0.6rem;
+        padding: 1px 3px;
+    }
+}
+
 /* Template-Info-Section Styling */
 #templateInfoSection {
     display: none;

@@ -1,4 +1,4 @@
-// App with userManager and Settings Modal Loading (Fixed)
+// App with userManager - Fixed Settings Modal Loading
 
 const app = {
     initialized: false,
@@ -6,12 +6,9 @@ const app = {
     async init() {
         if (this.initialized) return;
         
-        console.log('🚀 Starting MetaFold (with userManager)...');
+        console.log('🚀 Starting MetaFold (User Management Fixed)...');
         
         try {
-            // Load settings modal HTML first
-            await this.loadSettingsModal();
-            
             // Check what modules are available
             console.log('=== AVAILABLE MODULES ===');
             const modules = ['storage', 'userManager', 'templateManager', 'templateTypeManager', 'templateModal', 'projectManager', 'settingsManager'];
@@ -23,6 +20,13 @@ const app = {
                     console.log(`❌ ${module}: Missing`);
                 }
             });
+            
+            // Initialize settingsManager FIRST (required for user management check)
+            if (window.settingsManager) {
+                console.log('🔧 Initializing settingsManager...');
+                window.settingsManager.init();
+                console.log('✅ settingsManager initialized');
+            }
             
             // Initialize userManager if available
             if (window.userManager) {
@@ -49,33 +53,12 @@ const app = {
             if (window.userManager) {
                 this.showSuccess(`App started! User: ${window.userManager.currentUser} (${window.userManager.currentGroup})`);
             } else {
-                this.showSuccess('App started! (without user system)');
+                this.showSuccess('App started! (User management ready)');
             }
             
         } catch (error) {
             console.error('❌ Error during app initialization:', error);
             this.showError('Error starting app: ' + error.message);
-        }
-    },
-
-    // Load settings modal HTML
-    async loadSettingsModal() {
-        try {
-            const response = await fetch('settingsModal.html');
-            if (response.ok) {
-                const html = await response.text();
-                const container = document.getElementById('settingsModalContainer');
-                if (container) {
-                    container.innerHTML = html;
-                    console.log('✅ Settings modal loaded');
-                } else {
-                    console.warn('❌ Settings modal container not found');
-                }
-            } else {
-                console.warn('❌ Could not load settings modal');
-            }
-        } catch (error) {
-            console.warn('❌ Error loading settings modal:', error);
         }
     },
 
@@ -109,16 +92,6 @@ const app = {
                 console.log('✅ projectManager initialized');
             } catch (error) {
                 console.error('❌ Error initializing projectManager:', error);
-            }
-        }
-
-        // Initialize settings manager if available
-        if (window.settingsManager && typeof window.settingsManager.init === 'function') {
-            try {
-                window.settingsManager.init();
-                console.log('✅ settingsManager initialized');
-            } catch (error) {
-                console.error('❌ Error initializing settingsManager:', error);
             }
         }
 
