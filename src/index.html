@@ -1041,6 +1041,191 @@ experiment_log.md"></textarea>
                 closeSettingsModal();
             }
         });
+		
+		// Enhanced OMERO Settings Functions - Visual Confirmation like elabFTW
+
+		// OMERO connection test with visual feedback (analog zu elabFTW)
+		window.testOMEROConnection = async function() {
+			const statusDiv = document.getElementById('omeroConnectionStatus');
+			
+			if (statusDiv) {
+				statusDiv.style.display = 'block';
+				statusDiv.textContent = 'Testing OMERO connection...';
+				statusDiv.className = '';
+				
+				try {
+					const result = await window.settingsManager.testOMEROConnection();
+					
+					// Enhanced status message with details
+					let message = result.message;
+					if (result.success && result.details) {
+						const authType = result.details.isAuthenticated ? 'Private' : 'Public';
+						const projectCount = result.details.projectCount || 0;
+						message += ` (${authType} access, ${projectCount} projects)`;
+					}
+					
+					statusDiv.textContent = message;
+					statusDiv.className = result.success ? 'success-message' : 'error-message';
+					
+					// Update additional status elements if they exist
+					updateOMEROStatusDisplay(result);
+					
+				} catch (error) {
+					statusDiv.textContent = 'OMERO connection test failed: ' + error.message;
+					statusDiv.className = 'error-message';
+				}
+			}
+		};
+
+		// Enhanced OMERO diagnosis with visual feedback
+		window.runOMERODiagnosis = async function() {
+			const statusDiv = document.getElementById('omeroConnectionStatus');
+			
+			statusDiv.style.display = 'block';
+			statusDiv.textContent = 'Running enhanced OMERO diagnosis...';
+			statusDiv.className = '';
+			
+			try {
+				if (window.omeroIntegration && window.omeroIntegration.runDiagnosis) {
+					const diagnosisResult = await window.omeroIntegration.runDiagnosis();
+					
+					// Create detailed diagnosis message
+					let message = `🔧 OMERO Diagnosis: ${diagnosisResult.success ? '✅ Success' : '❌ Issues Found'}`;
+					if (diagnosisResult.authMethods) {
+						message += ` (Auth: ${diagnosisResult.authMethods.join(', ')})`;
+					}
+					
+					statusDiv.innerHTML = `
+						<strong>${message}</strong><br>
+						<div style="margin-top: 8px; font-size: 12px;">
+							${diagnosisResult.message}<br>
+							Check browser console for detailed information.
+						</div>
+					`;
+					statusDiv.className = diagnosisResult.success ? 'success-message' : 'error-message';
+					
+					// Update status display with diagnosis results
+					updateOMEROStatusDisplay(diagnosisResult);
+					
+				} else {
+					throw new Error('OMERO Integration module not available');
+				}
+				
+			} catch (error) {
+				statusDiv.textContent = 'OMERO diagnosis failed: ' + error.message;
+				statusDiv.className = 'error-message';
+			}
+		};
+
+		// Update detailed OMERO status display (analog zu elabFTW)
+		function updateOMEROStatusDisplay(result) {
+			// Main status elements
+			const statusIcon = document.getElementById('omeroStatusIcon');
+			const statusText = document.getElementById('omeroStatusText');
+			const statusDetails = document.getElementById('omeroStatusDetails');
+			
+			if (result.success) {
+				// Success state
+				if (statusIcon) {
+					statusIcon.textContent = result.details?.isAuthenticated ? '🔐' : '🌐';
+				}
+				
+				if (statusText) {
+					const authType = result.details?.isAuthenticated ? 'Private' : 'Public';
+					statusText.textContent = `OMERO Status: Connected (${authType})`;
+					statusText.style.color = '#059669';
+				}
+				
+				if (statusDetails && result.details) {
+					statusDetails.style.display = 'block';
+					
+					// Update individual detail fields
+					const updateField = (id, value) => {
+						const element = document.getElementById(id);
+						if (element) element.textContent = value || '-';
+					};
+					
+					updateField('omeroLoginMethod', result.details.loginMethod || result.loginMethod);
+					updateField('omeroProjectCount', result.details.projectCount || '0');
+					updateField('omeroSessionType', result.details.isAuthenticated ? 'Authenticated' : 'Public Group');
+					updateField('omeroActiveServerUrl', result.details.proxyUrl || 'Direct');
+				}
+			} else {
+				// Error state
+				if (statusIcon) statusIcon.textContent = '❌';
+				if (statusText) {
+					statusText.textContent = 'OMERO Status: Connection failed';
+					statusText.style.color = '#dc2626';
+				}
+				if (statusDetails) statusDetails.style.display = 'none';
+			}
+		}
+
+		// Load OMERO settings into modal (enhanced)
+		window.loadOMEROSettingsIntoModal = function() {
+			const sm = window.settingsManager;
+			if (!sm) return;
+			
+			// Load basic settings
+			const omeroEnabled = sm.get('omero.enabled');
+			const omeroEnabledEl = document.getElementById('omeroEnabled');
+			if (omeroEnabledEl) omeroEnabledEl.checked = omeroEnabled;
+			
+			// Show/hide config
+			const omeroConfigEl = document.getElementById('omeroConfig');
+			if (omeroConfigEl) {
+				omeroConfigEl.style.display = omeroEnabled ? 'block' : 'none';
+			}
+			
+			if (omeroEnabled) {
+				// Load server and auth settings
+				const serverUrl = sm.get('omero.server_url');
+				const username = sm.get('omero.username');
+				const password = sm.get('omero.password');
+				const sessionId = sm.get('omero.session_id');
+				const csrfToken = sm.get('omero.csrf_token');
+				
+				// Set form values
+				const setFieldValue = (id, value) => {
+					const element = document.getElementById(id);
+					if (element) element.value = value || '';
+				};
+				
+				setFieldValue('omeroServerUrl', serverUrl);
+				setFieldValue('omeroUsername', username);
+				setFieldValue('omeroPassword', password);
+				setFieldValue('omeroSessionId', sessionId);
+				setFieldValue('omeroCSRFToken', csrfToken);
+				
+				// Load integration settings
+				const autoSyncEl = document.getElementById('omeroAutoSync');
+				if (autoSyncEl) autoSyncEl.checked = sm.get('omero.auto_sync') || false;
+				
+				const defaultProjectEl = document.getElementById('omeroDefaultProject');
+				if (defaultProjectEl) defaultProjectEl.value = sm.get('omero.default_project_id') || '';
+				
+				const createDatasetsEl = document.getElementById('omeroCreateDatasets');
+				if (createDatasetsEl) createDatasetsEl.checked = sm.get('omero.create_datasets') !== false;
+				
+				// Update status display if we have existing connection info
+				setTimeout(updateOMEROStatusDisplay, 100);
+			}
+		};
+
+		// Initialize OMERO status when modal opens
+		document.addEventListener('DOMContentLoaded', function() {
+			// Auto-load settings when OMERO tab is clicked
+			const omeroTab = document.getElementById('omeroTab');
+			if (omeroTab) {
+				omeroTab.addEventListener('click', function() {
+					setTimeout(() => {
+						loadOMEROSettingsIntoModal();
+						// Auto-update status display
+						updateOMEROStatusDisplay({ success: false });
+					}, 100);
+				});
+			}
+		});
     </script>
 </body>
 </html>

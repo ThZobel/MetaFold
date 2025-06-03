@@ -908,3 +908,125 @@ body {
 #templateInfoSection.active {
     display: block;
 }
+/* OMERO Connection Status Styling */
+#omeroConnectionStatus {
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+#omeroConnectionStatus.success-message {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #059669;
+}
+
+#omeroConnectionStatus.error-message {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #dc2626;
+}
+
+/* OMERO Status Info Panel */
+#omeroConnectionInfo {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 15px;
+    transition: all 0.3s ease;
+}
+
+#omeroStatusDetails {
+    animation: fadeIn 0.3s ease;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+#omeroStatusDetails div {
+    margin-bottom: 2px;
+}
+
+/* Status Icons Animation */
+#omeroStatusIcon {
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+#omeroStatusIcon:hover {
+    transform: scale(1.1);
+}
+
+/* OMERO Test Buttons */
+.omero-test-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.omero-test-buttons .btn {
+    transition: all 0.3s ease;
+}
+
+.omero-test-buttons .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Success/Error Animation */
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(-5px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes pulse {
+    0% { 
+        transform: scale(1); 
+    }
+    50% { 
+        transform: scale(1.05); 
+    }
+    100% { 
+        transform: scale(1); 
+    }
+}
+
+.success-message {
+    animation: fadeIn 0.3s ease;
+}
+
+.error-message {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Loading State */
+#omeroConnectionStatus:empty:before {
+    content: "⏳ Testing connection...";
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .omero-test-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    #omeroConnectionStatus {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+}
