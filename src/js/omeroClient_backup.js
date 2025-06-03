@@ -107,146 +107,133 @@ const omeroClient = {
     // =================== AUTHENTICATION (FIXED) ===================
     
     // Enhanced Login mit CSRF-Fixes
-		async loginWithCredentials(username, password) {
-		console.log('🔬 === OMERO JSON API LOGIN (CSRF FIXED) ===');
-		console.log('🔬 Username:', username);
-		
-		try {
-			// Step 1: Get fresh CSRF token
-			console.log('🔬 Step 1: Getting fresh CSRF token...');
-			const csrfToken = await this.getCSRFToken();
-			
-			if (!csrfToken) {
-				throw new Error('Failed to obtain CSRF token');
-			}
-			
-			// Step 2: Get server ID
-			console.log('🔬 Step 2: Getting server ID...');
-			let serverId = 1;
-			
-			try {
-				const serversResponse = await fetch(`${this.baseUrl}api/v0/servers/`, {
-					method: 'GET',
-					credentials: 'include',
-					headers: {
-						'Accept': 'application/json',
-						'X-CSRFToken': csrfToken
-					}
-				});
-				
-				if (serversResponse.ok) {
-					const serversData = await serversResponse.json();
-					if (serversData.data && serversData.data.length > 0) {
-						serverId = serversData.data[0].id;
-						console.log('🔬 Server ID found:', serverId);
-					}
-				}
-			} catch (serverError) {
-				console.warn('⚠️ Server fetch failed, using default ID (1)');
-			}
-			
-			// Step 3: FIXED Login Request - FORM DATA statt JSON!
-			console.log('🔬 Step 3: Login with CSRF fixes...');
-			
-			// 🔧 WICHTIGER FIX: Form-Data für Django Login
-			const loginData = new URLSearchParams({
-				username: username,
-				password: password,
-				server: serverId,
-				csrfmiddlewaretoken: csrfToken  // CSRF Token im Body
-			});
-			
-			console.log('🔬 Login data prepared as form data');
-			
-			const loginResponse = await fetch(`${this.baseUrl}api/v0/login/`, {
-				method: 'POST',
-				credentials: 'include',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',  // Form statt JSON!
-					'X-CSRFToken': csrfToken,  // CSRF auch im Header
-					'Accept': 'application/json',
-					'Referer': `${this.baseUrl}webclient/login/`,  // Django Referer-Check
-					'Origin': this.baseUrl.replace(/\/$/, '')      // Origin ohne trailing slash
-				},
-				body: loginData
-			});
-			
-			console.log('🔬 Login response status:', loginResponse.status);
-			
-			if (loginResponse.ok || loginResponse.status === 302) {
-				let loginResult;
-				try {
-					loginResult = await loginResponse.json();
-				} catch (e) {
-					// Manchmal ist die Antwort HTML bei erfolgreicher Anmeldung
-					loginResult = { success: true };
-				}
-				
-				console.log('✅ Login successful!');
-				
-				// Create/update session
-				this.session = {
-					...this.session,
-					loginTime: Date.now(),
-					username: username,
-					userId: 'authenticated_user',
-					serverUrl: this.baseUrl,
-					loginMethod: 'Fixed Form Login',
-					isAuthenticated: true,
-					hasApiAccess: false
-				};
-				
-				// Test API access
-				console.log('🔬 Step 4: Testing API access...');
-				try {
-					const projectsResponse = await fetch(`${this.baseUrl}api/v0/m/projects/`, {
-						method: 'GET',
-						credentials: 'include',
-						headers: {
-							'Accept': 'application/json',
-							'X-CSRFToken': csrfToken
-						}
-					});
-					
-					if (projectsResponse.ok) {
-						const projectsData = await projectsResponse.json();
-						this.session.hasApiAccess = true;
-						this.session.projectCount = Array.isArray(projectsData.data) ? projectsData.data.length : 0;
-						
-						console.log('✅ API access confirmed');
-						console.log('📁 Projects found:', this.session.projectCount);
-						
-						return {
-							success: true,
-							session: this.session,
-							loginMethod: 'Fixed Form Login',
-							isAuthenticated: true,
-							projectCount: this.session.projectCount
-						};
-					}
-				} catch (apiError) {
-					console.warn('⚠️ API test failed but login successful:', apiError.message);
-				}
-				
-				return {
-					success: true,
-					session: this.session,
-					loginMethod: 'Fixed Form Login',
-					isAuthenticated: true
-				};
-				
-			} else {
-				const errorText = await loginResponse.text();
-				console.error('❌ Login failed:', loginResponse.status, errorText);
-				throw new Error(`Login failed: ${loginResponse.status} - ${errorText}`);
-			}
-			
-		} catch (error) {
-			console.error('❌ Login error:', error);
-			this.session = null;
-			throw error;
-		}
-	},
+    async loginWithCredentials(username, password) {
+        console.log('🔬 === OMERO JSON API LOGIN (CSRF FIXED) ===');
+        console.log('🔬 Username:', username);
+        
+        try {
+            // Step 1: Get fresh CSRF token
+            console.log('🔬 Step 1: Getting fresh CSRF token...');
+            const csrfToken = await this.getCSRFToken();
+            
+            if (!csrfToken) {
+                throw new Error('Failed to obtain CSRF token');
+            }
+            
+            // Step 2: Get server ID dynamically
+            console.log('🔬 Step 2: Getting server ID...');
+            let serverId = 1; // Default fallback
+            
+            try {
+                const serversResponse = await this.apiRequest('api/v0/servers/', { method: 'GET' });
+                if (serversResponse.data && serversResponse.data.length > 0) {
+                    serverId = serversResponse.data[0].id;
+                    console.log('🔬 Server ID found:', serverId);
+                } else {
+                    console.log('🔬 No servers found, using default ID (1)');
+                }
+            } catch (serverError) {
+                console.warn('⚠️ Server fetch failed, using default ID (1):', serverError.message);
+            }
+            
+            // Step 3: FIXED Login Request
+            console.log('🔬 Step 3: Attempting JSON API login with CSRF fixes...');
+            
+            const loginPayload = {
+                server: serverId,
+                username: username,
+                password: password
+            };
+            
+            // 🔧 CSRF FIX: Get the best available CSRF token
+            const finalCSRFToken = this.getBestCSRFToken();
+            
+            const loginResponse = await fetch(`${this.baseUrl}api/v0/login/`, {
+                method: 'POST',
+                credentials: 'include',  // ✅ Wichtig für Session-Cookies!
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': finalCSRFToken,  // 🔧 CSRF in Header
+                    'Accept': 'application/json',
+                    // 🔧 CSRF FIX: Diese Header sind kritisch für Django CSRF
+                    'Origin': window.location.origin,
+                    'Referer': window.location.href
+                },
+                body: JSON.stringify(loginPayload)
+            });
+            
+            console.log('🔬 Login response status:', loginResponse.status);
+            console.log('🔬 Login response headers:', [...loginResponse.headers.entries()]);
+            
+            if (loginResponse.ok) {
+                const loginData = await loginResponse.json();
+                console.log('🔬 Login response data:', loginData);
+                
+                // Extract session information
+                const eventContext = loginData.eventContext || loginData;
+                
+                // Create session object
+                this.session = {
+                    ...this.session,
+                    loginTime: Date.now(),
+                    username: username,
+                    userId: eventContext.userId || 'authenticated_user',
+                    groupId: eventContext.groupId || null,
+                    groupName: eventContext.groupName || 'private',
+                    serverUrl: this.baseUrl,
+                    loginMethod: 'JSON API Login (CSRF Fixed)',
+                    isAuthenticated: true,
+                    hasApiAccess: false, // Will be tested next
+                    sessionCookies: this.extractSessionCookies(),
+                    eventContext: eventContext
+                };
+                
+                console.log('✅ JSON API login successful!');
+                console.log('🔬 Session created:', this.session);
+                
+                // Test API access
+                console.log('🔬 Step 4: Testing authenticated API access...');
+                const apiResult = await this.testAuthenticatedAPIAccess();
+                
+                return apiResult;
+                
+            } else {
+                const errorText = await loginResponse.text();
+                console.error('❌ JSON API login failed:', loginResponse.status, errorText);
+                
+                // Enhanced error analysis
+                let errorMessage = 'JSON API login failed';
+                if (errorText.includes('CSRF')) {
+                    if (errorText.includes('Origin checking failed')) {
+                        errorMessage = 'CSRF Origin Check failed - this is a header configuration issue';
+                        console.error('🔧 CSRF Fix needed: Origin/Referer headers not matching server expectations');
+                    } else if (errorText.includes('CSRF token missing')) {
+                        errorMessage = 'CSRF token missing from request';
+                        console.error('🔧 CSRF Fix needed: Token not included in request headers or body');
+                    } else {
+                        errorMessage = 'CSRF token validation failed';
+                        console.error('🔧 CSRF Fix needed: Token invalid or expired');
+                    }
+                } else if (errorText.includes('invalid') || errorText.includes('authentication')) {
+                    errorMessage = 'Invalid username or password';
+                } else if (loginResponse.status === 403) {
+                    errorMessage = 'Access forbidden - check credentials and CSRF configuration';
+                } else if (loginResponse.status === 401) {
+                    errorMessage = 'Authentication failed';
+                } else if (loginResponse.status === 500) {
+                    errorMessage = 'OMERO server internal error';
+                }
+                
+                throw new Error(`${errorMessage}: ${loginResponse.status} - ${errorText}`);
+            }
+            
+        } catch (error) {
+            console.error('❌ JSON API login failed:', error);
+            this.session = null;
+            throw error;
+        }
+    },
     
     // Test authenticated API access
     async testAuthenticatedAPIAccess() {

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Robust OMERO CORS Proxy Server with connection pooling and retry logic
+OMERO CORS Proxy Server - CSRF Problem FIXED
+Basiert auf der DeepResearch-Recherche und OMERO-Dokumentation
 """
 
 import http.server
@@ -56,8 +57,8 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
             self.proxy_to_omero('GET')
         elif self.path == '/proxy-status':
             self.serve_proxy_status()
-        elif self.path == '/test-omero-robust':
-            self.test_robust_connection()
+        elif self.path == '/csrf-debug':
+            self.csrf_debug_endpoint()
         else:
             self.serve_static_file()
     
@@ -75,98 +76,37 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
     
-    def test_robust_connection(self):
-        """Test OMERO connection with retry logic"""
-        results = {
+    def csrf_debug_endpoint(self):
+        """Debug endpoint to check CSRF token handling"""
+        debug_info = {
             "timestamp": time.time(),
-            "tests": {}
+            "active_sessions": len(self.client_sessions),
+            "session_details": {}
         }
         
-        # Test critical endpoints with retries
-        critical_endpoints = [
-            '/api/v0/token/',
-            '/api/v0/m/projects/',
-            '/api/v0/m/datasets/',
-            '/api/v0/servers/'
-        ]
-        
-        for endpoint in critical_endpoints:
-            print(f"🔬 Testing {endpoint} with retries...")
-            
-            success_count = 0
-            total_attempts = 3
-            response_times = []
-            
-            for attempt in range(total_attempts):
-                start_time = time.time()
-                try:
-                    success = self.test_single_endpoint(endpoint)
-                    end_time = time.time()
-                    response_time = (end_time - start_time) * 1000  # ms
-                    
-                    if success:
-                        success_count += 1
-                        response_times.append(response_time)
-                        print(f"  ✅ Attempt {attempt + 1}: {response_time:.0f}ms")
-                    else:
-                        print(f"  ❌ Attempt {attempt + 1}: Failed")
-                    
-                    # Brief delay between attempts
-                    if attempt < total_attempts - 1:
-                        time.sleep(0.5)
-                        
-                except Exception as e:
-                    print(f"  ❌ Attempt {attempt + 1}: {e}")
-            
-            # Calculate reliability
-            reliability = (success_count / total_attempts) * 100
-            avg_response_time = sum(response_times) / len(response_times) if response_times else 0
-            
-            results["tests"][endpoint] = {
-                "success_rate": f"{reliability:.1f}%",
-                "successful_attempts": success_count,
-                "total_attempts": total_attempts,
-                "avg_response_time_ms": round(avg_response_time),
-                "is_reliable": reliability >= 80,
-                "recommendation": "OK" if reliability >= 80 else "UNSTABLE"
-            }
-            
-            print(f"  📊 {endpoint}: {reliability:.1f}% success rate")
-        
-        # Overall assessment
-        reliable_endpoints = sum(1 for test in results["tests"].values() if test["is_reliable"])
-        total_endpoints = len(results["tests"])
-        
-        results["overall"] = {
-            "reliable_endpoints": reliable_endpoints,
-            "total_endpoints": total_endpoints,
-            "overall_reliability": f"{(reliable_endpoints / total_endpoints) * 100:.1f}%",
-            "status": "STABLE" if reliable_endpoints >= total_endpoints * 0.8 else "UNSTABLE"
-        }
+        with self.session_lock:
+            for client_id, cookies in self.client_sessions.items():
+                csrf_token = None
+                if 'csrftoken=' in cookies:
+                    for cookie in cookies.split(';'):
+                        if 'csrftoken=' in cookie:
+                            csrf_token = cookie.split('csrftoken=')[1].split(';')[0]
+                            break
+                
+                debug_info["session_details"][client_id] = {
+                    "has_csrf_token": csrf_token is not None,
+                    "csrf_token_preview": csrf_token[:10] + "..." if csrf_token else None,
+                    "full_cookies": cookies[:100] + "..." if len(cookies) > 100 else cookies
+                }
         
         self.send_response(200)
         self.send_cors_headers()
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        self.wfile.write(json.dumps(results, indent=2).encode('utf-8'))
-    
-    def test_single_endpoint(self, endpoint):
-        """Test a single endpoint with timeout"""
-        try:
-            url = f"{self.OMERO_SERVER}{endpoint}"
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'MetaFold-Robust-Test/1.0')
-            req.add_header('Accept', 'application/json')
-            
-            with self.opener.open(req, timeout=10) as response:
-                return response.getcode() == 200
-                
-        except Exception:
-            return False
+        self.wfile.write(json.dumps(debug_info, indent=2).encode('utf-8'))
     
     def serve_proxy_status(self):
-        """Enhanced proxy status with connection health"""
-        # Initialize connection pool if needed
+        """Enhanced proxy status with CSRF debugging"""
         self.initialize_connection_pool()
         
         status = {
@@ -174,10 +114,13 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
             "omero_server": self.OMERO_SERVER,
             "active_sessions": len(self.client_sessions),
             "connection_pool_initialized": self.ssl_context is not None,
-            "session_details": {
-                client_id: cookies[:30] + "..." if len(cookies) > 30 else cookies 
-                for client_id, cookies in self.client_sessions.items()
-            }
+            "csrf_fixes_applied": [
+                "Referer header automatically set",
+                "Origin header set to OMERO server",
+                "CSRF tokens preserved in cookies",
+                "Cookie domain restrictions removed",
+                "Secure flag handling for localhost"
+            ]
         }
         
         self.send_response(200)
@@ -203,7 +146,7 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
         return f"{client_ip}_{hash(user_agent) & 0xffffffff}"
     
     def proxy_to_omero(self, method):
-        """Robust proxy with retry logic and better error handling"""
+        """CSRF-FIXED proxy with proper header and cookie handling"""
         self.initialize_connection_pool()
         
         try:
@@ -245,87 +188,93 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
                     data = self.rfile.read(content_length)
                     print(f"🔬 Data: {len(data)} bytes")
             
-            # Retry logic for request
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    print(f"🔬 Attempt {attempt + 1}/{max_retries}")
+            # Create request with CSRF fixes
+            req = urllib.request.Request(omero_url, data=data, method=method)
+            
+            # 🔧 CSRF FIX 1: Copy headers but with important modifications
+            headers_to_copy = ['Content-Type', 'X-CSRFToken', 'Authorization', 'Accept', 'User-Agent']
+            for header_name in headers_to_copy:
+                if header_name in self.headers:
+                    req.add_header(header_name, self.headers[header_name])
+            
+            # 🔧 CSRF FIX 2: Set critical headers for Django CSRF validation
+            req.add_header('Referer', self.OMERO_SERVER + '/')  # CRITICAL für Django
+            req.add_header('Origin', self.OMERO_SERVER)         # CRITICAL für Django 4+
+            
+            # Set User-Agent if not present
+            if 'User-Agent' not in self.headers:
+                req.add_header('User-Agent', 'MetaFold-CSRF-Fixed-Proxy/1.0')
+            
+            # 🔧 CSRF FIX 3: Handle session cookies properly
+            with self.session_lock:
+                if client_id in self.client_sessions:
+                    stored_cookies = self.client_sessions[client_id]
+                    if stored_cookies:
+                        req.add_header('Cookie', stored_cookies)
+                        print(f"🔬 Using stored cookies: {stored_cookies[:50]}...")
+                elif 'Cookie' in self.headers:
+                    # First request with cookies from browser
+                    browser_cookies = self.headers['Cookie']
+                    req.add_header('Cookie', browser_cookies)
+                    print(f"🔬 Using browser cookies: {browser_cookies[:50]}...")
+            
+            # Make request with timeout
+            print(f"🔬 Making request to OMERO...")
+            response = self.opener.open(req, timeout=30)
+            response_data = response.read()
+            
+            print(f"✅ Success: {response.getcode()} ({len(response_data)} bytes)")
+            
+            # 🔧 CSRF FIX 4: Process and store cookies correctly
+            self.process_response_cookies_fixed(response, client_id)
+            
+            # Send response
+            self.send_successful_response_fixed(response, response_data)
+            return
                     
-                    # Create fresh request for each attempt
-                    req = urllib.request.Request(omero_url, data=data, method=method)
-                    
-                    # Copy headers
-                    headers_to_copy = ['Content-Type', 'X-CSRFToken', 'Authorization', 'Accept']
-                    for header_name in headers_to_copy:
-                        if header_name in self.headers:
-                            req.add_header(header_name, self.headers[header_name])
-                    
-                    # Add session cookies
-                    with self.session_lock:
-                        if client_id in self.client_sessions:
-                            stored_cookies = self.client_sessions[client_id]
-                            if stored_cookies:
-                                req.add_header('Cookie', stored_cookies)
-                                print(f"🔬 Using cookies: {stored_cookies[:50]}...")
-                    
-                    # Add OMERO headers
-                    req.add_header('Referer', self.OMERO_SERVER + '/')
-                    req.add_header('Origin', self.OMERO_SERVER)
-                    req.add_header('User-Agent', 'MetaFold-Robust-Proxy/1.0')
-                    
-                    # Make request with progressive timeout
-                    timeout = 15 + (attempt * 5)  # 15s, 20s, 25s
-                    print(f"🔬 Timeout: {timeout}s")
-                    
-                    response = self.opener.open(req, timeout=timeout)
-                    response_data = response.read()
-                    
-                    print(f"✅ Success: {response.getcode()} ({len(response_data)} bytes)")
-                    
-                    # Process cookies
-                    self.process_response_cookies(response, client_id)
-                    
-                    # Send response
-                    self.send_successful_response(response, response_data)
-                    return
-                    
-                except socket.timeout:
-                    print(f"⏰ Timeout on attempt {attempt + 1}")
-                    if attempt == max_retries - 1:
-                        self.send_error(504, f"Gateway Timeout after {max_retries} attempts")
-                        return
-                    
-                except HTTPError as e:
-                    print(f"❌ HTTP Error {e.code} on attempt {attempt + 1}")
-                    if attempt == max_retries - 1:
-                        error_data = e.read()
-                        self.send_response(e.code)
-                        self.send_cors_headers()
-                        self.send_header('Content-Type', 'application/json')
-                        self.end_headers()
-                        self.wfile.write(error_data)
-                        return
-                    
-                except URLError as e:
-                    print(f"❌ URL Error on attempt {attempt + 1}: {e.reason}")
-                    if attempt == max_retries - 1:
-                        error_response = {
-                            "error": "Connection failed after retries",
-                            "message": str(e.reason),
-                            "url": omero_url,
-                            "attempts": max_retries
-                        }
-                        self.send_response(502)
-                        self.send_cors_headers()
-                        self.send_header('Content-Type', 'application/json')
-                        self.end_headers()
-                        self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                        return
+        except socket.timeout:
+            print(f"⏰ Request timeout")
+            self.send_error(504, "Gateway Timeout")
+            return
+            
+        except HTTPError as e:
+            print(f"❌ HTTP Error {e.code}")
+            error_data = e.read()
+            
+            # Special handling for CSRF errors
+            error_text = error_data.decode('utf-8', errors='ignore')
+            if 'CSRF' in error_text:
+                print(f"🔍 CSRF Error Details: {error_text[:200]}...")
                 
-                # Brief delay before retry
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    
+                # Try to extract more details
+                if 'Origin checking failed' in error_text:
+                    print("🔧 CSRF Origin Check failed - this is usually a Referer/Origin header problem")
+                if 'CSRF token missing' in error_text:
+                    print("🔧 CSRF Token missing - token not found in request")
+                if 'CSRF token incorrect' in error_text:
+                    print("🔧 CSRF Token incorrect - token doesn't match server expectation")
+            
+            self.send_response(e.code)
+            self.send_cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(error_data)
+            return
+            
+        except URLError as e:
+            print(f"❌ URL Error: {e.reason}")
+            error_response = {
+                "error": "Connection failed",
+                "message": str(e.reason),
+                "url": omero_url
+            }
+            self.send_response(502)
+            self.send_cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(error_response).encode('utf-8'))
+            return
+            
         except Exception as e:
             print(f"❌ Proxy Error: {e}")
             import traceback
@@ -343,8 +292,8 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(error_response).encode('utf-8'))
     
-    def process_response_cookies(self, response, client_id):
-        """Process and store response cookies"""
+    def process_response_cookies_fixed(self, response, client_id):
+        """CSRF-FIXED cookie processing - preserves CSRF tokens correctly"""
         response_headers = response.info()
         set_cookie_headers = []
         
@@ -363,34 +312,33 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
                 with self.session_lock:
                     existing_cookies = self.client_sessions.get(client_id, '')
                     
-                    # Smart cookie merging
+                    # Smart cookie merging - PRESERVE CSRF consistency
+                    existing_dict = {}
                     if existing_cookies:
-                        existing_dict = {}
                         for cookie in existing_cookies.split(';'):
                             if '=' in cookie:
                                 key, value = cookie.strip().split('=', 1)
                                 existing_dict[key] = value
-                        
-                        for cookie in cookie_strings:
-                            if '=' in cookie:
-                                key, value = cookie.strip().split('=', 1)
-                                existing_dict[key] = value
-                        
-                        combined_cookies = '; '.join([f"{k}={v}" for k, v in existing_dict.items()])
-                    else:
-                        combined_cookies = '; '.join(cookie_strings)
                     
+                    # Update with new cookies
+                    for cookie in cookie_strings:
+                        if '=' in cookie:
+                            key, value = cookie.strip().split('=', 1)
+                            existing_dict[key] = value
+                    
+                    # Store combined cookies
+                    combined_cookies = '; '.join([f"{k}={v}" for k, v in existing_dict.items()])
                     self.client_sessions[client_id] = combined_cookies
-                    print(f"🔬 Updated cookies: {combined_cookies[:50]}...")
+                    print(f"🔬 Updated cookies for {client_id}: {combined_cookies[:50]}...")
     
-    def send_successful_response(self, response, response_data):
-        """Send successful response to client"""
+    def send_successful_response_fixed(self, response, response_data):
+        """CSRF-FIXED response sending - handles cookies for localhost properly"""
         response_headers = response.info()
         
         self.send_response(response.getcode())
         self.send_cors_headers()
         
-        # Forward headers (excluding problematic ones)
+        # Forward most headers
         skip_headers = ['set-cookie', 'access-control-allow-origin', 'access-control-allow-methods', 
                        'access-control-allow-headers', 'access-control-allow-credentials']
         
@@ -398,16 +346,29 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
             if header_name.lower() not in skip_headers:
                 self.send_header(header_name, header_value)
         
-        # Forward cookies with localhost modifications
+        # 🔧 CSRF FIX 5: Forward cookies with localhost-friendly modifications
         for header_name, header_value in response_headers.items():
             if header_name.lower() == 'set-cookie':
+                # Modify cookies for localhost compatibility
                 modified_cookie = header_value
+                
+                # Remove Domain restrictions that would block localhost
                 if 'Domain=' in modified_cookie:
                     parts = modified_cookie.split(';')
-                    new_parts = [part for part in parts if not part.strip().startswith('Domain=')]
+                    new_parts = []
+                    for part in parts:
+                        if not part.strip().startswith('Domain='):
+                            new_parts.append(part)
                     modified_cookie = ';'.join(new_parts)
                 
+                # Remove Secure flag for localhost (HTTP)
                 modified_cookie = modified_cookie.replace('; Secure', '').replace('Secure;', '')
+                
+                # Handle SameSite for cross-origin requests
+                if 'SameSite=' not in modified_cookie:
+                    modified_cookie += '; SameSite=None'
+                
+                print(f"🔧 Cookie forwarded: {modified_cookie[:80]}...")
                 self.send_header('Set-Cookie', modified_cookie)
         
         self.end_headers()
@@ -452,11 +413,11 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
             self.send_error(500)
     
     def send_cors_headers(self):
-        """Send CORS headers"""
+        """Send CORS headers optimized for CSRF"""
         origin = self.headers.get('Origin', 'http://localhost:3000')
         self.send_header('Access-Control-Allow-Origin', origin)
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRFToken, Referer, Accept, Cookie')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRFToken, Referer, Accept, Cookie, Origin')
         self.send_header('Access-Control-Allow-Credentials', 'true')
         self.send_header('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type, Content-Length')
     
@@ -468,21 +429,22 @@ class OMEROProxyHandler(BaseHTTPRequestHandler):
 def main():
     PORT = 3000
     
-    print("🚀 MetaFold OMERO Proxy Server (Robust & Reliable)")
+    print("🚀 MetaFold OMERO Proxy Server (CSRF-FIXED)")
     print(f"📱 App: http://localhost:{PORT}")
     print(f"🔬 OMERO Proxy: http://localhost:{PORT}/omero-api/*")
     print(f"🔬 Target OMERO: {OMEROProxyHandler.OMERO_SERVER}")
     print("")
-    print("🔧 Robust Features:")
-    print("   ✅ Connection Pooling & Reuse")
-    print("   ✅ Automatic Retry Logic (3 attempts)")
-    print("   ✅ Progressive Timeouts (15s→20s→25s)")
-    print("   ✅ Smart Cookie Management")
-    print("   ✅ Enhanced Error Handling")
+    print("🔧 CSRF Fixes Applied:")
+    print("   ✅ Referer header automatically set to OMERO server")
+    print("   ✅ Origin header set for Django 4+ compatibility")
+    print("   ✅ CSRF tokens preserved across requests")
+    print("   ✅ Cookie domain restrictions removed for localhost")
+    print("   ✅ Secure flag handling for HTTP development")
+    print("   ✅ SameSite=None for cross-origin cookies")
     print("")
-    print("🔍 Test Endpoints:")
+    print("🔍 Debug Endpoints:")
     print(f"   📊 Proxy Status: http://localhost:{PORT}/proxy-status")
-    print(f"   🌐 Robust Test: http://localhost:{PORT}/test-omero-robust")
+    print(f"   🐛 CSRF Debug: http://localhost:{PORT}/csrf-debug")
     print("")
     print("Press Ctrl+C to stop the server")
     print("")
@@ -491,7 +453,7 @@ def main():
         with HTTPServer(('localhost', PORT), OMEROProxyHandler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n🔬 Robust OMERO Proxy Server stopped")
+        print("\n🔬 CSRF-Fixed OMERO Proxy Server stopped")
         sys.exit(0)
     except Exception as e:
         print(f"❌ Error starting server: {e}")
