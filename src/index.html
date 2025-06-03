@@ -96,6 +96,58 @@
 							</small>
 						</div>
 					</div>
+
+                    <!-- OMERO Integration Option -->
+                    <div id="omeroOption" style="display: none; margin-top: 15px; padding: 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
+                        <!-- OMERO Status Info -->
+                        <div id="omeroStatusInfo" style="margin-bottom: 10px;">
+                            <div id="omeroConnectionStatus" style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                <span id="omeroStatusIcon">🔬</span>
+                                <span id="omeroStatusText">OMERO Status: Checking...</span>
+                            </div>
+                        </div>
+
+                        <!-- Auto-sync info message -->
+                        <div id="omeroAutoInfo" style="display: none; color: #92400e; font-weight: 500; margin-bottom: 10px;">
+                            <span style="color: #059669;">✅</span> Auto-sync to OMERO is enabled - datasets will be created automatically
+                        </div>
+                        
+                        <!-- Manual sync checkbox -->
+                        <div id="omeroManualOption">
+                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                <input type="checkbox" id="sendToOMERO" style="width: auto;">
+                                🔬 Send to OMERO
+                            </label>
+                            <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
+                                Create this experiment as a dataset in OMERO with metadata annotations
+                            </small>
+                        </div>
+                        
+                        <!-- OMERO Project Selection -->
+                        <div id="omeroProjectSelection" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+                            <label for="omeroProjectSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                📁 OMERO Project (optional):
+                            </label>
+                            <select id="omeroProjectSelect" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px; background: white;">
+                                <option value="">-- Create standalone dataset --</option>
+                                <option value="refresh">🔄 Refresh project list</option>
+                            </select>
+                            <small style="color: #92400e; display: block; margin-top: 4px;">
+                                Select an existing OMERO project to link the dataset to, or leave empty for standalone dataset
+                            </small>
+                        </div>
+
+                        <!-- Dataset Name Override -->
+                        <div id="omeroDatasetName" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+                            <label for="omeroDatasetNameInput" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                🗂️ Dataset Name (optional):
+                            </label>
+                            <input type="text" id="omeroDatasetNameInput" placeholder="Leave empty to use project name" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px;">
+                            <small style="color: #92400e; display: block; margin-top: 4px;">
+                                Customize the dataset name in OMERO. If empty, uses the project name.
+                            </small>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="folder-structure">
@@ -128,7 +180,7 @@
         </div>
     </div>
 
-    <!-- Settings Modal (inline) -->
+    <!-- Settings Modal (Enhanced with OMERO) -->
     <div id="settingsModal" class="modal" style="display: none;">
         <div class="modal-content">
             <span class="close" onclick="closeSettingsModal()">&times;</span>
@@ -141,6 +193,9 @@
                 </button>
                 <button class="settings-tab" onclick="switchSettingsTab('elabftw')" id="elabftwTab">
                     🧪 elabFTW
+                </button>
+                <button class="settings-tab" onclick="switchSettingsTab('omero')" id="omeroTab">
+                    🔬 OMERO
                 </button>
             </div>
 
@@ -227,7 +282,73 @@
 
                     <div class="form-group">
                         <button class="btn btn-secondary" onclick="testElabFTWConnection()">🔍 Test Connection</button>
-                        <div id="connectionStatus" style="margin-top: 10px; display: none;"></div>
+                        <div id="elabftwConnectionStatus" style="margin-top: 10px; display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OMERO Settings Tab -->
+            <div id="omeroSettings" class="settings-tab-content">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="omeroEnabled" onchange="updateOMEROSetting()">
+                        <span>🔬 Enable OMERO Integration</span>
+                    </label>
+                    <small>Connect MetaFold with your OMERO image data management system.</small>
+                </div>
+
+                <div id="omeroConfig" style="display: none;">
+                    <div class="form-group">
+                        <label for="omeroServerUrl">🌐 OMERO Server URL:</label>
+                        <input type="url" id="omeroServerUrl" placeholder="https://your-omero-server.com" onchange="updateOMEROServerUrl()">
+                        <small>Full URL to your OMERO.web server (including https://)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="omeroUsername">👤 Username:</label>
+                        <input type="text" id="omeroUsername" placeholder="Your OMERO username" onchange="updateOMEROUsername()">
+                        <small>Your OMERO username for authentication</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="omeroPassword">🔑 Password:</label>
+                        <input type="password" id="omeroPassword" placeholder="Your OMERO password" onchange="updateOMEROPassword()">
+                        <small>Your OMERO password (stored locally - use secure setup in production)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroAutoSync" onchange="updateOMEROAutoSync()">
+                            <span>🔄 Auto-sync experiments</span>
+                        </label>
+                        <small>Automatically create datasets in OMERO when creating experiment projects.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="omeroDefaultProject">📁 Default Project ID:</label>
+                        <input type="number" id="omeroDefaultProject" placeholder="Leave empty for standalone datasets" onchange="updateOMERODefaultProject()">
+                        <small>Default OMERO project ID to link new datasets to (optional).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroCreateDatasets" onchange="updateOMEROCreateDatasets()">
+                            <span>🗂️ Create datasets</span>
+                        </label>
+                        <small>Create datasets in OMERO (disable if you only want metadata annotations).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroVerifySSL" onchange="updateOMEROVerifySSL()">
+                            <span>🔒 Verify SSL certificates</span>
+                        </label>
+                        <small>Disable only for development servers with self-signed certificates.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <button class="btn btn-secondary" onclick="testOMEROConnection()">🔍 Test Connection</button>
+                        <div id="omeroConnectionStatus" style="margin-top: 10px; display: none;"></div>
                     </div>
                 </div>
             </div>
@@ -339,6 +460,11 @@ experiment_log.md"></textarea>
 	<script src="js/loginModal.js"></script>
 	<script src="js/userManagementModal.js"></script>
     <script src="js/settingsManager.js"></script>
+    
+    <!-- OMERO Integration Modules -->
+    <script src="js/omeroClient.js"></script>
+    <script src="js/omeroIntegration.js"></script>
+    
     <script src="js/templateManager.js"></script>
     <script src="js/templateTypeManager.js"></script>
     <script src="js/metadataEditor.js"></script>
@@ -504,6 +630,32 @@ experiment_log.md"></textarea>
             if (elabftwConfigEl) {
                 elabftwConfigEl.style.display = elabftwEnabled ? 'block' : 'none';
             }
+
+            // OMERO settings
+            const omeroEnabled = sm.get('omero.enabled');
+            const omeroEnabledEl = document.getElementById('omeroEnabled');
+            const omeroServerEl = document.getElementById('omeroServerUrl');
+            const omeroUsernameEl = document.getElementById('omeroUsername');
+            const omeroPasswordEl = document.getElementById('omeroPassword');
+            const omeroAutoEl = document.getElementById('omeroAutoSync');
+            const omeroProjectEl = document.getElementById('omeroDefaultProject');
+            const omeroDatasetEl = document.getElementById('omeroCreateDatasets');
+            const omeroSslEl = document.getElementById('omeroVerifySSL');
+            const omeroConfigEl = document.getElementById('omeroConfig');
+            
+            if (omeroEnabledEl) omeroEnabledEl.checked = omeroEnabled;
+            if (omeroServerEl) omeroServerEl.value = sm.get('omero.server_url');
+            if (omeroUsernameEl) omeroUsernameEl.value = sm.get('omero.username');
+            if (omeroPasswordEl) omeroPasswordEl.value = sm.get('omero.password');
+            if (omeroAutoEl) omeroAutoEl.checked = sm.get('omero.auto_sync');
+            if (omeroProjectEl) omeroProjectEl.value = sm.get('omero.default_project_id');
+            if (omeroDatasetEl) omeroDatasetEl.checked = sm.get('omero.create_datasets');
+            if (omeroSslEl) omeroSslEl.checked = sm.get('omero.verify_ssl');
+            
+            // Show/hide OMERO config
+            if (omeroConfigEl) {
+                omeroConfigEl.style.display = omeroEnabled ? 'block' : 'none';
+            }
         };
 
         // Setting update functions
@@ -566,7 +718,7 @@ experiment_log.md"></textarea>
         };
 
         window.testElabFTWConnection = async function() {
-            const statusDiv = document.getElementById('connectionStatus');
+            const statusDiv = document.getElementById('elabftwConnectionStatus');
             if (statusDiv) {
                 statusDiv.style.display = 'block';
                 statusDiv.textContent = 'Testing connection...';
@@ -578,6 +730,69 @@ experiment_log.md"></textarea>
                     statusDiv.className = result.success ? 'success-message' : 'error-message';
                 } catch (error) {
                     statusDiv.textContent = 'Connection test failed: ' + error.message;
+                    statusDiv.className = 'error-message';
+                }
+            }
+        };
+
+        // OMERO Settings Functions
+        window.updateOMEROSetting = function() {
+            const enabled = document.getElementById('omeroEnabled').checked;
+            window.settingsManager.set('omero.enabled', enabled);
+            const configEl = document.getElementById('omeroConfig');
+            if (configEl) {
+                configEl.style.display = enabled ? 'block' : 'none';
+            }
+        };
+
+        window.updateOMEROServerUrl = function() {
+            const url = document.getElementById('omeroServerUrl').value;
+            window.settingsManager.set('omero.server_url', url);
+        };
+
+        window.updateOMEROUsername = function() {
+            const username = document.getElementById('omeroUsername').value;
+            window.settingsManager.set('omero.username', username);
+        };
+
+        window.updateOMEROPassword = function() {
+            const password = document.getElementById('omeroPassword').value;
+            window.settingsManager.set('omero.password', password);
+        };
+
+        window.updateOMEROAutoSync = function() {
+            const enabled = document.getElementById('omeroAutoSync').checked;
+            window.settingsManager.set('omero.auto_sync', enabled);
+        };
+
+        window.updateOMERODefaultProject = function() {
+            const projectId = document.getElementById('omeroDefaultProject').value;
+            window.settingsManager.set('omero.default_project_id', projectId);
+        };
+
+        window.updateOMEROCreateDatasets = function() {
+            const enabled = document.getElementById('omeroCreateDatasets').checked;
+            window.settingsManager.set('omero.create_datasets', enabled);
+        };
+
+        window.updateOMEROVerifySSL = function() {
+            const enabled = document.getElementById('omeroVerifySSL').checked;
+            window.settingsManager.set('omero.verify_ssl', enabled);
+        };
+
+        window.testOMEROConnection = async function() {
+            const statusDiv = document.getElementById('omeroConnectionStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Testing OMERO connection...';
+                statusDiv.className = '';
+                
+                try {
+                    const result = await window.settingsManager.testOMEROConnection();
+                    statusDiv.textContent = result.message;
+                    statusDiv.className = result.success ? 'success-message' : 'error-message';
+                } catch (error) {
+                    statusDiv.textContent = 'OMERO connection test failed: ' + error.message;
                     statusDiv.className = 'error-message';
                 }
             }
@@ -692,6 +907,132 @@ experiment_log.md"></textarea>
                 }
             }
         };
+
+        // Update OMERO options visibility
+        window.updateOMEROOptions = function() {
+            if (window.settingsManager) {
+                const omeroOption = document.getElementById('omeroOption');
+                const omeroAutoInfo = document.getElementById('omeroAutoInfo');
+                const omeroManualOption = document.getElementById('omeroManualOption');
+                
+                if (omeroOption && omeroAutoInfo && omeroManualOption) {
+                    const enabled = window.settingsManager.get('omero.enabled');
+                    const autoSync = window.settingsManager.get('omero.auto_sync');
+                    
+                    if (enabled && window.templateTypeManager && window.templateTypeManager.isExperimentMode()) {
+                        omeroOption.style.display = 'block';
+                        
+                        // Update OMERO status
+                        updateOMEROStatus();
+                        
+                        if (autoSync) {
+                            omeroAutoInfo.style.display = 'block';
+                            omeroManualOption.style.display = 'none';
+                        } else {
+                            omeroAutoInfo.style.display = 'none';
+                            omeroManualOption.style.display = 'block';
+                        }
+                    } else {
+                        omeroOption.style.display = 'none';
+                    }
+                }
+            }
+        };
+
+        // Update OMERO status display
+        window.updateOMEROStatus = async function() {
+            const statusIcon = document.getElementById('omeroStatusIcon');
+            const statusText = document.getElementById('omeroStatusText');
+            
+            if (!statusIcon || !statusText) return;
+            
+            if (window.omeroIntegration) {
+                const status = window.omeroIntegration.getStatus();
+                
+                switch (status.status) {
+                    case 'disabled':
+                        statusIcon.textContent = '⚫';
+                        statusText.textContent = 'OMERO: Disabled';
+                        statusText.style.color = '#6b7280';
+                        break;
+                    case 'not_configured':
+                        statusIcon.textContent = '⚠️';
+                        statusText.textContent = 'OMERO: Not configured';
+                        statusText.style.color = '#f59e0b';
+                        break;
+                    case 'incomplete':
+                        statusIcon.textContent = '❓';
+                        statusText.textContent = 'OMERO: Incomplete setup';
+                        statusText.style.color = '#f59e0b';
+                        break;
+                    case 'connected':
+                        statusIcon.textContent = '✅';
+                        statusText.textContent = 'OMERO: Connected';
+                        statusText.style.color = '#059669';
+                        break;
+                    case 'configured':
+                        statusIcon.textContent = '🔬';
+                        statusText.textContent = 'OMERO: Ready to connect';
+                        statusText.style.color = '#0369a1';
+                        break;
+                    default:
+                        statusIcon.textContent = '❓';
+                        statusText.textContent = 'OMERO: Unknown status';
+                        statusText.style.color = '#6b7280';
+                }
+            } else {
+                statusIcon.textContent = '❌';
+                statusText.textContent = 'OMERO: Module not available';
+                statusText.style.color = '#dc2626';
+            }
+        };
+
+        // Load OMERO projects for dropdown
+        window.loadOMEROProjects = async function() {
+            const projectSelect = document.getElementById('omeroProjectSelect');
+            if (!projectSelect || !window.omeroIntegration) return;
+            
+            try {
+                // Show loading
+                projectSelect.innerHTML = '<option value="">Loading projects...</option>';
+                
+                const projects = await window.omeroIntegration.getAvailableProjects();
+                
+                // Clear and rebuild options
+                projectSelect.innerHTML = '<option value="">-- Create standalone dataset --</option>';
+                
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.name} (ID: ${project.id})`;
+                    projectSelect.appendChild(option);
+                });
+                
+                projectSelect.innerHTML += '<option value="refresh">🔄 Refresh project list</option>';
+                
+            } catch (error) {
+                console.error('Error loading OMERO projects:', error);
+                projectSelect.innerHTML = '<option value="">Error loading projects</option>';
+            }
+        };
+
+        // Handle OMERO project selection
+        window.handleOMEROProjectSelection = function() {
+            const projectSelect = document.getElementById('omeroProjectSelect');
+            if (!projectSelect) return;
+            
+            if (projectSelect.value === 'refresh') {
+                loadOMEROProjects();
+            }
+        };
+
+        // Initialize OMERO project selection when OMERO option becomes visible
+        document.addEventListener('DOMContentLoaded', function() {
+            const projectSelect = document.getElementById('omeroProjectSelect');
+            if (projectSelect) {
+                projectSelect.addEventListener('change', handleOMEROProjectSelection);
+            }
+        });
 
         // Close settings modal on click outside
         window.addEventListener('click', function(event) {

@@ -1,4 +1,4 @@
-// Settings Manager (Fixed with complete elabFTW integration)
+// Settings Manager (Simplified - delegates to integration modules)
 
 const settingsManager = {
     settings: {},
@@ -15,14 +15,34 @@ const settingsManager = {
         'elabftw.api_key': '',
         'elabftw.auto_sync': false,
         'elabftw.default_category': 1,
-        'elabftw.verify_ssl': true
+        'elabftw.verify_ssl': true,
+        
+        // OMERO Integration Settings
+        'omero.enabled': false,
+        'omero.server_url': '',
+        'omero.username': '',
+        'omero.password': '', // Note: Store securely in production
+        'omero.auto_sync': false,
+        'omero.default_project_id': '',
+        'omero.create_datasets': true,
+        'omero.verify_ssl': true,
+        'omero.session_timeout': 600000 // 10 minutes
     },
 
     // Initialize settings manager
     init() {
         console.log('🔧 Initializing settingsManager...');
         this.loadSettings();
+        this.applyInitialSettings();
         console.log('✅ settingsManager initialized');
+    },
+
+    // Apply settings that need immediate effect
+    applyInitialSettings() {
+        const theme = this.get('general.theme');
+        if (theme) {
+            this.applyTheme(theme);
+        }
     },
 
     // Load settings from localStorage
@@ -34,6 +54,7 @@ const settingsManager = {
             } else {
                 this.settings = { ...this.defaultSettings };
             }
+            console.log('📂 Settings loaded:', this.settings);
         } catch (error) {
             console.warn('Error loading settings, using defaults:', error);
             this.settings = { ...this.defaultSettings };
@@ -44,6 +65,7 @@ const settingsManager = {
     saveSettings() {
         try {
             localStorage.setItem('metafold_settings', JSON.stringify(this.settings));
+            console.log('💾 Settings saved successfully');
             return true;
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -53,24 +75,28 @@ const settingsManager = {
 
     // Get setting value
     get(key) {
-        return this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
+        const value = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
+        return value;
     },
 
     // Set setting value
     set(key, value) {
+        console.log(`📝 Set setting "${key}":`, key.includes('password') ? '[HIDDEN]' : value);
         this.settings[key] = value;
-        this.saveSettings();
+        const saved = this.saveSettings();
         
-        // Handle special settings that need immediate action
-        this.handleSettingChange(key, value);
+        if (saved) {
+            this.handleSettingChange(key, value);
+        }
+        
+        return saved;
     },
 
     // Handle setting changes that need immediate action
     handleSettingChange(key, value) {
         switch (key) {
             case 'general.user_management_enabled':
-                console.log('🔧 User management toggle changed:', value);
-                // No immediate action needed - will take effect on next app start
+                this.handleUserManagementToggle(value);
                 break;
                 
             case 'general.theme':
@@ -78,62 +104,120 @@ const settingsManager = {
                 break;
                 
             case 'elabftw.enabled':
-                // Update elabFTW UI visibility
+            case 'elabftw.auto_sync':
                 if (window.updateElabFTWOptions) {
                     window.updateElabFTWOptions();
                 }
                 break;
                 
-            case 'elabftw.auto_sync':
-                // Update elabFTW UI state
-                if (window.updateElabFTWOptions) {
-                    window.updateElabFTWOptions();
+            case 'omero.enabled':
+            case 'omero.auto_sync':
+                if (window.updateOMEROOptions) {
+                    window.updateOMEROOptions();
                 }
                 break;
         }
     },
 
-    // Apply theme (if implemented)
+    // Apply theme
     applyTheme(theme) {
-        // Theme switching could be implemented here
-        console.log('Theme changed to:', theme);
+        console.log('🎨 Theme changed to:', theme);
     },
 
-    // Reset to defaults
-    reset() {
-        this.settings = { ...this.defaultSettings };
-        this.saveSettings();
-    },
-
-    // Get all settings
-    getAll() {
-        return { ...this.settings };
-    },
-
-    // Import settings from JSON
-    import(settingsJson) {
-        try {
-            const imported = JSON.parse(settingsJson);
-            this.settings = { ...this.defaultSettings, ...imported };
-            this.saveSettings();
-            return true;
-        } catch (error) {
-            console.error('Error importing settings:', error);
-            return false;
+    // Handle user management toggle
+    handleUserManagementToggle(enabled) {
+        console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
+        
+        if (enabled) {
+            this.showSettingsMessage(
+                '👥 User Management enabled! Initializing login system...',
+                'info'
+            );
+            
+            localStorage.removeItem('metafold_last_user');
+            
+            setTimeout(async () => {
+                if (window.userManager) {
+                    console.log('🔄 Reinitializing userManager with User Management enabled...');
+                    try {
+                        window.userManager.isInitialized = false;
+                        window.userManager.currentUser = null;
+                        window.userManager.currentGroup = null;
+                        
+                        const userResult = await window.userManager.init();
+                        console.log('✅ UserManager reinitialized:', userResult);
+                        
+                        if (window.templateManager && window.templateManager.init) {
+                            window.templateManager.init();
+                        }
+                        
+                        this.showSettingsMessage(
+                            '✅ User Management activated successfully!',
+                            'success'
+                        );
+                    } catch (error) {
+                        console.warn('Failed to reinitialize userManager:', error);
+                        this.showSettingsMessage(
+                            '⚠️ User Management activation failed. Please restart the app.',
+                            'warning'
+                        );
+                    }
+                }
+            }, 500);
+            
+        } else {
+            this.showSettingsMessage(
+                '📝 Simple mode enabled. Changes will take effect after restart.',
+                'info'
+            );
         }
     },
 
-    // Export settings to JSON
-    export() {
-        return JSON.stringify(this.settings, null, 2);
+    // Show settings message
+    showSettingsMessage(message, type = 'info') {
+        let messageDiv = document.getElementById('settingsStatusMessage');
+        if (!messageDiv) {
+            messageDiv = document.createElement('div');
+            messageDiv.id = 'settingsStatusMessage';
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                z-index: 10001;
+                font-weight: 500;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                max-width: 400px;
+            `;
+            document.body.appendChild(messageDiv);
+        }
+        
+        const styles = {
+            'info': { bg: '#dbeafe', color: '#1e40af', border: '#60a5fa' },
+            'success': { bg: '#d1fae5', color: '#065f46', border: '#34d399' },
+            'warning': { bg: '#fef3c7', color: '#92400e', border: '#fbbf24' },
+            'error': { bg: '#fee2e2', color: '#b91c1c', border: '#f87171' }
+        };
+        
+        const style = styles[type] || styles.info;
+        messageDiv.style.background = style.bg;
+        messageDiv.style.color = style.color;
+        messageDiv.style.border = `1px solid ${style.border}`;
+        
+        messageDiv.textContent = message;
+        messageDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            if (messageDiv.parentElement) {
+                messageDiv.remove();
+            }
+        }, 5000);
     },
 
-    // Check if user management is enabled
-    isUserManagementEnabled() {
-        return this.get('general.user_management_enabled') === true;
-    },
+    // =================== INTEGRATION DELEGATES ===================
 
-    // Test elabFTW connection
+    // Test elabFTW connection - delegates to existing implementation
     async testElabFTWConnection() {
         const serverUrl = this.get('elabftw.server_url');
         const apiKey = this.get('elabftw.api_key');
@@ -142,8 +226,10 @@ const settingsManager = {
             return { success: false, message: 'Server URL and API key are required' };
         }
 
+        const formattedUrl = this.getFormattedElabFTWUrl();
+
         try {
-            const response = await fetch(`${serverUrl}/api/v2/users/me`, {
+            const response = await fetch(`${formattedUrl}api/v2/users/me`, {
                 headers: {
                     'Authorization': apiKey,
                     'Content-Type': 'application/json'
@@ -170,9 +256,25 @@ const settingsManager = {
         }
     },
 
-    // Create elabFTW experiment
+    // Test OMERO connection - delegates to omeroIntegration
+    async testOMEROConnection() {
+        if (!window.omeroIntegration) {
+            return { success: false, message: 'OMERO integration module not available' };
+        }
+        
+        try {
+            return await window.omeroIntegration.testConnection();
+        } catch (error) {
+            return { 
+                success: false, 
+                message: `OMERO connection test failed: ${error.message}` 
+            };
+        }
+    },
+
+    // Create elabFTW experiment - delegates to existing implementation
     async createElabFTWExperiment(projectName, metadata, structure = '') {
-        const serverUrl = this.get('elabftw.server_url');
+        const serverUrl = this.getFormattedElabFTWUrl();
         const apiKey = this.get('elabftw.api_key');
         const categoryId = this.get('elabftw.default_category');
         
@@ -181,22 +283,16 @@ const settingsManager = {
         }
 
         try {
-            // Convert metadata to elabFTW format
-            const elabftwData = this.convertToElabFTWFormat(metadata);
-            
-            // Create experiment body
-            const experimentBody = this.generateExperimentBody(projectName, metadata, structure);
-            
             const experimentData = {
                 title: projectName,
-                category: categoryId,
-                body: experimentBody,
-                ...elabftwData
+                body: this.generateExperimentBody(projectName, metadata, structure)
             };
 
-            console.log('Creating elabFTW experiment:', experimentData);
+            if (categoryId && categoryId !== '') {
+                experimentData.category_id = parseInt(categoryId);
+            }
 
-            const response = await fetch(`${serverUrl}/api/v2/experiments`, {
+            const response = await fetch(`${serverUrl}api/v2/experiments`, {
                 method: 'POST',
                 headers: {
                     'Authorization': apiKey,
@@ -205,15 +301,19 @@ const settingsManager = {
                 body: JSON.stringify(experimentData)
             });
 
-            if (response.ok) {
-                const result = await response.json();
-                const experimentUrl = `${serverUrl}/experiments.php?mode=view&id=${result.id}`;
+            if (response.ok || response.status === 201) {
+                const location = response.headers.get('location');
+                const experimentId = location ? location.split('/').pop() : null;
+                
+                if (metadata && Object.keys(metadata).length > 0 && experimentId) {
+                    await this.updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata);
+                }
                 
                 return {
                     success: true,
-                    message: `Experiment created in elabFTW (ID: ${result.id})`,
-                    id: result.id,
-                    url: experimentUrl
+                    message: 'Experiment created in elabFTW successfully!',
+                    id: experimentId,
+                    url: `${serverUrl}experiments.php?mode=view&id=${experimentId}`
                 };
             } else {
                 const errorText = await response.text();
@@ -230,9 +330,25 @@ const settingsManager = {
         }
     },
 
+    // Create OMERO dataset - delegates to omeroIntegration
+    async createOMERODataset(projectName, metadata, options = {}) {
+        if (!window.omeroIntegration) {
+            return { success: false, message: 'OMERO integration module not available' };
+        }
+        
+        try {
+            return await window.omeroIntegration.createDatasetForProject(projectName, metadata, options);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Error creating OMERO dataset: ${error.message}`
+            };
+        }
+    },
+
     // Update existing elabFTW experiment
     async updateExistingElabFTWExperiment(experimentId, metadata) {
-        const serverUrl = this.get('elabftw.server_url');
+        const serverUrl = this.getFormattedElabFTWUrl();
         const apiKey = this.get('elabftw.api_key');
         
         if (!serverUrl || !apiKey) {
@@ -240,22 +356,29 @@ const settingsManager = {
         }
 
         try {
-            // Convert metadata to elabFTW format
-            const elabftwData = this.convertToElabFTWFormat(metadata);
-            
-            console.log('Updating elabFTW experiment:', experimentId, elabftwData);
+            const elabftwFields = this.convertMetadataToElabFTW(metadata);
+            const metadataString = JSON.stringify({
+                elabftw: {
+                    display_main_text: true
+                },
+                extra_fields: elabftwFields
+            });
 
-            const response = await fetch(`${serverUrl}/api/v2/experiments/${experimentId}`, {
+            const updateData = {
+                metadata: metadataString
+            };
+
+            const response = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': apiKey,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(elabftwData)
+                body: JSON.stringify(updateData)
             });
 
             if (response.ok) {
-                const experimentUrl = `${serverUrl}/experiments.php?mode=view&id=${experimentId}`;
+                const experimentUrl = `${serverUrl}experiments.php?mode=view&id=${experimentId}`;
                 
                 return {
                     success: true,
@@ -278,104 +401,99 @@ const settingsManager = {
         }
     },
 
-    // Convert metadata to elabFTW format
-    convertToElabFTWFormat(metadata) {
-        const elabftwData = {
-            extra_fields: {},
-            elabftw: {
-                display_main_text: true
-            }
-        };
-        
-        const groups = new Map();
-        let groupIdCounter = 1;
-        let positionCounter = 1;
-        
-        // First pass: identify groups
-        Object.entries(metadata).forEach(([key, fieldInfo]) => {
-            if (fieldInfo.type === 'group') {
-                const groupId = groupIdCounter++;
-                groups.set(key, {
-                    id: groupId,
-                    name: fieldInfo.label || key
-                });
-            }
-        });
-        
-        // Add groups to elabftw.extra_fields_groups
-        if (groups.size > 0) {
-            elabftwData.elabftw.extra_fields_groups = [];
-            groups.forEach(group => {
-                elabftwData.elabftw.extra_fields_groups.push(group);
-            });
+    // =================== UTILITY METHODS ===================
+
+    // Get formatted elabFTW URL
+    getFormattedElabFTWUrl() {
+        const serverUrl = this.get('elabftw.server_url');
+        if (!serverUrl) return null;
+
+        let formattedUrl = serverUrl.trim();
+        if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+            formattedUrl = 'https://' + formattedUrl;
         }
-        
-        // Second pass: convert fields
-        Object.entries(metadata).forEach(([key, fieldInfo]) => {
-            // Skip group headers
-            if (fieldInfo.type === 'group') {
-                return;
-            }
-            
-            let safeValue = fieldInfo.value;
-            
-            const elabField = {
-                type: this.mapFieldTypeToElabFTW(fieldInfo.type)
+        if (!formattedUrl.endsWith('/')) {
+            formattedUrl += '/';
+        }
+        return formattedUrl;
+    },
+
+    // Update experiment with metadata using PATCH
+    async updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata) {
+        try {
+            const elabftwFields = this.convertMetadataToElabFTW(metadata);
+            const metadataString = JSON.stringify({
+                elabftw: {
+                    display_main_text: true
+                },
+                extra_fields: elabftwFields
+            });
+
+            const updateData = {
+                metadata: metadataString
             };
-            
-            // Adjust value by type
-            switch (fieldInfo.type) {
-                case 'checkbox':
-                    elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
-                    break;
-                case 'number':
-                    elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
-                    break;
-                default:
-                    elabField.value = String(safeValue || '');
+
+            const response = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.ok) {
+                console.log('✅ Metadata successfully added to experiment');
+                return true;
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Failed to update experiment metadata:', response.status, errorText);
+                return false;
             }
-            
-            if (positionCounter > 1) {
-                elabField.position = positionCounter;
-            }
-            positionCounter++;
-            
+        } catch (error) {
+            console.error('❌ Error updating experiment metadata:', error);
+            return false;
+        }
+    },
+
+    // Convert MetaFold metadata to elabFTW format
+    convertMetadataToElabFTW(metadata) {
+        const elabftwFields = {};
+        
+        Object.entries(metadata).forEach(([key, fieldInfo]) => {
+            if (fieldInfo.type === 'group') return;
+
+            const elabField = {
+                type: this.mapFieldTypeToElabFTW(fieldInfo.type),
+                value: this.formatValueForElabFTW(fieldInfo.value, fieldInfo.type)
+            };
+
             if (fieldInfo.description) {
                 elabField.description = fieldInfo.description;
             }
-            
+
             if (fieldInfo.required) {
                 elabField.required = true;
             }
-            
+
             if (fieldInfo.type === 'textarea') {
                 elabField.multiline = true;
             }
-            
+
             if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
                 elabField.options = fieldInfo.options.map(opt => String(opt));
             }
-            
+
             if (fieldInfo.type === 'number') {
                 if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
                 if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
             }
-            
-            // Assign to group (if field belongs to a group)
-            if (key.includes('.')) {
-                const parts = key.split('.');
-                const possibleGroupKey = parts[0] + '_group';
-                
-                if (groups.has(possibleGroupKey)) {
-                    elabField.group_id = groups.get(possibleGroupKey).id;
-                }
-            }
-            
+
             const fieldKey = fieldInfo.label || key;
-            elabftwData.extra_fields[fieldKey] = elabField;
+            elabftwFields[fieldKey] = elabField;
         });
-        
-        return elabftwData;
+
+        return elabftwFields;
     },
 
     // Map field types to elabFTW types
@@ -392,6 +510,20 @@ const settingsManager = {
         return typeMap[type] || 'text';
     },
 
+    // Format values for elabFTW
+    formatValueForElabFTW(value, type) {
+        switch (type) {
+            case 'checkbox':
+                return (value === true || value === 'true' || value === 'on') ? "on" : "";
+            case 'number':
+                return String(value !== undefined && value !== null && value !== '' ? value : 0);
+            case 'dropdown':
+                return String(value || '');
+            default:
+                return String(value || '');
+        }
+    },
+
     // Generate experiment body for elabFTW
     generateExperimentBody(projectName, metadata, structure = '') {
         const date = new Date().toLocaleDateString('en-US', { 
@@ -403,7 +535,6 @@ const settingsManager = {
         let body = `<h1>${projectName}</h1>\n\n`;
         body += `<p><strong>Created:</strong> ${date}</p>\n\n`;
         
-        // Add metadata summary
         if (metadata && Object.keys(metadata).length > 0) {
             body += `<h2>Experiment Metadata</h2>\n<ul>\n`;
             
@@ -424,20 +555,55 @@ const settingsManager = {
             body += `</ul>\n\n`;
         }
         
-        // Add folder structure if present
         if (structure && structure.trim() !== '') {
             body += `<h2>Project Structure</h2>\n<pre>${structure}</pre>\n\n`;
         }
         
-        // Add sections for documentation
         body += `<h2>Description</h2>\n<p><em>Add your project description here...</em></p>\n\n`;
         body += `<h2>Methodology</h2>\n<p><em>Describe your methodology here...</em></p>\n\n`;
         body += `<h2>Results</h2>\n<p><em>Document your results here...</em></p>\n\n`;
         body += `<h2>Notes</h2>\n<p><em>Add any additional notes here...</em></p>\n`;
         
         return body;
+    },
+
+    // Reset to defaults
+    reset() {
+        console.log('🔄 Resetting settings to defaults...');
+        this.settings = { ...this.defaultSettings };
+        this.saveSettings();
+        this.applyInitialSettings();
+    },
+
+    // Export settings to JSON
+    export() {
+        return JSON.stringify(this.settings, null, 2);
+    },
+
+    // Import settings from JSON
+    import(settingsJson) {
+        try {
+            const imported = JSON.parse(settingsJson);
+            this.settings = { ...this.defaultSettings, ...imported };
+            const saved = this.saveSettings();
+            
+            if (saved) {
+                this.applyInitialSettings();
+            }
+            
+            return saved;
+        } catch (error) {
+            console.error('Error importing settings:', error);
+            return false;
+        }
+    },
+
+    // Check if user management is enabled
+    isUserManagementEnabled() {
+        const enabled = this.get('general.user_management_enabled') === true;
+        return enabled;
     }
 };
 
 window.settingsManager = settingsManager;
-console.log('✅ settingsManager loaded (Fixed with complete elabFTW integration)');
+console.log('✅ settingsManager loaded (Simplified with module delegation)');

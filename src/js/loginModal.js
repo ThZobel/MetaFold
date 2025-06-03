@@ -1,4 +1,4 @@
-// Login Modal (English translation)
+// Login Modal (Enhanced with better user experience)
 
 // Remove existing loginModal if already defined
 if (window.loginModal) {
@@ -41,81 +41,107 @@ const loginModal = {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.5);
+                background: rgba(0, 0, 0, 0.6);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                backdrop-filter: blur(5px);
             ">
                 <div style="
-                    background: white;
-                    padding: 2rem;
-                    border-radius: 8px;
-                    max-width: 400px;
+                    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+                    padding: 2.5rem;
+                    border-radius: 16px;
+                    max-width: 450px;
                     width: 90%;
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #e0e0e0;
                 ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h2 style="margin: 0; color: #007bff;">🚀 Welcome to MetaFold</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 style="margin: 0; color: #7c3aed; font-size: 1.8rem;">🚀 Welcome to MetaFold</h2>
                         <button onclick="loginModal.showUserManagement()" style="
-                            background: #28a745;
+                            background: linear-gradient(45deg, #059669, #10b981);
                             color: white;
                             border: none;
-                            padding: 0.25rem 0.5rem;
-                            border-radius: 3px;
+                            padding: 0.5rem 1rem;
+                            border-radius: 8px;
                             cursor: pointer;
-                            font-size: 0.8rem;
-                        ">👥 Manage</button>
+                            font-size: 0.9rem;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+                        " onmouseover="this.style.transform='translateY(-2px)'" 
+                           onmouseout="this.style.transform='translateY(0)'">
+                            👥 Manage Users
+                        </button>
                     </div>
-                    <p style="margin: 0 0 1.5rem 0; color: #666; text-align: center;">Enter your name:</p>
+                    <p style="margin: 0 0 2rem 0; color: #9ca3af; text-align: center; font-size: 1.1rem;">
+                        Enter your name to get started:
+                    </p>
                     
-                    <div style="margin-bottom: 1.5rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">👤 Your Name:</label>
+                    <div style="margin-bottom: 2rem;">
+                        <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #a855f7; font-size: 1rem;">
+                            👤 Your Name:
+                        </label>
                         <div style="position: relative;">
-                            <input type="text" id="usernameInput" placeholder="e.g. John Doe" 
+                            <input type="text" id="usernameInput" placeholder="e.g. Dr. Jane Smith" 
                                    autocomplete="off" style="
                                 width: 100%;
-                                padding: 0.75rem;
-                                border: 1px solid #ddd;
-                                border-radius: 4px;
+                                padding: 1rem;
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                border-radius: 8px;
                                 font-size: 1rem;
                                 box-sizing: border-box;
-                            ">
+                                background: rgba(255, 255, 255, 0.05);
+                                color: #e0e0e0;
+                                transition: all 0.3s ease;
+                            " onfocus="this.style.borderColor='#7c3aed'; this.style.boxShadow='0 0 0 2px rgba(124, 58, 237, 0.2)'"
+                               onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none'">
                             <div id="userSuggestions" style="
                                 position: absolute;
                                 top: 100%;
                                 left: 0;
                                 right: 0;
-                                background: white;
-                                border: 1px solid #ddd;
-                                border-radius: 4px;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                background: linear-gradient(135deg, #2a2a40, #1e1e2e);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                border-radius: 8px;
+                                box-shadow: 0 8px 25px rgba(0,0,0,0.3);
                                 display: none;
                                 z-index: 1000;
                                 max-height: 200px;
                                 overflow-y: auto;
+                                margin-top: 4px;
                             "></div>
                         </div>
-                        <small style="color: #666; margin-top: 0.5rem; display: block;">
-                            Groups can be assigned in user management.
+                        <small style="color: #9ca3af; margin-top: 0.75rem; display: block; font-size: 0.9rem;">
+                            💡 Groups can be assigned in user management
                         </small>
                     </div>
                     
                     <div style="text-align: center;">
                         <button id="loginConfirm" style="
-                            background: #007bff;
+                            background: linear-gradient(45deg, #7c3aed, #a855f7);
                             color: white;
                             border: none;
-                            padding: 0.75rem 2rem;
-                            border-radius: 4px;
-                            font-size: 1rem;
+                            padding: 1rem 2.5rem;
+                            border-radius: 12px;
+                            font-size: 1.1rem;
+                            font-weight: 600;
                             cursor: pointer;
-                            transition: background 0.2s;
-                        " onmouseover="this.style.background='#0056b3'" 
-                           onmouseout="this.style.background='#007bff'">
+                            transition: all 0.3s ease;
+                            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+                            min-width: 160px;
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(124, 58, 237, 0.4)'" 
+                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(124, 58, 237, 0.3)'">
                             🚀 Let's Go!
                         </button>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem; text-align: center;">
+                        <small style="color: #6b7280; font-size: 0.85rem;">
+                            Your data stays local in your browser 🔒
+                        </small>
                     </div>
                 </div>
             </div>
@@ -133,26 +159,68 @@ const loginModal = {
             this.showUserSuggestions(e.target.value);
         });
 
-        // Confirm button
-        document.getElementById('loginConfirm').addEventListener('click', () => {
-            this.handleConfirm();
+        // Hide suggestions when clicking outside or losing focus
+        // Use a longer delay and check if we're clicking on a suggestion
+        this.usernameInput.addEventListener('blur', (e) => {
+            // Check if the related target is within our suggestions
+            const suggestionsContainer = this.userSuggestions;
+            const relatedTarget = e.relatedTarget;
+            
+            setTimeout(() => {
+                // Don't hide if we clicked on a suggestion
+                if (suggestionsContainer && 
+                    (!relatedTarget || !suggestionsContainer.contains(relatedTarget))) {
+                    suggestionsContainer.style.display = 'none';
+                }
+            }, 300); // Increased delay
         });
+
+        // Show suggestions on focus if there's text
+        this.usernameInput.addEventListener('focus', () => {
+            if (this.usernameInput.value.trim()) {
+                this.showUserSuggestions(this.usernameInput.value);
+            }
+        });
+
+        // Confirm button
+        const confirmBtn = document.getElementById('loginConfirm');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                this.handleConfirm();
+            });
+        }
 
         // Enter key
         this.usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleConfirm();
+            if (e.key === 'Enter') {
+                this.handleConfirm();
+            }
         });
 
-        // Focus on input field
-        setTimeout(() => this.usernameInput.focus(), 100);
+        // Escape key to cancel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.modal) {
+                this.handleCancel();
+            }
+        });
+
+        // Focus on input field with slight delay
+        setTimeout(() => {
+            if (this.usernameInput) {
+                this.usernameInput.focus();
+                this.usernameInput.select();
+            }
+        }, 150);
     },
 
     loadSuggestions() {
-        // Set last used user if available
+        // Set placeholder based on existing users
         const users = window.userManager?.users || [];
         
         if (users.length > 0) {
-            this.usernameInput.placeholder = `e.g. ${users[0]}`;
+            this.usernameInput.placeholder = `e.g. ${users[0]} or enter new name`;
+        } else {
+            this.usernameInput.placeholder = 'e.g. Dr. Jane Smith';
         }
     },
 
@@ -169,8 +237,30 @@ const loginModal = {
             .slice(0, 5);
 
         this.renderUserSuggestions(this.userSuggestions, suggestions, (user) => {
-            this.usernameInput.value = user;
-            this.userSuggestions.style.display = 'none';
+            console.log('🔄 User selected from suggestions:', user);
+            
+            // Set the username immediately
+            if (this.usernameInput) {
+                this.usernameInput.value = user;
+            }
+            
+            // Hide suggestions with a slight delay to ensure click is processed
+            setTimeout(() => {
+                if (this.userSuggestions) {
+                    this.userSuggestions.style.display = 'none';
+                }
+            }, 50);
+            
+            // Focus back to input
+            setTimeout(() => {
+                if (this.usernameInput) {
+                    this.usernameInput.focus();
+                }
+            }, 100);
+            
+            // Optional: Auto-submit if user clicks suggestion
+            // Uncomment next line for immediate login on suggestion click:
+            // this.handleConfirm();
         });
     },
 
@@ -181,22 +271,23 @@ const loginModal = {
         }
 
         container.innerHTML = suggestions
-            .map(user => {
+            .map((user, index) => {
                 const group = window.userManager?.getUserGroup(user) || 'Default';
-                const color = window.userManager?.generateUserColor(user) || '#666';
+                const color = window.userManager?.generateUserColor(user) || '#7c3aed';
                 const initials = window.userManager?.getUserInitials(user) || '??';
                 
-                return `<div style="
-                    padding: 0.5rem;
+                return `<div class="suggestion-item" data-user="${user}" data-index="${index}" style="
+                    padding: 0.75rem;
                     cursor: pointer;
-                    border-bottom: 1px solid #eee;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                     display: flex;
                     align-items: center;
-                " onmouseover="this.style.background='#f0f0f0'"
-                   onmouseout="this.style.background='white'">
+                    transition: all 0.2s ease;
+                    user-select: none;
+                ">
                     <div style="
-                        width: 24px;
-                        height: 24px;
+                        width: 32px;
+                        height: 32px;
                         border-radius: 50%;
                         background: ${color};
                         color: white;
@@ -204,12 +295,14 @@ const loginModal = {
                         align-items: center;
                         justify-content: center;
                         font-weight: bold;
-                        font-size: 0.7rem;
-                        margin-right: 0.5rem;
+                        font-size: 0.8rem;
+                        margin-right: 0.75rem;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                        pointer-events: none;
                     ">${initials}</div>
-                    <div>
-                        <strong>${user}</strong>
-                        <span style="color: #666; font-size: 0.9rem;"> (${group})</span>
+                    <div style="pointer-events: none;">
+                        <div style="font-weight: 600; color: #e0e0e0;">${user}</div>
+                        <div style="color: #9ca3af; font-size: 0.85rem;">${group}</div>
                     </div>
                 </div>`;
             })
@@ -217,11 +310,54 @@ const loginModal = {
 
         container.style.display = 'block';
 
-        container.querySelectorAll('div').forEach((item, index) => {
-            item.addEventListener('click', () => {
-                onClick(suggestions[index]);
+        // Add click handlers using proper event delegation with multiple event types
+        container.querySelectorAll('.suggestion-item').forEach((item, index) => {
+            const username = item.getAttribute('data-user');
+            
+            // Add hover effects
+            item.addEventListener('mouseenter', () => {
+                item.style.background = 'rgba(124, 58, 237, 0.1)';
             });
+            
+            item.addEventListener('mouseleave', () => {
+                item.style.background = 'transparent';
+            });
+            
+            // Add multiple event handlers for reliability
+            const handleSelection = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                console.log('User suggestion selected:', username);
+                
+                // Hide suggestions immediately
+                container.style.display = 'none';
+                
+                // Call the callback
+                onClick(username);
+            };
+            
+            // Multiple event types for maximum compatibility
+            item.addEventListener('click', handleSelection, true);
+            item.addEventListener('mousedown', handleSelection, true);
+            item.addEventListener('touchstart', handleSelection, true);
         });
+
+        // Also add a global click handler on the container itself
+        container.addEventListener('click', (e) => {
+            const suggestionItem = e.target.closest('.suggestion-item');
+            if (suggestionItem) {
+                const username = suggestionItem.getAttribute('data-user');
+                if (username) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Container click - User selected:', username);
+                    container.style.display = 'none';
+                    onClick(username);
+                }
+            }
+        }, true);
     },
 
     showUserManagement() {
@@ -238,7 +374,11 @@ const loginModal = {
                 originalClose.call(window.userManagementModal);
                 this.modal.style.display = 'flex';
                 this.loadSuggestions(); // Refresh suggestions
+                this.usernameInput.focus();
             };
+        } else {
+            console.warn('User management modal not available');
+            this.modal.style.display = 'flex';
         }
     },
 
@@ -246,7 +386,14 @@ const loginModal = {
         const username = this.usernameInput.value.trim();
 
         if (!username) {
-            this.showError('Please enter your name.');
+            this.showError('Please enter your name to continue.');
+            this.usernameInput.focus();
+            return;
+        }
+
+        if (username.length < 2) {
+            this.showError('Name must be at least 2 characters long.');
+            this.usernameInput.focus();
             return;
         }
 
@@ -258,32 +405,50 @@ const loginModal = {
         this.onConfirm({ username, groupname });
     },
 
+    handleCancel() {
+        console.log('❌ Login cancelled');
+        this.close();
+        this.onCancel(new Error('Login cancelled'));
+    },
+
     showError(message) {
         let errorDiv = this.modal.querySelector('.error-message');
         if (!errorDiv) {
             errorDiv = document.createElement('div');
             errorDiv.className = 'error-message';
             errorDiv.style.cssText = `
-                background-color: #fee;
-                color: #c33;
-                padding: 0.5rem;
-                border-radius: 4px;
+                background: linear-gradient(45deg, #dc2626, #ef4444);
+                color: white;
+                padding: 0.75rem;
+                border-radius: 8px;
                 margin: 1rem 0;
-                border: 1px solid #fcc;
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                text-align: center;
+                font-weight: 500;
+                box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
             `;
             this.modal.querySelector('div > div').appendChild(errorDiv);
         }
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
+        
+        // Auto-hide after 4 seconds
+        setTimeout(() => {
+            if (errorDiv.style.display !== 'none') {
+                errorDiv.style.display = 'none';
+            }
+        }, 4000);
     },
 
     close() {
         if (this.modal) {
             this.modal.remove();
             this.modal = null;
+            this.usernameInput = null;
+            this.userSuggestions = null;
         }
     }
 };
 
 window.loginModal = loginModal;
-console.log('✅ loginModal loaded (English translation)');
+console.log('✅ loginModal loaded (Enhanced user experience)');
