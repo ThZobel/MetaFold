@@ -2,7 +2,7 @@
 
 **MetaFold** is a program for creating folder structures and metadata files (e.g., .json) based on templates.
 
-*Note: This project is currently under development (Work in Progress).*
+*Note: This project is currently under development (Work in Progress). Some function might not work yet*
 
 ---
 
