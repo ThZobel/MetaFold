@@ -1,25 +1,24 @@
-// OMERO REST API Client - Enhanced Multi-University Version with CSRF Fixes
-// Supports multiple OMERO configurations, fallback strategies, and debugging
+// OMERO Authentication and Session Management - Enhanced Multi-University Version
 
-const omeroClient = {
+const omeroAuth = {
     session: null,
     baseUrl: null,
-    
-    // Initialize client with server URL
+    options: {
+        verifySSL: true,
+        sessionTimeout: 600000, // 10 minutes
+        maxRetries: 3,
+        retryDelay: 1000
+    },
+
+    // Initialize auth module with server URL
     init(serverUrl, options = {}) {
         this.baseUrl = this.formatUrl(serverUrl);
-        this.options = {
-            verifySSL: true,
-            sessionTimeout: 600000, // 10 minutes
-            maxRetries: 3,
-            retryDelay: 1000,
-            ...options
-        };
+        this.options = { ...this.options, ...options };
         
-        console.log('🔬 OMERO Client initialized (Multi-Uni + CSRF Fixed):', this.baseUrl);
+        console.log('🔬 OMERO Auth initialized (Multi-Uni + CSRF Fixed):', this.baseUrl);
         return this;
     },
-    
+
     // Format server URL with validation
     formatUrl(serverUrl) {
         if (!serverUrl) return null;
@@ -33,7 +32,7 @@ const omeroClient = {
         }
         return formattedUrl;
     },
-    
+
     // =================== SESSION DEBUGGING ===================
     
     debugSession() {
@@ -45,7 +44,7 @@ const omeroClient = {
         console.log('🔬 Session valid:', this.isSessionValid());
         console.log('🔬 ================================');
     },
-    
+
     // Debug CSRF state
     debugCSRF() {
         console.log('🔬 === CSRF DEBUG INFO ===');
@@ -58,13 +57,13 @@ const omeroClient = {
         console.log('Session state:', this.session || 'NONE');
         console.log('=========================');
     },
-    
-    // =================== CSRF TOKEN MANAGEMENT (ENHANCED) ===================
+
+    // =================== CSRF TOKEN MANAGEMENT ===================
     
     // Get CSRF Token with retry logic
     async getCSRFToken() {
         if (!this.baseUrl) {
-            throw new Error('OMERO client not initialized');
+            throw new Error('OMERO auth not initialized');
         }
         
         console.log('🔬 Getting CSRF token from:', `${this.baseUrl}api/v0/token/`);
@@ -118,7 +117,7 @@ const omeroClient = {
             }
         }
     },
-    
+
     // Get best available CSRF token with fallback
     getBestCSRFToken() {
         // Try cookie first (Django standard)
@@ -140,7 +139,7 @@ const omeroClient = {
         
         return bestToken;
     },
-    
+
     // Extract CSRF token from cookie
     getCSRFTokenFromCookie() {
         return document.cookie
@@ -148,9 +147,9 @@ const omeroClient = {
             .find(row => row.trim().startsWith('csrftoken='))
             ?.split('=')[1];
     },
-    
-    // =================== AUTHENTICATION (ENHANCED MULTI-UNI) ===================
-    
+
+    // =================== AUTHENTICATION METHODS ===================
+
     // Enhanced Login with multi-university support
     async loginWithCredentials(username, password) {
         console.log('🔬 === OMERO MULTI-UNI LOGIN (CSRF FIXED) ===');
@@ -171,7 +170,7 @@ const omeroClient = {
             let serverId = 1;
             
             try {
-                const serversResponse = await this.makeRequest(`${this.baseUrl}api/v0/servers/`, {
+                const serversResponse = await window.omeroAPI.makeRequest(`${this.baseUrl}api/v0/servers/`, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -233,8 +232,8 @@ const omeroClient = {
             throw error;
         }
     },
-    
-    // Form-based login (Django standard) - FIXED to use raw fetch
+
+    // Form-based login (Django standard)
     async attemptFormLogin(username, password, serverId, csrfToken) {
         const loginData = new URLSearchParams({
             username: username,
@@ -262,8 +261,8 @@ const omeroClient = {
         
         return await this.processLoginResponse(response, 'Form-based Login', csrfToken);
     },
-    
-    // JSON API login (alternative) - FIXED to use raw fetch
+
+    // JSON API login (alternative)
     async attemptJsonLogin(username, password, serverId, csrfToken) {
         const loginPayload = {
             server: serverId,
@@ -290,7 +289,7 @@ const omeroClient = {
         
         return await this.processLoginResponse(response, 'JSON API Login', csrfToken);
     },
-    
+
     // Process login response
     async processLoginResponse(response, method, csrfToken) {
         console.log('🔬 Login response status:', response.status);
@@ -340,7 +339,7 @@ const omeroClient = {
             throw new Error(`${errorMessage}: ${response.status}`);
         }
     },
-    
+
     // Analyze login errors for better user feedback
     analyzeLoginError(status, errorText) {
         if (errorText.includes('CSRF')) {
@@ -365,11 +364,11 @@ const omeroClient = {
             return 'Login failed';
         }
     },
-    
-    // Test authenticated API access - FIXED to use makeRequest properly
+
+    // Test authenticated API access
     async testAuthenticatedAPIAccess(csrfToken) {
         try {
-            const projectsResponse = await this.makeRequest(`${this.baseUrl}api/v0/m/projects/`, {
+            const projectsResponse = await window.omeroAPI.makeRequest(`${this.baseUrl}api/v0/m/projects/`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -389,7 +388,7 @@ const omeroClient = {
             return false;
         }
     },
-    
+
     // Enhanced login with session cookie support
     async loginWithSessionCookies(sessionId, csrfToken) {
         console.log('🔬 === LOGIN WITH SESSION COOKIES (ENHANCED) ===');
@@ -433,47 +432,16 @@ const omeroClient = {
             throw error;
         }
     },
-    
-    // Main login method with enhanced fallback strategies
-    async login(username, password) {
-        console.log('🔬 === OMERO ENHANCED LOGIN ===');
-        console.log('🔬 Username:', username || 'not provided');
-        console.log('🔬 Server:', this.baseUrl);
-        
-        // Strategy 1: Try session cookie recovery first
-        try {
-            console.log('🔬 Strategy 1: Session cookie recovery...');
-            await this.establishSessionFromCookies();
-            console.log('✅ Session recovered from existing cookies');
-            return {
-                success: true,
-                session: this.session,
-                loginMethod: 'Cookie Recovery (Enhanced)'
-            };
-        } catch (cookieError) {
-            console.log('🔬 Cookie recovery failed:', cookieError.message);
-        }
-        
-        // Strategy 2: Username/Password login
-        if (username && password) {
-            console.log('🔬 Strategy 2: Credential-based login...');
-            return await this.loginWithCredentials(username, password);
-        }
-        
-        // Strategy 3: Public group fallback
-        console.log('🔬 Strategy 3: Public group fallback...');
-        return await this.loginPublicGroup();
-    },
-    
-    // Public group login with enhanced error handling - FIXED makeRequest usage
+
+    // Public group login with enhanced error handling
     async loginPublicGroup() {
         console.log('🔬 === PUBLIC GROUP SESSION (ENHANCED) ===');
         
         try {
             const csrfToken = await this.getCSRFToken();
             
-            // Test API access without login using makeRequest which returns JSON
-            const projectsResponse = await this.makeRequest(`${this.baseUrl}api/v0/m/projects/`, {
+            // Test API access without login
+            const projectsResponse = await window.omeroAPI.makeRequest(`${this.baseUrl}api/v0/m/projects/`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -508,49 +476,40 @@ const omeroClient = {
             throw error;
         }
     },
-    
-    // =================== ENHANCED REQUEST HANDLING ===================
-    
-    // Enhanced request with retry logic and proper error handling
-    async makeRequest(url, options = {}) {
-        const defaultOptions = {
-            credentials: 'include',
-            mode: 'cors',
-            headers: {
-                'Origin': window.location.origin,
-                'Referer': window.location.href,
-                ...options.headers
-            },
-            ...options
-        };
+
+    // Main login method with enhanced fallback strategies
+    async login(username, password) {
+        console.log('🔬 === OMERO ENHANCED LOGIN ===');
+        console.log('🔬 Username:', username || 'not provided');
+        console.log('🔬 Server:', this.baseUrl);
         
-        for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
-            try {
-                const response = await fetch(url, defaultOptions);
-                
-                if (response.ok) {
-                    return await response.json();
-                } else {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-                
-            } catch (error) {
-                if (attempt < this.options.maxRetries && !error.message.includes('CSRF')) {
-                    console.warn(`⚠️ Request failed (attempt ${attempt}), retrying...`);
-                    await this.delay(this.options.retryDelay * attempt);
-                    continue;
-                }
-                throw error;
-            }
+        // Strategy 1: Try session cookie recovery first
+        try {
+            console.log('🔬 Strategy 1: Session cookie recovery...');
+            await this.establishSessionFromCookies();
+            console.log('✅ Session recovered from existing cookies');
+            return {
+                success: true,
+                session: this.session,
+                loginMethod: 'Cookie Recovery (Enhanced)'
+            };
+        } catch (cookieError) {
+            console.log('🔬 Cookie recovery failed:', cookieError.message);
         }
+        
+        // Strategy 2: Username/Password login
+        if (username && password) {
+            console.log('🔬 Strategy 2: Credential-based login...');
+            return await this.loginWithCredentials(username, password);
+        }
+        
+        // Strategy 3: Public group fallback
+        console.log('🔬 Strategy 3: Public group fallback...');
+        return await this.loginPublicGroup();
     },
-    
-    // Utility: delay function
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    },
-    
+
+    // =================== SESSION MANAGEMENT ===================
+
     // Extract session cookies
     extractSessionCookies() {
         const cookies = {};
@@ -562,7 +521,7 @@ const omeroClient = {
         });
         return cookies;
     },
-    
+
     // Try to use existing session cookies
     async establishSessionFromCookies() {
         console.log('🔬 Establishing session from existing cookies...');
@@ -586,28 +545,28 @@ const omeroClient = {
         
         return await this.testAuthenticatedAPIAccess(csrfToken);
     },
-    
+
     // =================== SESSION VALIDATION ===================
-    
+
     isSessionValid() {
         if (!this.session) return false;
         
         const sessionAge = Date.now() - this.session.loginTime;
         return sessionAge < this.options.sessionTimeout;
     },
-    
+
     async ensureSession(username, password) {
         if (!this.isSessionValid()) {
             await this.login(username, password);
         }
         return this.session;
     },
-    
+
     async logout() {
         if (this.session) {
             if (this.session.isAuthenticated && this.session.csrfToken) {
                 try {
-                    await this.makeRequest(`${this.baseUrl}webclient/logout/`, {
+                    await window.omeroAPI.makeRequest(`${this.baseUrl}webclient/logout/`, {
                         method: 'POST',
                         headers: {
                             'X-CSRFToken': this.session.csrfToken
@@ -623,87 +582,14 @@ const omeroClient = {
             console.log('🔬 Session cleared');
         }
     },
-    
-    // =================== API REQUESTS ===================
-    
-    async apiRequest(endpoint, options = {}) {
-        if (!this.session && !options.skipAuth) {
-            throw new Error('No active OMERO session');
-        }
-        
-        const url = `${this.baseUrl}${endpoint}`;
-        const csrfToken = this.getBestCSRFToken();
-        
-        const requestOptions = {
-            headers: {
-                'Accept': 'application/json',
-                ...options.headers
-            },
-            ...options
-        };
-        
-        if (options.method && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(options.method.toUpperCase())) {
-            if (csrfToken) {
-                requestOptions.headers['X-CSRFToken'] = csrfToken;
-            }
-            requestOptions.headers['Content-Type'] = 'application/json';
-        }
-        
-        return await this.makeRequest(url, requestOptions);
-    },
-    
-    // =================== PROJECTS & DATASETS ===================
-    
-    async getProjects() {
-        const response = await this.apiRequest('api/v0/m/projects/');
-        return response.data || [];
-    },
-    
-    async createProject(name, description = '') {
-        const projectData = { name, description };
-        const response = await this.apiRequest('api/v0/m/projects/', {
-            method: 'POST',
-            body: JSON.stringify(projectData)
-        });
-        return response.data;
-    },
-    
-    async getDatasets() {
-        const response = await this.apiRequest('api/v0/m/datasets/');
-        return response.data || [];
-    },
-    
-    async createDataset(name, description = '') {
-        const datasetData = { name, description };
-        const response = await this.apiRequest('api/v0/m/datasets/', {
-            method: 'POST',
-            body: JSON.stringify(datasetData)
-        });
-        return response.data;
-    },
-    
-    async linkDatasetToProject(datasetId, projectId) {
-        const linkData = {
-            parent: {
-                '@type': 'http://www.openmicroscopy.org/Schemas/OME/2016-06#Project',
-                '@id': projectId
-            },
-            child: {
-                '@type': 'http://www.openmicroscopy.org/Schemas/OME/2016-06#Dataset',
-                '@id': datasetId
-            }
-        };
-        
-        const response = await this.apiRequest('api/v0/m/projectdatasetlinks/', {
-            method: 'POST',
-            body: JSON.stringify(linkData)
-        });
-        
-        return response.data;
-    },
-    
+
     // =================== UTILITY METHODS ===================
-    
+
+    // Utility: delay function
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
     // Test connection without login
     async testConnection() {
         try {
@@ -720,100 +606,7 @@ const omeroClient = {
             };
         }
     },
-    
-    // Enhanced connection test with CSRF diagnosis (ADDED FROM CSRF-FIXED VERSION)
-    async testConnectionEnhanced() {
-        try {
-            console.log('🔬 Starting enhanced connection test (Multi-Uni + CSRF Fixed)...');
-            
-            // Test 1: Basic connectivity with CSRF
-            const basicTest = await this.testConnection();
-            if (!basicTest.success) {
-                return basicTest;
-            }
-            
-            // Test 2: CSRF token functionality
-            console.log('🔬 Testing CSRF token functionality...');
-            let csrfTest = { success: false, error: 'Not tested' };
-            try {
-                const token = await this.getCSRFToken();
-                const cookieToken = this.getCSRFTokenFromCookie();
-                csrfTest = {
-                    success: !!token,
-                    token_received: !!token,
-                    cookie_set: !!cookieToken,
-                    tokens_match: token === cookieToken
-                };
-            } catch (error) {
-                csrfTest = { success: false, error: error.message };
-            }
-            
-            // Test 3: Try different login strategies
-            const strategies = [];
-            
-            // Strategy: Cookie recovery
-            try {
-                await this.establishSessionFromCookies();
-                strategies.push({
-                    name: 'Cookie Recovery',
-                    success: true,
-                    projects: this.session?.projectCount || 0
-                });
-            } catch (error) {
-                strategies.push({
-                    name: 'Cookie Recovery',
-                    success: false,
-                    error: error.message
-                });
-            }
-            
-            // Strategy: Public group
-            try {
-                await this.loginPublicGroup();
-                strategies.push({
-                    name: 'Public Group',
-                    success: true,
-                    projects: this.session?.projectCount || 0
-                });
-            } catch (error) {
-                strategies.push({
-                    name: 'Public Group',
-                    success: false,
-                    error: error.message
-                });
-            }
-            
-            const workingStrategies = strategies.filter(s => s.success);
-            
-            return {
-                success: workingStrategies.length > 0,
-                message: `Enhanced test complete (Multi-Uni + CSRF Fixed) - ${workingStrategies.length} working strategies`,
-                csrf_test: csrfTest,
-                strategies: strategies,
-                bestStrategy: workingStrategies[0] || null,
-                hasPrivateAccess: this.session?.isAuthenticated || false,
-                hasPublicAccess: this.session?.isPublicGroup || false,
-                fixes_applied: [
-                    'Multi-university support',
-                    'Enhanced retry logic',
-                    'Form-based login priority',
-                    'Origin header set automatically',
-                    'Referer header set automatically', 
-                    'CSRF tokens handled in both header and cookie',
-                    'Session cookies preserved correctly',
-                    'Django 4+ compatibility ensured'
-                ]
-            };
-            
-        } catch (error) {
-            return {
-                success: false,
-                message: `Enhanced test failed: ${error.message}`,
-                csrf_debug: 'Check if proxy server is running and CSRF fixes are applied'
-            };
-        }
-    },
-    
+
     analyzeConnectionError(error) {
         if (error.message.includes('fetch')) {
             return 'Connection failed - Check if OMERO server is accessible';
@@ -824,13 +617,9 @@ const omeroClient = {
         } else {
             return `Connection error: ${error.message}`;
         }
-    },
-    
-    getWebclientUrl(objectType, objectId) {
-        return `${this.baseUrl}webclient/?show=${objectType}-${objectId}`;
     }
 };
 
 // Make globally available
-window.omeroClient = omeroClient;
-console.log('✅ Enhanced Multi-University OMERO Client loaded (CSRF Fixed + Fallback Strategies + testConnectionEnhanced)');
+window.omeroAuth = omeroAuth;
+console.log('✅ OMERO Auth Module loaded (Enhanced Multi-University + CSRF Fixed)');

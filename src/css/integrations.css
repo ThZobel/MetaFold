@@ -1,0 +1,630 @@
+/* Integration Styles - elabFTW and OMERO - MetaFold */
+
+/* =========================== elabFTW INTEGRATION =========================== */
+
+/* elabFTW Option Container */
+#elabftwOption {
+    margin-top: 15px;
+    padding: 12px;
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+#elabftwOption:hover {
+    background: rgba(240, 249, 255, 0.9);
+    border-color: #0284c7;
+}
+
+/* elabFTW Auto-sync Info */
+#elabftwAutoInfo {
+    color: #0369a1;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+#elabftwAutoInfo span {
+    color: #059669;
+}
+
+/* elabFTW Manual Option */
+#elabftwManualOption label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #0369a1;
+    cursor: pointer;
+}
+
+#elabftwManualOption input[type="checkbox"] {
+    width: auto;
+    transform: scale(1.1);
+    accent-color: #0ea5e9;
+}
+
+#elabftwManualOption small {
+    color: #0369a1;
+    margin-left: 24px;
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+/* elabFTW Experiment ID Field */
+#elabftwExperimentId {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+#elabftwExperimentId label {
+    display: block;
+    font-weight: 500;
+    color: #0369a1;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+#elabftwExperimentId input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #0ea5e9;
+    border-radius: 4px;
+    background: white;
+    color: #374151;
+}
+
+#elabftwExperimentId input:focus {
+    outline: none;
+    border-color: #0284c7;
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+#elabftwExperimentId small {
+    color: #0369a1;
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+/* =========================== OMERO INTEGRATION =========================== */
+
+/* OMERO Option Container */
+#omeroOption {
+    margin-top: 15px;
+    padding: 12px;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+#omeroOption:hover {
+    background: rgba(254, 243, 199, 0.9);
+    border-color: #d97706;
+}
+
+/* OMERO Status Info */
+#omeroStatusInfo {
+    margin-bottom: 10px;
+}
+
+#omeroConnectionStatus {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #92400e;
+    transition: all 0.3s ease;
+}
+
+#omeroStatusIcon {
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+#omeroStatusIcon.connected {
+    color: #059669;
+}
+
+#omeroStatusIcon.error {
+    color: #dc2626;
+}
+
+#omeroStatusIcon.testing {
+    animation: omeroStatusSpin 1s linear infinite;
+}
+
+@keyframes omeroStatusSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* OMERO Auto-sync Info */
+#omeroAutoInfo {
+    color: #92400e;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+#omeroAutoInfo span {
+    color: #059669;
+}
+
+/* OMERO Manual Option */
+#omeroManualOption label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #92400e;
+    cursor: pointer;
+}
+
+#omeroManualOption input[type="checkbox"] {
+    width: auto;
+    transform: scale(1.1);
+    accent-color: #f59e0b;
+}
+
+#omeroManualOption small {
+    color: #92400e;
+    margin-left: 24px;
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+/* OMERO Group Selection */
+#omeroGroupSelection {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    transition: all 0.3s ease;
+}
+
+#omeroGroupSelection:hover {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: #f59e0b;
+}
+
+#omeroGroupSelection label {
+    display: block;
+    font-weight: 500;
+    color: #92400e;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+#omeroGroupSelect {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#omeroGroupSelect:focus {
+    outline: none;
+    border-color: #d97706;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+#omeroGroupSelect:hover {
+    border-color: #d97706;
+}
+
+#omeroGroupStatus {
+    margin-top: 6px;
+    font-size: 12px;
+    font-style: italic;
+    min-height: 16px;
+    transition: color 0.3s ease;
+}
+
+/* OMERO Project Selection */
+#omeroProjectSelection {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    transition: all 0.3s ease;
+}
+
+#omeroProjectSelection:hover {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: #f59e0b;
+}
+
+#omeroProjectSelection label {
+    display: block;
+    font-weight: 500;
+    color: #92400e;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+#omeroProjectSelect {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#omeroProjectSelect:focus {
+    outline: none;
+    border-color: #d97706;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+#omeroProjectSelect:hover {
+    border-color: #d97706;
+}
+
+/* OMERO Dataset Name Override */
+#omeroDatasetName {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    transition: all 0.3s ease;
+}
+
+#omeroDatasetName:hover {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: #f59e0b;
+}
+
+#omeroDatasetName label {
+    display: block;
+    font-weight: 500;
+    color: #92400e;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+#omeroDatasetNameInput {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#omeroDatasetNameInput:focus {
+    outline: none;
+    border-color: #d97706;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+#omeroDatasetNameInput::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* OMERO Advanced Options (Collapsible) */
+#omeroOption details {
+    margin-top: 15px;
+}
+
+#omeroOption details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #92400e;
+    padding: 8px 0;
+    user-select: none;
+    transition: color 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#omeroOption details summary:hover {
+    color: #d97706;
+}
+
+#omeroOption details summary:before {
+    content: "▶";
+    transition: transform 0.3s ease;
+}
+
+#omeroOption details[open] summary:before {
+    transform: rotate(90deg);
+}
+
+#omeroOption details > div {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* OMERO Advanced Options Elements */
+#omeroOption details input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    transform: scale(1.1);
+    accent-color: #f59e0b;
+}
+
+#omeroOption details label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #92400e;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    margin-bottom: 10px;
+}
+
+#omeroOption details label:hover {
+    color: #d97706;
+}
+
+/* OMERO Namespace Input */
+#omeroNamespace {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: white;
+    color: #374151;
+    transition: all 0.3s ease;
+}
+
+#omeroNamespace:focus {
+    outline: none;
+    border-color: #d97706;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+/* OMERO Test Buttons */
+#omeroOption details button {
+    background: linear-gradient(45deg, #f59e0b, #d97706);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    min-width: 160px;
+}
+
+#omeroOption details button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    background: linear-gradient(45deg, #d97706, #b45309);
+}
+
+#omeroOption details button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+/* Small text styling within integrations */
+#omeroOption small,
+#elabftwOption small {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+#omeroOption small {
+    color: #92400e;
+}
+
+#elabftwOption small {
+    color: #0369a1;
+}
+
+/* =========================== INTEGRATION TEST RESULTS =========================== */
+
+/* Test Results Panel */
+#omeroTestResults {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+#omeroTestContent {
+    animation: fadeIn 0.3s ease;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Integration Status Details */
+#omeroConnectionInfo {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 15px;
+    transition: all 0.3s ease;
+}
+
+#omeroStatusDetails {
+    animation: fadeIn 0.3s ease;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #9ca3af;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+#omeroStatusDetails div {
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+#omeroStatusDetails div strong {
+    color: #e0e0e0;
+    display: inline-block;
+    min-width: 100px;
+}
+
+/* Loading States */
+.omero-loading,
+.elabftw-loading {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.omero-loading::after,
+.elabftw-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f59e0b;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: integrationSpin 1s linear infinite;
+}
+
+.elabftw-loading::after {
+    border-color: #0ea5e9;
+    border-top: 2px solid transparent;
+}
+
+@keyframes integrationSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Success/Error Animations */
+.omero-success,
+.elabftw-success {
+    animation: integrationSuccess 0.5s ease;
+}
+
+.omero-error,
+.elabftw-error {
+    animation: integrationError 0.5s ease;
+}
+
+@keyframes integrationSuccess {
+    0% {
+        transform: scale(1);
+        background-color: rgba(16, 185, 129, 0.1);
+    }
+    50% {
+        transform: scale(1.05);
+        background-color: rgba(16, 185, 129, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        background-color: rgba(16, 185, 129, 0.2);
+    }
+}
+
+@keyframes integrationError {
+    0% {
+        transform: scale(1);
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+    25% {
+        transform: translateX(-5px);
+        background-color: rgba(239, 68, 68, 0.3);
+    }
+    75% {
+        transform: translateX(5px);
+        background-color: rgba(239, 68, 68, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        background-color: rgba(239, 68, 68, 0.2);
+    }
+}
+
+/* Tooltip Styles for Integrations */
+.integration-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.integration-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+.integration-tooltip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.integration-tooltip:hover::after,
+.integration-tooltip:hover::before {
+    opacity: 1;
+}

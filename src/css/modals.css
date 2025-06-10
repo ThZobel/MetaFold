@@ -1,0 +1,308 @@
+/* Modal Styles - Template Modal, Settings Modal, User Management - MetaFold */
+
+/* Base Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+    margin: 2% auto;
+    padding: 30px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.close:hover {
+    color: #7c3aed;
+}
+
+/* Settings Modal Specific */
+.settings-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-tab {
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.settings-tab.active {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: #7c3aed;
+    color: #a855f7;
+}
+
+.settings-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Settings Form Styling */
+.settings-tab-content .form-group {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-tab-content .form-group label {
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.settings-tab-content .form-group small {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+.settings-tab-content input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    transform: scale(1.2);
+}
+
+.settings-tab-content input[type="url"],
+.settings-tab-content input[type="password"],
+.settings-tab-content input[type="number"],
+.settings-tab-content input[type="text"] {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.settings-tab-content input[type="url"]:focus,
+.settings-tab-content input[type="password"]:focus,
+.settings-tab-content input[type="number"]:focus,
+.settings-tab-content input[type="text"]:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.settings-tab-content select {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+/* Connection Status in Settings */
+#connectionStatus,
+#elabftwConnectionStatus,
+#omeroConnectionStatus {
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+}
+
+#connectionStatus.success-message,
+#elabftwConnectionStatus.success-message,
+#omeroConnectionStatus.success-message {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #34d399;
+}
+
+#connectionStatus.error-message,
+#elabftwConnectionStatus.error-message,
+#omeroConnectionStatus.error-message {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #f87171;
+}
+
+#connectionStatus.testing,
+#elabftwConnectionStatus.testing,
+#omeroConnectionStatus.testing {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid #3b82f6;
+    color: #1d4ed8;
+}
+
+/* Login Modal Specific */
+.login-modal {
+    max-width: 400px;
+    padding: 2rem;
+}
+
+.login-modal h2 {
+    color: var(--primary-color, #007bff);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+/* Autocomplete for User Login */
+.autocomplete-container {
+    position: relative;
+}
+
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #2a2a40, #1e1e2e);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    display: none;
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.suggestion-item {
+    padding: 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.suggestion-item:hover {
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+/* Metadata Editor Styles */
+.metadata-editor {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.metadata-field {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.metadata-field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.metadata-field-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.field-type-selector {
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+.metadata-preview {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* JSON Schema Support Styles */
+.metadata-group {
+    margin-bottom: 15px;
+}
+
+.form-group-header {
+    margin: 20px 0 10px 0;
+}
+
+.form-group-header h4 {
+    color: #a855f7;
+    margin: 0 0 5px 0;
+    font-size: 16px;
+}
+
+.form-group-header p {
+    color: #9ca3af;
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Nested field styling */
+.nested-field {
+    margin-left: 20px;
+    border-left: 2px solid rgba(124, 58, 237, 0.2);
+    padding-left: 15px;
+}
+
+/* Field options styling */
+.field-options input[placeholder*="Description"] {
+    font-size: 12px;
+    color: #9ca3af;
+}

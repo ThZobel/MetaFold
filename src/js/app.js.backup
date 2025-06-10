@@ -1,4 +1,4 @@
-// App with userManager - FIXED for async settingsManager
+// App with userManager - Fixed Settings Modal Loading
 
 const app = {
     initialized: false,
@@ -6,7 +6,7 @@ const app = {
     async init() {
         if (this.initialized) return;
         
-        console.log('🚀 Starting MetaFold (FIXED async User Management)...');
+        console.log('🚀 Starting MetaFold (User Management Fixed)...');
         
         try {
             // Check what modules are available
@@ -21,27 +21,27 @@ const app = {
                 }
             });
             
-            // STEP 1: Initialize settingsManager FIRST (required for user management check)
+            // Initialize settingsManager FIRST (required for user management check)
             if (window.settingsManager) {
                 console.log('🔧 Initializing settingsManager...');
-                await window.settingsManager.init(); // FIXED: await the async init
+                window.settingsManager.init();
                 console.log('✅ settingsManager initialized');
             }
             
-            // STEP 2: Initialize userManager AFTER settingsManager
+            // Initialize userManager if available
             if (window.userManager) {
                 console.log('🔧 Initializing userManager...');
-                const userResult = await window.userManager.init(); // FIXED: await the async init
+                const userResult = await window.userManager.init();
                 console.log('✅ User initialized:', userResult);
             }
             
-            // STEP 3: Initialize other available modules
+            // Initialize other available modules
             this.initializeAvailableModules();
             
-            // STEP 4: Setup event listeners
+            // Setup event listeners
             this.setupEventListeners();
             
-            // STEP 5: Platform-specific adjustments
+            // Platform-specific adjustments
             if (typeof appUtils !== 'undefined' && appUtils && typeof appUtils.applyPlatformStyles === 'function') {
                 appUtils.applyPlatformStyles();
             }
@@ -50,10 +50,10 @@ const app = {
             console.log('✅ MetaFold started successfully!');
             
             // Show current user info
-            if (window.userManager && window.userManager.isInitialized) {
+            if (window.userManager) {
                 this.showSuccess(`App started! User: ${window.userManager.currentUser} (${window.userManager.currentGroup})`);
             } else {
-                this.showSuccess('App started! (Simple mode - no user management)');
+                this.showSuccess('App started! (User management ready)');
             }
             
         } catch (error) {
@@ -196,43 +196,8 @@ const app = {
                 messageDiv.remove();
             }
         }, isError ? 15000 : 5000);
-    },
-
-    // DEBUG FUNCTION: Check user management status
-    async debugUserManagement() {
-        console.log('🐛 DEBUG: Checking user management status...');
-        
-        if (!window.userManager) {
-            console.log('❌ userManager not available');
-            return;
-        }
-        
-        if (!window.settingsManager) {
-            console.log('❌ settingsManager not available');
-            return;
-        }
-        
-        try {
-            const status = await window.userManager.debugStatus();
-            console.table(status);
-            
-            alert(`User Management Debug:
-            
-Enabled: ${status.userManagementEnabled}
-Current User: ${status.currentUser.username}
-Current Group: ${status.currentUser.groupname}
-Initialized: ${status.currentUser.isInitialized}
-Settings Manager: ${status.hasSettingsManager}`);
-            
-        } catch (error) {
-            console.error('Debug failed:', error);
-            alert('Debug failed: ' + error.message);
-        }
     }
 };
-
-// Make debug function globally available for testing
-window.debugUserManagement = () => app.debugUserManagement();
 
 // Wait until DOM is fully loaded
 if (document.readyState === 'loading') {
@@ -243,5 +208,4 @@ if (document.readyState === 'loading') {
 } else {
     console.log('DOM already loaded, starting app in 200ms...');
     setTimeout(() => app.init(), 200);
-};
-
+}

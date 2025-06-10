@@ -1,4 +1,4 @@
-// Settings Manager - Complete Clean Version with elabFTW Fix
+// Settings Manager - Complete Version with Secure Storage + All elabFTW Methods
 
 const settingsManager = {
     settings: {},
@@ -10,43 +10,37 @@ const settingsManager = {
         migratedKeys: []
     },
     
-    // ENHANCED Default Settings - Add these to settingsManager.js defaultSettings object
-
-	defaultSettings: {
-		// General Settings
-		'general.user_management_enabled': false,
-		'general.theme': 'dark',
-		'general.auto_save': true,
-		'general.show_tips': true,
-		
-		// Security Settings
-		'security.encryption_enabled': true,
-		'security.auto_migrate': true,
-		'security.require_encryption': false,
-		
-		// elabFTW Integration Settings
-		'elabftw.enabled': false,
-		'elabftw.server_url': '',
-		'elabftw.api_key': '', // Will be moved to secure storage
-		'elabftw.auto_sync': false,
-		'elabftw.default_category': 1,
-		'elabftw.verify_ssl': true,
-		
-		// NEW: elabFTW Conflict Resolution Settings
-		'elabftw.overwrite_enabled': false,        // SAFE MODE by default (versioning)
-		'elabftw.versioning_format': 'date',       // date, timestamp, or counter
-		
-		// OMERO Integration Settings
-		'omero.enabled': false,
-		'omero.server_url': '',
-		'omero.username': '', // Will be moved to secure storage
-		'omero.password': '', // Will be moved to secure storage
-		'omero.auto_sync': false,
-		'omero.default_project_id': '',
-		'omero.create_datasets': true,
-		'omero.verify_ssl': true,
-		'omero.session_timeout': 600000 // 10 minutes
-	},
+    defaultSettings: {
+        // General Settings
+        'general.user_management_enabled': false,
+        'general.theme': 'dark',
+        'general.auto_save': true,
+        'general.show_tips': true,
+        
+        // Security Settings
+        'security.encryption_enabled': true,
+        'security.auto_migrate': true,
+        'security.require_encryption': false,
+        
+        // elabFTW Integration Settings
+        'elabftw.enabled': false,
+        'elabftw.server_url': '',
+        'elabftw.api_key': '', // Will be moved to secure storage
+        'elabftw.auto_sync': false,
+        'elabftw.default_category': 1,
+        'elabftw.verify_ssl': true,
+        
+        // OMERO Integration Settings
+        'omero.enabled': false,
+        'omero.server_url': '',
+        'omero.username': '', // Will be moved to secure storage
+        'omero.password': '', // Will be moved to secure storage
+        'omero.auto_sync': false,
+        'omero.default_project_id': '',
+        'omero.create_datasets': true,
+        'omero.verify_ssl': true,
+        'omero.session_timeout': 600000 // 10 minutes
+    },
 
     // Keys that should be stored securely
     sensitiveKeys: [
@@ -85,68 +79,6 @@ const settingsManager = {
         this.applyInitialSettings();
         
         console.log('✅ settingsManager initialized with secure storage support');
-    },
-
-    // =================== CORE SETTINGS METHODS ===================
-
-    loadSettings() {
-        try {
-            const stored = localStorage.getItem('metafold_settings');
-            if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-            } else {
-                this.settings = { ...this.defaultSettings };
-            }
-            console.log('📂 Settings loaded');
-        } catch (error) {
-            console.warn('Error loading settings, using defaults:', error);
-            this.settings = { ...this.defaultSettings };
-        }
-    },
-
-    saveSettings() {
-        try {
-            localStorage.setItem('metafold_settings', JSON.stringify(this.settings));
-            console.log('💾 Settings saved successfully');
-            return true;
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            return false;
-        }
-    },
-
-    async get(key) {
-        // Check if this is a sensitive key that should be retrieved securely
-        if (this.sensitiveKeys.includes(key)) {
-            return await this.getSecureCredential(key);
-        }
-        
-        // Regular setting retrieval
-        const value = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
-        return value;
-    },
-
-    async set(key, value) {
-        console.log(`📝 Set setting "${key}":`, this.sensitiveKeys.includes(key) ? '[HIDDEN]' : value);
-        
-        // Check if this is a sensitive key that should be stored securely
-        if (this.sensitiveKeys.includes(key) && this.isSecureStorageReady) {
-            const success = await this.setSecureCredential(key, value);
-            if (success) {
-                this.handleSettingChange(key, value);
-            }
-            return success;
-        }
-        
-        // Regular setting storage
-        this.settings[key] = value;
-        const saved = this.saveSettings();
-        
-        if (saved) {
-            this.handleSettingChange(key, value);
-        }
-        
-        return saved;
     },
 
     // =================== SECURE CREDENTIAL MANAGEMENT ===================
@@ -220,19 +152,21 @@ const settingsManager = {
         if (this.secureCredentials[key]) {
             try {
                 const decrypted = await window.secureStorage.retrieveCredential(this.secureCredentials[key]);
+                console.log(`🔐 Successfully decrypted ${key}:`, decrypted ? `${decrypted.substring(0, 4)}*** (${decrypted.length} chars)` : 'EMPTY');
                 return decrypted || '';
             } catch (error) {
                 console.error(`🔐 Failed to decrypt credential ${key}:`, error);
                 
                 // FIXED: Fallback to plaintext setting WITHOUT recursion
                 const plaintextValue = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
-                console.warn(`🔐 Using plaintext fallback for ${key}`);
+                console.warn(`🔐 Using plaintext fallback for ${key}:`, plaintextValue ? `${String(plaintextValue).substring(0, 4)}*** (${String(plaintextValue).length} chars)` : 'EMPTY');
                 return plaintextValue || '';
             }
         }
         
         // FIXED: Fallback to regular settings WITHOUT recursion
         const regularValue = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
+        console.log(`🔐 No secure credential for ${key}, using regular setting:`, regularValue ? `${String(regularValue).substring(0, 4)}*** (${String(regularValue).length} chars)` : 'EMPTY');
         return regularValue || '';
     },
 
@@ -266,6 +200,9 @@ const settingsManager = {
         if (shouldAutoMigrate) {
             console.log('🔄 Auto-migrating credentials...');
             await this.performMigration(plaintextCredentials);
+        } else {
+            console.log('🔄 Migration needed but auto-migrate disabled');
+            this.showMigrationPrompt(plaintextCredentials);
         }
     },
 
@@ -313,12 +250,103 @@ const settingsManager = {
             const successCount = migrationLog.filter(log => log.success).length;
             console.log(`✅ Migration completed: ${successCount}/${migrationLog.length} credentials migrated`);
             
+            this.showMigrationSuccess(migrationLog);
+            
         } catch (error) {
             console.error('❌ Migration failed:', error);
+            this.showMigrationError(error);
         }
     },
 
-    // =================== ELABFTW INTEGRATION - FIXED ===================
+    showMigrationPrompt(plaintextCredentials) {
+        const credentialCount = Object.keys(plaintextCredentials).length;
+        const message = `MetaFold found ${credentialCount} unencrypted credential(s) in your settings. Would you like to encrypt them for better security?`;
+        
+        if (confirm(message)) {
+            this.performMigration(plaintextCredentials);
+        } else {
+            console.log('🔄 Migration declined by user');
+        }
+    },
+
+    showMigrationSuccess(migrationLog) {
+        const successCount = migrationLog.filter(log => log.success).length;
+        this.showSecurityMessage(
+            `🔐 Security Enhanced! ${successCount} credentials have been encrypted and are now stored securely.`,
+            'success'
+        );
+    },
+
+    showMigrationError(error) {
+        this.showSecurityMessage(
+            `⚠️ Credential migration failed: ${error.message}. Your data remains in plaintext.`,
+            'warning'
+        );
+    },
+
+    // =================== ENHANCED SETTINGS METHODS ===================
+
+    loadSettings() {
+        try {
+            const stored = localStorage.getItem('metafold_settings');
+            if (stored) {
+                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
+            } else {
+                this.settings = { ...this.defaultSettings };
+            }
+            console.log('📂 Settings loaded');
+        } catch (error) {
+            console.warn('Error loading settings, using defaults:', error);
+            this.settings = { ...this.defaultSettings };
+        }
+    },
+
+    saveSettings() {
+        try {
+            localStorage.setItem('metafold_settings', JSON.stringify(this.settings));
+            console.log('💾 Settings saved successfully');
+            return true;
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            return false;
+        }
+    },
+
+    async get(key) {
+        // Check if this is a sensitive key that should be retrieved securely
+        if (this.sensitiveKeys.includes(key)) {
+            return await this.getSecureCredential(key);
+        }
+        
+        // Regular setting retrieval
+        const value = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
+        return value;
+    },
+
+    async set(key, value) {
+        console.log(`📝 Set setting "${key}":`, this.sensitiveKeys.includes(key) ? '[HIDDEN]' : value);
+        
+        // Check if this is a sensitive key that should be stored securely
+        if (this.sensitiveKeys.includes(key) && this.isSecureStorageReady) {
+            const success = await this.setSecureCredential(key, value);
+            if (success) {
+                this.handleSettingChange(key, value);
+            }
+            return success;
+        }
+        
+        // Regular setting storage
+        this.settings[key] = value;
+        const saved = this.saveSettings();
+        
+        if (saved) {
+            this.handleSettingChange(key, value);
+        }
+        
+        return saved;
+    },
+
+    // =================== ELABFTW INTEGRATION (ALL METHODS) ===================
 
     // Test elabFTW connection
     async testElabFTWConnection() {
@@ -359,7 +387,7 @@ const settingsManager = {
         }
     },
 
-    // Create elabFTW experiment - FIXED
+    // Create elabFTW experiment
     async createElabFTWExperiment(projectName, metadata, structure = '') {
         const serverUrl = await this.getFormattedElabFTWUrl();
         const apiKey = await this.get('elabftw.api_key');
@@ -370,8 +398,6 @@ const settingsManager = {
         }
 
         try {
-            console.log('🧪 FIXED: Creating new elabFTW experiment');
-            
             const experimentData = {
                 title: projectName,
                 body: this.generateExperimentBody(projectName, metadata, structure)
@@ -394,11 +420,7 @@ const settingsManager = {
                 const location = response.headers.get('location');
                 const experimentId = location ? location.split('/').pop() : null;
                 
-                console.log('🧪 FIXED: Experiment created with ID:', experimentId);
-                
-                // Add metadata using the FIXED merge logic
                 if (metadata && Object.keys(metadata).length > 0 && experimentId) {
-                    console.log('🧪 FIXED: Adding metadata using merge logic');
                     await this.updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata);
                 }
                 
@@ -406,15 +428,16 @@ const settingsManager = {
                     success: true,
                     message: 'Experiment created in elabFTW successfully!',
                     id: experimentId,
-                    url: `${serverUrl}experiments.php?mode=view&id=${experimentId}`,
-                    metadataFields: metadata ? Object.keys(metadata).length : 0
+                    url: `${serverUrl}experiments.php?mode=view&id=${experimentId}`
                 };
             } else {
                 const errorText = await response.text();
-                throw new Error(`elabFTW API error: ${response.status} - ${errorText}`);
+                return {
+                    success: false,
+                    message: `elabFTW API error: ${response.status} - ${errorText}`
+                };
             }
         } catch (error) {
-            console.error('❌ FIXED: Error in createElabFTWExperiment:', error);
             return {
                 success: false,
                 message: `Error creating elabFTW experiment: ${error.message}`
@@ -422,294 +445,60 @@ const settingsManager = {
         }
     },
 
+    // Update existing elabFTW experiment
+    async updateExistingElabFTWExperiment(experimentId, metadata) {
+        const serverUrl = await this.getFormattedElabFTWUrl();
+        const apiKey = await this.get('elabftw.api_key');
+        
+        if (!serverUrl || !apiKey) {
+            return { success: false, message: 'elabFTW not configured' };
+        }
 
-
-	// Update existing elabFTW experiment - ENHANCED with Conflict Resolution
-	async updateExistingElabFTWExperiment(experimentId, metadata) {
-		const serverUrl = await this.getFormattedElabFTWUrl();
-		const apiKey = await this.get('elabftw.api_key');
-		
-		if (!serverUrl || !apiKey) {
-			return { success: false, message: 'elabFTW not configured' };
-		}
-
-		try {
-			console.log('🧪 ENHANCED: Starting GET-MERGE-PATCH workflow with conflict resolution for experiment', experimentId);
-			
-			// STEP 1: GET existing experiment to load current metadata
-			const getResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
-				headers: {
-					'Authorization': apiKey,
-					'Content-Type': 'application/json'
-				}
-			});
-
-			if (!getResponse.ok) {
-				throw new Error(`Failed to fetch existing experiment: ${getResponse.status} ${getResponse.statusText}`);
-			}
-
-			const existingExperiment = await getResponse.json();
-			console.log('🧪 ENHANCED: Successfully loaded existing experiment data');
-			
-			// STEP 2: Parse existing metadata
-			let existingMetadata = {
-				elabftw: {
-					display_main_text: true
-				},
-				extra_fields: {}
-			};
-			
-			try {
-				if (existingExperiment.metadata) {
-					let parsedMetadata;
-					
-					if (typeof existingExperiment.metadata === 'string') {
-						parsedMetadata = JSON.parse(existingExperiment.metadata);
-					} else if (typeof existingExperiment.metadata === 'object') {
-						parsedMetadata = existingExperiment.metadata;
-					} else {
-						parsedMetadata = {};
-					}
-					
-					if (parsedMetadata.elabftw) {
-						existingMetadata.elabftw = { 
-							display_main_text: true, 
-							...parsedMetadata.elabftw 
-						};
-					}
-					
-					if (parsedMetadata.extra_fields && typeof parsedMetadata.extra_fields === 'object') {
-						existingMetadata.extra_fields = { ...parsedMetadata.extra_fields };
-					}
-					
-					const existingFieldNames = Object.keys(existingMetadata.extra_fields);
-					console.log('🧪 ENHANCED: Existing extra_fields:', existingFieldNames.length, 'fields');
-					console.log('🧪 ENHANCED: Existing field names:', existingFieldNames);
-					
-				} else {
-					console.log('🧪 ENHANCED: No existing metadata found, starting fresh');
-				}
-			} catch (parseError) {
-				console.warn('🧪 ENHANCED: Could not parse existing metadata, starting fresh:', parseError);
-				existingMetadata = {
-					elabftw: { display_main_text: true },
-					extra_fields: {}
-				};
-			}
-
-			// STEP 3: Convert new MetaFold metadata to elabFTW format
-			const newElabftwFields = this.convertMetadataToElabFTW(metadata);
-			const newFieldNames = Object.keys(newElabftwFields);
-			console.log('🧪 ENHANCED: New metadata fields to add:', newFieldNames.length, 'fields');
-			console.log('🧪 ENHANCED: New field names:', newFieldNames);
-
-			// STEP 4: ENHANCED CONFLICT RESOLUTION
-			const { mergedFields, conflictLog } = await this.resolveFieldConflicts(
-				existingMetadata.extra_fields, 
-				newElabftwFields
-			);
-
-			// STEP 5: Create final merged metadata
-			const mergedMetadata = {
-				elabftw: {
-					display_main_text: true,
-					...existingMetadata.elabftw
-				},
-				extra_fields: mergedFields
-			};
-
-			// Preserve groups if they exist
-			if (existingMetadata.elabftw && existingMetadata.elabftw.extra_fields_groups) {
-				mergedMetadata.elabftw.extra_fields_groups = existingMetadata.elabftw.extra_fields_groups;
-			}
-
-			// ENHANCED DEBUG: Show conflict resolution results
-			const existingFieldCount = Object.keys(existingMetadata.extra_fields).length;
-			const newFieldCount = Object.keys(newElabftwFields).length;
-			const totalFieldCount = Object.keys(mergedFields).length;
-			
-			console.log('🧪 ENHANCED: Conflict resolution results:');
-			console.log('  - Existing fields:', existingFieldCount, Object.keys(existingMetadata.extra_fields));
-			console.log('  - New fields:', newFieldCount, Object.keys(newElabftwFields));
-			console.log('  - Final merged fields:', totalFieldCount, Object.keys(mergedFields));
-			console.log('  - Conflicts resolved:', conflictLog.length);
-			
-			if (conflictLog.length > 0) {
-				console.log('🧪 ENHANCED: Conflict details:');
-				conflictLog.forEach(conflict => {
-					console.log(`    - ${conflict.action}: "${conflict.originalName}" → "${conflict.finalName}"`);
-				});
-			}
-
-			// STEP 6: PATCH with merged metadata
-			const updateData = {
-				metadata: JSON.stringify(mergedMetadata)
-			};
-
-			console.log('🧪 ENHANCED: Sending PATCH with conflict-resolved metadata...');
-			
-			const patchResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
-				method: 'PATCH',
-				headers: {
-					'Authorization': apiKey,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(updateData)
-			});
-
-			if (patchResponse.ok) {
-				const experimentUrl = `${serverUrl}experiments.php?mode=view&id=${experimentId}`;
-				
-				console.log('✅ ENHANCED: Successfully updated experiment with conflict-resolved metadata');
-				console.log('🔗 ENHANCED: View experiment at:', experimentUrl);
-				
-				return {
-					success: true,
-					message: `Experiment ${experimentId} updated in elabFTW (${newFieldCount} new fields, ${conflictLog.length} conflicts resolved)`,
-					id: experimentId,
-					url: experimentUrl,
-					mergeInfo: {
-						existingFields: existingFieldCount,
-						newFields: newFieldCount,
-						totalFields: totalFieldCount,
-						conflictsResolved: conflictLog.length,
-						preservedFields: Object.keys(existingMetadata.extra_fields),
-						addedFields: Object.keys(newElabftwFields),
-						finalFields: Object.keys(mergedFields),
-						conflictLog: conflictLog
-					}
-				};
-			} else {
-				const errorText = await patchResponse.text();
-				console.error('❌ ENHANCED: PATCH failed:', patchResponse.status, errorText);
-				throw new Error(`PATCH failed: ${patchResponse.status} - ${errorText}`);
-			}
-
-		} catch (error) {
-			console.error('❌ ENHANCED: Error in updateExistingElabFTWExperiment:', error);
-			return {
-				success: false,
-				message: `Error updating elabFTW experiment: ${error.message}`
-			};
-		}
-	},
-
-	// NEW METHOD: Resolve field conflicts based on user settings
-	async resolveFieldConflicts(existingFields, newFields) {
-		const overwriteEnabled = await this.get('elabftw.overwrite_enabled');
-		const versioningFormat = await this.get('elabftw.versioning_format');
-		
-		console.log('🧪 CONFLICT: Resolving conflicts with settings:', {
-			overwriteEnabled: overwriteEnabled,
-			versioningFormat: versioningFormat
-		});
-		
-		const mergedFields = { ...existingFields }; // Start with existing fields
-		const conflictLog = [];
-		
-		for (const [newFieldName, newFieldData] of Object.entries(newFields)) {
-			if (existingFields.hasOwnProperty(newFieldName)) {
-				// CONFLICT DETECTED!
-				console.log(`🧪 CONFLICT: Field "${newFieldName}" already exists`);
-				
-				if (overwriteEnabled) {
-					// OVERWRITE MODE: Replace existing field
-					mergedFields[newFieldName] = newFieldData;
-					conflictLog.push({
-						action: 'OVERWRITE',
-						originalName: newFieldName,
-						finalName: newFieldName,
-						reason: 'Overwrite mode enabled'
-					});
-					console.log(`🧪 CONFLICT: OVERWRITE "${newFieldName}"`);
-					
-				} else {
-					// VERSIONING MODE: Create versioned field name
-					const versionedName = this.generateVersionedFieldName(newFieldName, existingFields, versioningFormat);
-					mergedFields[versionedName] = newFieldData;
-					conflictLog.push({
-						action: 'VERSION',
-						originalName: newFieldName,
-						finalName: versionedName,
-						reason: `Versioning mode (${versioningFormat})`
-					});
-					console.log(`🧪 CONFLICT: VERSION "${newFieldName}" → "${versionedName}"`);
-				}
-			} else {
-				// NO CONFLICT: Add new field directly
-				mergedFields[newFieldName] = newFieldData;
-				console.log(`🧪 CONFLICT: ADD "${newFieldName}" (no conflict)`);
-			}
-		}
-		
-		return { mergedFields, conflictLog };
-	},
-
-	// NEW METHOD: Generate versioned field names
-	generateVersionedFieldName(originalName, existingFields, versioningFormat) {
-		const now = new Date();
-		let versionedName;
-		
-		switch (versioningFormat) {
-			case 'timestamp':
-				const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-				versionedName = `${originalName}_${timestamp}`;
-				break;
-				
-			case 'date':
-				const date = now.toISOString().split('T')[0];
-				versionedName = `${originalName}_${date}`;
-				break;
-				
-			case 'counter':
-				let counter = 2;
-				versionedName = `${originalName}_v${counter}`;
-				while (existingFields.hasOwnProperty(versionedName)) {
-					counter++;
-					versionedName = `${originalName}_v${counter}`;
-				}
-				break;
-				
-			default:
-				// Fallback to date format
-				const fallbackDate = now.toISOString().split('T')[0];
-				versionedName = `${originalName}_${fallbackDate}`;
-		}
-		
-		// Ensure the versioned name is unique (safety check)
-		let finalName = versionedName;
-		let safetyCounter = 1;
-		while (existingFields.hasOwnProperty(finalName) && safetyCounter < 100) {
-			finalName = `${versionedName}_${safetyCounter}`;
-			safetyCounter++;
-		}
-		return finalName;
-	},
-	
-	
-    // Update experiment with metadata using PATCH - FIXED
-    async updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata) {
         try {
-            console.log('🧪 FIXED: updateExperimentWithMetadata using merge logic');
-            
-            // Use the same GET-MERGE-PATCH logic for consistency
-            const result = await this.updateExistingElabFTWExperiment(experimentId, metadata);
-            
-            if (result.success) {
-                console.log('✅ FIXED: Metadata successfully merged into experiment');
-                return true;
+            const elabftwFields = this.convertMetadataToElabFTW(metadata);
+            const metadataString = JSON.stringify({
+                elabftw: {
+                    display_main_text: true
+                },
+                extra_fields: elabftwFields
+            });
+
+            const updateData = {
+                metadata: metadataString
+            };
+
+            const response = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.ok) {
+                const experimentUrl = `${serverUrl}experiments.php?mode=view&id=${experimentId}`;
+                
+                return {
+                    success: true,
+                    message: `Experiment ${experimentId} updated in elabFTW`,
+                    id: experimentId,
+                    url: experimentUrl
+                };
             } else {
-                console.error('❌ FIXED: Failed to merge metadata into experiment:', result.message);
-                return false;
+                const errorText = await response.text();
+                return {
+                    success: false,
+                    message: `elabFTW API error: ${response.status} - ${errorText}`
+                };
             }
-            
         } catch (error) {
-            console.error('❌ FIXED: Error in updateExperimentWithMetadata:', error);
-            return false;
+            return {
+                success: false,
+                message: `Error updating elabFTW experiment: ${error.message}`
+            };
         }
     },
-
-    // =================== ELABFTW HELPER METHODS ===================
 
     // Get formatted elabFTW URL
     async getFormattedElabFTWUrl() {
@@ -724,6 +513,44 @@ const settingsManager = {
             formattedUrl += '/';
         }
         return formattedUrl;
+    },
+
+    // Update experiment with metadata using PATCH
+    async updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata) {
+        try {
+            const elabftwFields = this.convertMetadataToElabFTW(metadata);
+            const metadataString = JSON.stringify({
+                elabftw: {
+                    display_main_text: true
+                },
+                extra_fields: elabftwFields
+            });
+
+            const updateData = {
+                metadata: metadataString
+            };
+
+            const response = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.ok) {
+                console.log('✅ Metadata successfully added to experiment');
+                return true;
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Failed to update experiment metadata:', response.status, errorText);
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Error updating experiment metadata:', error);
+            return false;
+        }
     },
 
     // Convert MetaFold metadata to elabFTW format
@@ -861,6 +688,8 @@ const settingsManager = {
         
         try {
             console.log('🔬 settingsManager: Delegating to metaFoldOMEROIntegration.createDatasetForMetaFoldProject');
+            console.log('🔬 Parameters:', { projectName, metadataKeys: metadata ? Object.keys(metadata) : 'none', options });
+            
             return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, options);
         } catch (error) {
             console.error('❌ settingsManager: Error in createOMERODataset:', error);
@@ -871,7 +700,7 @@ const settingsManager = {
         }
     },
 
-    // =================== SECURITY & UTILITY METHODS ===================
+    // =================== SECURITY STATUS METHODS ===================
 
     getSecurityStatus() {
         if (!window.secureStorage) {
@@ -899,6 +728,93 @@ const settingsManager = {
         };
     },
 
+    showSecurityMessage(message, type = 'info') {
+        let messageDiv = document.getElementById('securityStatusMessage');
+        if (!messageDiv) {
+            messageDiv = document.createElement('div');
+            messageDiv.id = 'securityStatusMessage';
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                z-index: 10001;
+                font-weight: 500;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                max-width: 400px;
+            `;
+            document.body.appendChild(messageDiv);
+        }
+        
+        const styles = {
+            'info': { bg: '#dbeafe', color: '#1e40af', border: '#60a5fa' },
+            'success': { bg: '#d1fae5', color: '#065f46', border: '#34d399' },
+            'warning': { bg: '#fef3c7', color: '#92400e', border: '#fbbf24' },
+            'error': { bg: '#fee2e2', color: '#b91c1c', border: '#f87171' }
+        };
+        
+        const style = styles[type] || styles.info;
+        messageDiv.style.background = style.bg;
+        messageDiv.style.color = style.color;
+        messageDiv.style.border = `1px solid ${style.border}`;
+        
+        messageDiv.textContent = message;
+        messageDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            if (messageDiv.parentElement) {
+                messageDiv.remove();
+            }
+        }, 8000);
+    },
+
+    // =================== MIGRATION UTILITIES ===================
+
+    async forceMigration() {
+        this.migrationStatus.completed = false;
+        await this.checkAndPerformMigration();
+    },
+
+    async exportSecureSettings() {
+        const securityStatus = this.getSecurityStatus();
+        
+        return {
+            settings: this.settings,
+            securityStatus: securityStatus,
+            migrationStatus: this.migrationStatus,
+            hasEncryptedCredentials: Object.keys(this.secureCredentials).length > 0,
+            exportTimestamp: new Date().toISOString(),
+            warning: 'This export does not contain encrypted credentials for security reasons'
+        };
+    },
+
+    async resetSecurity() {
+        if (confirm('Reset all security settings and credentials? This will remove all encrypted data!')) {
+            this.secureCredentials = {};
+            this.migrationStatus = {
+                completed: false,
+                lastMigration: null,
+                migratedKeys: []
+            };
+            
+            // Move secure credentials back to plaintext (for this session only)
+            for (const key of this.sensitiveKeys) {
+                const value = await this.getSecureCredential(key);
+                if (value) {
+                    this.settings[key] = value;
+                }
+            }
+            
+            await this.saveSecureCredentials();
+            this.saveSettings();
+            
+            this.showSecurityMessage('🔄 Security settings reset. Credentials are now in plaintext.', 'warning');
+        }
+    },
+
+    // =================== LEGACY COMPATIBILITY ===================
+
     applyInitialSettings() {
         const theme = this.settings['general.theme'];
         if (theme) {
@@ -906,112 +822,31 @@ const settingsManager = {
         }
     },
 
-	// FIXED handleSettingChange method for settingsManager.js
-	
-	handleSettingChange(key, value) {
-		console.log(`🔧 handleSettingChange called: ${key} = ${value}`);
-		
-		switch (key) {
-			case 'general.user_management_enabled':
-				// ASYNC SAFE: Don't call the handler immediately, defer it
-				console.log('🔧 Deferring user management toggle...');
-				setTimeout(async () => {
-					try {
-						await this.handleUserManagementToggle(value);
-					} catch (error) {
-						console.error('❌ Deferred user management toggle failed:', error);
-					}
-				}, 100);
-				break;
-				
-			case 'general.theme':
-				this.applyTheme(value);
-				break;
-				
-			case 'elabftw.enabled':
-			case 'elabftw.auto_sync':
-				if (window.updateElabFTWOptions) {
-					setTimeout(() => window.updateElabFTWOptions(), 50);
-				}
-				break;
-				
-			case 'omero.enabled':
-			case 'omero.auto_sync':
-				if (window.updateOMEROOptions) {
-					setTimeout(() => window.updateOMEROOptions(), 50);
-				}
-				break;
-				
-			default:
-				console.log(`🔧 No special handling for setting: ${key}`);
-		}
-	},
-
-	// ENHANCED: Immediate user management toggle with user selection  
-	async handleUserManagementToggle(enabled) {
-		console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
-		
-		if (enabled) {
-			// User management was just enabled
-			console.log('🚀 User management activated - showing user selection...');
-			
-			if (window.userManager && window.loginModal) {
-				try {
-					// Show user selection dialog immediately
-					const userInfo = await window.userManager.showUserSelection();
-					
-					if (userInfo) {
-						console.log('✅ User selected via immediate activation:', userInfo);
-						
-						// Show success message
-						if (window.app && window.app.showSuccess) {
-							window.app.showSuccess(`User management activated! Current user: ${userInfo.username} (${userInfo.groupname})`);
-						}
-					} else {
-						console.log('❌ User selection cancelled - disabling user management');
-						
-						// User cancelled - disable user management again
-						await this.set('general.user_management_enabled', false);
-						
-						if (window.app && window.app.showError) {
-							window.app.showError('User management cancelled. Staying in simple mode.');
-						}
-					}
-				} catch (error) {
-					console.error('❌ Error activating user management:', error);
-					
-					// Error occurred - disable user management again
-					await this.set('general.user_management_enabled', false);
-					
-					if (window.app && window.app.showError) {
-						window.app.showError('Error activating user management: ' + error.message);
-					}
-				}
-			} else {
-				console.warn('⚠️ userManager or loginModal not available');
-				if (window.app && window.app.showError) {
-					window.app.showError('User management modules not available');
-				}
-			}
-		} else {
-			// User management was disabled
-			console.log('📝 User management deactivated - switching to simple mode');
-			
-			if (window.userManager) {
-				// Switch to simple mode
-				window.userManager.initSimpleMode();
-				
-				// Reinitialize templates for simple mode
-				if (window.templateManager && window.templateManager.init) {
-					window.templateManager.init();
-				}
-				
-				if (window.app && window.app.showSuccess) {
-					window.app.showSuccess('Switched to simple mode (no user management)');
-				}
-			}
-		}
-	},
+    handleSettingChange(key, value) {
+        switch (key) {
+            case 'general.user_management_enabled':
+                this.handleUserManagementToggle(value);
+                break;
+                
+            case 'general.theme':
+                this.applyTheme(value);
+                break;
+                
+            case 'elabftw.enabled':
+            case 'elabftw.auto_sync':
+                if (window.updateElabFTWOptions) {
+                    window.updateElabFTWOptions();
+                }
+                break;
+                
+            case 'omero.enabled':
+            case 'omero.auto_sync':
+                if (window.updateOMEROOptions) {
+                    window.updateOMEROOptions();
+                }
+                break;
+        }
+    },
 
     applyTheme(theme) {
         console.log('🎨 Theme changed to:', theme);
@@ -1019,6 +854,18 @@ const settingsManager = {
 
     handleUserManagementToggle(enabled) {
         console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
+        
+        if (enabled) {
+            this.showSecurityMessage(
+                '👥 User Management enabled! Initializing login system...',
+                'info'
+            );
+        } else {
+            this.showSecurityMessage(
+                '📝 Simple mode enabled. Changes will take effect after restart.',
+                'info'
+            );
+        }
     },
 
     reset() {
@@ -1039,16 +886,7 @@ const settingsManager = {
     },
 
     export() {
-        const securityStatus = this.getSecurityStatus();
-        
-        return {
-            settings: this.settings,
-            securityStatus: securityStatus,
-            migrationStatus: this.migrationStatus,
-            hasEncryptedCredentials: Object.keys(this.secureCredentials).length > 0,
-            exportTimestamp: new Date().toISOString(),
-            warning: 'This export does not contain encrypted credentials for security reasons'
-        };
+        return this.exportSecureSettings();
     },
 
     import(settingsJson) {
@@ -1059,6 +897,10 @@ const settingsManager = {
             
             if (saved) {
                 this.applyInitialSettings();
+                this.showSecurityMessage(
+                    'Settings imported. Encrypted credentials were not imported for security.',
+                    'info'
+                );
             }
             
             return saved;
@@ -1068,14 +910,10 @@ const settingsManager = {
         }
     },
 
-    // Enhanced isUserManagementEnabled function
-	isUserManagementEnabled() {
-		// Synchronous check for backward compatibility
-		if (!this.settings) return false;
-		return this.settings['general.user_management_enabled'] === true;
-	},
+    isUserManagementEnabled() {
+        return this.settings['general.user_management_enabled'] === true;
+    }
 };
 
-// Make globally available
 window.settingsManager = settingsManager;
-console.log('✅ settingsManager loaded - CLEAN VERSION with elabFTW FIXES');
+console.log('✅ settingsManager loaded with Complete elabFTW + OMERO + Secure Storage support');

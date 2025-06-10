@@ -1,0 +1,722 @@
+/* Responsive Design and Media Queries - MetaFold */
+
+/* =========================== MOBILE AND TABLET BREAKPOINTS =========================== */
+
+/* Tablet (768px and below) */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .sidebar {
+        width: 100%;
+        padding: 15px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+    
+    .main-content {
+        padding: 15px;
+        flex: 1;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .project-input-group {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .btn {
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* Template Items on Mobile */
+    .template-header {
+        flex-wrap: wrap;
+    }
+    
+    .copy-template-btn {
+        margin: 0.5rem 0 0 0;
+        align-self: flex-start;
+        width: 100%;
+    }
+    
+    .template-header-details {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .template-header-details .template-avatar {
+        margin: 0 auto 1rem auto;
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+    
+    /* Settings Modal on Mobile */
+    .settings-tabs {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .settings-tab {
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+        padding: 20px;
+        max-height: 85vh;
+    }
+    
+    /* Template Type Selector on Mobile */
+    .template-type-selector {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .template-type-btn {
+        padding: 15px;
+        font-size: 14px;
+    }
+}
+
+/* Small Mobile (480px and below) */
+@media (max-width: 480px) {
+    body {
+        overflow-x: hidden;
+    }
+    
+    .sidebar {
+        padding: 10px;
+        max-height: 35vh;
+    }
+    
+    .main-content {
+        padding: 10px;
+    }
+    
+    .header {
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .project-setup {
+        padding: 15px;
+    }
+    
+    .folder-structure {
+        padding: 15px;
+    }
+    
+    .metadata-editor {
+        padding: 15px;
+    }
+    
+    /* Form Elements on Small Mobile */
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        padding: 10px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .btn {
+        padding: 15px 20px;
+        font-size: 16px;
+    }
+    
+    /* Template Items on Small Mobile */
+    .template-item {
+        padding: 10px;
+    }
+    
+    .template-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+    
+    .template-info h3 {
+        font-size: 0.85rem;
+    }
+    
+    .template-badge {
+        font-size: 0.6rem;
+        padding: 1px 3px;
+    }
+    
+    /* Modal on Small Mobile */
+    .modal-content {
+        width: 98%;
+        margin: 1% auto;
+        padding: 15px;
+    }
+    
+    .close {
+        font-size: 24px;
+    }
+}
+
+/* =========================== INTEGRATION RESPONSIVE STYLES =========================== */
+
+/* OMERO Integration on Mobile */
+@media (max-width: 768px) {
+    #omeroOption {
+        padding: 12px;
+    }
+    
+    #omeroProjectSelection,
+    #omeroGroupSelection,
+    #omeroDatasetName {
+        padding: 10px;
+    }
+    
+    #omeroOption details > div {
+        padding: 10px;
+    }
+    
+    #omeroOption details button {
+        width: 100%;
+        min-width: auto;
+        margin-bottom: 10px;
+    }
+    
+    #omeroStatusDetails {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    
+    #omeroStatusDetails div {
+        font-size: 11px;
+    }
+    
+    /* elabFTW Integration on Mobile */
+    #elabftwOption {
+        padding: 12px;
+    }
+    
+    #elabftwExperimentId {
+        padding: 10px;
+    }
+    
+    #elabftwExperimentId input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+/* =========================== VERY NARROW SIDEBARS =========================== */
+
+@media (max-width: 400px) {
+    .template-header {
+        gap: 6px;
+    }
+    
+    .template-avatar {
+        width: 18px;
+        height: 18px;
+        font-size: 0.55rem;
+    }
+    
+    .template-info h3 {
+        font-size: 0.8rem;
+    }
+    
+    .template-badge {
+        font-size: 0.55rem;
+        padding: 1px 2px;
+    }
+    
+    .template-meta {
+        font-size: 0.7rem;
+    }
+}
+
+/* =========================== HIGH CONTRAST MODE SUPPORT =========================== */
+
+@media (prefers-contrast: high) {
+    .btn {
+        border: 2px solid currentColor;
+    }
+    
+    .template-item {
+        border-width: 2px;
+    }
+    
+    .template-item.active {
+        border-width: 3px;
+    }
+    
+    .modal-content {
+        border-width: 2px;
+    }
+    
+    /* Integration High Contrast */
+    #omeroOption {
+        border-width: 2px;
+        border-color: #d97706;
+    }
+    
+    #elabftwOption {
+        border-width: 2px;
+        border-color: #0284c7;
+    }
+    
+    #omeroStatusIcon.connected {
+        color: #047857;
+    }
+    
+    #omeroStatusIcon.error {
+        color: #b91c1c;
+    }
+    
+    #omeroConnectionStatus.success-message,
+    #elabftwConnectionStatus.success-message {
+        border-width: 2px;
+        background: rgba(16, 185, 129, 0.3);
+    }
+    
+    #omeroConnectionStatus.error-message,
+    #elabftwConnectionStatus.error-message {
+        border-width: 2px;
+        background: rgba(239, 68, 68, 0.3);
+    }
+}
+
+/* =========================== REDUCED MOTION SUPPORT =========================== */
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    
+    .btn:hover {
+        transform: none;
+    }
+    
+    .template-item:hover {
+        transform: none;
+    }
+    
+    #omeroStatusIcon,
+    #omeroOption,
+    #elabftwOption {
+        transition: none;
+    }
+    
+    @keyframes omeroStatusSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(0deg); }
+    }
+    
+    @keyframes integrationSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(0deg); }
+    }
+    
+    .omero-success,
+    .omero-error,
+    .elabftw-success,
+    .elabftw-error {
+        animation: none;
+    }
+    
+    .integration-tooltip::after,
+    .integration-tooltip::before {
+        transition: none;
+    }
+}
+
+/* =========================== FOCUS MANAGEMENT FOR ACCESSIBILITY =========================== */
+
+/* Enhanced focus indicators */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+.btn:focus {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.template-item:focus {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+/* Integration Focus States */
+#omeroProjectSelect:focus,
+#omeroGroupSelect:focus,
+#omeroDatasetNameInput:focus,
+#omeroNamespace:focus {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+}
+
+#elabftwExperimentId input:focus {
+    outline: 2px solid #0ea5e9;
+    outline-offset: 2px;
+}
+
+/* =========================== PRINT STYLES =========================== */
+
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .sidebar {
+        display: none;
+    }
+    
+    .main-content {
+        width: 100%;
+        padding: 0;
+    }
+    
+    .btn {
+        display: none;
+    }
+    
+    .modal {
+        display: none !important;
+    }
+    
+    /* Hide integration options in print */
+    #omeroOption,
+    #elabftwOption {
+        display: none;
+    }
+    
+    .actions {
+        display: none;
+    }
+    
+    .header {
+        background: none;
+        box-shadow: none;
+    }
+    
+    .project-setup,
+    .folder-structure,
+    .metadata-editor {
+        background: none;
+        border: 1px solid #ccc;
+        box-shadow: none;
+    }
+}
+
+/* =========================== DARK MODE ENHANCEMENTS =========================== */
+
+@media (prefers-color-scheme: dark) {
+    /* Additional dark mode styles for better integration contrast */
+    #omeroProjectSelect,
+    #omeroGroupSelect,
+    #omeroDatasetNameInput,
+    #omeroNamespace {
+        background: rgba(55, 65, 81, 0.8);
+        border-color: #6b7280;
+        color: #e5e7eb;
+    }
+    
+    #omeroProjectSelect:focus,
+    #omeroGroupSelect:focus,
+    #omeroDatasetNameInput:focus,
+    #omeroNamespace:focus {
+        border-color: #f59e0b;
+        background: rgba(55, 65, 81, 0.9);
+    }
+    
+    #elabftwExperimentId input {
+        background: rgba(55, 65, 81, 0.8);
+        border-color: #6b7280;
+        color: #e5e7eb;
+    }
+    
+    #elabftwExperimentId input:focus {
+        border-color: #0ea5e9;
+        background: rgba(55, 65, 81, 0.9);
+    }
+    
+    #omeroOption details > div {
+        background: rgba(31, 41, 55, 0.6);
+        border-color: rgba(75, 85, 99, 0.3);
+    }
+    
+    #elabftwExperimentId {
+        background: rgba(31, 41, 55, 0.6);
+        border-color: rgba(14, 165, 233, 0.3);
+    }
+}
+
+/* =========================== SCREEN READER SUPPORT =========================== */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Skip links for keyboard navigation */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: #7c3aed;
+    color: white;
+    padding: 8px;
+    text-decoration: none;
+    border-radius: 4px;
+    z-index: 10000;
+}
+
+.skip-link:focus {
+    top: 6px;
+}
+
+/* =========================== KEYBOARD NAVIGATION ENHANCEMENTS =========================== */
+
+/* Visible focus for keyboard users only */
+.js-focus-visible :focus:not(.focus-visible) {
+    outline: none;
+}
+
+.js-focus-visible .focus-visible {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+/* Enhanced tab navigation */
+.template-item[tabindex]:focus {
+    background: rgba(124, 58, 237, 0.3);
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+/* =========================== LARGE SCREENS AND DESKTOP ENHANCEMENTS =========================== */
+
+@media (min-width: 1200px) {
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .sidebar {
+        width: 350px;
+    }
+    
+    .header h1 {
+        font-size: 3rem;
+    }
+    
+    .project-input-group {
+        gap: 20px;
+    }
+    
+    .modal-content {
+        max-width: 1000px;
+    }
+    
+    /* Better spacing for large screens */
+    .template-item {
+        padding: 15px;
+    }
+    
+    .template-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.8rem;
+    }
+    
+    /* Integration options with better spacing */
+    #omeroOption,
+    #elabftwOption {
+        padding: 20px;
+    }
+    
+    #omeroProjectSelection,
+    #omeroGroupSelection,
+    #omeroDatasetName,
+    #elabftwExperimentId {
+        padding: 15px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .sidebar {
+        width: 400px;
+    }
+    
+    .header h1 {
+        font-size: 3.5rem;
+    }
+    
+    .main-content {
+        padding: 30px;
+    }
+}
+
+/* =========================== SPECIAL DEVICE ADAPTATIONS =========================== */
+
+/* iPad and tablet landscape */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+    .container {
+        flex-direction: row;
+    }
+    
+    .sidebar {
+        width: 280px;
+        max-height: 100vh;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: none;
+    }
+    
+    .template-type-selector {
+        flex-direction: row;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .btn {
+        min-height: 44px; /* Touch target size */
+        padding: 15px 24px;
+    }
+    
+    .template-item {
+        min-height: 60px;
+        padding: 15px;
+    }
+    
+    .template-type-btn {
+        min-height: 50px;
+        padding: 15px;
+    }
+    
+    /* Larger touch targets for checkboxes and small buttons */
+    input[type="checkbox"] {
+        min-width: 20px;
+        min-height: 20px;
+    }
+    
+    .btn-small {
+        min-height: 36px;
+        padding: 10px 15px;
+    }
+    
+    /* Integration touch optimizations */
+    #omeroOption details summary {
+        min-height: 44px;
+        padding: 12px 0;
+    }
+    
+    #omeroProjectSelect,
+    #omeroGroupSelect,
+    #omeroDatasetNameInput {
+        min-height: 44px;
+        padding: 12px;
+    }
+}
+
+/* =========================== ANIMATION PERFORMANCE =========================== */
+
+/* Hardware acceleration for smooth animations */
+.btn,
+.template-item,
+.modal-content,
+.template-avatar {
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Reduce animations on low-performance devices */
+@media (prefers-reduced-motion: no-preference) {
+    .btn:hover {
+        will-change: transform, box-shadow;
+    }
+    
+    .template-item:hover {
+        will-change: transform, background-color;
+    }
+}
+
+/* =========================== CONTAINER QUERIES (Future-proofing) =========================== */
+
+/* These will work when container queries are widely supported */
+@supports (container-type: inline-size) {
+    .sidebar {
+        container-type: inline-size;
+    }
+    
+    @container (max-width: 280px) {
+        .template-type-selector {
+            flex-direction: column;
+        }
+        
+        .template-type-btn {
+            padding: 10px;
+            font-size: 12px;
+        }
+    }
+}
+
+/* =========================== FINAL RESPONSIVE UTILITIES =========================== */
+
+/* Responsive text sizing */
+.text-responsive {
+    font-size: clamp(0.875rem, 2.5vw, 1rem);
+}
+
+.heading-responsive {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+}
+
+/* Responsive spacing */
+.spacing-responsive {
+    padding: clamp(1rem, 3vw, 2rem);
+}
+
+.gap-responsive {
+    gap: clamp(0.5rem, 2vw, 1rem);
+}
+
+/* Responsive grid for future layouts */
+.grid-responsive {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+    gap: clamp(1rem, 3vw, 2rem);
+}

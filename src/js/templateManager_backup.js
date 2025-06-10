@@ -1,4 +1,4 @@
-// Template Manager (Complete - Enhanced with Search & Shared Templates Toggle, MINIMAL Search Index Fix)
+// Template Manager (Complete - Enhanced with Search & Shared Templates Toggle, ALL original functions preserved)
 
 const templateManager = {
     templates: [],
@@ -30,37 +30,22 @@ const templateManager = {
     },
 
     // ORIGINAL: Initialize template manager (enhanced with search features)
-	init() {
-		console.log('🔧 Initializing templateManager...');
-		try {
-			// Load templates
-			this.templates = window.storage ? window.storage.loadTemplates() : [];
-			
-			// Initialize search state
-			this.initializeSearchState();
-			
-			// Clear any stale cache
-			this.allTemplates = [];
-			
-			// Render the list first
-			this.renderList();
-			this.updateTemplateInfo();
-			
-			// Build search index AFTER templates are loaded and rendered
-			setTimeout(() => {
-				console.log('📊 Building initial search index...');
-				this.buildSearchIndex();
-				console.log(`✅ Initial search index built with ${this.searchState.searchIndex.size} entries`);
-			}, 100);
-			
-			console.log('✅ templateManager initialized with', this.templates.length, 'templates');
-		} catch (error) {
-			console.error('❌ Error in templateManager.init:', error);
-			this.templates = [];
-			this.initializeSearchState();
-			this.renderList();
-		}
-	},
+    init() {
+        console.log('🔧 Initializing templateManager...');
+        try {
+            this.templates = window.storage ? window.storage.loadTemplates() : [];
+            this.initializeSearchState(); // NEW
+            this.renderList();
+            this.updateTemplateInfo();
+            this.buildSearchIndex(); // NEW
+            console.log('✅ templateManager initialized with', this.templates.length, 'templates');
+        } catch (error) {
+            console.error('❌ Error in templateManager.init:', error);
+            this.templates = [];
+            this.initializeSearchState(); // NEW
+            this.renderList();
+        }
+    },
 
     // NEW: Initialize search state
     initializeSearchState() {
@@ -76,14 +61,12 @@ const templateManager = {
         this.searchState.suggestionCache.clear();
     },
 
-    // NEW: Build search index for fast searching - FIXED with better logging
+    // NEW: Build search index for fast searching
     buildSearchIndex() {
         console.log('🔍 Building search index...');
         this.searchState.searchIndex.clear();
         
         const allTemplates = this.getAllTemplates();
-        
-        console.log(`📊 Building index for ${allTemplates.length} templates (type: ${this.getCurrentType()})`);
         
         allTemplates.forEach((template, index) => {
             const searchableContent = this.extractSearchableContent(template);
@@ -490,103 +473,73 @@ const templateManager = {
 
     // ORIGINAL: Get all templates (including group templates) - FIXED: No circular dependency
     getAllTemplates() {
-		const currentType = this.getCurrentType();
-		
-		// FIXED: Cache nur verwenden wenn wir Type-spezifische Templates haben
-		// PROBLEM WAR: Cache enthielt alte Templates vom vorherigen Type
-		if (this.allTemplates.length > 0) {
-			// CRITICAL FIX: Prüfe ob Cache für aktuellen Type gültig ist
-			const firstTemplate = this.allTemplates[0];
-			const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
-									  (currentType === 'experiments' && firstTemplate.type === 'experiment');
-			
-			if (cacheValidForType) {
-				console.log(`📋 Using valid cached templates: ${this.allTemplates.length} for type: ${currentType}`);
-				return this.allTemplates;
-			} else {
-				console.log(`🔄 Cache invalid for type ${currentType}, rebuilding...`);
-				this.allTemplates = []; // Clear invalid cache
-			}
-		}
-		
-		console.log(`🔄 Rebuilding templates for type: ${currentType}`);
-		
-		// Get own templates
-		const ownTemplates = this.templates.filter(t => 
-			(currentType === 'folders' && t.type !== 'experiment') ||
-			(currentType === 'experiments' && t.type === 'experiment')
-		);
+        const currentType = this.getCurrentType();
+        
+        // Get own templates
+        const ownTemplates = this.templates.filter(t => 
+            (currentType === 'folders' && t.type !== 'experiment') ||
+            (currentType === 'experiments' && t.type === 'experiment')
+        );
 
-		// Load group templates
-		let groupTemplates = [];
-		try {
-			const currentGroup = window.userManager?.currentGroup;
-			if (window.storage && window.storage.loadGroupTemplates && currentGroup && currentGroup !== 'Unknown') {
-				console.log(`📚 Loading group templates for group: "${currentGroup}"`);
-				groupTemplates = window.storage.loadGroupTemplates(currentGroup)
-					.filter(t => 
-						((currentType === 'folders' && t.type !== 'experiment') ||
-						(currentType === 'experiments' && t.type === 'experiment')) &&
-						t.createdBy !== window.userManager?.currentUser &&
-						t.createdBy !== 'System'
-					);
-				console.log(`🤝 Found ${groupTemplates.length} shared templates from group "${currentGroup}"`);
-			}
-		} catch (error) {
-			console.warn('Could not load group templates:', error);
-			groupTemplates = [];
-		}
+        // Load group templates - FIXED to use current user's group
+        let groupTemplates = [];
+        try {
+            const currentGroup = window.userManager?.currentGroup;
+            if (window.storage && window.storage.loadGroupTemplates && currentGroup && currentGroup !== 'Unknown') {
+                console.log(`📚 Loading group templates for group: "${currentGroup}"`);
+                groupTemplates = window.storage.loadGroupTemplates(currentGroup)
+                    .filter(t => 
+                        ((currentType === 'folders' && t.type !== 'experiment') ||
+                        (currentType === 'experiments' && t.type === 'experiment')) &&
+                        t.createdBy !== window.userManager?.currentUser &&
+                        t.createdBy !== 'System'
+                    );
+                console.log(`🤝 Found ${groupTemplates.length} shared templates from group "${currentGroup}"`);
+            }
+        } catch (error) {
+            console.warn('Could not load group templates:', error);
+            groupTemplates = [];
+        }
 
-		// Mark templates with proper indices and ownership
-		const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
-			...t, 
-			isOwn: true, 
-			originalIndex: i
-		}));
-		
-		const groupTemplatesMarked = groupTemplates.map(t => ({ 
-			...t, 
-			isOwn: false, 
-			originalIndex: -1,
-			isShared: true
-		}));
+        // Mark templates with proper indices and ownership
+        const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
+            ...t, 
+            isOwn: true, 
+            originalIndex: i
+        }));
+        
+        const groupTemplatesMarked = groupTemplates.map(t => ({ 
+            ...t, 
+            isOwn: false, 
+            originalIndex: -1,
+            isShared: true
+        }));
 
-		this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
-		console.log(`📋 Total templates: ${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared = ${this.allTemplates.length}`);
-		
-		// Update toggle visibility
-		this.updateSharedToggleVisibility();
-		
-		return this.allTemplates;
-	},
-
-	
-	
+        this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
+        console.log(`📋 Total templates: ${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared = ${this.allTemplates.length}`);
+        
+        // FIXED: Update toggle visibility WITHOUT causing circular dependency
+        this.updateSharedToggleVisibility();
+        
+        return this.allTemplates;
+    },
 
     // NEW: Update visibility of shared templates toggle (FIXED: No circular dependency)
-	updateSharedToggleVisibility() {
-		const toggleElement = document.getElementById('sharedTemplatesToggle');
-		if (!toggleElement) return;
+    updateSharedToggleVisibility() {
+        const toggleElement = document.getElementById('sharedTemplatesToggle');
+        if (!toggleElement) return;
 
-		// FIXED: Toggle IMMER anzeigen wenn User Management aktiv ist
-		// (Auch wenn aktuell keine shared templates für diesen Type da sind)
-		const userManagementEnabled = window.userManager?.isEnabled() || false;
-		
-		console.log('🤝 Toggle visibility check:', {
-			userManagementEnabled,
-			currentType: this.getCurrentType(),
-			allTemplatesCount: this.allTemplates.length
-		});
-		
-		// FIXED: Zeige Toggle wenn User Management aktiv ist (unabhängig von shared templates)
-		if (userManagementEnabled) {
-			toggleElement.style.display = 'block';
-			console.log('✅ Showing shared templates toggle (user management enabled)');
-		} else {
-			toggleElement.style.display = 'none';
-			console.log('❌ Hiding shared templates toggle (user management disabled)');
-		}
-	},
+        // Show toggle only if user management is enabled and we have shared templates
+        const userManagementEnabled = window.userManager?.isEnabled() || false;
+        // FIXED: Use this.allTemplates directly instead of calling getAllTemplates()
+        const hasSharedTemplates = this.allTemplates.some(t => !t.isOwn);
+        
+        if (userManagementEnabled && hasSharedTemplates) {
+            toggleElement.style.display = 'block';
+        } else {
+            toggleElement.style.display = 'none';
+        }
+    },
 
     // ORIGINAL: Safe user color generation
     getUserColor(username) {
@@ -983,7 +936,42 @@ const templateManager = {
         }
     },
 	
-	// ENHANCED: Manual refresh function for external calls
+	// ENHANCED: React to template type changes
+    onTemplateTypeChanged(newType) {
+        console.log('🔄 Template type changed to:', newType);
+        
+        // Clear current selection
+        this.currentTemplate = null;
+        this.selectedIndex = -1;
+        
+        // Hide template details
+        const detailsElement = document.getElementById('templateDetails');
+        if (detailsElement) {
+            detailsElement.style.display = 'none';
+        }
+        
+        // Clear search if active
+        if (this.searchState.isSearching) {
+            const searchInput = document.getElementById('templateSearchInput');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            this.clearSearch();
+        }
+        
+        // Force rebuild of templates for new type
+        this.allTemplates = []; // Clear cache
+        this.buildSearchIndex(); // This will call getAllTemplates() internally
+        this.updateSharedToggleVisibility();
+        
+        // Re-render list
+        this.renderList();
+        this.updateTemplateInfo();
+        
+        console.log(`✅ Switched to ${newType}, showing ${this.getAllTemplates().length} templates`);
+    },
+
+    // ENHANCED: Manual refresh function for external calls
     refresh() {
         console.log('🔄 Manually refreshing template manager...');
         this.allTemplates = []; // Clear cache
@@ -992,8 +980,84 @@ const templateManager = {
         this.renderList();
         this.updateTemplateInfo();
     }
+	
 };
 
+// ENHANCED: Override the global switchTemplateType function to notify templateManager
+window.switchTemplateType = function(type) {
+    console.log('🔄 switchTemplateType called with:', type);
+    
+    try {
+        // Call original templateTypeManager if available
+        if (window.templateTypeManager && window.templateTypeManager.switchType) {
+            console.log('📞 Calling templateTypeManager.switchType:', type);
+            window.templateTypeManager.switchType(type);
+
+
+		} else {
+					console.warn('⚠️ templateTypeManager not available - creating minimal fallback');
+					
+					// FALLBACK: Minimal template type management if templateTypeManager is missing
+					if (!window.templateTypeManager) {
+						window.templateTypeManager = {
+							currentType: 'folders',
+							switchType: function(newType) {
+								console.log('📁 Fallback: Switching to', newType);
+								this.currentType = newType;
+								
+								// Update button states
+								const foldersBtn = document.getElementById('foldersTypeBtn');
+								const experimentsBtn = document.getElementById('experimentsTypeBtn');
+								
+								if (foldersBtn && experimentsBtn) {
+									foldersBtn.classList.toggle('active', newType === 'folders');
+									experimentsBtn.classList.toggle('active', newType === 'experiments');
+								}
+							}
+						};
+					}
+					
+					window.templateTypeManager.switchType(type);
+				}
+        
+        // Notify our enhanced templateManager
+        if (window.templateManager && window.templateManager.onTemplateTypeChanged) {
+            console.log('📞 Calling templateManager.onTemplateTypeChanged:', type);
+            window.templateManager.onTemplateTypeChanged(type);
+        } else {
+            console.warn('⚠️ templateManager.onTemplateTypeChanged not available');
+        }
+        
+        // Also try to refresh integration options
+        if (window.updateIntegrationOptions) {
+            window.updateIntegrationOptions();
+        }
+        
+        console.log('✅ Template type switched to:', type);
+        
+    } catch (error) {
+        console.error('❌ Error switching template type:', error);
+    }
+};
+
+// DEBUG: Add debugging for templateTypeManager
+if (window.templateTypeManager) {
+    console.log('✅ templateTypeManager available:', window.templateTypeManager);
+    console.log('Current type:', window.templateTypeManager.currentType);
+} else {
+    console.warn('⚠️ templateTypeManager NOT available - this might be the problem!');
+}
+
+// DEBUG: Test function to check what's happening
+window.debugTemplateTypes = function() {
+    console.log('=== TEMPLATE TYPE DEBUG ===');
+    console.log('templateTypeManager available:', !!window.templateTypeManager);
+    console.log('templateTypeManager.currentType:', window.templateTypeManager?.currentType);
+    console.log('templateManager available:', !!window.templateManager);
+    console.log('Current templates count:', window.templateManager?.getAllTemplates()?.length);
+    console.log('All templates:', window.templateManager?.getAllTemplates());
+    console.log('===========================');
+};
 
 window.templateManager = templateManager;
-console.log('✅ Complete templateManager loaded (Enhanced with Search & Shared Templates Toggle, MINIMAL Search Index Fix)');
+console.log('✅ Complete templateManager loaded (Enhanced with Search & Shared Templates Toggle, ALL original functions preserved)');
