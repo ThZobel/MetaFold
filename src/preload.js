@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Secure API for renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
+    // =================== EXISTING APIS ===================
+    
     // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
     
@@ -23,15 +25,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Save JSON file
     saveJsonFile: (data) => ipcRenderer.invoke('save-json-file', data),
     
+    // Open external URL in default browser
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    
     // Platform info
     platform: process.platform,
     
-    // Open external URL in default browser
-    openExternal: (url) => ipcRenderer.invoke('open-external', url)
+    // =================== SECURE STORAGE APIS ===================
+    
+    // Check if secure storage is available
+    isSecureStorageAvailable: () => ipcRenderer.invoke('secure-storage-available'),
+    
+    // Encrypt data using Electron safeStorage
+    encryptData: (plaintext) => ipcRenderer.invoke('encrypt-data', plaintext),
+    
+    // Decrypt data using Electron safeStorage
+    decryptData: (encryptedData, method = 'safeStorage') => 
+        ipcRenderer.invoke('decrypt-data', encryptedData, method),
+    
+    // Migrate plaintext credentials to encrypted format
+    migrateCredentials: (credentials) => ipcRenderer.invoke('migrate-credentials', credentials),
+    
+    // Generate secure random salt
+    generateSalt: () => ipcRenderer.invoke('generate-salt'),
+    
+    // Store secure credential with metadata
+    storeSecureCredential: (key, value, metadata = {}) => 
+        ipcRenderer.invoke('store-secure-credential', key, value, metadata),
+    
+    // Retrieve secure credential with metadata
+    retrieveSecureCredential: (encryptedData, method = 'safeStorage') => 
+        ipcRenderer.invoke('retrieve-secure-credential', encryptedData, method),
+    
+    // Generic invoke for future extensions
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 });
 
 // Extended utilities
 contextBridge.exposeInMainWorld('utils', {
+    // =================== EXISTING UTILITIES ===================
+    
     // Path utilities
     joinPath: (...paths) => {
         return paths.join(process.platform === 'win32' ? '\\' : '/');
@@ -141,5 +174,108 @@ contextBridge.exposeInMainWorld('utils', {
             folders: templates.filter(t => t.type !== 'experiment').length,
             experiments: templates.filter(t => t.type === 'experiment').length
         };
+    },
+    
+    // =================== SECURITY UTILITIES ===================
+    
+    // Check if data appears to be encrypted
+    looksEncrypted: (data) => {
+        if (typeof data === 'object' && data.encrypted && data.method) {
+            return true;
+        }
+        
+        // Check if string looks like base64 encrypted data
+        if (typeof data === 'string' && data.length > 20) {
+            const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+            return base64Regex.test(data);
+        }
+        
+        return false;
+    },
+    
+    // Mask sensitive data for logging
+    maskSensitive: (text, maskChar = '*', visibleChars = 4) => {
+        if (!text || typeof text !== 'string') return '';
+        
+        if (text.length <= visibleChars * 2) {
+            return maskChar.repeat(text.length);
+        }
+        
+        const start = text.substring(0, visibleChars);
+        const end = text.substring(text.length - visibleChars);
+        const middle = maskChar.repeat(Math.max(3, text.length - (visibleChars * 2)));
+        
+        return start + middle + end;
+    },
+    
+    // Generate random ID for encryption operations
+    generateSecureId: () => {
+        const timestamp = Date.now().toString(36);
+        const random = Math.random().toString(36).substring(2, 15);
+        return `sec_${timestamp}_${random}`;
+    },
+    
+    // Validate password strength
+    validatePasswordStrength: (password) => {
+        if (!password) return { strength: 'none', score: 0, feedback: [] };
+        
+        const feedback = [];
+        let score = 0;
+        
+        // Length check
+        if (password.length >= 8) score += 1;
+        else feedback.push('Use at least 8 characters');
+        
+        if (password.length >= 12) score += 1;
+        
+        // Character variety
+        if (/[a-z]/.test(password)) score += 1;
+        else feedback.push('Include lowercase letters');
+        
+        if (/[A-Z]/.test(password)) score += 1;
+        else feedback.push('Include uppercase letters');
+        
+        if (/[0-9]/.test(password)) score += 1;
+        else feedback.push('Include numbers');
+        
+        if (/[^A-Za-z0-9]/.test(password)) score += 1;
+        else feedback.push('Include special characters');
+        
+        // Determine strength
+        let strength;
+        if (score <= 2) strength = 'weak';
+        else if (score <= 4) strength = 'medium';
+        else strength = 'strong';
+        
+        return { strength, score, feedback };
+    },
+    
+    // Check if running in secure context (HTTPS or localhost)
+    isSecureContext: () => {
+        if (typeof window !== 'undefined') {
+            return window.isSecureContext || 
+                   window.location.protocol === 'https:' || 
+                   window.location.hostname === 'localhost' ||
+                   window.location.hostname === '127.0.0.1';
+        }
+        return true; // Assume secure in Electron
+    },
+    
+    // Secure comparison for passwords/keys (timing attack resistant)
+    secureCompare: (a, b) => {
+        if (typeof a !== 'string' || typeof b !== 'string') {
+            return false;
+        }
+        
+        if (a.length !== b.length) {
+            return false;
+        }
+        
+        let result = 0;
+        for (let i = 0; i < a.length; i++) {
+            result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        }
+        
+        return result === 0;
     }
 });

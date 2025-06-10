@@ -1,4 +1,4 @@
-// Experiment Form for filling in metadata - FIXED saveTemplate function
+// Experiment Form for filling in metadata
 
 const experimentForm = {
     savedFieldValues: {},
@@ -20,25 +20,6 @@ const experimentForm = {
     render(metadata) {
         const container = document.getElementById('experimentFields');
         container.innerHTML = '';
-        
-        // Load saved paths if available in template
-        if (templateManager.currentTemplate && templateManager.currentTemplate.projectDefaults) {
-            const defaults = templateManager.currentTemplate.projectDefaults;
-            const targetPathEl = document.getElementById('targetPath');
-            const projectNameEl = document.getElementById('projectName');
-            
-            if (targetPathEl && defaults.basePath) {
-                targetPathEl.value = defaults.basePath;
-            }
-            if (projectNameEl && defaults.projectName) {
-                projectNameEl.value = defaults.projectName;
-            }
-            
-            // Update path preview
-            if (window.projectManager && window.projectManager.updatePathPreview) {
-                window.projectManager.updatePathPreview();
-            }
-        }
         
         // Sort fields so groups are positioned correctly
         const sortedEntries = Object.entries(metadata).sort(([a], [b]) => {
@@ -189,86 +170,60 @@ const experimentForm = {
         return { valid: true };
     },
 
-    // FIXED: Save current form values back to template - Enhanced with paths and proper template finding
-    saveTemplate() {
-        console.log('💾 Starting saveTemplate...');
-        
-        if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
-            alert('No template selected or no metadata available to save.');
-            return;
-        }
+    // Save current form values back to template - ENHANCED with paths
+	saveTemplate() {
+		if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
+			alert('No template selected or no metadata available to save.');
+			return;
+		}
 
-        // Check if user owns this template
-        if (!templateManager.currentTemplate.isOwn) {
-            alert('You can only save your own templates. Please copy this template first to make changes.');
-            return;
-        }
+		// Collect current form data
+		const currentData = this.collectFormValues();
+		
+		if (!currentData || Object.keys(currentData).length === 0) {
+			alert('No data to save.');
+			return;
+		}
 
-        // Collect current form data
-        const currentData = this.collectFormValues();
-        
-        if (!currentData || Object.keys(currentData).length === 0) {
-            alert('No data to save.');
-            return;
-        }
+		// Get current project paths
+		const basePath = document.getElementById('targetPath')?.value?.trim() || '';
+		const projectName = document.getElementById('projectName')?.value?.trim() || '';
 
-        // Get current project paths
-        const basePath = document.getElementById('targetPath')?.value?.trim() || '';
-        const projectName = document.getElementById('projectName')?.value?.trim() || '';
+		// Update the template's metadata with current form values
+		const updatedTemplate = { ...templateManager.currentTemplate };
+		
+		// Merge current form values into template metadata
+		Object.entries(currentData).forEach(([fieldName, value]) => {
+			if (updatedTemplate.metadata[fieldName]) {
+				updatedTemplate.metadata[fieldName].value = value;
+			}
+		});
 
-        console.log('💾 Form data collected:', Object.keys(currentData).length, 'fields');
-        console.log('💾 Project paths:', { basePath, projectName });
+		// Save project paths with template
+		if (!updatedTemplate.projectDefaults) {
+			updatedTemplate.projectDefaults = {};
+		}
+		updatedTemplate.projectDefaults.basePath = basePath;
+		updatedTemplate.projectDefaults.projectName = projectName;
 
-        // FIXED: Find the correct template index in the own templates array
-        const templateIndex = templateManager.templates.findIndex(t => 
-            t.name === templateManager.currentTemplate.name && 
-            t.createdBy === templateManager.currentTemplate.createdBy &&
-            t.createdAt === templateManager.currentTemplate.createdAt
-        );
+		// Update template in templateManager
+		const templateIndex = templateManager.templates.indexOf(templateManager.currentTemplate);
+		if (templateIndex >= 0) {
+			templateManager.update(templateIndex, updatedTemplate);
+			
+			// Show success message
+			this.showSaveMessage('✅ Template values and project paths saved successfully!');
+			
+			// Re-render form to show updated values
+			setTimeout(() => {
+				this.render(updatedTemplate.metadata);
+			}, 100);
+		} else {
+			alert('Error: Could not find template to update.');
+		}
+	},
 
-        if (templateIndex < 0) {
-            console.error('❌ Template not found in own templates array');
-            alert('Error: Could not find template to update. This might be a shared template that you need to copy first.');
-            return;
-        }
-
-        console.log('💾 Found template at index:', templateIndex);
-
-        // Create updated template
-        const updatedTemplate = { ...templateManager.templates[templateIndex] };
-        
-        // Merge current form values into template metadata
-        Object.entries(currentData).forEach(([fieldName, value]) => {
-            if (updatedTemplate.metadata[fieldName]) {
-                updatedTemplate.metadata[fieldName].value = value;
-                console.log(`💾 Updated field "${fieldName}":`, value);
-            }
-        });
-
-        // Save project paths with template
-        if (!updatedTemplate.projectDefaults) {
-            updatedTemplate.projectDefaults = {};
-        }
-        updatedTemplate.projectDefaults.basePath = basePath;
-        updatedTemplate.projectDefaults.projectName = projectName;
-        updatedTemplate.updatedAt = new Date().toISOString();
-
-        // Update template in templateManager
-        templateManager.update(templateIndex, updatedTemplate);
-        
-        // Update current template reference
-        templateManager.currentTemplate = updatedTemplate;
-        
-        // Show success message
-        this.showSaveMessage('✅ Template values and project paths saved successfully!');
-        
-        console.log('✅ Template saved successfully');
-        
-        // Optional: Re-render form to show updated values (but preserve current form state)
-        // Commented out to prevent form reset: this.render(updatedTemplate.metadata);
-    },
-
-    // Collect current form values (similar to collectData but simpler)
+    // Collect current form values (similar to collectData but simpler) - NEW FUNCTION
     collectFormValues() {
         if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
             return null;
@@ -298,7 +253,7 @@ const experimentForm = {
         return formValues;
     },
 
-    // Show save message
+    // Show save message - NEW FUNCTION
     showSaveMessage(message) {
         // Create or get save message element
         let saveMessage = document.getElementById('saveMessage');

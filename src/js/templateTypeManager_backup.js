@@ -1,4 +1,4 @@
-// Template Type Manager - FIXED for async settingsManager AND Search Index
+// Template Type Manager - FIXED for async settingsManager
 
 const templateTypeManager = {
     currentType: 'folders', // 'folders' or 'experiments'
@@ -27,38 +27,6 @@ const templateTypeManager = {
         // Clear current template selection
         if (window.templateManager) {
             window.templateManager.currentTemplate = null;
-            
-            // CRITICAL FIX: Update search index when switching type
-            // This is what was missing!
-            console.log('🔧 Fixing search index for type switch to:', type);
-            
-            // Clear all caches - exactly like the manual fix
-            window.templateManager.allTemplates = [];
-            window.templateManager.searchState.searchCache.clear();
-            window.templateManager.searchState.searchIndex.clear();
-            
-            // Clear search input if active
-            if (window.templateManager.searchState.isSearching) {
-                const searchInput = document.getElementById('templateSearchInput');
-                if (searchInput) {
-                    searchInput.value = '';
-                }
-                window.templateManager.clearSearch();
-            }
-            
-            // Rebuild index after a delay - exactly like the manual fix
-            setTimeout(() => {
-                console.log('🔧 Rebuilding search index for:', type);
-                const templates = window.templateManager.getAllTemplates();
-                console.log(`📊 Got ${templates.length} templates`);
-                
-                window.templateManager.buildSearchIndex();
-                console.log(`✅ Search index rebuilt with ${window.templateManager.searchState.searchIndex.size} entries`);
-                
-                // Re-render with updated index
-                window.templateManager.renderList();
-                window.templateManager.updateSharedToggleVisibility();
-            }, 100);
         }
 
         // Update integration options visibility - ASYNC VERSION

@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMERO Debug Session - MetaFold</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            color: #7c3aed;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
+        }
+        
+        .debug-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .debug-section h2 {
+            color: #a855f7;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #7c3aed, #a855f7);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #374151, #4b5563);
+            box-shadow: 0 4px 15px rgba(75, 85, 99, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #dc2626, #ef4444);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(45deg, #059669, #10b981);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        .result-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .result-box.success {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .result-box.error {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
+        .result-box.warning {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background: #10b981;
+        }
+        
+        .status-indicator.offline {
+            background: #ef4444;
+        }
+        
+        .status-indicator.unknown {
+            background: #6b7280;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #7c3aed, #a855f7);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .test-results {
+            margin-top: 20px;
+        }
+        
+        .module-status {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+        
+        .endpoint-test {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .clear-all {
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 OMERO Debug Session</h1>
+            <p>Comprehensive analysis and testing of MetaFold OMERO integration</p>
+            <div>
+                <button class="btn btn-danger" onclick="clearAllResults()">🗑️ Clear All Results</button>
+                <button class="btn btn-success" onclick="runFullDiagnostics()">🚀 Run Full Diagnostics</button>
+            </div>
+        </div>
+
+        <!-- Module Status Check -->
+        <div class="debug-section">
+            <h2>📦 Module Status Check</h2>
+            <p>Verify that all OMERO modules are loaded correctly</p>
+            <button class="btn" onclick="checkModuleStatus()">Check Module Status</button>
+            <div id="moduleStatusResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Settings Analysis -->
+        <div class="debug-section">
+            <h2>⚙️ Settings Analysis</h2>
+            <p>Analyze current OMERO settings configuration</p>
+            <div class="two-column">
+                <div>
+                    <button class="btn" onclick="analyzeSettings()">Analyze Settings</button>
+                    <button class="btn btn-secondary" onclick="validateSettings()">Validate Settings</button>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="exportSettings()">Export Settings</button>
+                    <button class="btn btn-secondary" onclick="debugSettingsManager()">Debug Settings Manager</button>
+                </div>
+            </div>
+            <div id="settingsResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Connection Testing -->
+        <div class="debug-section">
+            <h2>🔌 Connection Testing</h2>
+            <p>Test proxy server and OMERO server connectivity</p>
+            <div class="grid">
+                <div>
+                    <h3>Proxy Server</h3>
+                    <button class="btn" onclick="testProxyServer()">Test Proxy Server</button>
+                    <button class="btn btn-secondary" onclick="checkProxyStatus()">Check Proxy Status</button>
+                    <div id="proxyResult" class="result-box" style="display: none;"></div>
+                </div>
+                <div>
+                    <h3>OMERO Server</h3>
+                    <button class="btn" onclick="testOMEROConnection()">Test OMERO Connection</button>
+                    <button class="btn btn-secondary" onclick="advancedConnectionTest()">Advanced Test</button>
+                    <div id="omeroConnectionResult" class="result-box" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Testing -->
+        <div class="debug-section">
+            <h2>🔐 Authentication Testing</h2>
+            <p>Test different authentication strategies</p>
+            <div class="grid">
+                <div>
+                    <button class="btn" onclick="testCredentialLogin()">Test Credential Login</button>
+                    <button class="btn" onclick="testPublicGroupLogin()">Test Public Group</button>
+                    <button class="btn" onclick="testCookieRecovery()">Test Cookie Recovery</button>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="debugAuthState()">Debug Auth State</button>
+                    <button class="btn btn-secondary" onclick="debugCSRF()">Debug CSRF</button>
+                    <button class="btn btn-danger" onclick="clearAuthSession()">Clear Session</button>
+                </div>
+            </div>
+            <div id="authResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Endpoint Discovery -->
+        <div class="debug-section">
+            <h2>🎯 Endpoint Discovery</h2>
+            <p>Discover and test OMERO API endpoints</p>
+            <button class="btn" onclick="discoverEndpoints()">Discover Endpoints</button>
+            <button class="btn btn-secondary" onclick="testCriticalEndpoints()">Test Critical Endpoints</button>
+            <div id="endpointResult" class="result-box" style="display: none;"></div>
+            <div id="endpointProgress" class="progress-bar" style="display: none;">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- Data Testing -->
+        <div class="debug-section">
+            <h2>📊 Data Access Testing</h2>
+            <p>Test access to projects, groups, and annotations</p>
+            <div class="grid">
+                <div>
+                    <h3>Projects & Groups</h3>
+                    <button class="btn" onclick="testProjectAccess()">Test Project Access</button>
+                    <button class="btn" onclick="testGroupAccess()">Test Group Access</button>
+                    <div id="dataAccessResult" class="result-box" style="display: none;"></div>
+                </div>
+                <div>
+                    <h3>Annotations</h3>
+                    <button class="btn" onclick="testAnnotations()">Test Map Annotations</button>
+                    <button class="btn" onclick="testAnnotationEndpoints()">Test Annotation Endpoints</button>
+                    <div id="annotationResult" class="result-box" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dataset Creation Testing -->
+        <div class="debug-section">
+            <h2>🗂️ Dataset Creation Testing</h2>
+            <p>Test dataset creation and metadata integration</p>
+            <div class="two-column">
+                <div>
+                    <button class="btn" onclick="testDatasetCreation()">Test Dataset Creation</button>
+                    <button class="btn btn-secondary" onclick="testWithSampleMetadata()">Test with Sample Metadata</button>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="testCurrentExperiment()">Test Current Experiment</button>
+                    <button class="btn btn-danger" onclick="cleanupTestDatasets()">Cleanup Test Data</button>
+                </div>
+            </div>
+            <div id="datasetResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Performance Analysis -->
+        <div class="debug-section">
+            <h2>⚡ Performance Analysis</h2>
+            <p>Analyze performance and identify bottlenecks</p>
+            <div class="grid">
+                <div>
+                    <button class="btn" onclick="measurePerformance()">Measure Performance</button>
+                    <button class="btn btn-secondary" onclick="profileRequests()">Profile Requests</button>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="analyzeMemoryUsage()">Memory Usage</button>
+                    <button class="btn btn-secondary" onclick="networkAnalysis()">Network Analysis</button>
+                </div>
+            </div>
+            <div id="performanceResult" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Debug Console -->
+        <div class="debug-section">
+            <h2>🖥️ Debug Console</h2>
+            <p>Real-time debugging and console output</p>
+            <div style="margin-bottom: 10px;">
+                <button class="btn btn-secondary" onclick="clearDebugConsole()">Clear Console</button>
+                <button class="btn btn-secondary" onclick="exportDebugLog()">Export Log</button>
+                <label>
+                    <input type="checkbox" id="autoScroll" checked> Auto-scroll
+                </label>
+            </div>
+            <div id="debugConsole" class="result-box" style="height: 300px; background: #000; color: #0f0; font-family: 'Courier New', monospace;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Debug Console Management
+        let debugLog = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            debugLog.push(logEntry);
+            
+            const console = document.getElementById('debugConsole');
+            console.textContent += logEntry + '\n';
+            
+            if (document.getElementById('autoScroll').checked) {
+                console.scrollTop = console.scrollHeight;
+            }
+        }
+        
+        function clearDebugConsole() {
+            document.getElementById('debugConsole').textContent = '';
+            debugLog = [];
+        }
+        
+        function exportDebugLog() {
+            const blob = new Blob([debugLog.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `omero-debug-${new Date().toISOString().split('T')[0]}.log`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function clearAllResults() {
+            const resultBoxes = document.querySelectorAll('.result-box');
+            resultBoxes.forEach(box => {
+                if (box.id !== 'debugConsole') {
+                    box.style.display = 'none';
+                    box.textContent = '';
+                }
+            });
+            log('All debug results cleared');
+        }
+        
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = content;
+            element.className = `result-box ${type}`;
+        }
+        
+        // Module Status Check
+        function checkModuleStatus() {
+            log('Checking OMERO module status...');
+            try {
+                const modules = {
+                    'omeroAuth': window.omeroAuth,
+                    'omeroAPI': window.omeroAPI,
+                    'omeroGroups': window.omeroGroups,
+                    'omeroProjects': window.omeroProjects,
+                    'omeroAnnotations': window.omeroAnnotations,
+                    'omeroDatasetCreation': window.omeroDatasetCreation,
+                    'omeroUIIntegration': window.omeroUIIntegration,
+                    'omeroTestFunctions': window.omeroTestFunctions,
+                    'settingsManager': window.settingsManager,
+                    'userManager': window.userManager
+                };
+                
+                let result = 'OMERO Module Status:\n\n';
+                let allLoaded = true;
+                
+                Object.entries(modules).forEach(([name, module]) => {
+                    const status = module ? '✅ Loaded' : '❌ Missing';
+                    const initialized = module && module.isInitialized !== false ? '✅' : '⚠️';
+                    result += `${status} ${initialized} ${name}\n`;
+                    if (!module) allLoaded = false;
+                });
+                
+                result += '\n' + (allLoaded ? '✅ All critical modules loaded' : '⚠️ Some modules missing');
+                
+                showResult('moduleStatusResult', result, allLoaded ? 'success' : 'warning');
+                log(`Module check complete: ${allLoaded ? 'All loaded' : 'Some missing'}`);
+                
+            } catch (error) {
+                showResult('moduleStatusResult', `Error checking modules: ${error.message}`, 'error');
+                log(`Module check failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Settings Analysis
+        function analyzeSettings() {
+            log('Analyzing OMERO settings...');
+            try {
+                if (!window.settingsManager) {
+                    throw new Error('Settings manager not available');
+                }
+                
+                const settings = {
+                    'omero.enabled': window.settingsManager.get('omero.enabled'),
+                    'omero.server_url': window.settingsManager.get('omero.server_url'),
+                    'omero.username': window.settingsManager.get('omero.username'),
+                    'omero.password': window.settingsManager.get('omero.password') ? '[SET]' : '[NOT SET]',
+                    'omero.auto_sync': window.settingsManager.get('omero.auto_sync'),
+                    'omero.default_project_id': window.settingsManager.get('omero.default_project_id'),
+                    'omero.create_datasets': window.settingsManager.get('omero.create_datasets'),
+                    'omero.verify_ssl': window.settingsManager.get('omero.verify_ssl')
+                };
+                
+                let result = 'OMERO Settings Analysis:\n\n';
+                Object.entries(settings).forEach(([key, value]) => {
+                    result += `${key}: ${value}\n`;
+                });
+                
+                // Analysis
+                result += '\nAnalysis:\n';
+                if (!settings['omero.enabled']) {
+                    result += '⚠️ OMERO integration is disabled\n';
+                } else if (!settings['omero.server_url']) {
+                    result += '❌ Server URL not configured\n';
+                } else if (!settings['omero.username']) {
+                    result += '⚠️ No username configured (will use public access)\n';
+                } else {
+                    result += '✅ Basic configuration looks complete\n';
+                }
+                
+                showResult('settingsResult', result, 'info');
+                log('Settings analysis complete');
+                
+            } catch (error) {
+                showResult('settingsResult', `Error analyzing settings: ${error.message}`, 'error');
+                log(`Settings analysis failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function validateSettings() {
+            log('Validating OMERO settings...');
+            try {
+                if (!window.settingsManager) {
+                    throw new Error('Settings manager not available');
+                }
+                
+                const serverUrl = window.settingsManager.get('omero.server_url');
+                const username = window.settingsManager.get('omero.username');
+                const enabled = window.settingsManager.get('omero.enabled');
+                
+                let result = 'Settings Validation:\n\n';
+                let isValid = true;
+                
+                // URL validation
+                if (!serverUrl) {
+                    result += '❌ Server URL is required\n';
+                    isValid = false;
+                } else {
+                    try {
+                        new URL(serverUrl);
+                        result += '✅ Server URL format is valid\n';
+                    } catch {
+                        result += '❌ Server URL format is invalid\n';
+                        isValid = false;
+                    }
+                }
+                
+                // Authentication validation
+                if (!username) {
+                    result += '⚠️ No username configured (public access only)\n';
+                } else {
+                    result += '✅ Username configured\n';
+                }
+                
+                // Enabled check
+                if (!enabled) {
+                    result += '⚠️ OMERO integration is disabled\n';
+                } else {
+                    result += '✅ OMERO integration is enabled\n';
+                }
+                
+                result += `\nOverall: ${isValid ? '✅ Valid' : '❌ Invalid'} configuration`;
+                
+                showResult('settingsResult', result, isValid ? 'success' : 'error');
+                log(`Settings validation: ${isValid ? 'Valid' : 'Invalid'}`);
+                
+            } catch (error) {
+                showResult('settingsResult', `Error validating settings: ${error.message}`, 'error');
+                log(`Settings validation failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Proxy Server Testing
+        async function testProxyServer() {
+            log('Testing proxy server...');
+            try {
+                const response = await fetch('http://localhost:3000/proxy-status', {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    let result = '✅ Proxy server is running\n\n';
+                    result += `Server: ${status.omero_server || 'Unknown'}\n`;
+                    result += `Active sessions: ${status.active_sessions || 0}\n`;
+                    result += `Connection pool: ${status.connection_pool_initialized ? 'Initialized' : 'Not initialized'}\n`;
+                    
+                    if (status.csrf_fixes_applied) {
+                        result += '\nCSRF Fixes Applied:\n';
+                        status.csrf_fixes_applied.forEach(fix => {
+                            result += `✅ ${fix}\n`;
+                        });
+                    }
+                    
+                    showResult('proxyResult', result, 'success');
+                    log('Proxy server test: SUCCESS');
+                } else {
+                    showResult('proxyResult', `❌ Proxy server responded with status: ${response.status}`, 'error');
+                    log(`Proxy server test: FAILED (${response.status})`, 'error');
+                }
+            } catch (error) {
+                showResult('proxyResult', `❌ Cannot connect to proxy server: ${error.message}`, 'error');
+                log(`Proxy server test: ERROR - ${error.message}`, 'error');
+            }
+        }
+        
+        async function checkProxyStatus() {
+            log('Checking detailed proxy status...');
+            try {
+                const response = await fetch('http://localhost:3000/csrf-debug', {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const debug = await response.json();
+                    let result = 'Proxy Debug Information:\n\n';
+                    result += `Timestamp: ${new Date(debug.timestamp * 1000).toLocaleString()}\n`;
+                    result += `Active sessions: ${debug.active_sessions}\n\n`;
+                    
+                    if (debug.session_details) {
+                        result += 'Session Details:\n';
+                        Object.entries(debug.session_details).forEach(([clientId, details]) => {
+                            result += `Client ${clientId}:\n`;
+                            result += `  CSRF token: ${details.has_csrf_token ? 'Present' : 'Missing'}\n`;
+                            result += `  Token preview: ${details.csrf_token_preview || 'None'}\n`;
+                            result += `  Cookies: ${details.full_cookies || 'None'}\n\n`;
+                        });
+                    }
+                    
+                    showResult('proxyResult', result, 'info');
+                    log('Proxy debug check complete');
+                } else {
+                    showResult('proxyResult', 'Debug endpoint not available', 'warning');
+                    log('Proxy debug endpoint not available', 'warning');
+                }
+            } catch (error) {
+                showResult('proxyResult', `Debug check failed: ${error.message}`, 'error');
+                log(`Proxy debug check failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // OMERO Connection Testing
+        async function testOMEROConnection() {
+            log('Testing OMERO connection...');
+            try {
+                if (!window.omeroUIIntegration) {
+                    throw new Error('OMERO UI Integration not available');
+                }
+                
+                const result = await window.omeroUIIntegration.testConnection();
+                
+                let output = result.success ? '✅ OMERO Connection Successful\n\n' : '❌ OMERO Connection Failed\n\n';
+                output += `Message: ${result.message}\n\n`;
+                
+                if (result.details) {
+                    output += 'Details:\n';
+                    Object.entries(result.details).forEach(([key, value]) => {
+                        output += `  ${key}: ${value}\n`;
+                    });
+                }
+                
+                showResult('omeroConnectionResult', output, result.success ? 'success' : 'error');
+                log(`OMERO connection test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('omeroConnectionResult', `Connection test error: ${error.message}`, 'error');
+                log(`OMERO connection test error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function advancedConnectionTest() {
+            log('Running advanced OMERO connection test...');
+            try {
+                if (!window.omeroTestFunctions) {
+                    throw new Error('OMERO test functions not available');
+                }
+                
+                const result = await window.omeroTestFunctions.testOMEROConnectionAdvanced();
+                
+                let output = result.success ? '✅ Advanced Test Passed\n\n' : '❌ Advanced Test Failed\n\n';
+                output += `Message: ${result.message}\n\n`;
+                
+                if (result.diagnostics) {
+                    output += 'Diagnostics:\n';
+                    Object.entries(result.diagnostics).forEach(([test, details]) => {
+                        output += `\n${test.toUpperCase()}:\n`;
+                        output += `  Tested: ${details.tested}\n`;
+                        output += `  Working: ${details.working}\n`;
+                        if (details.details) {
+                            if (typeof details.details === 'object') {
+                                Object.entries(details.details).forEach(([key, value]) => {
+                                    output += `  ${key}: ${JSON.stringify(value)}\n`;
+                                });
+                            } else {
+                                output += `  Details: ${details.details}\n`;
+                            }
+                        }
+                    });
+                }
+                
+                if (result.recommendations) {
+                    output += '\nRecommendations:\n';
+                    result.recommendations.forEach(rec => {
+                        output += `• ${rec}\n`;
+                    });
+                }
+                
+                showResult('omeroConnectionResult', output, result.success ? 'success' : 'error');
+                log(`Advanced connection test: ${result.success ? 'PASSED' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('omeroConnectionResult', `Advanced test error: ${error.message}`, 'error');
+                log(`Advanced connection test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Authentication Testing
+        async function testCredentialLogin() {
+            log('Testing credential-based login...');
+            try {
+                if (!window.omeroAuth || !window.settingsManager) {
+                    throw new Error('Required modules not available');
+                }
+                
+                const settings = window.omeroUIIntegration.getSettings();
+                
+                if (!settings.username || !settings.password) {
+                    showResult('authResult', '⚠️ No credentials configured. Cannot test credential login.', 'warning');
+                    log('Credential test skipped: No credentials configured', 'warning');
+                    return;
+                }
+                
+                // Initialize client first
+                await window.omeroUIIntegration.initializeClient();
+                
+                const result = await window.omeroAuth.loginWithCredentials(settings.username, settings.password);
+                
+                let output = result.success ? '✅ Credential Login Successful\n\n' : '❌ Credential Login Failed\n\n';
+                output += `Login Method: ${result.loginMethod || 'Unknown'}\n`;
+                output += `Authenticated: ${result.isAuthenticated || false}\n`;
+                output += `Project Count: ${result.projectCount || 0}\n`;
+                
+                if (result.session) {
+                    output += `\nSession Details:\n`;
+                    output += `  Username: ${result.session.username}\n`;
+                    output += `  Group: ${result.session.groupName || 'Unknown'}\n`;
+                    output += `  Login Time: ${new Date(result.session.loginTime).toLocaleString()}\n`;
+                }
+                
+                showResult('authResult', output, result.success ? 'success' : 'error');
+                log(`Credential login test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('authResult', `Credential login error: ${error.message}`, 'error');
+                log(`Credential login error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testPublicGroupLogin() {
+            log('Testing public group login...');
+            try {
+                if (!window.omeroAuth) {
+                    throw new Error('OMERO Auth module not available');
+                }
+                
+                // Initialize client first
+                await window.omeroUIIntegration.initializeClient();
+                
+                const result = await window.omeroAuth.loginPublicGroup();
+                
+                let output = result.success ? '✅ Public Group Login Successful\n\n' : '❌ Public Group Login Failed\n\n';
+                output += `Login Method: ${result.loginMethod || 'Unknown'}\n`;
+                output += `Is Public Group: ${result.isPublicGroup || false}\n`;
+                output += `Project Count: ${result.projectCount || 0}\n`;
+                
+                if (result.session) {
+                    output += `\nSession Details:\n`;
+                    output += `  Username: ${result.session.username}\n`;
+                    output += `  Has API Access: ${result.session.hasApiAccess}\n`;
+                    output += `  Login Time: ${new Date(result.session.loginTime).toLocaleString()}\n`;
+                }
+                
+                showResult('authResult', output, result.success ? 'success' : 'error');
+                log(`Public group login test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('authResult', `Public group login error: ${error.message}`, 'error');
+                log(`Public group login error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCookieRecovery() {
+            log('Testing cookie recovery...');
+            try {
+                if (!window.omeroAuth) {
+                    throw new Error('OMERO Auth module not available');
+                }
+                
+                // Initialize client first
+                await window.omeroUIIntegration.initializeClient();
+                
+                try {
+                    await window.omeroAuth.establishSessionFromCookies();
+                    
+                    let output = '✅ Cookie Recovery Successful\n\n';
+                    if (window.omeroAuth.session) {
+                        output += `Username: ${window.omeroAuth.session.username}\n`;
+                        output += `Has API Access: ${window.omeroAuth.session.hasApiAccess}\n`;
+                        output += `CSRF Token: ${window.omeroAuth.session.csrfToken ? 'Present' : 'Missing'}\n`;
+                    }
+                    
+                    showResult('authResult', output, 'success');
+                    log('Cookie recovery test: SUCCESS');
+                    
+                } catch (cookieError) {
+                    showResult('authResult', `❌ Cookie Recovery Failed: ${cookieError.message}`, 'error');
+                    log(`Cookie recovery test: FAILED - ${cookieError.message}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult('authResult', `Cookie recovery error: ${error.message}`, 'error');
+                log(`Cookie recovery error: ${error.message}`, 'error');
+            }
+        }
+        
+        function debugAuthState() {
+            log('Debugging authentication state...');
+            try {
+                if (!window.omeroAuth) {
+                    throw new Error('OMERO Auth module not available');
+                }
+                
+                window.omeroAuth.debugSession();
+                
+                let output = 'Authentication State Debug:\n\n';
+                output += `Base URL: ${window.omeroAuth.baseUrl || 'Not set'}\n`;
+                output += `Session exists: ${!!window.omeroAuth.session}\n`;
+                output += `Session valid: ${window.omeroAuth.isSessionValid()}\n\n`;
+                
+                if (window.omeroAuth.session) {
+                    output += 'Session Details:\n';
+                    Object.entries(window.omeroAuth.session).forEach(([key, value]) => {
+                        if (key === 'csrfToken') {
+                            output += `  ${key}: ${value ? value.substring(0, 10) + '...' : 'None'}\n`;
+                        } else if (key === 'password') {
+                            output += `  ${key}: [HIDDEN]\n`;
+                        } else {
+                            output += `  ${key}: ${JSON.stringify(value)}\n`;
+                        }
+                    });
+                }
+                
+                // Cookie analysis
+                output += '\nCookie Analysis:\n';
+                const cookies = document.cookie;
+                if (cookies) {
+                    const relevantCookies = cookies.split(';').filter(c => 
+                        c.includes('csrf') || c.includes('session') || c.includes('omero')
+                    );
+                    relevantCookies.forEach(cookie => {
+                        output += `  ${cookie.trim()}\n`;
+                    });
+                } else {
+                    output += '  No cookies found\n';
+                }
+                
+                showResult('authResult', output, 'info');
+                log('Auth state debug complete');
+                
+            } catch (error) {
+                showResult('authResult', `Auth debug error: ${error.message}`, 'error');
+                log(`Auth debug error: ${error.message}`, 'error');
+            }
+        }
+        
+        function debugCSRF() {
+            log('Debugging CSRF state...');
+            try {
+                if (!window.omeroAuth) {
+                    throw new Error('OMERO Auth module not available');
+                }
+                
+                window.omeroAuth.debugCSRF();
+                
+                let output = 'CSRF Debug Information:\n\n';
+                output += `Current URL: ${window.location.href}\n`;
+                output += `Origin: ${window.location.origin}\n`;
+                output += `Document cookies: ${document.cookie || 'NONE'}\n\n`;
+                
+                if (window.omeroAuth.session) {
+                    output += `Session CSRF token: ${window.omeroAuth.session.csrfToken ? window.omeroAuth.session.csrfToken.substring(0, 10) + '...' : 'NONE'}\n`;
+                }
+                
+                const cookieToken = window.omeroAuth.getCSRFTokenFromCookie();
+                output += `Cookie CSRF token: ${cookieToken ? cookieToken.substring(0, 10) + '...' : 'NONE'}\n`;
+                
+                const bestToken = window.omeroAuth.getBestCSRFToken();
+                output += `Best CSRF token: ${bestToken ? bestToken.substring(0, 10) + '...' : 'NONE'}\n`;
+                
+                showResult('authResult', output, 'info');
+                log('CSRF debug complete');
+                
+            } catch (error) {
+                showResult('authResult', `CSRF debug error: ${error.message}`, 'error');
+                log(`CSRF debug error: ${error.message}`, 'error');
+            }
+        }
+        
+        function clearAuthSession() {
+            log('Clearing authentication session...');
+            try {
+                if (window.omeroAuth && window.omeroAuth.logout) {
+                    window.omeroAuth.logout();
+                }
+                
+                // Clear relevant cookies
+                document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'omero.web.sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                
+                showResult('authResult', '✅ Authentication session cleared\nCookies removed\nYou may need to refresh the page', 'success');
+                log('Auth session cleared');
+                
+            } catch (error) {
+                showResult('authResult', `Error clearing session: ${error.message}`, 'error');
+                log(`Error clearing session: ${error.message}`, 'error');
+            }
+        }
+        
+        // Endpoint Discovery
+        async function discoverEndpoints() {
+            log('Discovering OMERO endpoints...');
+            try {
+                if (!window.omeroTestFunctions) {
+                    throw new Error('OMERO test functions not available');
+                }
+                
+                // Show progress
+                document.getElementById('endpointProgress').style.display = 'block';
+                const progressFill = document.querySelector('#endpointProgress .progress-fill');
+                progressFill.style.width = '10%';
+                
+                const result = await window.omeroTestFunctions.testOMEROEndpointDiscovery();
+                
+                progressFill.style.width = '100%';
+                
+                let output = result.success ? '✅ Endpoint Discovery Successful\n\n' : '❌ Endpoint Discovery Failed\n\n';
+                
+                if (result.workingEndpoints) {
+                    output += `Working Endpoints (${Object.keys(result.workingEndpoints).length}):\n`;
+                    Object.entries(result.workingEndpoints).forEach(([endpoint, details]) => {
+                        output += `✅ ${endpoint} (${details.responseType}, hasData: ${details.hasData})\n`;
+                    });
+                    output += '\n';
+                }
+                
+                if (result.failedEndpoints) {
+                    output += `Failed Endpoints (${Object.keys(result.failedEndpoints).length}):\n`;
+                    Object.entries(result.failedEndpoints).forEach(([endpoint, details]) => {
+                        output += `❌ ${endpoint} - ${details.error}\n`;
+                    });
+                    output += '\n';
+                }
+                
+                if (result.recommendations) {
+                    output += 'Recommendations:\n';
+                    Object.entries(result.recommendations).forEach(([purpose, endpoint]) => {
+                        output += `${purpose}: ${endpoint}\n`;
+                    });
+                }
+                
+                showResult('endpointResult', output, result.success ? 'success' : 'error');
+                log(`Endpoint discovery: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+                // Hide progress after delay
+                setTimeout(() => {
+                    document.getElementById('endpointProgress').style.display = 'none';
+                }, 2000);
+                
+            } catch (error) {
+                showResult('endpointResult', `Endpoint discovery error: ${error.message}`, 'error');
+                log(`Endpoint discovery error: ${error.message}`, 'error');
+                document.getElementById('endpointProgress').style.display = 'none';
+            }
+        }
+        
+        async function testCriticalEndpoints() {
+            log('Testing critical OMERO endpoints...');
+            try {
+                if (!window.omeroAPI) {
+                    throw new Error('OMERO API module not available');
+                }
+                
+                const criticalEndpoints = [
+                    'api/v0/token/',
+                    'api/v0/servers/',
+                    'api/v0/m/projects/',
+                    'api/v0/m/datasets/',
+                    'api/v0/m/experimentergroups/',
+                    'api/v0/m/annotations/'
+                ];
+                
+                let output = 'Critical Endpoint Test Results:\n\n';
+                let workingCount = 0;
+                
+                for (const endpoint of criticalEndpoints) {
+                    try {
+                        log(`Testing endpoint: ${endpoint}`);
+                        const response = await window.omeroAPI.makeRequest(endpoint, {
+                            method: 'GET',
+                            skipAuth: endpoint === 'api/v0/token/'
+                        });
+                        
+                        output += `✅ ${endpoint} - Working\n`;
+                        workingCount++;
+                        
+                    } catch (error) {
+                        output += `❌ ${endpoint} - ${error.message}\n`;
+                    }
+                }
+                
+                output += `\nSummary: ${workingCount}/${criticalEndpoints.length} critical endpoints working`;
+                
+                showResult('endpointResult', output, workingCount === criticalEndpoints.length ? 'success' : 'warning');
+                log(`Critical endpoints test: ${workingCount}/${criticalEndpoints.length} working`);
+                
+            } catch (error) {
+                showResult('endpointResult', `Critical endpoint test error: ${error.message}`, 'error');
+                log(`Critical endpoint test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Data Access Testing
+        async function testProjectAccess() {
+            log('Testing project access...');
+            try {
+                if (!window.omeroProjects) {
+                    throw new Error('OMERO Projects module not available');
+                }
+                
+                // Ensure we're logged in
+                await window.omeroUIIntegration.ensureLoggedIn();
+                
+                const projects = await window.omeroProjects.getProjects();
+                
+                let output = `✅ Project Access Successful\n\n`;
+                output += `Total projects: ${projects.length}\n\n`;
+                
+                if (projects.length > 0) {
+                    output += 'Sample projects:\n';
+                    projects.slice(0, 5).forEach(project => {
+                        output += `  - ${project.Name || project.name} (ID: ${project['@id'] || project.id})\n`;
+                    });
+                    
+                    if (projects.length > 5) {
+                        output += `  ... and ${projects.length - 5} more\n`;
+                    }
+                } else {
+                    output += 'No projects found or accessible\n';
+                }
+                
+                showResult('dataAccessResult', output, 'success');
+                log(`Project access test: SUCCESS (${projects.length} projects)`);
+                
+            } catch (error) {
+                showResult('dataAccessResult', `Project access error: ${error.message}`, 'error');
+                log(`Project access error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testGroupAccess() {
+            log('Testing group access...');
+            try {
+                if (!window.omeroGroups) {
+                    throw new Error('OMERO Groups module not available');
+                }
+                
+                // Ensure we're logged in
+                await window.omeroUIIntegration.ensureLoggedIn();
+                
+                const groupData = await window.omeroGroups.getCurrentUserGroups();
+                const groups = groupData.allGroups;
+                
+                let output = `✅ Group Access Successful\n\n`;
+                output += `Total groups: ${groups.length}\n`;
+                output += `Current group: ${groupData.currentGroupName} (ID: ${groupData.currentGroupId})\n\n`;
+                
+                if (groups.length > 0) {
+                    output += 'Available groups:\n';
+                    groups.forEach(group => {
+                        const current = group.id == groupData.currentGroupId ? ' (current)' : '';
+                        output += `  - ${group.name} (ID: ${group.id})${current}\n`;
+                        if (group.description) {
+                            output += `    ${group.description}\n`;
+                        }
+                    });
+                } else {
+                    output += 'No groups found or accessible\n';
+                }
+                
+                showResult('dataAccessResult', output, 'success');
+                log(`Group access test: SUCCESS (${groups.length} groups)`);
+                
+            } catch (error) {
+                showResult('dataAccessResult', `Group access error: ${error.message}`, 'error');
+                log(`Group access error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Annotation Testing
+        async function testAnnotations() {
+            log('Testing Map Annotations...');
+            try {
+                if (!window.omeroAnnotations) {
+                    throw new Error('OMERO Annotations module not available');
+                }
+                
+                const result = await window.omeroAnnotations.testMapAnnotationsWithSampleData();
+                
+                let output = result.success ? '✅ Map Annotations Test Successful\n\n' : '❌ Map Annotations Test Failed\n\n';
+                output += `Message: ${result.message}\n`;
+                
+                if (result.keyValuePairs) {
+                    output += `Key-value pairs created: ${result.keyValuePairs}\n`;
+                }
+                
+                if (result.workingStrategy) {
+                    output += `Working endpoint: ${result.workingStrategy}\n`;
+                }
+                
+                if (result.annotationId) {
+                    output += `Annotation ID: ${result.annotationId}\n`;
+                }
+                
+                showResult('annotationResult', output, result.success ? 'success' : 'error');
+                log(`Map annotations test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('annotationResult', `Map annotations error: ${error.message}`, 'error');
+                log(`Map annotations error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAnnotationEndpoints() {
+            log('Testing annotation endpoints...');
+            try {
+                if (!window.omeroAnnotations) {
+                    throw new Error('OMERO Annotations module not available');
+                }
+                
+                const discovery = await window.omeroAnnotations.discoverWorkingEndpoints();
+                
+                let output = 'Annotation Endpoint Discovery:\n\n';
+                output += `Working endpoints: ${discovery.working.length}\n`;
+                output += `Failed endpoints: ${discovery.failed.length}\n\n`;
+                
+                if (discovery.working.length > 0) {
+                    output += 'Working Endpoints:\n';
+                    discovery.working.forEach(endpoint => {
+                        output += `✅ ${endpoint.endpoint} (${endpoint.method}, ${endpoint.responseType})\n`;
+                    });
+                    output += '\n';
+                }
+                
+                if (discovery.failed.length > 0) {
+                    output += 'Failed Endpoints:\n';
+                    discovery.failed.forEach(endpoint => {
+                        output += `❌ ${endpoint.endpoint} - ${endpoint.error}\n`;
+                    });
+                    output += '\n';
+                }
+                
+                output += 'Recommendations:\n';
+                Object.entries(discovery.recommendations).forEach(([purpose, endpoint]) => {
+                    output += `${purpose}: ${endpoint}\n`;
+                });
+                
+                showResult('annotationResult', output, discovery.working.length > 0 ? 'success' : 'warning');
+                log(`Annotation endpoints test: ${discovery.working.length} working`);
+                
+            } catch (error) {
+                showResult('annotationResult', `Annotation endpoints error: ${error.message}`, 'error');
+                log(`Annotation endpoints error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Dataset Creation Testing
+        async function testDatasetCreation() {
+            log('Testing dataset creation...');
+            try {
+                if (!window.omeroDatasetCreation) {
+                    throw new Error('OMERO Dataset Creation module not available');
+                }
+                
+                const result = await window.omeroDatasetCreation.testDatasetCreation();
+                
+                let output = result.success ? '✅ Dataset Creation Test Successful\n\n' : '❌ Dataset Creation Test Failed\n\n';
+                output += `Message: ${result.message}\n`;
+                
+                if (result.datasetId) {
+                    output += `Dataset ID: ${result.datasetId}\n`;
+                }
+                
+                if (result.mapAnnotationsAdded) {
+                    output += `Map annotations added: ${result.mapAnnotationsAdded}\n`;
+                }
+                
+                if (result.url) {
+                    output += `Dataset URL: ${result.url}\n`;
+                }
+                
+                if (result.loginMethod) {
+                    output += `Login method: ${result.loginMethod}\n`;
+                }
+                
+                showResult('datasetResult', output, result.success ? 'success' : 'error');
+                log(`Dataset creation test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('datasetResult', `Dataset creation error: ${error.message}`, 'error');
+                log(`Dataset creation error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testWithSampleMetadata() {
+            log('Testing with sample metadata...');
+            try {
+                if (!window.omeroTestFunctions) {
+                    throw new Error('OMERO test functions not available');
+                }
+                
+                const result = await window.omeroTestFunctions.quickOMEROTest();
+                
+                let output = 'Quick OMERO Test Results:\n\n';
+                
+                if (result.connection) {
+                    output += `Connection: ${result.connection.success ? 'SUCCESS' : 'FAILED'}\n`;
+                    if (result.connection.workingEndpoints) {
+                        output += `Working endpoints: ${Object.keys(result.connection.workingEndpoints).length}\n`;
+                    }
+                }
+                
+                if (result.integration) {
+                    output += `Integration: ${result.integration.success ? 'SUCCESS' : 'FAILED'}\n`;
+                    output += `Message: ${result.integration.message}\n`;
+                    
+                    if (result.integration.datasetId) {
+                        output += `Dataset ID: ${result.integration.datasetId}\n`;
+                    }
+                    
+                    if (result.integration.mapAnnotationsAdded) {
+                        output += `Annotations: ${result.integration.mapAnnotationsAdded}\n`;
+                    }
+                    
+                    if (result.integration.url) {
+                        output += `URL: ${result.integration.url}\n`;
+                    }
+                }
+                
+                const success = result.connection?.success && result.integration?.success;
+                showResult('datasetResult', output, success ? 'success' : 'error');
+                log(`Sample metadata test: ${success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('datasetResult', `Sample metadata test error: ${error.message}`, 'error');
+                log(`Sample metadata test error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCurrentExperiment() {
+            log('Testing with current experiment data...');
+            try {
+                if (!window.omeroTestFunctions) {
+                    throw new Error('OMERO test functions not available');
+                }
+                
+                const result = await window.omeroTestFunctions.testWithCurrentExperimentData();
+                
+                let output = result.success ? '✅ Current Experiment Test Successful\n\n' : '❌ Current Experiment Test Failed\n\n';
+                output += `Message: ${result.message}\n`;
+                
+                if (result.datasetName) {
+                    output += `Dataset name: ${result.datasetName}\n`;
+                }
+                
+                if (result.mapAnnotationsAdded) {
+                    output += `Metadata fields: ${result.mapAnnotationsAdded}\n`;
+                }
+                
+                if (result.url) {
+                    output += `Dataset URL: ${result.url}\n`;
+                }
+                
+                if (result.loginMethod) {
+                    output += `Login method: ${result.loginMethod}\n`;
+                }
+                
+                showResult('datasetResult', output, result.success ? 'success' : 'error');
+                log(`Current experiment test: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+                
+            } catch (error) {
+                showResult('datasetResult', `Current experiment test error: ${error.message}`, 'error');
+                log(`Current experiment test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Performance Analysis
+        async function measurePerformance() {
+            log('Measuring OMERO performance...');
+            try {
+                const startTime = performance.now();
+                
+                const tests = [
+                    { name: 'CSRF Token', test: () => window.omeroAuth.getCSRFToken() },
+                    { name: 'Projects Load', test: () => window.omeroProjects.getProjects() },
+                    { name: 'Groups Load', test: () => window.omeroGroups.getGroups() },
+                    { name: 'Connection Test', test: () => window.omeroAuth.testConnection() }
+                ];
+                
+                let output = 'Performance Measurement Results:\n\n';
+                let totalTime = 0;
+                
+                for (const { name, test } of tests) {
+                    const testStart = performance.now();
+                    try {
+                        await test();
+                        const testTime = performance.now() - testStart;
+                        output += `✅ ${name}: ${testTime.toFixed(2)}ms\n`;
+                        totalTime += testTime;
+                    } catch (error) {
+                        const testTime = performance.now() - testStart;
+                        output += `❌ ${name}: ${testTime.toFixed(2)}ms (failed)\n`;
+                        totalTime += testTime;
+                    }
+                }
+                
+                const endTime = performance.now();
+                output += `\nTotal time: ${(endTime - startTime).toFixed(2)}ms\n`;
+                output += `Average per test: ${(totalTime / tests.length).toFixed(2)}ms`;
+                
+                showResult('performanceResult', output, 'info');
+                log('Performance measurement complete');
+                
+            } catch (error) {
+                showResult('performanceResult', `Performance measurement error: ${error.message}`, 'error');
+                log(`Performance measurement error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Full Diagnostics
+        async function runFullDiagnostics() {
+            log('Running full OMERO diagnostics...');
+            clearAllResults();
+            
+            const tests = [
+                { name: 'Module Status', func: checkModuleStatus },
+                { name: 'Settings Analysis', func: analyzeSettings },
+                { name: 'Proxy Server', func: testProxyServer },
+                { name: 'OMERO Connection', func: testOMEROConnection },
+                { name: 'Public Group Login', func: testPublicGroupLogin },
+                { name: 'Endpoint Discovery', func: discoverEndpoints },
+                { name: 'Project Access', func: testProjectAccess },
+                { name: 'Performance Measurement', func: measurePerformance }
+            ];
+            
+            let successCount = 0;
+            
+            for (let i = 0; i < tests.length; i++) {
+                const test = tests[i];
+                log(`Running ${test.name}...`);
+                
+                try {
+                    await test.func();
+                    successCount++;
+                    log(`${test.name}: COMPLETED`);
+                } catch (error) {
+                    log(`${test.name}: ERROR - ${error.message}`, 'error');
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log(`Full diagnostics complete: ${successCount}/${tests.length} tests successful`);
+        }
+        
+        // Initialize debug session
+        document.addEventListener('DOMContentLoaded', function() {
+            log('OMERO Debug Session initialized');
+            log('All debug functions are ready to use');
+            
+            // Auto-check module status on load
+            setTimeout(checkModuleStatus, 1000);
+        });
+    </script>
+</body>
+</html>

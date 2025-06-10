@@ -1,0 +1,79 @@
+/* Layout Override - Force Full Width (Add this after other CSS files) */
+
+/* CRITICAL: Override any max-width constraints */
+.container {
+    max-width: none !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* CRITICAL: Override any responsive constraints from responsive.css */
+@media (min-width: 1200px) {
+    .container {
+        max-width: none !important;
+        width: 100vw !important;
+        margin: 0 !important;
+    }
+    
+    .main-content {
+        max-width: none !important;
+        width: calc(100vw - 380px) !important;
+        margin: 0 !important;
+    }
+}
+
+@media (min-width: 1600px) {
+    .container {
+        max-width: none !important;
+        width: 100vw !important;
+        margin: 0 !important;
+    }
+    
+    .main-content {
+        max-width: none !important;
+        width: calc(100vw - 380px) !important;
+        margin: 0 !important;
+    }
+    
+    /* Ensure sidebar doesn't get wider on large screens */
+    .sidebar {
+        width: 380px !important;
+        max-width: 380px !important;
+    }
+}
+
+/* Override any centering from responsive.css */
+@media (min-width: 1200px) {
+    .container {
+        margin: 0 !important;
+    }
+}
+
+/* Ensure project-setup and other content use full width */
+.project-setup,
+.folder-structure,
+.metadata-editor,
+.actions {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Ensure main content header uses full width */
+.main-content .header {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Force template details to use full width */
+#templateDetails {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Force all form groups to use full width */
+.form-group,
+.project-input-group {
+    max-width: none !important;
+    width: 100% !important;
+}

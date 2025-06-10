@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -52,211 +52,7 @@ app.on('window-all-closed', () => {
     }
 });
 
-// =================== SECURE STORAGE API ===================
-
-// Check if safeStorage is available
-ipcMain.handle('secure-storage-available', () => {
-    try {
-        return safeStorage.isEncryptionAvailable();
-    } catch (error) {
-        console.warn('safeStorage not available:', error.message);
-        return false;
-    }
-});
-
-// Encrypt sensitive data
-ipcMain.handle('encrypt-data', (event, plaintext) => {
-    try {
-        if (!plaintext || plaintext.trim() === '') {
-            return { success: true, encrypted: '', method: 'empty' };
-        }
-        
-        if (safeStorage.isEncryptionAvailable()) {
-            const buffer = safeStorage.encryptString(plaintext);
-            const encrypted = buffer.toString('base64');
-            console.log('🔐 Data encrypted using safeStorage');
-            return { 
-                success: true, 
-                encrypted: encrypted,
-                method: 'safeStorage'
-            };
-        } else {
-            // Fallback: Return plaintext for browser-side encryption
-            console.log('⚠️ safeStorage not available, using fallback method');
-            return { 
-                success: true, 
-                encrypted: plaintext,
-                method: 'fallback'
-            };
-        }
-    } catch (error) {
-        console.error('❌ Encryption failed:', error);
-        return { 
-            success: false, 
-            error: error.message,
-            encrypted: plaintext // Fallback to plaintext
-        };
-    }
-});
-
-// Decrypt sensitive data
-ipcMain.handle('decrypt-data', (event, encryptedData, method = 'safeStorage') => {
-    try {
-        if (!encryptedData || encryptedData.trim() === '') {
-            return { success: true, decrypted: '' };
-        }
-        
-        if (method === 'safeStorage' && safeStorage.isEncryptionAvailable()) {
-            const buffer = Buffer.from(encryptedData, 'base64');
-            const decrypted = safeStorage.decryptString(buffer);
-            console.log('🔓 Data decrypted using safeStorage');
-            return { 
-                success: true, 
-                decrypted: decrypted 
-            };
-        } else {
-            // For fallback method, return as-is (will be handled by browser-side crypto)
-            return { 
-                success: true, 
-                decrypted: encryptedData 
-            };
-        }
-    } catch (error) {
-        console.error('❌ Decryption failed:', error);
-        return { 
-            success: false, 
-            error: error.message,
-            decrypted: encryptedData // Fallback to original data
-        };
-    }
-});
-
-// Migrate plaintext credentials to encrypted
-ipcMain.handle('migrate-credentials', async (event, credentials) => {
-    try {
-        const migratedCredentials = {};
-        
-        for (const [key, value] of Object.entries(credentials)) {
-            if (value && typeof value === 'string' && value.trim() !== '') {
-                const encryptResult = await ipcMain.emit('encrypt-data', event, value);
-                const result = encryptResult[0]; // Get the first result from the event
-                
-                migratedCredentials[key] = {
-                    encrypted: result?.encrypted || value,
-                    method: result?.method || 'fallback'
-                };
-                console.log(`🔄 Migrated credential: ${key.replace(/password|key/gi, '***')}`);
-            } else {
-                migratedCredentials[key] = { encrypted: '', method: 'none' };
-            }
-        }
-        
-        return { success: true, migrated: migratedCredentials };
-    } catch (error) {
-        console.error('❌ Migration failed:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Generate secure random salt
-ipcMain.handle('generate-salt', () => {
-    try {
-        const crypto = require('crypto');
-        const salt = crypto.randomBytes(32).toString('hex');
-        return { success: true, salt: salt };
-    } catch (error) {
-        console.error('❌ Salt generation failed:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Secure credential storage with metadata
-ipcMain.handle('store-secure-credential', async (event, key, value, metadata = {}) => {
-    try {
-        if (!value || value.trim() === '') {
-            return { success: true, stored: '', method: 'empty' };
-        }
-
-        const timestamp = new Date().toISOString();
-        const credentialData = {
-            value: value,
-            timestamp: timestamp,
-            metadata: metadata
-        };
-
-        if (safeStorage.isEncryptionAvailable()) {
-            const buffer = safeStorage.encryptString(JSON.stringify(credentialData));
-            const encrypted = buffer.toString('base64');
-            
-            console.log(`🔐 Credential '${key.replace(/password|key/gi, '***')}' encrypted and stored`);
-            
-            return {
-                success: true,
-                stored: encrypted,
-                method: 'safeStorage',
-                timestamp: timestamp
-            };
-        } else {
-            // Mark for browser-side encryption
-            return {
-                success: true,
-                stored: JSON.stringify(credentialData),
-                method: 'fallback',
-                timestamp: timestamp
-            };
-        }
-    } catch (error) {
-        console.error('❌ Secure credential storage failed:', error);
-        return {
-            success: false,
-            error: error.message,
-            stored: value // Fallback
-        };
-    }
-});
-
-// Retrieve secure credential with metadata
-ipcMain.handle('retrieve-secure-credential', async (event, encryptedData, method = 'safeStorage') => {
-    try {
-        if (!encryptedData || encryptedData.trim() === '') {
-            return { success: true, value: '', metadata: {}, timestamp: null };
-        }
-
-        let credentialData;
-
-        if (method === 'safeStorage' && safeStorage.isEncryptionAvailable()) {
-            const buffer = Buffer.from(encryptedData, 'base64');
-            const decrypted = safeStorage.decryptString(buffer);
-            credentialData = JSON.parse(decrypted);
-            console.log('🔓 Secure credential retrieved and decrypted');
-        } else {
-            // Try to parse as JSON, fallback to plain string
-            try {
-                credentialData = JSON.parse(encryptedData);
-            } catch {
-                credentialData = { value: encryptedData, timestamp: null, metadata: {} };
-            }
-        }
-
-        return {
-            success: true,
-            value: credentialData.value || '',
-            metadata: credentialData.metadata || {},
-            timestamp: credentialData.timestamp || null
-        };
-    } catch (error) {
-        console.error('❌ Secure credential retrieval failed:', error);
-        return {
-            success: false,
-            error: error.message,
-            value: encryptedData, // Fallback
-            metadata: {},
-            timestamp: null
-        };
-    }
-});
-
-// =================== EXISTING IPC HANDLERS ===================
+// IPC Handlers
 
 // Folder Dialog
 ipcMain.handle('select-folder', async () => {
@@ -397,7 +193,7 @@ ipcMain.handle('open-external', async (event, url) => {
     }
 });
 
-// =================== EXISTING HELPER FUNCTIONS ===================
+// Helper Functions
 
 // Improved folder structure creation
 async function createFolderStructure(basePath, structure) {
@@ -666,9 +462,6 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
 			} else {
 				formattedValue = value || '_Not filled_';
 			}
-            
-            content += `- **${label}:** ${formattedValue}\n`;
-            
             // Add description if available
             if (fieldInfo.description) {
                 content += `  - *${fieldInfo.description}*\n`;

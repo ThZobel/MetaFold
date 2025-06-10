@@ -1,4 +1,4 @@
-// Project Manager - FIXED elabFTW Auto-sync Logic
+// Project Manager - Handles project creation with OMERO Integration ADDED
 
 const projectManager = {
     // Initialize project manager
@@ -57,7 +57,7 @@ const projectManager = {
         }
     },
 
-    // Create project - FIXED elabFTW Logic
+    // Create project - ENHANCED with OMERO integration
     async createProject() {
         if (!templateManager.currentTemplate) return;
         
@@ -104,15 +104,14 @@ const projectManager = {
                 
                 if (result.success) {
                     // =========================
-                    // OMERO INTEGRATION - unchanged
+                    // OMERO INTEGRATION - NEW!
                     // =========================
                     let omeroResult = null;
-                    const omeroEnabled = await settingsManager.get('omero.enabled');
-					if (template.type === 'experiment' && hasMetadata && omeroEnabled) {
+                    if (template.type === 'experiment' && hasMetadata && settingsManager.get('omero.enabled')) {
                         console.log('🔬 Starting OMERO integration...');
                         
                         // Check if auto-sync is enabled or manual checkbox is checked
-                        const shouldSyncToOMERO = await this.shouldSyncToOMERO();
+                        const shouldSyncToOMERO = this.shouldSyncToOMERO();
                         
                         if (shouldSyncToOMERO) {
                             try {
@@ -142,59 +141,46 @@ const projectManager = {
                         }
                     }
                     
-                    // ==========================================
-                    // FIXED elabFTW INTEGRATION LOGIC
-                    // ==========================================
+                    // Handle elabFTW integration for experiments (existing code)
                     let elabFTWResult = null;
                     if (template.type === 'experiment' && hasMetadata && settingsManager.get('elabftw.enabled')) {
-                        console.log('🧪 Starting elabFTW integration...');
+                        // Check for existing experiment ID
+                        const existingExpId = document.getElementById('existingExperimentId')?.value?.trim();
                         
-                        // Check if should sync to elabFTW
-                        const shouldSyncToElabFTW = await this.shouldSyncToElabFTW();
-                        
-                        if (shouldSyncToElabFTW) {
-                            try {
-                                // Check for existing experiment ID
-                                const existingExpId = document.getElementById('existingExperimentId')?.value?.trim();
-                                
-                                if (existingExpId) {
-                                    // Update existing experiment (with merge logic)
-                                    console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
-                                    elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
-                                        existingExpId,
-                                        experimentMetadata
-                                    );
-                                } else {
-                                    // Create new experiment
-                                    console.log('🧪 Creating new elabFTW experiment');
-                                    elabFTWResult = await settingsManager.createElabFTWExperiment(
-                                        projectName, 
-                                        experimentMetadata, 
-                                        template.structure
-                                    );
-                                }
-                                
-                                console.log('🧪 elabFTW result:', elabFTWResult);
-                                
-                            } catch (elabFTWError) {
-                                console.error('❌ elabFTW integration failed:', elabFTWError);
-                                elabFTWResult = {
-                                    success: false,
-                                    message: elabFTWError.message || 'Unknown elabFTW error'
-                                };
-                            }
+                        if (existingExpId) {
+                            // Update existing experiment
+                            elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
+                                existingExpId,
+                                experimentMetadata
+                            );
+                        } else if (settingsManager.get('elabftw.auto_sync')) {
+                            // Auto-sync to elabFTW (create new)
+                            elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                projectName, 
+                                experimentMetadata, 
+                                template.structure
+                            );
                         } else {
-                            console.log('🧪 elabFTW sync skipped (not enabled or not requested)');
+                            // Check manual checkbox
+                            const sendToElabFTW = document.getElementById('sendToElabFTW');
+                            if (sendToElabFTW && sendToElabFTW.checked) {
+                                // Manual sync selected
+                                elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                    projectName, 
+                                    experimentMetadata, 
+                                    template.structure
+                                );
+                            }
                         }
                     }
 
                     // ==========================================
-                    // ENHANCED SUCCESS MESSAGE WITH BOTH LINKS
+                    // ENHANCED SUCCESS MESSAGE WITH OMERO LINK
                     // ==========================================
                     let successMessage = result.message;
                     const links = [];
                     
-                    // Add elabFTW link
+                    // Add elabFTW link (existing)
                     if (elabFTWResult && elabFTWResult.success) {
                         successMessage += ' Experiment also created in elabFTW!';
                         links.push({
@@ -206,7 +192,7 @@ const projectManager = {
                         successMessage += ` (elabFTW sync failed: ${elabFTWResult.message})`;
                     }
                     
-                    // Add OMERO link
+                    // Add OMERO link (NEW!)
                     if (omeroResult && omeroResult.success) {
                         successMessage += ' Dataset also created in OMERO!';
                         links.push({
@@ -233,53 +219,27 @@ const projectManager = {
     },
 
     // ==========================================
-    // FIXED elabFTW Helper Function
+    // NEW OMERO HELPER FUNCTIONS
     // ==========================================
 
-    // Check if should sync to elabFTW - FIXED LOGIC
-    async shouldSyncToElabFTW() {
+    // Check if should sync to OMERO
+    shouldSyncToOMERO() {
         // Auto-sync enabled?
-        const autoSync = await settingsManager.get('elabftw.auto_sync');
-        if (autoSync) {
-            console.log('🧪 elabFTW auto-sync is enabled');
+        if (settingsManager.get('omero.auto_sync')) {
+            console.log('🔬 OMERO auto-sync is enabled');
             return true;
         }
         
         // Manual checkbox checked?
-        const sendToElabFTW = document.getElementById('sendToElabFTW');
-        if (sendToElabFTW && sendToElabFTW.checked) {
-            console.log('🧪 elabFTW manual sync checkbox is checked');
+        const sendToOMERO = document.getElementById('sendToOMERO');
+        if (sendToOMERO && sendToOMERO.checked) {
+            console.log('🔬 OMERO manual sync checkbox is checked');
             return true;
         }
         
-        console.log('🧪 elabFTW sync not requested');
+        console.log('🔬 OMERO sync not requested');
         return false;
     },
-
-    // ==========================================
-    // OMERO HELPER FUNCTIONS (unchanged)
-    // ==========================================
-
-		// Check if should sync to OMERO
-	// Check if should sync to OMERO - FIXED ASYNC
-	async shouldSyncToOMERO() {
-		// Auto-sync enabled?
-		const autoSync = await settingsManager.get('omero.auto_sync');
-		if (autoSync) {
-			console.log('🔬 OMERO auto-sync is enabled');
-			return true;
-		}
-		
-		// Manual checkbox checked?
-		const sendToOMERO = document.getElementById('sendToOMERO');
-		if (sendToOMERO && sendToOMERO.checked) {
-			console.log('🔬 OMERO manual sync checkbox is checked');
-			return true;
-		}
-		
-		console.log('🔬 OMERO sync not requested');
-		return false;
-	},
 
     // Get OMERO options from UI
     getOMEROOptions() {
@@ -304,7 +264,7 @@ const projectManager = {
     },
 
     // ==========================================
-    // ENHANCED SUCCESS MESSAGE DISPLAY (unchanged)
+    // ENHANCED SUCCESS MESSAGE DISPLAY
     // ==========================================
 
     // Show enhanced success message with multiple links

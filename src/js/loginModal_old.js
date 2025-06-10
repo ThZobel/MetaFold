@@ -1,4 +1,4 @@
-// Login Modal - FIXED Group Assignment
+// Login Modal (Enhanced with better user experience + App Startup Fix)
 
 // Remove existing loginModal if already defined
 if (window.loginModal) {
@@ -197,16 +197,19 @@ const loginModal = {
         });
 
         // Hide suggestions when clicking outside or losing focus
+        // Use a longer delay and check if we're clicking on a suggestion
         this.usernameInput.addEventListener('blur', (e) => {
+            // Check if the related target is within our suggestions
             const suggestionsContainer = this.userSuggestions;
             const relatedTarget = e.relatedTarget;
             
             setTimeout(() => {
+                // Don't hide if we clicked on a suggestion
                 if (suggestionsContainer && 
                     (!relatedTarget || !suggestionsContainer.contains(relatedTarget))) {
                     suggestionsContainer.style.display = 'none';
                 }
-            }, 300);
+            }, 300); // Increased delay
         });
 
         // Show suggestions on focus if there's text
@@ -273,21 +276,28 @@ const loginModal = {
         this.renderUserSuggestions(this.userSuggestions, suggestions, (user) => {
             console.log('🔄 User selected from suggestions:', user);
             
+            // Set the username immediately
             if (this.usernameInput) {
                 this.usernameInput.value = user;
             }
             
+            // Hide suggestions with a slight delay to ensure click is processed
             setTimeout(() => {
                 if (this.userSuggestions) {
                     this.userSuggestions.style.display = 'none';
                 }
             }, 50);
             
+            // Focus back to input
             setTimeout(() => {
                 if (this.usernameInput) {
                     this.usernameInput.focus();
                 }
             }, 100);
+            
+            // Optional: Auto-submit if user clicks suggestion
+            // Uncomment next line for immediate login on suggestion click:
+            // this.handleConfirm();
         });
     },
 
@@ -299,8 +309,7 @@ const loginModal = {
 
         container.innerHTML = suggestions
             .map((user, index) => {
-                // FIXED: Get proper group from storage
-                const group = this.getUserGroupFromStorage(user);
+                const group = window.userManager?.getUserGroup(user) || 'Default';
                 const color = window.userManager?.generateUserColor(user) || '#7c3aed';
                 const initials = window.userManager?.getUserInitials(user) || '??';
                 
@@ -338,10 +347,11 @@ const loginModal = {
 
         container.style.display = 'block';
 
-        // Add click handlers
+        // Add click handlers using proper event delegation with multiple event types
         container.querySelectorAll('.suggestion-item').forEach((item, index) => {
             const username = item.getAttribute('data-user');
             
+            // Add hover effects
             item.addEventListener('mouseenter', () => {
                 item.style.background = 'rgba(124, 58, 237, 0.1)';
             });
@@ -350,21 +360,28 @@ const loginModal = {
                 item.style.background = 'transparent';
             });
             
+            // Add multiple event handlers for reliability
             const handleSelection = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
                 
                 console.log('User suggestion selected:', username);
+                
+                // Hide suggestions immediately
                 container.style.display = 'none';
+                
+                // Call the callback
                 onClick(username);
             };
             
+            // Multiple event types for maximum compatibility
             item.addEventListener('click', handleSelection, true);
             item.addEventListener('mousedown', handleSelection, true);
             item.addEventListener('touchstart', handleSelection, true);
         });
 
+        // Also add a global click handler on the container itself
         container.addEventListener('click', (e) => {
             const suggestionItem = e.target.closest('.suggestion-item');
             if (suggestionItem) {
@@ -381,16 +398,19 @@ const loginModal = {
     },
 
     showUserManagement() {
+        // Close login modal temporarily
         this.modal.style.display = 'none';
         
+        // Show user management
         if (window.userManagementModal) {
             window.userManagementModal.show();
             
+            // Re-show login modal when user management closes
             const originalClose = window.userManagementModal.close;
             window.userManagementModal.close = () => {
                 originalClose.call(window.userManagementModal);
                 this.modal.style.display = 'flex';
-                this.loadSuggestions();
+                this.loadSuggestions(); // Refresh suggestions
                 this.usernameInput.focus();
             };
         } else {
@@ -399,35 +419,19 @@ const loginModal = {
         }
     },
 
-    // IMPROVED: Continue with last user with proper group
+    // IMPROVED: Continue with last user (quick option)
     continueWithLastUser() {
         const lastUser = this.getLastUser();
         if (lastUser && lastUser.username && lastUser.username !== 'User') {
-            // FIXED: Ensure we use the actual group from storage
-            const actualGroup = this.getUserGroupFromStorage(lastUser.username) || lastUser.groupname || 'Default';
-            
-            console.log('✅ User selected continue with last user:', lastUser.username, 'in group:', actualGroup);
+            console.log('✅ User selected continue with last user:', lastUser.username);
             this.close();
             this.onConfirm({ 
                 username: lastUser.username, 
-                groupname: actualGroup,
+                groupname: lastUser.groupname || 'Default',
                 isContinuation: true 
             });
         } else {
             this.showError('No valid last user found');
-        }
-    },
-
-    // NEW: Get user group from storage
-    getUserGroupFromStorage(username) {
-        try {
-            const mapping = JSON.parse(localStorage.getItem('metafold_user_group_mapping') || '{}');
-            const group = mapping[username];
-            console.log(`🔧 getUserGroupFromStorage("${username}") → "${group || 'Default'}"`);
-            return group || 'Default';
-        } catch (error) {
-            console.warn('Could not load user-group mapping:', error);
-            return 'Default';
         }
     },
 
@@ -463,7 +467,6 @@ const loginModal = {
         }
     },
 
-    // FIXED: handleConfirm with proper group assignment
     handleConfirm() {
         const username = this.usernameInput.value.trim();
 
@@ -479,8 +482,8 @@ const loginModal = {
             return;
         }
 
-        // FIXED: Get actual group from storage instead of using getUserGroup
-        const groupname = this.getUserGroupFromStorage(username);
+        // Use mapped group if available, otherwise default
+        const groupname = window.userManager?.getUserGroup(username) || 'Default';
 
         console.log(`✅ Login confirmed: "${username}" in group: "${groupname}"`);
         this.close();
@@ -514,6 +517,7 @@ const loginModal = {
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
         
+        // Auto-hide after 4 seconds
         setTimeout(() => {
             if (errorDiv.style.display !== 'none') {
                 errorDiv.style.display = 'none';
@@ -532,4 +536,4 @@ const loginModal = {
 };
 
 window.loginModal = loginModal;
-console.log('✅ loginModal loaded (FIXED Group Assignment)');
+console.log('✅ loginModal loaded (Enhanced user experience + App Startup Fix)');

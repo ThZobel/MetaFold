@@ -16,144 +16,68 @@
 </head>
 <body>
     <div class="container">
-
-	<!-- LEFT SIDEBAR - Template Selection (ENHANCED with Search & Toggle) -->
-	<div class="sidebar">
-		<div class="header">
-			<h1>📁 MetaFold</h1>
-			
-			<div class="template-type-selector">
-				<button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
-					📂 Folders
-				</button>
-				<button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
-					🧪 Experiments
-				</button>
-			</div>
-			
-			<!-- Current User Display with Shared Templates Toggle -->
-			<div id="currentUserDisplay" style="
-				margin: 15px 0;
-				padding: 12px;
-				background: rgba(124, 58, 237, 0.1);
-				border: 1px solid rgba(124, 58, 237, 0.3);
-				border-radius: 8px;
-				text-align: center;
-			">
-				<div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
-					<div id="currentUserAvatar" style="
-						width: 24px;
-						height: 24px;
-						border-radius: 50%;
-						background: #7c3aed;
-						color: white;
-						display: flex;
-						align-items: center;
-						justify-content: center;
-						font-weight: bold;
-						font-size: 0.7rem;
-					">U</div>
-					<span id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</span>
-				</div>
-				<div id="currentUserGroup" style="color: #9ca3af; font-size: 0.8rem;">Default</div>
-				
-				<!-- NEW: Shared Templates Toggle -->
-				<div id="sharedTemplatesToggle" style="
-					margin-top: 8px; 
-					padding: 6px 0; 
-					border-top: 1px solid rgba(124, 58, 237, 0.2);
-					display: none;
-				">
-					<label style="
-						display: flex; 
-						align-items: center; 
-						justify-content: center; 
-						gap: 6px; 
-						font-size: 0.8rem; 
-						color: #9ca3af; 
-						cursor: pointer;
-					">
-						<input type="checkbox" id="showSharedTemplates" 
-							   checked 
-							   onchange="templateManager.toggleSharedTemplates()"
-							   style="width: auto; transform: scale(0.9);">
-						<span>🤝 Show shared templates</span>
-					</label>
-				</div>
-			</div>
-			
-			<!-- NEW: Template Search -->
-			<div class="template-search" style="margin-bottom: 15px;">
-				<div class="search-container" style="position: relative;">
-					<input type="text" 
-						   id="templateSearchInput" 
-						   placeholder="🔍 Search templates..." 
-						   onInput="templateManager.handleSearch()"
-						   onFocus="templateManager.showSearchSuggestions()"
-						   onBlur="templateManager.hideSearchSuggestions()"
-						   style="
-							   width: 100%;
-							   padding: 10px 12px;
-							   background: rgba(255, 255, 255, 0.08);
-							   border: 1px solid rgba(255, 255, 255, 0.2);
-							   border-radius: 8px;
-							   color: #e0e0e0;
-							   font-size: 14px;
-							   transition: all 0.3s ease;
-						   ">
-					
-					<!-- Search Suggestions Dropdown -->
-					<div id="searchSuggestions" style="
-						position: absolute;
-						top: 100%;
-						left: 0;
-						right: 0;
-						background: linear-gradient(135deg, #2a2a40, #1e1e2e);
-						border: 1px solid rgba(255, 255, 255, 0.2);
-						border-radius: 8px;
-						box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-						display: none;
-						z-index: 1000;
-						max-height: 200px;
-						overflow-y: auto;
-						margin-top: 4px;
-					">
-						<!-- Suggestions will be populated by JavaScript -->
-					</div>
-				</div>
-				
-				<!-- Search Status -->
-				<div id="searchStatus" style="
-					margin-top: 6px;
-					font-size: 0.75rem;
-					color: #6b7280;
-					text-align: center;
-					display: none;
-				"></div>
-			</div>
-			
-			<button class="btn" onclick="showTemplateModal()">New Template</button>
-			
-			<!-- Switch User Button -->
-			<button class="btn btn-secondary" onclick="showSwitchUserModal()" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-				<span>👥</span>
-				<span>Switch User</span>
-			</button>
-			
-			<button class="btn btn-secondary" onclick="showSettingsModal()" style="margin-top: 10px;">⚙️ Settings</button>
-		</div>
-		
-		<!-- TEMPLATE LIST - Enhanced with Search Results -->
-		<div id="templateList">
-			<div class="empty-state">
-				<svg fill="currentColor" viewBox="0 0 20 20">
-					<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-				</svg>
-				<p>No templates available yet.<br>Create your first template!</p>
-			</div>
-		</div>
-	</div>
-
+        <!-- LEFT SIDEBAR - Template Selection -->
+         <div class="sidebar">
+            <div class="header">
+                <h1>📁 MetaFold</h1>
+                
+                <div class="template-type-selector">
+                    <button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
+                        📂 Folders
+                    </button>
+                    <button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
+                        🧪 Experiments
+                    </button>
+                </div>
+                
+                <!-- NEU: Current User Display -->
+                <div id="currentUserDisplay" style="
+                    margin: 15px 0;
+                    padding: 12px;
+                    background: rgba(124, 58, 237, 0.1);
+                    border: 1px solid rgba(124, 58, 237, 0.3);
+                    border-radius: 8px;
+                    text-align: center;
+                ">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
+                        <div id="currentUserAvatar" style="
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            background: #7c3aed;
+                            color: white;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-weight: bold;
+                            font-size: 0.7rem;
+                        ">U</div>
+                        <span id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</span>
+                    </div>
+                    <div id="currentUserGroup" style="color: #9ca3af; font-size: 0.8rem;">Default</div>
+                </div>
+                
+                <button class="btn" onclick="showTemplateModal()">New Template</button>
+                
+                <!-- NEU: Switch User Button -->
+                <button class="btn btn-secondary" onclick="showSwitchUserModal()" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span>👥</span>
+                    <span>Switch User</span>
+                </button>
+                
+                <button class="btn btn-secondary" onclick="showSettingsModal()" style="margin-top: 10px;">⚙️ Settings</button>
+            </div>
+            
+            <!-- TEMPLATE LIST -->
+            <div id="templateList">
+                <div class="empty-state">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                    </svg>
+                    <p>No templates available yet.<br>Create your first template!</p>
+                </div>
+            </div>
+        </div>
 
         <!-- RIGHT MAIN CONTENT - Project Manager -->
         <div class="main-content">
@@ -342,7 +266,6 @@
                     <div id="experimentFields"></div>
                 </div>
 
-                <!-- CRITICAL: Actions MUST be inside main-content -->
                 <div class="actions">
                     <button class="btn" onclick="createProject()">🎯 Create Project</button>
                     <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
@@ -357,7 +280,7 @@
         </div>
     </div>
 
-    <!-- Settings Modal (Enhanced with OMERO) -->
+    <!-- Settings Modal -->
     <div id="settingsModal" class="modal" style="display: none;">
         <div class="modal-content">
             <span class="close" onclick="closeSettingsModal()">&times;</span>
@@ -445,8 +368,8 @@
 
                     <div class="form-group">
                         <label for="elabftwDefaultCategory">📂 Default Category ID:</label>
-                        <input type="number" id="elabftwDefaultCategory" value="0" min="0" onchange="updateElabFTWDefaultCategory()">
-                        <small><strong>Hint:</strong> Use <code>0</code> if you don't know the correct category ID. Other valid IDs will also work.</small>
+                        <input type="number" id="elabftwDefaultCategory" value="1" min="1" onchange="updateElabFTWDefaultCategory()">
+                        <small>Default category ID for new experiments in elabFTW.</small>
                     </div>
 
                     <div class="form-group">
@@ -755,10 +678,13 @@ experiment_log.md"></textarea>
     <!-- App Initialisierung zuletzt -->
 	<script src="js/app.js"></script>
 
-    <!-- FIXED Global Functions -->
+    <!-- CLEAN Global Functions -->
+
+<!-- COMPLETE JavaScript Functions - FIXED Syntax Errors + User Display -->
     <script>
-        // =================== TEMPLATE TYPE MANAGEMENT ===================
+        // =================== ERROR-SAFE EVENT HANDLERS ===================
         
+        // Template Type Management - Safe wrapper
         window.switchTemplateType = function(type) {
             try {
                 if (window.templateTypeManager && window.templateTypeManager.switchType) {
@@ -769,8 +695,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== TEMPLATE MODAL MANAGEMENT ===================
-        
+        // Template Modal Management - Safe wrappers
         window.showTemplateModal = function() {
             try {
                 if (window.templateModal && window.templateModal.show) {
@@ -821,8 +746,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== METADATA EDITOR MANAGEMENT ===================
-        
+        // Metadata Editor Management - Safe wrappers
         window.addMetadataField = function() {
             try {
                 if (window.metadataEditor && window.metadataEditor.addField) {
@@ -843,8 +767,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== PROJECT MANAGEMENT ===================
-        
+        // Project Management - Safe wrappers
         window.browsePath = function() {
             try {
                 if (window.projectManager && window.projectManager.browsePath) {
@@ -865,8 +788,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== TEMPLATE MANAGEMENT ===================
-        
+        // Template Management - Safe wrappers
         window.editCurrentTemplate = function() {
             try {
                 if (window.templateManager && window.templateManager.editCurrent) {
@@ -887,8 +809,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== EXPERIMENT FORM MANAGEMENT ===================
-        
+        // Experiment Form Management
         window.saveExperimentTemplate = function() {
             try {
                 if (window.experimentForm && window.experimentForm.saveTemplate) {
@@ -896,72 +817,6 @@ experiment_log.md"></textarea>
                 }
             } catch (error) {
                 console.error('Error in saveExperimentTemplate:', error);
-            }
-        };
-
-        // =================== USER MANAGEMENT ===================
-        
-        window.showSwitchUserModal = function() {
-            try {
-                if (window.userManagementModal && window.userManagementModal.show) {
-                    console.log('👥 Opening Switch User Modal...');
-                    window.userManagementModal.show();
-                } else {
-                    console.warn('⚠️ User Management Modal not available');
-                    alert('User Management not available. Please check if user management is enabled in settings.');
-                }
-            } catch (error) {
-                console.error('Error in showSwitchUserModal:', error);
-            }
-        };
-
-        window.updateCurrentUserDisplay = function() {
-            try {
-                const userNameEl = document.getElementById('currentUserName');
-                const userGroupEl = document.getElementById('currentUserGroup');
-                const userAvatarEl = document.getElementById('currentUserAvatar');
-                const userDisplayEl = document.getElementById('currentUserDisplay');
-                
-                if (!userNameEl || !userGroupEl || !userAvatarEl || !userDisplayEl) {
-                    console.warn('⚠️ User display elements not found');
-                    return;
-                }
-                
-                // Get current user info
-                const userInfo = window.userManager?.getCurrentUserInfo() || {
-                    username: 'User',
-                    groupname: 'Default',
-                    isEnabled: false
-                };
-                
-                console.log('👤 Updating user display:', userInfo);
-                
-                // Update display elements
-                userNameEl.textContent = userInfo.username || 'User';
-                userGroupEl.textContent = userInfo.groupname || 'Default';
-                
-                // Update avatar
-                const initials = window.userManager?.getUserInitials ? 
-                    window.userManager.getUserInitials(userInfo.username) : 
-                    (userInfo.username ? userInfo.username.substring(0, 2).toUpperCase() : 'U');
-                const color = window.userManager?.generateUserColor ? 
-                    window.userManager.generateUserColor(userInfo.username) : 
-                    '#7c3aed';
-                
-                userAvatarEl.textContent = initials;
-                userAvatarEl.style.background = color;
-                
-                // Show/hide user display based on user management status
-                if (userInfo.isEnabled && userInfo.username && userInfo.username !== 'User') {
-                    userDisplayEl.style.display = 'block';
-                    userDisplayEl.style.opacity = '1';
-                } else {
-                    // In simple mode, show minimal info
-                    userDisplayEl.style.display = 'block';
-                    userDisplayEl.style.opacity = '0.7';
-                }
-            } catch (error) {
-                console.error('Error updating user display:', error);
             }
         };
 
@@ -1020,7 +875,7 @@ experiment_log.md"></textarea>
             console.log('🔧 Loading all settings into modal...');
             
             try {
-                // General settings with proper async handling
+                // CRITICAL FIX: General settings with proper async handling
                 const userMgmtEl = document.getElementById('userManagementEnabled');
                 const themeEl = document.getElementById('themeSelect');
                 const autoSaveEl = document.getElementById('autoSaveEnabled');
@@ -1109,6 +964,11 @@ experiment_log.md"></textarea>
                     omeroConfigEl.style.display = omeroEnabled ? 'block' : 'none';
                 }
                 
+                // Update preview
+                if (typeof window.updateVersioningPreview === 'function') {
+                    window.updateVersioningPreview();
+                }
+                
                 console.log('✅ All settings loaded into modal successfully');
                 
             } catch (error) {
@@ -1116,9 +976,10 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== SETTING UPDATE FUNCTIONS - FIXED ===================
+        // =================== SETTING UPDATE FUNCTIONS ===================
 
         // General Settings
+        // FIXED: updateUserManagementSetting function
         window.updateUserManagementSetting = async function() {
             const checkbox = document.getElementById('userManagementEnabled');
             if (!checkbox) {
@@ -1129,25 +990,69 @@ experiment_log.md"></textarea>
             const enabled = checkbox.checked;
             console.log('🔧 User management setting changed to:', enabled);
             
+            // Show loading state
+            checkbox.disabled = true;
+            const spanElement = checkbox.parentElement.querySelector('span');
+            const originalText = spanElement.textContent;
+            spanElement.textContent = enabled ? 
+                '👥 Activating User Management...' : 
+                '📝 Deactivating User Management...';
+            
             try {
                 if (!window.settingsManager) {
                     throw new Error('Settings manager not available');
                 }
                 
+                // CRITICAL FIX: Set the setting first without triggering the handler
+                console.log('🔧 Setting user management value...');
+                
+                // Temporarily disable the handler to prevent recursion
+                const originalHandler = window.settingsManager.handleSettingChange;
+                window.settingsManager.handleSettingChange = function() {};
+                
+                // Set the value
                 const success = await window.settingsManager.set('general.user_management_enabled', enabled);
+                
+                // Restore the handler
+                window.settingsManager.handleSettingChange = originalHandler;
                 
                 if (!success) {
                     throw new Error('Failed to save setting');
                 }
                 
-                console.log('✅ Setting saved successfully');
+                console.log('✅ Setting saved, now handling toggle...');
+                
+                // Now manually call the enhanced toggle handler
+                await window.settingsManager.handleUserManagementToggle(enabled);
                 
             } catch (error) {
                 console.error('❌ Error updating user management setting:', error);
-                checkbox.checked = !enabled; // Revert on error
+                
+                // Revert checkbox state on error
+                checkbox.checked = !enabled;
+                
+                if (window.app && window.app.showError) {
+                    window.app.showError('Failed to update user management setting: ' + error.message);
+                }
+            } finally {
+                // Restore UI state
+                checkbox.disabled = false;
+                spanElement.textContent = originalText;
+                
+                // Verify the final state
+                setTimeout(async () => {
+                    try {
+                        const currentSetting = await window.settingsManager.get('general.user_management_enabled');
+                        checkbox.checked = currentSetting;
+                        console.log('🔧 Final user management state:', currentSetting);
+                    } catch (error) {
+                        console.warn('⚠️ Could not verify final state:', error);
+                    }
+                }, 500);
             }
         };
 
+        // Other setting update functions (keeping them but with try-catch)
         window.updateThemeSetting = async function() {
             try {
                 const theme = document.getElementById('themeSelect').value;
@@ -1175,8 +1080,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== ELABFTW SETTINGS - RESTORED MISSING FUNCTIONS ===================
-
+        // elabFTW Settings (truncated for space, add full functions if needed)
         window.updateElabFTWSetting = async function() {
             try {
                 const enabled = document.getElementById('elabftwEnabled').checked;
@@ -1195,365 +1099,114 @@ experiment_log.md"></textarea>
             }
         };
 
-        window.updateElabFTWServerUrl = async function() {
-            try {
-                const url = document.getElementById('elabftwServerUrl').value;
-                await window.settingsManager.set('elabftw.server_url', url);
-            } catch (error) {
-                console.error('Error updating elabFTW server URL:', error);
-            }
-        };
+        // =================== USER MANAGEMENT & DISPLAY ===================
 
-        window.updateElabFTWApiKey = async function() {
+        // Switch User Modal - RESTORED
+        window.showSwitchUserModal = function() {
             try {
-                const key = document.getElementById('elabftwApiKey').value;
-                await window.settingsManager.set('elabftw.api_key', key);
-            } catch (error) {
-                console.error('Error updating elabFTW API key:', error);
-            }
-        };
-
-        // FIXED: Missing updateElabFTWAutoSync function
-        window.updateElabFTWAutoSync = async function() {
-            try {
-                const enabled = document.getElementById('elabftwAutoSync').checked;
-                await window.settingsManager.set('elabftw.auto_sync', enabled);
-                
-                // Update UI to show/hide manual sync options
-                setTimeout(() => {
-                    window.updateElabFTWOptions();
-                }, 100);
-            } catch (error) {
-                console.error('Error updating elabFTW auto sync:', error);
-            }
-        };
-
-        // FIXED: Missing updateElabFTWDefaultCategory function
-        window.updateElabFTWDefaultCategory = async function() {
-            try {
-                const category = parseInt(document.getElementById('elabftwDefaultCategory').value);
-                await window.settingsManager.set('elabftw.default_category', category);
-            } catch (error) {
-                console.error('Error updating elabFTW default category:', error);
-            }
-        };
-
-        window.updateElabFTWVerifySSL = async function() {
-            try {
-                const enabled = document.getElementById('elabftwVerifySSL').checked;
-                await window.settingsManager.set('elabftw.verify_ssl', enabled);
-            } catch (error) {
-                console.error('Error updating elabFTW verify SSL:', error);
-            }
-        };
-
-        // FIXED: Missing testElabFTWConnection function  
-        window.testElabFTWConnection = async function() {
-            const statusDiv = document.getElementById('elabftwConnectionStatus');
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.textContent = 'Testing elabFTW connection...';
-                statusDiv.className = 'testing';
-                
-                try {
-                    const result = await window.settingsManager.testElabFTWConnection();
-                    statusDiv.textContent = result.message;
-                    statusDiv.className = result.success ? 'success-message' : 'error-message';
-                } catch (error) {
-                    statusDiv.textContent = 'Connection test failed: ' + error.message;
-                    statusDiv.className = 'error-message';
+                if (window.userManagementModal && window.userManagementModal.show) {
+                    console.log('👥 Opening Switch User Modal...');
+                    window.userManagementModal.show();
+                } else {
+                    console.warn('⚠️ User Management Modal not available');
+                    alert('User Management not available. Please check if user management is enabled in settings.');
                 }
+            } catch (error) {
+                console.error('Error in showSwitchUserModal:', error);
             }
         };
 
-        // =================== ELABFTW CONFLICT RESOLUTION SETTINGS ===================
-
-        // MISSING: updateElabFTWOverwrite function
-        window.updateElabFTWOverwrite = async function() {
+        // Update Current User Display - RESTORED
+        window.updateCurrentUserDisplay = function() {
             try {
-                const enabled = document.getElementById('elabftwOverwriteEnabled').checked;
-                await window.settingsManager.set('elabftw.overwrite_enabled', enabled);
+                const userNameEl = document.getElementById('currentUserName');
+                const userGroupEl = document.getElementById('currentUserGroup');
+                const userAvatarEl = document.getElementById('currentUserAvatar');
+                const userDisplayEl = document.getElementById('currentUserDisplay');
                 
-                // Update UI to show appropriate sections
-                const versioningInfoEl = document.getElementById('elabftwVersioningInfo');
-                const overwriteWarningEl = document.getElementById('elabftwOverwriteWarning');
-                
-                if (versioningInfoEl && overwriteWarningEl) {
-                    if (enabled) {
-                        versioningInfoEl.style.display = 'none';
-                        overwriteWarningEl.style.display = 'block';
-                    } else {
-                        versioningInfoEl.style.display = 'block';
-                        overwriteWarningEl.style.display = 'none';
-                    }
+                if (!userNameEl || !userGroupEl || !userAvatarEl || !userDisplayEl) {
+                    console.warn('⚠️ User display elements not found');
+                    return;
                 }
                 
-                console.log('🔄 elabFTW overwrite setting updated:', enabled);
-            } catch (error) {
-                console.error('Error updating elabFTW overwrite setting:', error);
-            }
-        };
-
-        // MISSING: updateElabFTWVersioningFormat function
-        window.updateElabFTWVersioningFormat = async function() {
-            try {
-                const format = document.getElementById('elabftwVersioningFormat').value;
-                await window.settingsManager.set('elabftw.versioning_format', format);
-                
-                // Update preview
-                window.updateVersioningPreview();
-                
-                console.log('📅 elabFTW versioning format updated:', format);
-            } catch (error) {
-                console.error('Error updating elabFTW versioning format:', error);
-            }
-        };
-
-        // MISSING: updateVersioningPreview function
-        window.updateVersioningPreview = function() {
-            const previewEl = document.getElementById('versioningPreview');
-            if (!previewEl) return;
-            
-            const formatSelect = document.getElementById('elabftwVersioningFormat');
-            const format = formatSelect ? formatSelect.value : 'date';
-            
-            const now = new Date();
-            let exampleSuffix;
-            
-            switch (format) {
-                case 'timestamp':
-                    exampleSuffix = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                    break;
-                case 'date':
-                    exampleSuffix = now.toISOString().split('T')[0];
-                    break;
-                case 'counter':
-                    exampleSuffix = 'v2';
-                    break;
-                default:
-                    exampleSuffix = now.toISOString().split('T')[0];
-            }
-            
-            previewEl.textContent = `Existing: "Hypothesis" → New: "Hypothesis_${exampleSuffix}"`;
-        };
-
-        // MISSING: testConflictSettings function (Debug)
-        window.testConflictSettings = async function() {
-            try {
-                const overwriteEnabled = await window.settingsManager.get('elabftw.overwrite_enabled');
-                const versioningFormat = await window.settingsManager.get('elabftw.versioning_format');
-                
-                const mode = overwriteEnabled ? 'OVERWRITE' : 'VERSIONING';
-                const details = overwriteEnabled ? 
-                    'Fields will be overwritten directly' : 
-                    `New versions created using ${versioningFormat} format`;
-                
-                alert(`🧪 Conflict Settings Test\n\nMode: ${mode}\nFormat: ${versioningFormat}\nBehavior: ${details}\n\nSettings are working correctly!`);
-                
-                console.log('🧪 Conflict settings test:', {
-                    overwriteEnabled,
-                    versioningFormat,
-                    mode,
-                    details
-                });
-                
-            } catch (error) {
-                console.error('Error testing conflict settings:', error);
-                alert(`❌ Error testing settings: ${error.message}`);
-            }
-        };
-
-        // =================== OMERO SETTINGS ===================
-
-        window.updateOMEROSetting = async function() {
-            try {
-                const enabled = document.getElementById('omeroEnabled').checked;
-                await window.settingsManager.set('omero.enabled', enabled);
-                const configEl = document.getElementById('omeroConfig');
-                if (configEl) {
-                    configEl.style.display = enabled ? 'block' : 'none';
-                }
-                
-                // Update UI
-                setTimeout(() => {
-                    window.updateOMEROOptions();
-                }, 100);
-            } catch (error) {
-                console.error('Error updating OMERO setting:', error);
-            }
-        };
-
-        window.updateOMEROServerUrl = async function() {
-            try {
-                const url = document.getElementById('omeroServerUrl').value;
-                await window.settingsManager.set('omero.server_url', url);
-            } catch (error) {
-                console.error('Error updating OMERO server URL:', error);
-            }
-        };
-
-        window.updateOMEROUsername = async function() {
-            try {
-                const username = document.getElementById('omeroUsername').value;
-                await window.settingsManager.set('omero.username', username);
-            } catch (error) {
-                console.error('Error updating OMERO username:', error);
-            }
-        };
-
-        window.updateOMEROPassword = async function() {
-            try {
-                const password = document.getElementById('omeroPassword').value;
-                await window.settingsManager.set('omero.password', password);
-            } catch (error) {
-                console.error('Error updating OMERO password:', error);
-            }
-        };
-
-        window.updateOMEROAutoSync = async function() {
-            try {
-                const enabled = document.getElementById('omeroAutoSync').checked;
-                await window.settingsManager.set('omero.auto_sync', enabled);
-                
-                // Update UI
-                setTimeout(() => {
-                    window.updateOMEROOptions();
-                }, 100);
-            } catch (error) {
-                console.error('Error updating OMERO auto sync:', error);
-            }
-        };
-
-        window.updateOMERODefaultProject = async function() {
-            try {
-                const projectId = document.getElementById('omeroDefaultProject').value;
-                await window.settingsManager.set('omero.default_project_id', projectId);
-            } catch (error) {
-                console.error('Error updating OMERO default project:', error);
-            }
-        };
-
-        window.updateOMEROCreateDatasets = async function() {
-            try {
-                const enabled = document.getElementById('omeroCreateDatasets').checked;
-                await window.settingsManager.set('omero.create_datasets', enabled);
-            } catch (error) {
-                console.error('Error updating OMERO create datasets:', error);
-            }
-        };
-
-        window.updateOMEROVerifySSL = async function() {
-            try {
-                const enabled = document.getElementById('omeroVerifySSL').checked;
-                await window.settingsManager.set('omero.verify_ssl', enabled);
-            } catch (error) {
-                console.error('Error updating OMERO verify SSL:', error);
-            }
-        };
-
-        window.testOMEROConnection = async function() {
-            const statusDiv = document.getElementById('omeroConnectionStatus');
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.textContent = 'Testing OMERO connection...';
-                statusDiv.className = 'testing';
-                
-                try {
-                    const result = await window.settingsManager.testOMEROConnection();
-                    statusDiv.textContent = result.message;
-                    statusDiv.className = result.success ? 'success-message' : 'error-message';
-                } catch (error) {
-                    statusDiv.textContent = 'OMERO connection test failed: ' + error.message;
-                    statusDiv.className = 'error-message';
-                }
-            }
-        };
-
-        // =================== SETTINGS UTILITY FUNCTIONS ===================
-
-        window.resetSettings = function() {
-            if (confirm('Reset all settings to defaults? This cannot be undone.')) {
-                window.settingsManager.reset();
-                loadSettingsIntoModal();
-                showSettingsMessage('Settings reset to defaults.', 'success');
-            }
-        };
-
-        window.exportSettings = function() {
-            const settings = window.settingsManager.export();
-            const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'metafold-settings.json';
-            a.click();
-            
-            URL.revokeObjectURL(url);
-            showSettingsMessage('Settings exported successfully.', 'success');
-        };
-
-        window.importSettings = function() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const success = window.settingsManager.import(e.target.result);
-                        if (success) {
-                            loadSettingsIntoModal();
-                            showSettingsMessage('Settings imported successfully.', 'success');
-                        } else {
-                            showSettingsMessage('Failed to import settings.', 'error');
-                        }
-                    } catch (error) {
-                        showSettingsMessage('Invalid settings file.', 'error');
-                    }
+                // Get current user info
+                const userInfo = window.userManager?.getCurrentUserInfo() || {
+                    username: 'User',
+                    groupname: 'Default',
+                    isEnabled: false
                 };
-                reader.readAsText(file);
-            };
-            
-            input.click();
+                
+                console.log('👤 Updating user display:', userInfo);
+                
+                // Update display elements
+                userNameEl.textContent = userInfo.username || 'User';
+                userGroupEl.textContent = userInfo.groupname || 'Default';
+                
+                // Update avatar
+                const initials = window.userManager?.getUserInitials ? 
+                    window.userManager.getUserInitials(userInfo.username) : 
+                    (userInfo.username ? userInfo.username.substring(0, 2).toUpperCase() : 'U');
+                const color = window.userManager?.generateUserColor ? 
+                    window.userManager.generateUserColor(userInfo.username) : 
+                    '#7c3aed';
+                
+                userAvatarEl.textContent = initials;
+                userAvatarEl.style.background = color;
+                
+                // Show/hide user display based on user management status
+                if (userInfo.isEnabled && userInfo.username && userInfo.username !== 'User') {
+                    userDisplayEl.style.display = 'block';
+                    userDisplayEl.style.opacity = '1';
+                } else {
+                    // In simple mode, show minimal info
+                    userDisplayEl.style.display = 'block';
+                    userDisplayEl.style.opacity = '0.7';
+                }
+            } catch (error) {
+                console.error('Error updating user display:', error);
+            }
         };
 
-        window.showSettingsMessage = function(message, type) {
-            let messageDiv = document.getElementById('settingsMessage');
-            if (!messageDiv) {
-                messageDiv = document.createElement('div');
-                messageDiv.id = 'settingsMessage';
-                messageDiv.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    padding: 12px 20px;
-                    border-radius: 8px;
-                    z-index: 10001;
-                    font-weight: 500;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                `;
-                document.body.appendChild(messageDiv);
-            }
-            
-            // Set message and style
-            messageDiv.textContent = message;
-            messageDiv.className = type + '-message';
-            
-            // Auto-remove after 3 seconds
-            setTimeout(() => {
-                if (messageDiv.parentElement) {
-                    messageDiv.remove();
+        // Enhanced Switch User functionality that updates display - RESTORED
+        const originalSwitchUser = window.userManager?.switchUser;
+        if (window.userManager && originalSwitchUser) {
+            window.userManager.switchUser = async function(username, groupname) {
+                try {
+                    const result = await originalSwitchUser.call(this, username, groupname);
+                    
+                    // Update display after successful switch
+                    setTimeout(() => {
+                        window.updateCurrentUserDisplay();
+                    }, 100);
+                    
+                    return result;
+                } catch (error) {
+                    console.error('Error in enhanced switchUser:', error);
+                    throw error;
                 }
-            }, 3000);
-        };
+            };
+        }
+
+        // Enhanced User Management Modal close to update display - RESTORED
+        const originalModalClose = window.userManagementModal?.close;
+        if (window.userManagementModal && originalModalClose) {
+            window.userManagementModal.close = function() {
+                try {
+                    originalModalClose.call(this);
+                    
+                    // Update display after modal closes
+                    setTimeout(() => {
+                        window.updateCurrentUserDisplay();
+                    }, 100);
+                } catch (error) {
+                    console.error('Error in enhanced modal close:', error);
+                }
+            };
+        }
 
         // =================== INTEGRATION UI UPDATE FUNCTIONS ===================
 
+        // Enhanced updateElabFTWOptions function
         window.updateElabFTWOptions = async function() {
             try {
                 console.log('🧪 UI: Updating elabFTW options visibility');
@@ -1572,6 +1225,7 @@ experiment_log.md"></textarea>
                     return;
                 }
                 
+                // FIXED: Use async settings access
                 const enabled = await window.settingsManager.get('elabftw.enabled');
                 const autoSync = await window.settingsManager.get('elabftw.auto_sync');
                 const isExperimentMode = window.templateTypeManager && window.templateTypeManager.isExperimentMode();
@@ -1579,18 +1233,22 @@ experiment_log.md"></textarea>
                 console.log('🧪 UI: elabFTW Settings:', { enabled, autoSync, isExperimentMode });
                 
                 if (enabled && isExperimentMode) {
+                    // Show elabFTW option section
                     elabftwOption.style.display = 'block';
                     
                     if (autoSync) {
+                        // Auto-sync enabled: show info, hide manual checkbox
                         elabftwAutoInfo.style.display = 'block';
                         elabftwManualOption.style.display = 'none';
                         console.log('🧪 UI: Showing auto-sync info');
                     } else {
+                        // Auto-sync disabled: hide info, show manual checkbox
                         elabftwAutoInfo.style.display = 'none';
                         elabftwManualOption.style.display = 'block';
                         console.log('🧪 UI: Showing manual sync checkbox');
                     }
                 } else {
+                    // Hide entire elabFTW option section
                     elabftwOption.style.display = 'none';
                     console.log('🧪 UI: Hiding elabFTW options (enabled:', enabled, ', experiment mode:', isExperimentMode, ')');
                 }
@@ -1599,6 +1257,7 @@ experiment_log.md"></textarea>
             }
         };
 
+        // Enhanced updateOMEROOptions function
         window.updateOMEROOptions = async function() {
             try {
                 console.log('🔬 UI: Updating OMERO options visibility');
@@ -1617,6 +1276,7 @@ experiment_log.md"></textarea>
                     return;
                 }
                 
+                // FIXED: Use async settings access
                 const enabled = await window.settingsManager.get('omero.enabled');
                 const autoSync = await window.settingsManager.get('omero.auto_sync');
                 const isExperimentMode = window.templateTypeManager && window.templateTypeManager.isExperimentMode();
@@ -1624,13 +1284,16 @@ experiment_log.md"></textarea>
                 console.log('🔬 UI: OMERO Settings:', { enabled, autoSync, isExperimentMode });
                 
                 if (enabled && isExperimentMode) {
+                    // Show OMERO option section
                     omeroOption.style.display = 'block';
                     
                     if (autoSync) {
+                        // Auto-sync enabled: show info, hide manual checkbox
                         omeroAutoInfo.style.display = 'block';
                         omeroManualOption.style.display = 'none';
                         console.log('🔬 UI: Showing auto-sync info');
                     } else {
+                        // Auto-sync disabled: hide info, show manual checkbox
                         omeroAutoInfo.style.display = 'none';
                         omeroManualOption.style.display = 'block';
                         console.log('🔬 UI: Showing manual sync checkbox');
@@ -1641,6 +1304,7 @@ experiment_log.md"></textarea>
                         window.updateOMEROStatus();
                     }
                 } else {
+                    // Hide entire OMERO option section
                     omeroOption.style.display = 'none';
                     console.log('🔬 UI: Hiding OMERO options (enabled:', enabled, ', experiment mode:', isExperimentMode, ')');
                 }
@@ -1649,6 +1313,7 @@ experiment_log.md"></textarea>
             }
         };
 
+        // FIXED: Update both integrations when template changes
         window.updateIntegrationOptions = async function() {
             try {
                 console.log('🔄 UI: Updating all integration options');
@@ -1656,74 +1321,6 @@ experiment_log.md"></textarea>
                 await window.updateOMEROOptions();
             } catch (error) {
                 console.error('Error updating integration options:', error);
-            }
-        };
-
-        // =================== OMERO UI HANDLERS ===================
-
-        window.handleOMEROGroupSelection = function() {
-            if (window.omeroUIIntegration && window.omeroUIIntegration.handleGroupSelection) {
-                window.omeroUIIntegration.handleGroupSelection();
-            } else {
-                console.warn('OMERO UI Integration not available for group selection');
-            }
-        };
-
-        window.handleOMEROProjectSelection = function() {
-            if (window.omeroUIIntegration && window.omeroUIIntegration.handleProjectSelection) {
-                window.omeroUIIntegration.handleProjectSelection();
-            } else {
-                console.warn('OMERO UI Integration not available for project selection');
-            }
-        };
-
-        window.loadOMEROProjects = async function() {
-            if (!window.omeroUIIntegration) return;
-            
-            try {
-                await window.omeroUIIntegration.loadGroupsForDropdown();
-            } catch (error) {
-                console.error('Error loading OMERO groups and projects:', error);
-                if (window.omeroUIIntegration.loadProjectsForDropdown) {
-                    window.omeroUIIntegration.loadProjectsForDropdown();
-                }
-            }
-        };
-
-        window.updateOMEROStatus = async function() {
-            if (window.omeroUIIntegration && window.omeroUIIntegration.updateStatusDisplay) {
-                window.omeroUIIntegration.updateStatusDisplay();
-            }
-        };
-
-        window.testOMEROConnectionInline = async function() {
-            if (!window.omeroUIIntegration) {
-                alert('OMERO UI integration not available');
-                return;
-            }
-            
-            try {
-                const result = await window.omeroUIIntegration.testConnection();
-                
-                if (result.success) {
-                    alert(`✅ OMERO Connection Successful!\n\n${result.message}\n\nDetails:\n- Proxy URL: ${result.details?.proxyUrl || 'Unknown'}\n- Projects: ${result.details?.projectCount || 0}\n- Auth Method: ${result.details?.authMethod || 'Unknown'}`);
-                    
-                    // Refresh project list after successful connection
-                    if (window.loadOMEROProjects) {
-                        window.loadOMEROProjects();
-                    }
-                } else {
-                    alert(`❌ OMERO Connection Failed!\n\n${result.message}\n\n${result.details?.guidance || 'Check console for more details.'}`);
-                }
-                
-                // Update status display
-                if (window.updateOMEROStatus) {
-                    window.updateOMEROStatus();
-                }
-                
-            } catch (error) {
-                console.error('OMERO connection test error:', error);
-                alert(`❌ OMERO Connection Test Failed!\n\nError: ${error.message}\n\nCheck console for details.`);
             }
         };
 
@@ -1754,6 +1351,9 @@ experiment_log.md"></textarea>
                     if (window.updateIntegrationOptions) {
                         window.updateIntegrationOptions();
                     }
+                    if (window.updateVersioningPreview) {
+                        window.updateVersioningPreview();
+                    }
                 }, 500);
             } catch (error) {
                 console.error('Error in DOMContentLoaded:', error);
@@ -1782,7 +1382,7 @@ experiment_log.md"></textarea>
             }
         }
 
-        console.log('✅ LAYOUT FIXED MetaFold UI Integration loaded successfully');
+        console.log('✅ COMPLETE MetaFold UI Integration loaded successfully (Syntax Error Fixed + User Display Preserved)');
     </script>
 
 </body>

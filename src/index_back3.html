@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaFold - Folder Structure & Experiment Manager</title>
+    
+    <!-- Updated CSS Structure -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/modals.css">
+    <link rel="stylesheet" href="css/integrations.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <!-- CRITICAL: Layout override to force full width -->
+    <link rel="stylesheet" href="css/layout-override.css">
+</head>
+<body>
+    <div class="container">
+        <!-- LEFT SIDEBAR - Template Selection (RESTORED) -->
+        <div class="sidebar">
+            <div class="header">
+                <h1>📁 MetaFold</h1>
+                
+                <div class="template-type-selector">
+                    <button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
+                        📂 Folders
+                    </button>
+                    <button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
+                        🧪 Experiments
+                    </button>
+                </div>
+                
+                <button class="btn" onclick="showTemplateModal()">New Template</button>
+                <button class="btn btn-secondary" onclick="showSettingsModal()" style="margin-top: 10px;">⚙️ Settings</button>
+            </div>
+            
+            <!-- TEMPLATE LIST - This was missing proper positioning -->
+            <div id="templateList">
+                <div class="empty-state">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                    </svg>
+                    <p>No templates available yet.<br>Create your first template!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT MAIN CONTENT - Project Manager -->
+        <div class="main-content">
+            <div class="header">
+                <h1>🚀 Project Manager</h1>
+                <p>Create and manage your project templates for better organization</p>
+            </div>
+
+            <div id="templateDetails" style="display: none;">
+                <div class="project-setup">
+                    <h3>🎯 Project Setup</h3>
+                    <div class="project-input-group">
+                        <div>
+                            <label for="targetPath">📂 Base Directory:</label>
+                            <input type="text" id="targetPath" placeholder="Enter path or browse...">
+                        </div>
+                        <div>
+                            <label for="projectName">📝 Project Name:</label>
+                            <input type="text" id="projectName" placeholder="MyProject">
+                        </div>
+                        <button class="btn btn-secondary" onclick="browsePath()">Browse</button>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
+                        Project will be created in: <span id="fullPathPreview">Choose directory and project name</span>
+                    </p>
+
+                    <!-- elabFTW Integration Option -->
+					<div id="elabftwOption" style="display: none; margin-top: 15px; padding: 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;">
+						<!-- Auto-sync info message -->
+						<div id="elabftwAutoInfo" style="display: none; color: #0369a1; font-weight: 500; margin-bottom: 10px;">
+							<span style="color: #059669;">✅</span> Auto-sync to elabFTW is enabled - experiments will be created automatically
+						</div>
+						
+						<!-- Manual sync checkbox -->
+						<div id="elabftwManualOption">
+							<label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #0369a1;">
+								<input type="checkbox" id="sendToElabFTW" style="width: auto;">
+								🧪 Send to elabFTW
+							</label>
+							<small style="color: #0369a1; margin-left: 24px; display: block; margin-top: 4px;">
+								Create this experiment in elabFTW with metadata and structure
+							</small>
+						</div>
+						
+						<!-- Existing experiment ID field -->
+						<div id="elabftwExperimentId" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+							<label for="existingExperimentId" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
+								📝 Update Existing Experiment (optional):
+							</label>
+							<input type="text" id="existingExperimentId" placeholder="Enter experiment ID (e.g., 149)" style="width: 100%; padding: 6px 10px; border: 1px solid #0ea5e9; border-radius: 4px;">
+							<small style="color: #0369a1; display: block; margin-top: 4px;">
+								If provided, metadata will be added to this existing experiment instead of creating a new one
+							</small>
+						</div>
+					</div>
+
+                    <!-- OMERO Integration Option -->
+                    <div id="omeroOption" style="display: none; margin-top: 15px; padding: 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
+                        <!-- OMERO Status Info -->
+                        <div id="omeroStatusInfo" style="margin-bottom: 10px;">
+                            <div id="omeroConnectionStatus" style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                <span id="omeroStatusIcon">🔬</span>
+                                <span id="omeroStatusText">OMERO Status: Checking...</span>
+                            </div>
+                        </div>
+
+                        <!-- Auto-sync info message -->
+                        <div id="omeroAutoInfo" style="display: none; color: #92400e; font-weight: 500; margin-bottom: 10px;">
+                            <span style="color: #059669;">✅</span> Auto-sync to OMERO is enabled - datasets will be created automatically
+                        </div>
+                        
+                        <!-- Manual sync checkbox -->
+                        <div id="omeroManualOption">
+                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                <input type="checkbox" id="sendToOMERO" style="width: auto;">
+                                🔬 Send to OMERO
+                            </label>
+                            <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
+                                Create this experiment as a dataset in OMERO with metadata annotations
+                            </small>
+                        </div>
+                        
+                        <!-- OMERO Group Selection -->
+						<div id="omeroGroupSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.4); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2); transition: all 0.3s ease;">
+							<label for="omeroGroupSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
+								👥 OMERO Group:
+							</label>
+							<select id="omeroGroupSelect" onchange="handleOMEROGroupSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
+								<option value="">Loading groups...</option>
+							</select>
+							<small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
+								Select a group to filter available projects
+							</small>
+							<div id="omeroGroupStatus" style="margin-top: 6px; font-size: 12px; font-style: italic; min-height: 16px;"></div>
+						</div>
+
+						<!-- OMERO Project Selection -->
+						<div id="omeroProjectSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); transition: all 0.3s ease;">
+							<label for="omeroProjectSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
+								📁 OMERO Project (optional):
+							</label>
+							<select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
+								<option value="">-- Create standalone dataset --</option>
+								<option value="refresh">🔄 Refresh project list</option>
+							</select>
+							<small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
+								Select an existing OMERO project to link the dataset to, or leave empty for standalone dataset
+							</small>
+						</div>
+
+                        <!-- Dataset Name Override -->
+                        <div id="omeroDatasetName" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+                            <label for="omeroDatasetNameInput" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                🗂️ Dataset Name (optional):
+                            </label>
+                            <input type="text" id="omeroDatasetNameInput" placeholder="Leave empty to use project name" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px;">
+                            <small style="color: #92400e; display: block; margin-top: 4px;">
+                                Customize the dataset name in OMERO. If empty, uses the project name.
+                            </small>
+                        </div>
+
+                        <!-- Advanced Options (Collapsible) -->
+                        <details style="margin-top: 15px;">
+                            <summary style="cursor: pointer; font-weight: 500; color: #92400e; padding: 5px 0;">
+                                🔧 Advanced OMERO Options
+                            </summary>
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.3); border-radius: 6px;">
+                                <!-- Map Annotations Info -->
+                                <div style="margin-bottom: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                        <input type="checkbox" id="omeroMapAnnotations" checked disabled style="width: auto;">
+                                        🗂️ Include Map Annotations
+                                    </label>
+                                    <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
+                                        Metadata will be stored as OMERO Map Annotations for programmatic access (recommended)
+                                    </small>
+                                </div>
+
+                                <!-- Namespace Selection -->
+                                <div style="margin-bottom: 10px;">
+                                    <label for="omeroNamespace" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                        🏷️ Annotation Namespace:
+                                    </label>
+                                    <input type="text" id="omeroNamespace" value="NFDI4BioImage.MetaFold.ExperimentMetadata" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                                    <small style="color: #92400e; display: block; margin-top: 4px;">
+                                        Namespace for metadata annotations (helps organize and filter annotations)
+                                    </small>
+                                </div>
+
+                                <!-- Connection Test Button -->
+                                <div style="margin-top: 15px; text-align: center;">
+                                    <button type="button" onclick="testOMEROConnectionInline()" style="
+                                        background: linear-gradient(45deg, #f59e0b, #d97706);
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 16px;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-size: 14px;
+                                        font-weight: 500;
+                                        transition: all 0.3s ease;
+                                        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+                                    " onmouseover="this.style.transform='translateY(-1px)'"
+                                       onmouseout="this.style.transform='translateY(0)'">
+                                        🔍 Test OMERO Connection
+                                    </button>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <div class="folder-structure">
+                    <h3>📋 Structure Preview:</h3>
+                    <div id="folderPreview" class="folder-tree"></div>
+                </div>
+
+                <!-- Metadata Form for Experiments -->
+                <div id="experimentForm" class="metadata-editor" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>🧪 Fill Experiment Metadata:</h3>
+                        <button class="btn btn-secondary btn-small" onclick="saveExperimentTemplate()" style="padding: 6px 12px;" title="Save current metadata values and project paths with this template">
+                            💾 Save Template & Paths
+                        </button>
+                    </div>
+                    <div id="experimentFields"></div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn" onclick="createProject()">🎯 Create Project</button>
+                    <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
+                    <button class="btn btn-danger" onclick="deleteCurrentTemplate()">🗑️ Delete</button>
+                </div>
+
+                <!-- Info Message for additional information -->
+                <div id="infoMessage" class="message info-message" style="display: none;"></div>
+                <div id="successMessage" class="success-message" style="display: none;"></div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal (Enhanced with OMERO) -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeSettingsModal()">&times;</span>
+            <h2>⚙️ Settings</h2>
+            
+            <!-- Settings Tabs -->
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('general')" id="generalTab">
+                    🔧 General
+                </button>
+                <button class="settings-tab" onclick="switchSettingsTab('elabftw')" id="elabftwTab">
+                    🧪 elabFTW
+                </button>
+                <button class="settings-tab" onclick="switchSettingsTab('omero')" id="omeroTab">
+                    🔬 OMERO
+                </button>
+            </div>
+
+            <!-- General Settings Tab -->
+            <div id="generalSettings" class="settings-tab-content active">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="userManagementEnabled" onchange="updateUserManagementSetting()">
+                        <span>👥 Enable User Management</span>
+                    </label>
+                    <small>When disabled, the app runs in simple mode without user selection at startup.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="themeSelect">🎨 Theme:</label>
+                    <select id="themeSelect" onchange="updateThemeSetting()">
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                    </select>
+                    <small>Choose your preferred color theme (currently only dark theme is implemented).</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="autoSaveEnabled" onchange="updateAutoSaveSetting()">
+                        <span>💾 Auto-save templates</span>
+                    </label>
+                    <small>Automatically save template changes without confirmation.</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="showTipsEnabled" onchange="updateShowTipsSetting()">
+                        <span>💡 Show tips and hints</span>
+                    </label>
+                    <small>Display helpful tips and guidance throughout the application.</small>
+                </div>
+            </div>
+
+            <!-- elabFTW Settings Tab -->
+            <div id="elabftwSettings" class="settings-tab-content">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="elabftwEnabled" onchange="updateElabFTWSetting()">
+                        <span>🧪 Enable elabFTW Integration</span>
+                    </label>
+                    <small>Connect MetaFold with your elabFTW electronic lab notebook.</small>
+                </div>
+
+                <div id="elabftwConfig" style="display: none;">
+                    <div class="form-group">
+                        <label for="elabftwServerUrl">🌐 elabFTW Server URL:</label>
+                        <input type="url" id="elabftwServerUrl" placeholder="https://your-elabftw-server.com" onchange="updateElabFTWServerUrl()">
+                        <small>Full URL to your elabFTW server (including https://)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="elabftwApiKey">🔑 API Key:</label>
+                        <input type="password" id="elabftwApiKey" placeholder="Your elabFTW API key" onchange="updateElabFTWApiKey()">
+                        <small>Your personal API key from elabFTW (User Panel → API)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="elabftwAutoSync" onchange="updateElabFTWAutoSync()">
+                            <span>🔄 Auto-sync experiments</span>
+                        </label>
+                        <small>Automatically create experiments in elabFTW when creating experiment projects.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="elabftwDefaultCategory">📂 Default Category ID:</label>
+                        <input type="number" id="elabftwDefaultCategory" value="1" min="1" onchange="updateElabFTWDefaultCategory()">
+                        <small>Default category ID for new experiments in elabFTW.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="elabftwVerifySSL" onchange="updateElabFTWVerifySSL()">
+                            <span>🔒 Verify SSL certificates</span>
+                        </label>
+                        <small>Disable only for development servers with self-signed certificates.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <button class="btn btn-secondary" onclick="testElabFTWConnection()">🔍 Test Connection</button>
+                        <div id="elabftwConnectionStatus" style="margin-top: 10px; display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+          <!-- Enhanced OMERO Settings Tab with Working Endpoints -->
+			<div id="omeroSettings" class="settings-tab-content">
+				<div class="form-group">
+					<label style="display: flex; align-items: center; gap: 8px;">
+						<input type="checkbox" id="omeroEnabled" onchange="updateOMEROSetting()">
+						<span>🔬 Enable OMERO Integration</span>
+					</label>
+					<small>Connect MetaFold with your OMERO image data management system.</small>
+				</div>
+
+				<div id="omeroConfig" style="display: none;">
+					<div class="form-group">
+						<label for="omeroServerUrl">🌐 OMERO Server URL:</label>
+						<input type="url" id="omeroServerUrl" placeholder="https://your-omero-server.com" onchange="updateOMEROServerUrl()">
+						<small>Full URL to your OMERO.web server (including https://)</small>
+					</div>
+
+					<div class="form-group">
+						<label for="omeroUsername">👤 Username:</label>
+						<input type="text" id="omeroUsername" placeholder="Your OMERO username" onchange="updateOMEROUsername()">
+						<small>Your OMERO username for authentication</small>
+					</div>
+
+					<div class="form-group">
+						<label for="omeroPassword">🔑 Password:</label>
+						<input type="password" id="omeroPassword" placeholder="Your OMERO password" onchange="updateOMEROPassword()">
+						<small>Your OMERO password (stored locally - use secure setup in production)</small>
+					</div>
+
+					<div class="form-group">
+						<label style="display: flex; align-items: center; gap: 8px;">
+							<input type="checkbox" id="omeroAutoSync" onchange="updateOMEROAutoSync()">
+							<span>🔄 Auto-sync experiments</span>
+						</label>
+						<small>Automatically create datasets in OMERO when creating experiment projects.</small>
+					</div>
+
+					<div class="form-group">
+						<label for="omeroDefaultProject">📁 Default Project ID:</label>
+						<input type="number" id="omeroDefaultProject" placeholder="Leave empty for standalone datasets" onchange="updateOMERODefaultProject()">
+						<small>Default OMERO project ID to link new datasets to (optional).</small>
+					</div>
+
+					<div class="form-group">
+						<label style="display: flex; align-items: center; gap: 8px;">
+							<input type="checkbox" id="omeroCreateDatasets" onchange="updateOMEROCreateDatasets()">
+							<span>🗂️ Create datasets</span>
+						</label>
+						<small>Create datasets in OMERO (disable if you only want metadata annotations).</small>
+					</div>
+
+					<div class="form-group">
+						<label style="display: flex; align-items: center; gap: 8px;">
+							<input type="checkbox" id="omeroVerifySSL" onchange="updateOMEROVerifySSL()">
+							<span>🔒 Verify SSL certificates</span>
+						</label>
+						<small>Disable only for development servers with self-signed certificates.</small>
+					</div>
+
+					<!-- Enhanced Testing Section -->
+					<div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px; margin-top: 20px;">
+						<label style="color: #a855f7; font-size: 1.1rem; margin-bottom: 15px; display: block;">
+							🧪 OMERO Testing & Validation
+						</label>
+						
+						<!-- Connection Test -->
+						<div style="margin-bottom: 15px;">
+							<button class="btn btn-secondary" onclick="testOMEROConnectionAdvanced()" style="margin-right: 10px;">
+								🔍 Test Connection & Discovery
+							</button>
+							<small style="display: block; color: #9ca3af; margin-top: 5px;">
+								Test connection and discover working OMERO endpoints for your server
+							</small>
+						</div>
+
+						<!-- Quick Integration Test -->
+						<div style="margin-bottom: 15px;">
+							<button class="btn btn-secondary" onclick="runQuickOMEROTest()" style="margin-right: 10px;">
+								🚀 Quick Integration Test
+							</button>
+							<small style="display: block; color: #9ca3af; margin-top: 5px;">
+								Create test dataset with metadata using working endpoints
+							</small>
+						</div>
+
+						<!-- Test with Current Data -->
+						<div style="margin-bottom: 15px;">
+							<button class="btn" onclick="testCurrentExperimentData()" style="margin-right: 10px;">
+								🧬 Test Current Experiment
+							</button>
+							<small style="display: block; color: #9ca3af; margin-top: 5px;">
+								Send current experiment form data to OMERO (if available)
+							</small>
+						</div>
+
+						<!-- Test Results Display -->
+						<div id="omeroTestResults" style="
+							margin-top: 15px; 
+							padding: 12px; 
+							background: rgba(255,255,255,0.05); 
+							border-radius: 8px; 
+							border: 1px solid rgba(255,255,255,0.1);
+							display: none;
+						">
+							<div id="omeroTestContent"></div>
+						</div>
+					</div>
+
+					<!-- Standard Connection Status -->
+					<div class="form-group">
+						<button class="btn btn-secondary" onclick="testOMEROConnection()">🔍 Test Connection</button>
+						<div id="omeroConnectionStatus" style="margin-top: 10px; display: none;"></div>
+					</div>
+				</div>
+			</div>
+
+            <!-- Settings Actions -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button class="btn btn-secondary" onclick="resetSettings()">🔄 Reset to Defaults</button>
+                <button class="btn btn-secondary" onclick="exportSettings()">📤 Export</button>
+                <button class="btn btn-secondary" onclick="importSettings()">📥 Import</button>
+                <button class="btn" onclick="closeSettingsModal()">✅ Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for new/edited template -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTemplateModal()">&times;</span>
+            <h2 id="modalTitle">Create New Template</h2>
+            
+            <div class="form-group">
+                <label for="templateName">Template Name:</label>
+                <input type="text" id="templateName" placeholder="e.g. Web Project, Photo Shoot, etc.">
+            </div>
+
+            <div class="form-group">
+                <label for="templateDescription">Description (optional):</label>
+                <input type="text" id="templateDescription" placeholder="Brief description of the template">
+            </div>
+
+            <div class="form-group">
+                <label for="templateType">Template Type:</label>
+                <select id="templateType" onchange="toggleTemplateTypeContent()">
+                    <option value="folders">📂 Folder Structure</option>
+                    <option value="experiment">🧪 Experiment (Folders + Metadata)</option>
+                </select>
+            </div>
+
+            <!-- Folder Structure Tab -->
+            <div id="folderTab" class="tab-content active">
+                <div class="form-group">
+                    <label for="folderStructure">Folder Structure:</label>
+                    <textarea id="folderStructure" placeholder="Enter folder structure (2 spaces = one level deeper):
+src/
+  components/
+  assets/
+    images/
+    css/
+  js/
+docs/
+tests/
+README.md"></textarea>
+                </div>
+            </div>
+
+            <!-- Experiment Tab -->
+            <div id="experimentTab" class="tab-content">
+                <div class="tabs">
+                    <div class="tab active" onclick="switchModalTab('structure')">Structure</div>
+                    <div class="tab" onclick="switchModalTab('metadata')">Metadata</div>
+                </div>
+
+                <div id="structureContent" class="tab-content active">
+                    <div class="form-group">
+                        <label for="experimentStructure">Folder Structure (optional):</label>
+                        <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
+data/
+  raw/
+  processed/
+analysis/
+results/
+  plots/
+  reports/
+README.md
+experiment_log.md"></textarea>
+                        <small style="color: #6b7280; margin-top: 5px; display: block;">
+                            💡 Tip: Leave this field empty if you only want to create metadata files.
+                        </small>
+                    </div>
+                </div>
+
+                <div id="metadataContent" class="tab-content">
+                    <div class="form-group">
+                        <label>Metadata Fields:</label>
+                        <button class="btn btn-secondary btn-small" onclick="addMetadataField()">+ Add Field</button>
+                        <button class="btn btn-secondary btn-small" onclick="loadJsonMetadata()" style="margin-left: 10px;">📂 Load JSON</button>
+                    </div>
+                    
+                    <div id="metadataFields"></div>
+
+                    <div class="metadata-preview">
+                        <h4>JSON Preview:</h4>
+                        <pre id="jsonPreview">{}</pre>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeTemplateModal()">Cancel</button>
+                <button class="btn" onclick="saveTemplate()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules - Updated modular structure -->
+    
+    <!-- Basis-Module zuerst -->
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+	<script src="js/userManager.js"></script>
+	<script src="js/loginModal.js"></script>
+	<script src="js/userManagementModal.js"></script>
+    <script src="js/settingsManager.js"></script>
+    
+    <!-- OMERO Integration Modules - Updated to modular structure -->
+    <script src="js/omero/omeroAuth.js"></script>
+    <script src="js/omero/omeroAPI.js"></script>
+    <script src="js/omero/omeroGroups.js"></script>
+    <script src="js/omero/omeroProjects.js"></script>
+    <script src="js/omero/omeroAnnotations.js"></script>
+    <script src="js/omero/omeroDatasetCreation.js"></script>
+    <script src="js/omero/omeroUIIntegration.js"></script>
+    <script src="js/omero/omeroTestFunctions.js"></script>
+	<script src="js/omero/omeroStepByStepTest.js"></script>
+	<script src="js/omero/omeroIntegrationTest.js"></script>
+    
+    <!-- Template und Form Module -->
+    <script src="js/templateManager.js"></script>
+    <script src="js/templateTypeManager.js"></script>
+    <script src="js/metadataEditor.js"></script>
+    <script src="js/experimentForm.js"></script>
+    <script src="js/templateModal.js"></script>
+    <script src="js/projectManager.js"></script>
+	
+    <!-- App Initialisierung zuletzt -->
+	<script src="js/app.js"></script>
+
+    <!-- Global Functions -->
+    <script>
+        // Template Type Management
+        window.switchTemplateType = function(type) {
+            if (window.templateTypeManager && window.templateTypeManager.switchType) {
+                window.templateTypeManager.switchType(type);
+            }
+        };
+
+        // Template Modal Management
+        window.showTemplateModal = function() {
+            if (window.templateModal && window.templateModal.show) {
+                window.templateModal.show();
+            }
+        };
+
+        window.closeTemplateModal = function() {
+            if (window.templateModal && window.templateModal.close) {
+                window.templateModal.close();
+            }
+        };
+
+        window.toggleTemplateTypeContent = function() {
+            if (window.templateModal && window.templateModal.toggleTypeContent) {
+                window.templateModal.toggleTypeContent();
+            }
+        };
+
+        window.switchModalTab = function(tab) {
+            if (window.templateModal && window.templateModal.switchTab) {
+                window.templateModal.switchTab(tab);
+            }
+        };
+
+        window.saveTemplate = function() {
+            if (window.templateModal && window.templateModal.save) {
+                window.templateModal.save();
+            }
+        };
+
+        // Metadata Editor Management
+        window.addMetadataField = function() {
+            if (window.metadataEditor && window.metadataEditor.addField) {
+                window.metadataEditor.addField();
+            }
+        };
+
+        window.loadJsonMetadata = function() {
+            if (window.metadataEditor && window.metadataEditor.loadFromJson) {
+                window.metadataEditor.loadFromJson();
+            }
+        };
+
+        // Project Management
+        window.browsePath = function() {
+            if (window.projectManager && window.projectManager.browsePath) {
+                window.projectManager.browsePath();
+            }
+        };
+
+        window.createProject = function() {
+            if (window.projectManager && window.projectManager.createProject) {
+                window.projectManager.createProject();
+            }
+        };
+
+        // Template Management
+        window.editCurrentTemplate = function() {
+            if (window.templateManager && window.templateManager.editCurrent) {
+                window.templateManager.editCurrent();
+            }
+        };
+
+        window.deleteCurrentTemplate = function() {
+            if (window.templateManager && window.templateManager.deleteCurrent) {
+                window.templateManager.deleteCurrent();
+            }
+        };
+
+        // Experiment Form Management
+        window.saveExperimentTemplate = function() {
+            if (window.experimentForm && window.experimentForm.saveTemplate) {
+                window.experimentForm.saveTemplate();
+            }
+        };
+
+        // Settings Management
+        window.showSettingsModal = function() {
+            if (!window.settingsManager) {
+                alert('Settings manager not available');
+                return;
+            }
+            
+            loadSettingsIntoModal();
+            document.getElementById('settingsModal').style.display = 'block';
+        };
+
+        window.closeSettingsModal = function() {
+            document.getElementById('settingsModal').style.display = 'none';
+        };
+
+        window.switchSettingsTab = function(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.settings-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.settings-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Settings').classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        };
+
+        window.loadSettingsIntoModal = function() {
+            const sm = window.settingsManager;
+            if (!sm) {
+                console.error('Settings manager not available');
+                return;
+            }
+            
+            // General settings
+            const userMgmtEl = document.getElementById('userManagementEnabled');
+            const themeEl = document.getElementById('themeSelect');
+            const autoSaveEl = document.getElementById('autoSaveEnabled');
+            const showTipsEl = document.getElementById('showTipsEnabled');
+            
+            if (userMgmtEl) userMgmtEl.checked = sm.get('general.user_management_enabled');
+            if (themeEl) themeEl.value = sm.get('general.theme');
+            if (autoSaveEl) autoSaveEl.checked = sm.get('general.auto_save');
+            if (showTipsEl) showTipsEl.checked = sm.get('general.show_tips');
+            
+            // elabFTW settings
+            const elabftwEnabled = sm.get('elabftw.enabled');
+            const elabftwEnabledEl = document.getElementById('elabftwEnabled');
+            const elabftwServerEl = document.getElementById('elabftwServerUrl');
+            const elabftwApiEl = document.getElementById('elabftwApiKey');
+            const elabftwAutoEl = document.getElementById('elabftwAutoSync');
+            const elabftwCatEl = document.getElementById('elabftwDefaultCategory');
+            const elabftwSslEl = document.getElementById('elabftwVerifySSL');
+            const elabftwConfigEl = document.getElementById('elabftwConfig');
+            
+            if (elabftwEnabledEl) elabftwEnabledEl.checked = elabftwEnabled;
+            if (elabftwServerEl) elabftwServerEl.value = sm.get('elabftw.server_url');
+            if (elabftwApiEl) elabftwApiEl.value = sm.get('elabftw.api_key');
+            if (elabftwAutoEl) elabftwAutoEl.checked = sm.get('elabftw.auto_sync');
+            if (elabftwCatEl) elabftwCatEl.value = sm.get('elabftw.default_category');
+            if (elabftwSslEl) elabftwSslEl.checked = sm.get('elabftw.verify_ssl');
+            
+            // Show/hide elabFTW config
+            if (elabftwConfigEl) {
+                elabftwConfigEl.style.display = elabftwEnabled ? 'block' : 'none';
+            }
+
+            // OMERO settings
+            const omeroEnabled = sm.get('omero.enabled');
+            const omeroEnabledEl = document.getElementById('omeroEnabled');
+            const omeroServerEl = document.getElementById('omeroServerUrl');
+            const omeroUsernameEl = document.getElementById('omeroUsername');
+            const omeroPasswordEl = document.getElementById('omeroPassword');
+            const omeroAutoEl = document.getElementById('omeroAutoSync');
+            const omeroProjectEl = document.getElementById('omeroDefaultProject');
+            const omeroDatasetEl = document.getElementById('omeroCreateDatasets');
+            const omeroSslEl = document.getElementById('omeroVerifySSL');
+            const omeroConfigEl = document.getElementById('omeroConfig');
+            
+            if (omeroEnabledEl) omeroEnabledEl.checked = omeroEnabled;
+            if (omeroServerEl) omeroServerEl.value = sm.get('omero.server_url');
+            if (omeroUsernameEl) omeroUsernameEl.value = sm.get('omero.username');
+            if (omeroPasswordEl) omeroPasswordEl.value = sm.get('omero.password');
+            if (omeroAutoEl) omeroAutoEl.checked = sm.get('omero.auto_sync');
+            if (omeroProjectEl) omeroProjectEl.value = sm.get('omero.default_project_id');
+            if (omeroDatasetEl) omeroDatasetEl.checked = sm.get('omero.create_datasets');
+            if (omeroSslEl) omeroSslEl.checked = sm.get('omero.verify_ssl');
+            
+            // Show/hide OMERO config
+            if (omeroConfigEl) {
+                omeroConfigEl.style.display = omeroEnabled ? 'block' : 'none';
+            }
+        };
+
+        // Setting update functions
+        window.updateUserManagementSetting = function() {
+            const enabled = document.getElementById('userManagementEnabled').checked;
+            window.settingsManager.set('general.user_management_enabled', enabled);
+            
+            if (enabled !== window.userManager?.isEnabled()) {
+                showSettingsMessage('User management changes will take effect after restarting the app.', 'info');
+            }
+        };
+
+        window.updateThemeSetting = function() {
+            const theme = document.getElementById('themeSelect').value;
+            window.settingsManager.set('general.theme', theme);
+        };
+
+        window.updateAutoSaveSetting = function() {
+            const enabled = document.getElementById('autoSaveEnabled').checked;
+            window.settingsManager.set('general.auto_save', enabled);
+        };
+
+        window.updateShowTipsSetting = function() {
+            const enabled = document.getElementById('showTipsEnabled').checked;
+            window.settingsManager.set('general.show_tips', enabled);
+        };
+
+        window.updateElabFTWSetting = function() {
+            const enabled = document.getElementById('elabftwEnabled').checked;
+            window.settingsManager.set('elabftw.enabled', enabled);
+            const configEl = document.getElementById('elabftwConfig');
+            if (configEl) {
+                configEl.style.display = enabled ? 'block' : 'none';
+            }
+        };
+
+        window.updateElabFTWServerUrl = function() {
+            const url = document.getElementById('elabftwServerUrl').value;
+            window.settingsManager.set('elabftw.server_url', url);
+        };
+
+        window.updateElabFTWApiKey = function() {
+            const key = document.getElementById('elabftwApiKey').value;
+            window.settingsManager.set('elabftw.api_key', key);
+        };
+
+        window.updateElabFTWAutoSync = function() {
+            const enabled = document.getElementById('elabftwAutoSync').checked;
+            window.settingsManager.set('elabftw.auto_sync', enabled);
+        };
+
+        window.updateElabFTWDefaultCategory = function() {
+            const category = parseInt(document.getElementById('elabftwDefaultCategory').value);
+            window.settingsManager.set('elabftw.default_category', category);
+        };
+
+        window.updateElabFTWVerifySSL = function() {
+            const enabled = document.getElementById('elabftwVerifySSL').checked;
+            window.settingsManager.set('elabftw.verify_ssl', enabled);
+        };
+
+        window.testElabFTWConnection = async function() {
+            const statusDiv = document.getElementById('elabftwConnectionStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Testing connection...';
+                statusDiv.className = '';
+                
+                try {
+                    const result = await window.settingsManager.testElabFTWConnection();
+                    statusDiv.textContent = result.message;
+                    statusDiv.className = result.success ? 'success-message' : 'error-message';
+                } catch (error) {
+                    statusDiv.textContent = 'Connection test failed: ' + error.message;
+                    statusDiv.className = 'error-message';
+                }
+            }
+        };
+
+        // OMERO Settings Functions
+        window.updateOMEROSetting = function() {
+            const enabled = document.getElementById('omeroEnabled').checked;
+            window.settingsManager.set('omero.enabled', enabled);
+            const configEl = document.getElementById('omeroConfig');
+            if (configEl) {
+                configEl.style.display = enabled ? 'block' : 'none';
+            }
+        };
+
+        window.updateOMEROServerUrl = function() {
+            const url = document.getElementById('omeroServerUrl').value;
+            window.settingsManager.set('omero.server_url', url);
+        };
+
+        window.updateOMEROUsername = function() {
+            const username = document.getElementById('omeroUsername').value;
+            window.settingsManager.set('omero.username', username);
+        };
+
+        window.updateOMEROPassword = function() {
+            const password = document.getElementById('omeroPassword').value;
+            window.settingsManager.set('omero.password', password);
+        };
+
+        window.updateOMEROAutoSync = function() {
+            const enabled = document.getElementById('omeroAutoSync').checked;
+            window.settingsManager.set('omero.auto_sync', enabled);
+        };
+
+        window.updateOMERODefaultProject = function() {
+            const projectId = document.getElementById('omeroDefaultProject').value;
+            window.settingsManager.set('omero.default_project_id', projectId);
+        };
+
+        window.updateOMEROCreateDatasets = function() {
+            const enabled = document.getElementById('omeroCreateDatasets').checked;
+            window.settingsManager.set('omero.create_datasets', enabled);
+        };
+
+        window.updateOMEROVerifySSL = function() {
+            const enabled = document.getElementById('omeroVerifySSL').checked;
+            window.settingsManager.set('omero.verify_ssl', enabled);
+        };
+
+        window.testOMEROConnection = async function() {
+            const statusDiv = document.getElementById('omeroConnectionStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Testing OMERO connection...';
+                statusDiv.className = '';
+                
+                try {
+                    const result = await window.settingsManager.testOMEROConnection();
+                    statusDiv.textContent = result.message;
+                    statusDiv.className = result.success ? 'success-message' : 'error-message';
+                } catch (error) {
+                    statusDiv.textContent = 'OMERO connection test failed: ' + error.message;
+                    statusDiv.className = 'error-message';
+                }
+            }
+        };
+
+        window.resetSettings = function() {
+            if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+                window.settingsManager.reset();
+                loadSettingsIntoModal();
+                showSettingsMessage('Settings reset to defaults.', 'success');
+            }
+        };
+
+        window.exportSettings = function() {
+            const settings = window.settingsManager.export();
+            const blob = new Blob([settings], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'metafold-settings.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showSettingsMessage('Settings exported successfully.', 'success');
+        };
+
+        window.importSettings = function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const success = window.settingsManager.import(e.target.result);
+                        if (success) {
+                            loadSettingsIntoModal();
+                            showSettingsMessage('Settings imported successfully.', 'success');
+                        } else {
+                            showSettingsMessage('Failed to import settings.', 'error');
+                        }
+                    } catch (error) {
+                        showSettingsMessage('Invalid settings file.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        };
+
+        window.showSettingsMessage = function(message, type) {
+            // Create or update message element
+            let messageDiv = document.getElementById('settingsMessage');
+            if (!messageDiv) {
+                messageDiv = document.createElement('div');
+                messageDiv.id = 'settingsMessage';
+                messageDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    z-index: 10001;
+                    font-weight: 500;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                `;
+                document.body.appendChild(messageDiv);
+            }
+            
+            // Set message and style
+            messageDiv.textContent = message;
+            messageDiv.className = type + '-message';
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                if (messageDiv.parentElement) {
+                    messageDiv.remove();
+                }
+            }, 3000);
+        };
+
+        // Update elabFTW options visibility
+        window.updateElabFTWOptions = function() {
+            if (window.settingsManager) {
+                const elabftwOption = document.getElementById('elabftwOption');
+                const elabftwAutoInfo = document.getElementById('elabftwAutoInfo');
+                const elabftwManualOption = document.getElementById('elabftwManualOption');
+                
+                if (elabftwOption && elabftwAutoInfo && elabftwManualOption) {
+                    const enabled = window.settingsManager.get('elabftw.enabled');
+                    const autoSync = window.settingsManager.get('elabftw.auto_sync');
+                    
+                    if (enabled && window.templateTypeManager && window.templateTypeManager.isExperimentMode()) {
+                        elabftwOption.style.display = 'block';
+                        
+                        if (autoSync) {
+                            elabftwAutoInfo.style.display = 'block';
+                            elabftwManualOption.style.display = 'none';
+                        } else {
+                            elabftwAutoInfo.style.display = 'none';
+                            elabftwManualOption.style.display = 'block';
+                        }
+                    } else {
+                        elabftwOption.style.display = 'none';
+                    }
+                }
+            }
+        };
+
+        // Close settings modal on click outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('settingsModal');
+            if (event.target === modal) {
+                closeSettingsModal();
+            }
+        });
+    </script>
+
+	<script>
+	// Global handlers for OMERO Group and Project selection (Using new modular structure)
+	window.handleOMEROGroupSelection = function() {
+		if (window.omeroUIIntegration && window.omeroUIIntegration.handleGroupSelection) {
+			window.omeroUIIntegration.handleGroupSelection();
+		} else {
+			console.warn('OMERO UI Integration not available for group selection');
+		}
+	};
+
+	window.handleOMEROProjectSelection = function() {
+		if (window.omeroUIIntegration && window.omeroUIIntegration.handleProjectSelection) {
+			window.omeroUIIntegration.handleProjectSelection();
+		} else {
+			console.warn('OMERO UI Integration not available for project selection');
+		}
+	};
+
+	// Enhanced loadOMEROProjects function (Using new modular structure)
+	window.loadOMEROProjects = async function() {
+		if (!window.omeroUIIntegration) return;
+		
+		try {
+			await window.omeroUIIntegration.loadGroupsForDropdown();
+		} catch (error) {
+			console.error('Error loading OMERO groups and projects:', error);
+			if (window.omeroUIIntegration.loadProjectsForDropdown) {
+				window.omeroUIIntegration.loadProjectsForDropdown();
+			}
+		}
+	};
+
+	// Update OMERO options visibility (Using new modular structure)
+	window.updateOMEROOptions = function() {
+		if (window.omeroUIIntegration && window.omeroUIIntegration.updateOptionsVisibility) {
+			window.omeroUIIntegration.updateOptionsVisibility();
+		}
+	};
+
+	// Update OMERO status display (Using new modular structure)
+	window.updateOMEROStatus = async function() {
+		if (window.omeroUIIntegration && window.omeroUIIntegration.updateStatusDisplay) {
+			window.omeroUIIntegration.updateStatusDisplay();
+		}
+	};
+
+	// Inline connection test (Using new modular structure)
+	window.testOMEROConnectionInline = async function() {
+		if (!window.omeroUIIntegration) {
+			alert('OMERO UI integration not available');
+			return;
+		}
+		
+		try {
+			const result = await window.omeroUIIntegration.testConnection();
+			
+			if (result.success) {
+				alert(`✅ OMERO Connection Successful!\n\n${result.message}\n\nDetails:\n- Proxy URL: ${result.details?.proxyUrl || 'Unknown'}\n- Projects: ${result.details?.projectCount || 0}\n- Auth Method: ${result.details?.authMethod || 'Unknown'}`);
+				
+				// Refresh project list after successful connection
+				if (window.loadOMEROProjects) {
+					window.loadOMEROProjects();
+				}
+			} else {
+				alert(`❌ OMERO Connection Failed!\n\n${result.message}\n\n${result.details?.guidance || 'Check console for more details.'}`);
+			}
+			
+			// Update status display
+			if (window.updateOMEROStatus) {
+				window.updateOMEROStatus();
+			}
+			
+		} catch (error) {
+			console.error('OMERO connection test error:', error);
+			alert(`❌ OMERO Connection Test Failed!\n\nError: ${error.message}\n\nCheck console for details.`);
+		}
+	};
+</script>
+
+<script>
+// Enhanced OMERO testing functions (Using new modular structure)
+
+// Test connection with endpoint discovery
+window.testOMEROConnectionAdvanced = async function() {
+    const testResults = document.getElementById('omeroTestResults');
+    const testContent = document.getElementById('omeroTestContent');
+    
+    if (testResults && testContent) {
+        testResults.style.display = 'block';
+        testContent.innerHTML = '<div style="color: #0369a1;">🔄 Testing OMERO connection and discovering endpoints...</div>';
+    }
+    
+    try {
+        if (!window.testOMEROEndpointDiscovery) {
+            throw new Error('OMERO test functions not loaded. Please reload the page.');
+        }
+        
+        const result = await window.testOMEROEndpointDiscovery();
+        
+        if (result.success) {
+            const workingCount = Object.keys(result.workingEndpoints).length;
+            const failedCount = Object.keys(result.failedEndpoints).length;
+            
+            let html = '<div style="color: #059669; font-weight: 600; margin-bottom: 10px;">✅ Connection & Discovery Successful!</div>';
+            html += `<div style="margin-bottom: 8px;">📊 Working endpoints: ${workingCount}, Failed: ${failedCount}</div>`;
+            
+            html += '<div style="margin: 10px 0;"><strong>📝 Recommendations:</strong></div>';
+            html += `<div style="font-family: monospace; font-size: 0.9rem; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">`;
+            html += `Dataset creation: ${result.recommendations.datasetCreation}<br>`;
+            html += `Annotations: ${result.recommendations.annotations}<br>`;
+            html += `Projects: ${result.recommendations.projects}`;
+            html += '</div>';
+            
+            if (testContent) testContent.innerHTML = html;
+            
+            // Also update main connection status
+            const statusDiv = document.getElementById('omeroConnectionStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = `<div class="success-message">✅ Connection successful! ${workingCount} working endpoints discovered.</div>`;
+                statusDiv.className = 'success-message';
+            }
+            
+        } else {
+            let html = '<div style="color: #dc2626; font-weight: 600;">❌ Connection or Discovery Failed</div>';
+            html += `<div style="margin-top: 8px;">Error: ${result.error}</div>`;
+            
+            if (testContent) testContent.innerHTML = html;
+            
+            const statusDiv = document.getElementById('omeroConnectionStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = `<div class="error-message">❌ ${result.error}</div>`;
+                statusDiv.className = 'error-message';
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Advanced connection test error:', error);
+        
+        const errorHtml = `<div style="color: #dc2626; font-weight: 600;">❌ Test Error</div><div style="margin-top: 8px;">${error.message}</div>`;
+        if (testContent) testContent.innerHTML = errorHtml;
+        
+        const statusDiv = document.getElementById('omeroConnectionStatus');
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `<div class="error-message">❌ Test failed: ${error.message}</div>`;
+            statusDiv.className = 'error-message';
+        }
+    }
+};
+
+// Quick integration test
+window.runQuickOMEROTest = async function() {
+    const testResults = document.getElementById('omeroTestResults');
+    const testContent = document.getElementById('omeroTestContent');
+    
+    if (testResults && testContent) {
+        testResults.style.display = 'block';
+        testContent.innerHTML = '<div style="color: #0369a1;">🚀 Running quick OMERO integration test...</div>';
+    }
+    
+    try {
+        if (!window.quickOMEROTest) {
+            throw new Error('OMERO test functions not loaded. Please reload the page.');
+        }
+        
+        const result = await window.quickOMEROTest();
+        
+        if (result && result.integration && result.integration.success) {
+            let html = '<div style="color: #059669; font-weight: 600; margin-bottom: 10px;">🎉 Quick Test SUCCESS!</div>';
+            html += `<div style="margin-bottom: 5px;">📊 Dataset ID: ${result.integration.datasetId}</div>`;
+            html += `<div style="margin-bottom: 5px;">📝 Map Annotations: ${result.integration.mapAnnotationsAdded} fields</div>`;
+            html += `<div style="margin-bottom: 10px;">🔗 <a href="${result.integration.url}" target="_blank" style="color: #7c3aed;">View in OMERO</a></div>`;
+            html += `<div style="font-size: 0.9rem; color: #6b7280;">Working endpoint: ${result.integration.workingEndpoint}</div>`;
+            
+            if (testContent) testContent.innerHTML = html;
+            
+        } else {
+            const errorMsg = result?.integration?.message || 'Unknown error';
+            const html = `<div style="color: #dc2626; font-weight: 600;">❌ Quick Test Failed</div><div style="margin-top: 8px;">${errorMsg}</div>`;
+            if (testContent) testContent.innerHTML = html;
+        }
+        
+    } catch (error) {
+        console.error('❌ Quick test error:', error);
+        const errorHtml = `<div style="color: #dc2626; font-weight: 600;">❌ Quick Test Error</div><div style="margin-top: 8px;">${error.message}</div>`;
+        if (testContent) testContent.innerHTML = errorHtml;
+    }
+};
+
+// Test with current experiment data
+window.testCurrentExperimentData = async function() {
+    const testResults = document.getElementById('omeroTestResults');
+    const testContent = document.getElementById('omeroTestContent');
+    
+    if (testResults && testContent) {
+        testResults.style.display = 'block';
+        testContent.innerHTML = '<div style="color: #0369a1;">🧬 Testing with current experiment data...</div>';
+    }
+    
+    try {
+        if (!window.testWithCurrentExperimentData) {
+            throw new Error('OMERO test functions not loaded. Please reload the page.');
+        }
+        
+        const result = await window.testWithCurrentExperimentData();
+        
+        if (result && result.success) {
+            let html = '<div style="color: #059669; font-weight: 600; margin-bottom: 10px;">🎉 Experiment Data Test SUCCESS!</div>';
+            html += `<div style="margin-bottom: 5px;">📊 Dataset: ${result.datasetName}</div>`;
+            html += `<div style="margin-bottom: 5px;">📝 Metadata Fields: ${result.mapAnnotationsAdded}</div>`;
+            html += `<div style="margin-bottom: 10px;">🔗 <a href="${result.url}" target="_blank" style="color: #7c3aed;">View in OMERO</a></div>`;
+            html += `<div style="font-size: 0.9rem; color: #6b7280;">Authentication: ${result.loginMethod}</div>`;
+            
+            if (testContent) testContent.innerHTML = html;
+            
+        } else {
+            const errorMsg = result?.message || 'Unknown error';
+            const html = `<div style="color: #dc2626; font-weight: 600;">❌ Experiment Data Test Failed</div><div style="margin-top: 8px;">${errorMsg}</div>`;
+            if (testContent) testContent.innerHTML = html;
+        }
+        
+    } catch (error) {
+        console.error('❌ Experiment data test error:', error);
+        const errorHtml = `<div style="color: #dc2626; font-weight: 600;">❌ Experiment Data Test Error</div><div style="margin-top: 8px;">${error.message}</div>`;
+        if (testContent) testContent.innerHTML = errorHtml;
+    }
+};
+
+// Hide test results when other tabs are opened
+window.hideOMEROTestResults = function() {
+    const testResults = document.getElementById('omeroTestResults');
+    if (testResults) {
+        testResults.style.display = 'none';
+    }
+};
+
+// Override the existing switchSettingsTab to hide test results
+const originalSwitchSettingsTab = window.switchSettingsTab;
+window.switchSettingsTab = function(tabName) {
+    if (originalSwitchSettingsTab) {
+        originalSwitchSettingsTab(tabName);
+    }
+    
+    // Hide OMERO test results when switching away from OMERO tab
+    if (tabName !== 'omero') {
+        hideOMEROTestResults();
+    }
+};
+
+console.log('✅ Enhanced OMERO UI Integration loaded with modular structure');
+</script>
+
+</body>
+</html>

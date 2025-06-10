@@ -106,26 +106,76 @@ experiment_log.md`,
         return this.getDefaultTemplates();
     },
 
-    // Save templates
-    saveTemplates(templates) {
-        if (!this.isAvailable) return false;
+	// Save templates - ENHANCED with automatic group sharing
+	saveTemplates(templates) {
+		if (!this.isAvailable) return false;
+		
+		try {
+			const templatesWithMeta = templates.map(template => ({
+				...template,
+				createdBy: template.createdBy || window.userManager?.currentUser || 'Unknown',
+				createdByGroup: template.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+				createdAt: template.createdAt || new Date().toISOString()
+			}));
+			
+			// Save to user's own storage
+			localStorage.setItem(
+				this.getStorageKey('templates'), 
+				JSON.stringify(templatesWithMeta)
+			);
+			
+			// FIXED: Also save to group storage for sharing
+			this.saveToGroupStorage(templatesWithMeta);
+			
+			return true;
+		} catch (error) {
+			console.warn('Error saving templates:', error);
+			return false;
+		}
+	},
+
+// NEW: Save templates to group storage for sharing
+    saveToGroupStorage(templates) {
+        const currentUser = window.userManager?.currentUser;
+        const currentGroup = window.userManager?.currentGroup;
         
+        if (!currentUser || !currentGroup || currentGroup === 'Unknown') {
+            console.log('📝 No current group, skipping group template sharing');
+            return;
+        }
+
         try {
-            const templatesWithMeta = templates.map(template => ({
-                ...template,
-                createdBy: template.createdBy || window.userManager?.currentUser || 'Unknown',
-                createdByGroup: template.createdByGroup || window.userManager?.currentGroup || 'Unknown',
-                createdAt: template.createdAt || new Date().toISOString()
+            const groupKey = `metafold_group_${currentGroup}_templates`;
+            
+            // Get existing group templates
+            let existingGroupTemplates = [];
+            try {
+                const stored = localStorage.getItem(groupKey);
+                existingGroupTemplates = stored ? JSON.parse(stored) : [];
+            } catch (error) {
+                console.warn('Could not load existing group templates:', error);
+                existingGroupTemplates = [];
+            }
+            
+            // Remove old templates from this user
+            const filteredTemplates = existingGroupTemplates.filter(t => t.createdBy !== currentUser);
+            
+            // Add current user's templates for sharing
+            const userTemplatesForGroup = templates.map(t => ({
+                ...t,
+                sharedBy: currentUser,
+                sharedAt: new Date().toISOString()
             }));
             
-            localStorage.setItem(
-                this.getStorageKey('templates'), 
-                JSON.stringify(templatesWithMeta)
-            );
-            return true;
+            const updatedGroupTemplates = [...filteredTemplates, ...userTemplatesForGroup];
+            
+            // Save to group storage
+            localStorage.setItem(groupKey, JSON.stringify(updatedGroupTemplates));
+            
+            console.log(`🤝 Shared ${templates.length} templates to group "${currentGroup}" (key: ${groupKey})`);
+            
         } catch (error) {
-            console.warn('Error saving templates:', error);
-            return false;
+            console.warn('Could not save to group templates:', error);
         }
     },
 
@@ -140,31 +190,32 @@ experiment_log.md`,
     },
 
     // Load group templates (placeholder for now)
-    loadGroupTemplates(groupName) {
-        if (!this.isAvailable || !groupName) return [];
-        
-        const allKeys = Object.keys(localStorage);
-        const groupTemplates = [];
-        
-        allKeys.forEach(key => {
-            // Look for templates from same group but different users
-            if (key.startsWith(`metafold_${groupName}_`) && 
-                key.endsWith('_templates') && 
-                key !== this.getStorageKey('templates')) {
-                try {
-                    const templates = JSON.parse(localStorage.getItem(key));
-                    if (templates && Array.isArray(templates)) {
-                        groupTemplates.push(...this.addTemplateMetadata(templates));
-                    }
-                } catch (error) {
-                    console.warn('Error loading group templates:', error);
-                }
-            }
-        });
-        
-        return groupTemplates;
-    },
+   loadGroupTemplates(groupName) {
+        if (!this.isAvailable || !groupName) {
+            console.log('📚 No group name provided for loading group templates');
+            return [];
+        }
 
+        try {
+            const groupKey = `metafold_group_${groupName}_templates`;
+            const stored = localStorage.getItem(groupKey);
+            let groupTemplates = stored ? JSON.parse(stored) : [];
+            
+            // Filter out current user's templates (they see their own separately)
+            const currentUser = window.userManager?.currentUser;
+            if (currentUser) {
+                groupTemplates = groupTemplates.filter(t => t.createdBy !== currentUser);
+            }
+            
+            console.log(`🤝 Loaded ${groupTemplates.length} group templates from "${groupName}" (key: ${groupKey})`);
+            return this.addTemplateMetadata(groupTemplates);
+            
+        } catch (error) {
+            console.warn(`Could not load group templates for "${groupName}":`, error);
+            return [];
+        }
+    },
+   
     // Legacy compatibility methods
     addTemplate(template, templates) {
         templates.push(template);

@@ -16,144 +16,68 @@
 </head>
 <body>
     <div class="container">
-
-	<!-- LEFT SIDEBAR - Template Selection (ENHANCED with Search & Toggle) -->
-	<div class="sidebar">
-		<div class="header">
-			<h1>📁 MetaFold</h1>
-			
-			<div class="template-type-selector">
-				<button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
-					📂 Folders
-				</button>
-				<button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
-					🧪 Experiments
-				</button>
-			</div>
-			
-			<!-- Current User Display with Shared Templates Toggle -->
-			<div id="currentUserDisplay" style="
-				margin: 15px 0;
-				padding: 12px;
-				background: rgba(124, 58, 237, 0.1);
-				border: 1px solid rgba(124, 58, 237, 0.3);
-				border-radius: 8px;
-				text-align: center;
-			">
-				<div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
-					<div id="currentUserAvatar" style="
-						width: 24px;
-						height: 24px;
-						border-radius: 50%;
-						background: #7c3aed;
-						color: white;
-						display: flex;
-						align-items: center;
-						justify-content: center;
-						font-weight: bold;
-						font-size: 0.7rem;
-					">U</div>
-					<span id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</span>
-				</div>
-				<div id="currentUserGroup" style="color: #9ca3af; font-size: 0.8rem;">Default</div>
-				
-				<!-- NEW: Shared Templates Toggle -->
-				<div id="sharedTemplatesToggle" style="
-					margin-top: 8px; 
-					padding: 6px 0; 
-					border-top: 1px solid rgba(124, 58, 237, 0.2);
-					display: none;
-				">
-					<label style="
-						display: flex; 
-						align-items: center; 
-						justify-content: center; 
-						gap: 6px; 
-						font-size: 0.8rem; 
-						color: #9ca3af; 
-						cursor: pointer;
-					">
-						<input type="checkbox" id="showSharedTemplates" 
-							   checked 
-							   onchange="templateManager.toggleSharedTemplates()"
-							   style="width: auto; transform: scale(0.9);">
-						<span>🤝 Show shared templates</span>
-					</label>
-				</div>
-			</div>
-			
-			<!-- NEW: Template Search -->
-			<div class="template-search" style="margin-bottom: 15px;">
-				<div class="search-container" style="position: relative;">
-					<input type="text" 
-						   id="templateSearchInput" 
-						   placeholder="🔍 Search templates..." 
-						   onInput="templateManager.handleSearch()"
-						   onFocus="templateManager.showSearchSuggestions()"
-						   onBlur="templateManager.hideSearchSuggestions()"
-						   style="
-							   width: 100%;
-							   padding: 10px 12px;
-							   background: rgba(255, 255, 255, 0.08);
-							   border: 1px solid rgba(255, 255, 255, 0.2);
-							   border-radius: 8px;
-							   color: #e0e0e0;
-							   font-size: 14px;
-							   transition: all 0.3s ease;
-						   ">
-					
-					<!-- Search Suggestions Dropdown -->
-					<div id="searchSuggestions" style="
-						position: absolute;
-						top: 100%;
-						left: 0;
-						right: 0;
-						background: linear-gradient(135deg, #2a2a40, #1e1e2e);
-						border: 1px solid rgba(255, 255, 255, 0.2);
-						border-radius: 8px;
-						box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-						display: none;
-						z-index: 1000;
-						max-height: 200px;
-						overflow-y: auto;
-						margin-top: 4px;
-					">
-						<!-- Suggestions will be populated by JavaScript -->
-					</div>
-				</div>
-				
-				<!-- Search Status -->
-				<div id="searchStatus" style="
-					margin-top: 6px;
-					font-size: 0.75rem;
-					color: #6b7280;
-					text-align: center;
-					display: none;
-				"></div>
-			</div>
-			
-			<button class="btn" onclick="showTemplateModal()">New Template</button>
-			
-			<!-- Switch User Button -->
-			<button class="btn btn-secondary" onclick="showSwitchUserModal()" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-				<span>👥</span>
-				<span>Switch User</span>
-			</button>
-			
-			<button class="btn btn-secondary" onclick="showSettingsModal()" style="margin-top: 10px;">⚙️ Settings</button>
-		</div>
-		
-		<!-- TEMPLATE LIST - Enhanced with Search Results -->
-		<div id="templateList">
-			<div class="empty-state">
-				<svg fill="currentColor" viewBox="0 0 20 20">
-					<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-				</svg>
-				<p>No templates available yet.<br>Create your first template!</p>
-			</div>
-		</div>
-	</div>
-
+        <!-- LEFT SIDEBAR - Template Selection (RESTORED) -->
+        <div class="sidebar">
+            <div class="header">
+                <h1>📁 MetaFold</h1>
+                
+                <div class="template-type-selector">
+                    <button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
+                        📂 Folders
+                    </button>
+                    <button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
+                        🧪 Experiments
+                    </button>
+                </div>
+                
+                <!-- Current User Display -->
+                <div id="currentUserDisplay" style="
+                    margin: 15px 0;
+                    padding: 12px;
+                    background: rgba(124, 58, 237, 0.1);
+                    border: 1px solid rgba(124, 58, 237, 0.3);
+                    border-radius: 8px;
+                    text-align: center;
+                ">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
+                        <div id="currentUserAvatar" style="
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            background: #7c3aed;
+                            color: white;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-weight: bold;
+                            font-size: 0.7rem;
+                        ">U</div>
+                        <span id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</span>
+                    </div>
+                    <div id="currentUserGroup" style="color: #9ca3af; font-size: 0.8rem;">Default</div>
+                </div>
+                
+                <button class="btn" onclick="showTemplateModal()">New Template</button>
+                
+                <!-- Switch User Button -->
+                <button class="btn btn-secondary" onclick="showSwitchUserModal()" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span>👥</span>
+                    <span>Switch User</span>
+                </button>
+                
+                <button class="btn btn-secondary" onclick="showSettingsModal()" style="margin-top: 10px;">⚙️ Settings</button>
+            </div>
+            
+            <!-- TEMPLATE LIST - This was missing proper positioning -->
+            <div id="templateList">
+                <div class="empty-state">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                    </svg>
+                    <p>No templates available yet.<br>Create your first template!</p>
+                </div>
+            </div>
+        </div>
 
         <!-- RIGHT MAIN CONTENT - Project Manager -->
         <div class="main-content">
@@ -461,88 +385,6 @@
                         <button class="btn btn-secondary" onclick="testElabFTWConnection()">🔍 Test Connection</button>
                         <div id="elabftwConnectionStatus" style="margin-top: 10px; display: none;"></div>
                     </div>
-					
-					<!-- CONFLICT RESOLUTION SETTINGS -->
-					<div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px; margin-top: 15px;">
-						<label style="color: #a855f7; font-size: 1.1rem; margin-bottom: 10px; display: block;">
-							🔄 Field Conflict Handling
-						</label>
-						
-						<div style="margin-bottom: 15px;">
-							<label style="display: flex; align-items: center; gap: 8px;">
-								<input type="checkbox" id="elabftwOverwriteEnabled" onchange="updateElabFTWOverwrite()">
-								<span>⚠️ Overwrite existing fields</span>
-							</label>
-							<small style="color: #9ca3af; margin-left: 24px; display: block; margin-top: 4px;">
-								<strong>Default:</strong> Fields with same names will be versioned (safe mode)<br>
-								<strong>When checked:</strong> Fields with same names will be overwritten (data loss possible)
-							</small>
-						</div>
-						
-						<div id="elabftwVersioningInfo" style="margin-left: 20px; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; border-left: 3px solid #22c55e;">
-							<div style="margin-bottom: 10px;">
-								<strong style="color: #16a34a;">✅ Safe Mode Active (Recommended)</strong>
-								<div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
-									When field names conflict, new versions will be created automatically
-								</div>
-							</div>
-							
-							<label for="elabftwVersioningFormat" style="display: block; font-weight: 500; margin-bottom: 5px; color: #16a34a;">
-								📅 Versioning Format:
-							</label>
-							<select id="elabftwVersioningFormat" onchange="updateElabFTWVersioningFormat()" style="width: 100%; padding: 6px 10px; border: 1px solid #22c55e; border-radius: 4px; background: white; color: #374151;">
-								<option value="timestamp">Timestamp (Field_2024-06-06T14-30-45)</option>
-								<option value="date">Date (Field_2024-06-06)</option>
-								<option value="counter">Counter (Field_v2, Field_v3, ...)</option>
-							</select>
-							<small style="color: #6b7280; display: block; margin-top: 4px;">
-								Choose how versioned field names should be formatted
-							</small>
-							
-							<!-- Safe Mode Preview -->
-							<div style="margin-top: 10px; padding: 8px; background: rgba(34, 197, 94, 0.1); border-radius: 4px; border-left: 3px solid #22c55e;">
-								<strong style="color: #16a34a;">Example (Safe Mode):</strong>
-								<div id="versioningPreview" style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
-									Existing: "Hypothesis" → New: "Hypothesis_2024-06-06"
-								</div>
-							</div>
-						</div>
-						
-						<!-- Overwrite Warning (hidden by default) -->
-						<div id="elabftwOverwriteWarning" style="display: none; margin-left: 20px; padding: 10px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border-left: 3px solid #ef4444;">
-							<div style="margin-bottom: 8px;">
-								<strong style="color: #dc2626;">⚠️ Overwrite Mode Active</strong>
-								<div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
-									Fields with the same name will replace existing data
-								</div>
-							</div>
-							
-							<div style="padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border-left: 3px solid #ef4444;">
-								<strong style="color: #dc2626;">Example (Overwrite Mode):</strong>
-								<div style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
-									Existing: "Hypothesis: Old Value" → Becomes: "Hypothesis: New Value"
-								</div>
-								<div style="color: #dc2626; font-size: 11px; margin-top: 2px; font-weight: 500;">
-									⚠️ Original value will be lost permanently
-								</div>
-							</div>
-						</div>
-						
-						<!-- DEBUG BUTTON -->
-						<div style="margin-top: 15px; text-align: center;">
-							<button type="button" onclick="testConflictSettings()" style="
-								background: #6366f1;
-								color: white;
-								border: none;
-								padding: 6px 12px;
-								border-radius: 4px;
-								cursor: pointer;
-								font-size: 12px;
-							">
-								🧪 Test Settings
-							</button>
-						</div>
-					</div>
                 </div>
             </div>
 
@@ -1060,29 +902,6 @@ experiment_log.md"></textarea>
                     elabftwConfigEl.style.display = elabftwEnabled ? 'block' : 'none';
                 }
 
-                // CONFLICT RESOLUTION SETTINGS
-                const overwriteEnabled = await sm.get('elabftw.overwrite_enabled');
-                const versioningFormat = await sm.get('elabftw.versioning_format');
-                
-                const overwriteEnabledEl = document.getElementById('elabftwOverwriteEnabled');
-                const versioningFormatEl = document.getElementById('elabftwVersioningFormat');
-                const versioningInfoEl = document.getElementById('elabftwVersioningInfo');
-                const overwriteWarningEl = document.getElementById('elabftwOverwriteWarning');
-                
-                if (overwriteEnabledEl) overwriteEnabledEl.checked = overwriteEnabled === true;
-                if (versioningFormatEl) versioningFormatEl.value = versioningFormat || 'date';
-                
-                // Show appropriate section
-                if (versioningInfoEl && overwriteWarningEl) {
-                    if (overwriteEnabled === true) {
-                        versioningInfoEl.style.display = 'none';
-                        overwriteWarningEl.style.display = 'block';
-                    } else {
-                        versioningInfoEl.style.display = 'block';
-                        overwriteWarningEl.style.display = 'none';
-                    }
-                }
-
                 // OMERO settings
                 const omeroEnabled = await sm.get('omero.enabled');
                 const omeroEnabledEl = document.getElementById('omeroEnabled');
@@ -1263,103 +1082,6 @@ experiment_log.md"></textarea>
                     statusDiv.textContent = 'Connection test failed: ' + error.message;
                     statusDiv.className = 'error-message';
                 }
-            }
-        };
-
-        // =================== ELABFTW CONFLICT RESOLUTION SETTINGS ===================
-
-        // MISSING: updateElabFTWOverwrite function
-        window.updateElabFTWOverwrite = async function() {
-            try {
-                const enabled = document.getElementById('elabftwOverwriteEnabled').checked;
-                await window.settingsManager.set('elabftw.overwrite_enabled', enabled);
-                
-                // Update UI to show appropriate sections
-                const versioningInfoEl = document.getElementById('elabftwVersioningInfo');
-                const overwriteWarningEl = document.getElementById('elabftwOverwriteWarning');
-                
-                if (versioningInfoEl && overwriteWarningEl) {
-                    if (enabled) {
-                        versioningInfoEl.style.display = 'none';
-                        overwriteWarningEl.style.display = 'block';
-                    } else {
-                        versioningInfoEl.style.display = 'block';
-                        overwriteWarningEl.style.display = 'none';
-                    }
-                }
-                
-                console.log('🔄 elabFTW overwrite setting updated:', enabled);
-            } catch (error) {
-                console.error('Error updating elabFTW overwrite setting:', error);
-            }
-        };
-
-        // MISSING: updateElabFTWVersioningFormat function
-        window.updateElabFTWVersioningFormat = async function() {
-            try {
-                const format = document.getElementById('elabftwVersioningFormat').value;
-                await window.settingsManager.set('elabftw.versioning_format', format);
-                
-                // Update preview
-                window.updateVersioningPreview();
-                
-                console.log('📅 elabFTW versioning format updated:', format);
-            } catch (error) {
-                console.error('Error updating elabFTW versioning format:', error);
-            }
-        };
-
-        // MISSING: updateVersioningPreview function
-        window.updateVersioningPreview = function() {
-            const previewEl = document.getElementById('versioningPreview');
-            if (!previewEl) return;
-            
-            const formatSelect = document.getElementById('elabftwVersioningFormat');
-            const format = formatSelect ? formatSelect.value : 'date';
-            
-            const now = new Date();
-            let exampleSuffix;
-            
-            switch (format) {
-                case 'timestamp':
-                    exampleSuffix = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                    break;
-                case 'date':
-                    exampleSuffix = now.toISOString().split('T')[0];
-                    break;
-                case 'counter':
-                    exampleSuffix = 'v2';
-                    break;
-                default:
-                    exampleSuffix = now.toISOString().split('T')[0];
-            }
-            
-            previewEl.textContent = `Existing: "Hypothesis" → New: "Hypothesis_${exampleSuffix}"`;
-        };
-
-        // MISSING: testConflictSettings function (Debug)
-        window.testConflictSettings = async function() {
-            try {
-                const overwriteEnabled = await window.settingsManager.get('elabftw.overwrite_enabled');
-                const versioningFormat = await window.settingsManager.get('elabftw.versioning_format');
-                
-                const mode = overwriteEnabled ? 'OVERWRITE' : 'VERSIONING';
-                const details = overwriteEnabled ? 
-                    'Fields will be overwritten directly' : 
-                    `New versions created using ${versioningFormat} format`;
-                
-                alert(`🧪 Conflict Settings Test\n\nMode: ${mode}\nFormat: ${versioningFormat}\nBehavior: ${details}\n\nSettings are working correctly!`);
-                
-                console.log('🧪 Conflict settings test:', {
-                    overwriteEnabled,
-                    versioningFormat,
-                    mode,
-                    details
-                });
-                
-            } catch (error) {
-                console.error('Error testing conflict settings:', error);
-                alert(`❌ Error testing settings: ${error.message}`);
             }
         };
 

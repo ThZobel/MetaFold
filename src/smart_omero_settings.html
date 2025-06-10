@@ -1,0 +1,669 @@
+<!-- Smart OMERO Settings with Institution Presets and Proxy Detection -->
+<div id="omeroSettings" class="settings-tab-content">
+    <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="omeroEnabled" onchange="updateOMEROSetting()">
+            <span>🔬 Enable OMERO Integration</span>
+        </label>
+        <small>Connect MetaFold with your OMERO image data management system.</small>
+    </div>
+
+    <div id="omeroConfig" style="display: none;">
+        <!-- Institution Presets -->
+        <div class="form-group">
+            <label for="omeroInstitutionPreset">🏛️ Institution Preset:</label>
+            <select id="omeroInstitutionPreset" onchange="applyInstitutionPreset()">
+                <option value="">-- Select your institution --</option>
+                <option value="uni-muenster">🇩🇪 University of Münster</option>
+                <option value="uni-heidelberg">🇩🇪 University of Heidelberg</option>
+                <option value="mpi-cbg">🇩🇪 MPI-CBG Dresden</option>
+                <option value="embl">🇪🇺 EMBL Heidelberg</option>
+                <option value="custom">⚙️ Custom Configuration</option>
+            </select>
+            <small>Choose your institution for pre-configured OMERO settings, or select "Custom" for manual setup.</small>
+        </div>
+
+        <!-- Server Configuration -->
+        <div id="omeroServerConfig" class="form-group" style="display: none;">
+            <label for="omeroServerUrl">🌐 OMERO Server URL:</label>
+            <input type="url" id="omeroServerUrl" placeholder="https://your-omero-server.com" onchange="updateOMEROServerUrl()">
+            <small>Full URL to your OMERO.web server (including https://)</small>
+            
+            <!-- Proxy Status -->
+            <div id="omeroProxyStatus" style="margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 13px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span id="omeroProxyIcon">⏳</span>
+                    <span id="omeroProxyText">Checking proxy status...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="omeroAuthSection" style="display: none;">
+            <div class="form-group">
+                <label>🔐 Authentication:</label>
+                
+                <!-- Primary Auth: Username/Password -->
+                <div style="background: rgba(124, 58, 237, 0.1); border: 1px solid #7c3aed; border-radius: 8px; padding: 15px; margin: 10px 0;">
+                    <h4 style="color: #a855f7; margin: 0 0 10px 0;">👤 Login Credentials</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <label for="omeroUsername" style="display: block; margin-bottom: 5px; font-weight: 500; color: #d1d5db;">Username:</label>
+                            <input type="text" id="omeroUsername" placeholder="your.username" onchange="updateOMEROUsername()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #e0e0e0;">
+                        </div>
+                        <div>
+                            <label for="omeroPassword" style="display: block; margin-bottom: 5px; font-weight: 500; color: #d1d5db;">Password:</label>
+                            <div style="position: relative;">
+                                <input type="password" id="omeroPassword" placeholder="your.password" onchange="updateOMEROPassword()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #e0e0e0;">
+                                <button type="button" onclick="togglePasswordVisibility()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #9ca3af; cursor: pointer;">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                            <input type="checkbox" id="omeroRememberCredentials" onchange="updateOMERORememberCredentials()" style="width: auto;">
+                            <span>💾 Remember credentials (stored securely locally)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Advanced Options (Collapsible) -->
+                <div style="margin-top: 15px;">
+                    <button type="button" onclick="toggleAdvancedAuth()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                        <span id="advancedAuthToggle">▶️</span> Advanced Authentication Options
+                    </button>
+                    
+                    <div id="omeroAdvancedAuth" style="display: none; margin-top: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 15px;">
+                        <h5 style="color: #a855f7; margin: 0 0 10px 0;">🍪 Session Cookies (Advanced)</h5>
+                        <p style="color: #9ca3af; font-size: 13px; margin-bottom: 15px;">
+                            Alternative method: Copy session cookies from your browser after manual login to OMERO.web
+                        </p>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label for="omeroSessionId" style="display: block; margin-bottom: 5px; font-size: 12px; color: #9ca3af;">Session ID:</label>
+                                <input type="text" id="omeroSessionId" placeholder="sessionid cookie value" onchange="updateOMEROSessionId()" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); color: #e0e0e0;">
+                            </div>
+                            <div>
+                                <label for="omeroCSRFToken" style="display: block; margin-bottom: 5px; font-size: 12px; color: #9ca3af;">CSRF Token:</label>
+                                <input type="text" id="omeroCSRFToken" placeholder="csrftoken cookie value" onchange="updateOMEROCSRFToken()" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); color: #e0e0e0;">
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 10px;">
+                            <button type="button" onclick="showCookieInstructions()" style="background: rgba(124, 58, 237, 0.2); border: 1px solid #7c3aed; color: #e0e0e0; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                ❓ How to get cookies
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Integration Options -->
+        <div id="omeroIntegrationOptions" style="display: none;">
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="omeroAutoSync" onchange="updateOMEROAutoSync()">
+                    <span>🔄 Auto-sync experiments</span>
+                </label>
+                <small>Automatically create datasets in OMERO when creating experiment projects.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="omeroDefaultProject">📁 Default Project ID (optional):</label>
+                <input type="number" id="omeroDefaultProject" placeholder="Leave empty for standalone datasets" onchange="updateOMERODefaultProject()">
+                <small>Default OMERO project ID to link new datasets to.</small>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="omeroCreateDatasets" onchange="updateOMEROCreateDatasets()">
+                    <span>🗂️ Create datasets</span>
+                </label>
+                <small>Create datasets in OMERO (disable if you only want metadata annotations).</small>
+            </div>
+        </div>
+
+        <!-- Connection Testing -->
+        <div id="omeroTestingSection" style="display: none;">
+            <div class="form-group">
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="btn btn-secondary" onclick="testOMEROConnection()" style="margin-right: 10px;">🔍 Test Connection</button>
+                    <button class="btn btn-secondary" onclick="runOMERODiagnosis()">🔧 Run Diagnosis</button>
+                </div>
+                
+                <div id="omeroConnectionStatus" style="display: none;"></div>
+                
+                <!-- Connection Status Display -->
+                <div id="omeroConnectionInfo" style="padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span id="omeroStatusIcon">❓</span>
+                        <span id="omeroStatusText" style="font-weight: 500;">OMERO Status: Not tested</span>
+                    </div>
+                    <div id="omeroStatusDetails" style="font-size: 12px; color: #9ca3af; display: none;">
+                        <div>Login Method: <span id="omeroLoginMethod">-</span></div>
+                        <div>Projects Accessible: <span id="omeroProjectCount">-</span></div>
+                        <div>Session Type: <span id="omeroSessionType">-</span></div>
+                        <div>Server URL: <span id="omeroActiveServerUrl">-</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Smart OMERO Settings with Institution Presets
+
+// Institution Presets Database
+const institutionPresets = {
+    'uni-muenster': {
+        name: 'University of Münster',
+        serverUrl: 'https://omero-imaging.uni-muenster.de',
+        proxyRequired: true,
+        notes: 'Uses CORS proxy for browser access'
+    },
+    'uni-heidelberg': {
+        name: 'University of Heidelberg',
+        serverUrl: 'https://omero.hd-hub.de',
+        proxyRequired: true,
+        notes: 'Check with local IT for exact URL'
+    },
+    'mpi-cbg': {
+        name: 'MPI-CBG Dresden',
+        serverUrl: 'https://omero.mpi-cbg.de',
+        proxyRequired: true,
+        notes: 'Internal network access may vary'
+    },
+    'embl': {
+        name: 'EMBL Heidelberg',
+        serverUrl: 'https://omero.embl.de',
+        proxyRequired: true,
+        notes: 'Check EMBL IT documentation'
+    }
+};
+
+// Apply institution preset
+window.applyInstitutionPreset = function() {
+    const presetSelect = document.getElementById('omeroInstitutionPreset');
+    const serverConfig = document.getElementById('omeroServerConfig');
+    const authSection = document.getElementById('omeroAuthSection');
+    const integrationOptions = document.getElementById('omeroIntegrationOptions');
+    const testingSection = document.getElementById('omeroTestingSection');
+    
+    const selectedPreset = presetSelect.value;
+    
+    if (selectedPreset === '') {
+        // No preset selected
+        serverConfig.style.display = 'none';
+        authSection.style.display = 'none';
+        integrationOptions.style.display = 'none';
+        testingSection.style.display = 'none';
+        return;
+    }
+    
+    if (selectedPreset === 'custom') {
+        // Custom configuration
+        serverConfig.style.display = 'block';
+        authSection.style.display = 'block';
+        integrationOptions.style.display = 'block';
+        testingSection.style.display = 'block';
+        
+        const serverUrlInput = document.getElementById('omeroServerUrl');
+        serverUrlInput.value = '';
+        serverUrlInput.placeholder = 'https://your-omero-server.com';
+        
+    } else if (institutionPresets[selectedPreset]) {
+        // Apply preset
+        const preset = institutionPresets[selectedPreset];
+        
+        serverConfig.style.display = 'block';
+        authSection.style.display = 'block';
+        integrationOptions.style.display = 'block';
+        testingSection.style.display = 'block';
+        
+        const serverUrlInput = document.getElementById('omeroServerUrl');
+        serverUrlInput.value = preset.serverUrl;
+        window.settingsManager.set('omero.server_url', preset.serverUrl);
+        
+        // Update proxy status
+        updateProxyStatus(preset.serverUrl, preset.proxyRequired);
+        
+        console.log(`🏛️ Applied preset for ${preset.name}`);
+    }
+};
+
+// Check and update proxy status
+window.updateProxyStatus = async function(serverUrl, proxyRequired = true) {
+    const proxyStatus = document.getElementById('omeroProxyStatus');
+    const proxyIcon = document.getElementById('omeroProxyIcon');
+    const proxyText = document.getElementById('omeroProxyText');
+    
+    if (!proxyRequired) {
+        proxyStatus.style.background = 'rgba(16, 185, 129, 0.1)';
+        proxyStatus.style.border = '1px solid #10b981';
+        proxyIcon.textContent = '✅';
+        proxyText.textContent = 'Direct connection (no proxy needed)';
+        return;
+    }
+    
+    // Check if proxy is running
+    try {
+        const response = await fetch('http://localhost:3000/proxy-status');
+        if (response.ok) {
+            const data = await response.json();
+            
+            proxyStatus.style.background = 'rgba(16, 185, 129, 0.1)';
+            proxyStatus.style.border = '1px solid #10b981';
+            proxyIcon.textContent = '✅';
+            proxyText.textContent = `Proxy running (${data.active_sessions || 0} sessions)`;
+            
+        } else {
+            throw new Error('Proxy not responding');
+        }
+    } catch (error) {
+        proxyStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+        proxyStatus.style.border = '1px solid #ef4444';
+        proxyIcon.textContent = '❌';
+        proxyText.innerHTML = 'Proxy not running - <a href="#" onclick="showProxyInstructions()" style="color: #60a5fa;">Start proxy server</a>';
+    }
+};
+
+// Show proxy setup instructions
+window.showProxyInstructions = function() {
+    const instructions = `
+🔧 OMERO Proxy Setup Instructions:
+
+1. Open terminal/command prompt in your MetaFold directory
+2. Run: python omero_proxy.py
+3. You should see: "MetaFold OMERO Proxy Server running on port 3000"
+4. Keep the proxy running while using OMERO features
+
+The proxy is needed to bypass CORS restrictions when connecting to OMERO from the browser.
+    `;
+    alert(instructions);
+};
+
+// Toggle password visibility
+window.togglePasswordVisibility = function() {
+    const passwordInput = document.getElementById('omeroPassword');
+    const button = event.target;
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        button.textContent = '🙈';
+    } else {
+        passwordInput.type = 'password';
+        button.textContent = '👁️';
+    }
+};
+
+// Toggle advanced auth options
+window.toggleAdvancedAuth = function() {
+    const advancedSection = document.getElementById('omeroAdvancedAuth');
+    const toggleIcon = document.getElementById('advancedAuthToggle');
+    
+    if (advancedSection.style.display === 'none') {
+        advancedSection.style.display = 'block';
+        toggleIcon.textContent = '▼️';
+    } else {
+        advancedSection.style.display = 'none';
+        toggleIcon.textContent = '▶️';
+    }
+};
+
+// Show cookie extraction instructions
+window.showCookieInstructions = function() {
+    const instructions = `
+🍪 How to extract OMERO session cookies:
+
+1. Open your OMERO.web URL in another browser tab
+2. Login with your normal OMERO credentials
+3. Press F12 (Developer Tools)
+4. Go to Console tab
+5. Type: document.cookie
+6. Press Enter
+7. Copy the sessionid and csrftoken values
+8. Paste them in the fields above
+
+Note: Session cookies expire periodically and need to be refreshed.
+Username/Password login is usually more convenient.
+    `;
+    alert(instructions);
+};
+
+// Enhanced settings update functions
+window.updateOMEROUsername = function() {
+    const username = document.getElementById('omeroUsername').value;
+    window.settingsManager.set('omero.username', username);
+};
+
+window.updateOMEROPassword = function() {
+    const password = document.getElementById('omeroPassword').value;
+    if (document.getElementById('omeroRememberCredentials').checked) {
+        // TODO: Implement secure storage (encryption)
+        window.settingsManager.set('omero.password', password);
+    } else {
+        window.settingsManager.set('omero.password', '');
+    }
+};
+
+window.updateOMERORememberCredentials = function() {
+    const remember = document.getElementById('omeroRememberCredentials').checked;
+    window.settingsManager.set('omero.remember_credentials', remember);
+    
+    if (!remember) {
+        // Clear stored password
+        window.settingsManager.set('omero.password', '');
+        document.getElementById('omeroPassword').value = '';
+    }
+};
+
+window.updateOMEROSessionId = function() {
+    const sessionId = document.getElementById('omeroSessionId').value;
+    window.settingsManager.set('omero.session_id', sessionId);
+};
+
+window.updateOMEROCSRFToken = function() {
+    const csrfToken = document.getElementById('omeroCSRFToken').value;
+    window.settingsManager.set('omero.csrf_token', csrfToken);
+};
+
+// Enhanced connection test with smart URL detection
+window.testOMEROConnection = async function() {
+    const statusDiv = document.getElementById('omeroConnectionStatus');
+    const statusIcon = document.getElementById('omeroStatusIcon');
+    const statusText = document.getElementById('omeroStatusText');
+    const statusDetails = document.getElementById('omeroStatusDetails');
+    
+    statusDiv.style.display = 'block';
+    statusDiv.textContent = 'Testing OMERO connection with smart proxy detection...';
+    statusDiv.className = '';
+    
+    // Update status display
+    if (statusIcon) statusIcon.textContent = '⏳';
+    if (statusText) statusText.textContent = 'OMERO Status: Testing...';
+    if (statusDetails) statusDetails.style.display = 'none';
+    
+    try {
+        // Smart URL detection
+        const serverUrl = document.getElementById('omeroServerUrl').value;
+        let testUrl = serverUrl;
+        
+        // Check if proxy is needed and available
+        if (serverUrl.includes('omero-imaging.uni-muenster.de') || 
+            serverUrl.includes('omero.') || 
+            serverUrl.includes('localhost') === false) {
+            
+            // Try proxy first
+            try {
+                await fetch('http://localhost:3000/proxy-status');
+                testUrl = 'http://localhost:3000/omero-api';
+                console.log('🔗 Using proxy for connection:', testUrl);
+            } catch (proxyError) {
+                console.warn('⚠️ Proxy not available, trying direct connection');
+            }
+        }
+        
+        // Initialize client with detected URL
+        if (window.omeroIntegration) {
+            window.settingsManager.set('omero.server_url', testUrl);
+            const result = await window.settingsManager.testOMEROConnection();
+            
+            // Update main status
+            statusDiv.textContent = result.message;
+            statusDiv.className = result.success ? 'success-message' : 'error-message';
+            
+            // Update detailed status
+            if (result.success && result.details) {
+                const details = result.details;
+                
+                if (statusIcon) {
+                    statusIcon.textContent = details.isAuthenticated ? '🔐' : '🌐';
+                }
+                
+                if (statusText) {
+                    const authType = details.isAuthenticated ? 'Private' : 'Public';
+                    statusText.textContent = `OMERO Status: Connected (${authType})`;
+                }
+                
+                if (statusDetails) {
+                    statusDetails.style.display = 'block';
+                    
+                    document.getElementById('omeroLoginMethod').textContent = details.loginMethod || 'Unknown';
+                    document.getElementById('omeroProjectCount').textContent = details.projectCount || '0';
+                    document.getElementById('omeroSessionType').textContent = details.isAuthenticated ? 'Authenticated' : 'Public Group';
+                    document.getElementById('omeroActiveServerUrl').textContent = testUrl;
+                }
+            } else {
+                // Error state
+                if (statusIcon) statusIcon.textContent = '❌';
+                if (statusText) statusText.textContent = 'OMERO Status: Connection failed';
+                if (statusDetails) statusDetails.style.display = 'none';
+            }
+        }
+        
+    } catch (error) {
+        statusDiv.textContent = 'OMERO connection test failed: ' + error.message;
+        statusDiv.className = 'error-message';
+        
+        if (statusIcon) statusIcon.textContent = '❌';
+        if (statusText) statusText.textContent = 'OMERO Status: Error';
+        if (statusDetails) statusDetails.style.display = 'none';
+    }
+};
+
+// Enhanced settings loading
+window.loadOMEROSettingsIntoModal = function() {
+    const sm = window.settingsManager;
+    if (!sm) return;
+    
+    // Load basic settings
+    const omeroEnabled = sm.get('omero.enabled');
+    document.getElementById('omeroEnabled').checked = omeroEnabled;
+    
+    // Show/hide config
+    document.getElementById('omeroConfig').style.display = omeroEnabled ? 'block' : 'none';
+    
+    if (omeroEnabled) {
+        // Load server settings
+        const serverUrl = sm.get('omero.server_url');
+        const username = sm.get('omero.username');
+        const password = sm.get('omero.password');
+        const sessionId = sm.get('omero.session_id');
+        const csrfToken = sm.get('omero.csrf_token');
+        const rememberCredentials = sm.get('omero.remember_credentials');
+        
+        // Set institution preset based on server URL
+        let presetFound = false;
+        for (const [key, preset] of Object.entries(institutionPresets)) {
+            if (serverUrl && serverUrl.includes(preset.serverUrl)) {
+                document.getElementById('omeroInstitutionPreset').value = key;
+                presetFound = true;
+                break;
+            }
+        }
+        
+        if (!presetFound && serverUrl) {
+            document.getElementById('omeroInstitutionPreset').value = 'custom';
+        }
+        
+        // Apply preset to show relevant sections
+        applyInstitutionPreset();
+        
+        // Load form values
+        if (document.getElementById('omeroServerUrl')) {
+            document.getElementById('omeroServerUrl').value = serverUrl || '';
+        }
+        if (document.getElementById('omeroUsername')) {
+            document.getElementById('omeroUsername').value = username || '';
+        }
+        if (document.getElementById('omeroPassword')) {
+            document.getElementById('omeroPassword').value = password || '';
+        }
+        if (document.getElementById('omeroSessionId')) {
+            document.getElementById('omeroSessionId').value = sessionId || '';
+        }
+        if (document.getElementById('omeroCSRFToken')) {
+            document.getElementById('omeroCSRFToken').value = csrfToken || '';
+        }
+        if (document.getElementById('omeroRememberCredentials')) {
+            document.getElementById('omeroRememberCredentials').checked = rememberCredentials || false;
+        }
+        
+        // Load integration settings
+        if (document.getElementById('omeroAutoSync')) {
+            document.getElementById('omeroAutoSync').checked = sm.get('omero.auto_sync') || false;
+        }
+        if (document.getElementById('omeroDefaultProject')) {
+            document.getElementById('omeroDefaultProject').value = sm.get('omero.default_project_id') || '';
+        }
+        if (document.getElementById('omeroCreateDatasets')) {
+            document.getElementById('omeroCreateDatasets').checked = sm.get('omero.create_datasets') !== false;
+        }
+        
+        // Update proxy status if server URL is set
+        if (serverUrl) {
+            const preset = Object.values(institutionPresets).find(p => serverUrl.includes(p.serverUrl));
+            updateProxyStatus(serverUrl, preset ? preset.proxyRequired : true);
+        }
+    }
+};
+
+// Run enhanced diagnosis
+window.runOMERODiagnosis = async function() {
+    const statusDiv = document.getElementById('omeroConnectionStatus');
+    
+    statusDiv.style.display = 'block';
+    statusDiv.textContent = 'Running enhanced OMERO diagnosis...';
+    statusDiv.className = '';
+    
+    try {
+        if (window.omeroIntegration && window.omeroIntegration.runDiagnosis) {
+            const diagnosisResult = await window.omeroIntegration.runDiagnosis();
+            
+            statusDiv.innerHTML = `
+                <strong>🔧 OMERO Diagnosis Results:</strong><br>
+                <div style="margin-top: 8px;">
+                    Status: ${diagnosisResult.success ? '✅ Success' : '❌ Issues Found'}<br>
+                    Message: ${diagnosisResult.message}<br>
+                    ${diagnosisResult.authMethods ? `Available Auth Methods: ${diagnosisResult.authMethods.join(', ')}<br>` : ''}
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #9ca3af;">
+                    Check browser console for detailed diagnosis information.
+                </div>
+            `;
+            statusDiv.className = diagnosisResult.success ? 'success-message' : 'error-message';
+            
+        } else {
+            throw new Error('OMERO Integration module not available');
+        }
+        
+    } catch (error) {
+        statusDiv.textContent = 'OMERO diagnosis failed: ' + error.message;
+        statusDiv.className = 'error-message';
+    }
+};
+
+// Initialize when settings modal opens
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-load settings when OMERO tab is clicked
+    const omeroTab = document.getElementById('omeroTab');
+    if (omeroTab) {
+        omeroTab.addEventListener('click', function() {
+            setTimeout(loadOMEROSettingsIntoModal, 100);
+        });
+    }
+});
+
+</script>
+
+<style>
+/* Enhanced OMERO Settings Styles */
+.form-group input[type="radio"], 
+.form-group input[type="checkbox"] {
+    width: auto !important;
+    margin: 0 !important;
+}
+
+.form-group label input[type="radio"],
+.form-group label input[type="checkbox"] {
+    margin-right: 8px !important;
+}
+
+#omeroConnectionInfo {
+    transition: all 0.3s ease;
+}
+
+#omeroStatusDetails {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Institution preset styling */
+#omeroInstitutionPreset {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+#omeroInstitutionPreset:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+/* Proxy status styling */
+#omeroProxyStatus {
+    transition: all 0.3s ease;
+    border-radius: 6px;
+}
+
+/* Advanced auth section */
+#omeroAdvancedAuth {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; max-height: 0; }
+    to { opacity: 1; max-height: 300px; }
+}
+
+/* Password visibility toggle */
+input[type="password"], input[type="text"] {
+    transition: all 0.2s ease;
+}
+
+/* Button hover effects */
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Status icons */
+#omeroStatusIcon, #omeroProxyIcon {
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+#omeroStatusIcon:hover, #omeroProxyIcon:hover {
+    transform: scale(1.1);
+}
+
+/* Grid layouts for responsive design */
+@media (max-width: 768px) {
+    .form-group div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
