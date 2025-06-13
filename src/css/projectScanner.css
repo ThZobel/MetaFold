@@ -1,0 +1,707 @@
+/* Project Scanner Styles - MetaFold Discovery Tab */
+
+/* =================== DISCOVERY TAB LAYOUT =================== */
+
+.discovery-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.discovery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 12px;
+    margin-bottom: 10px;
+}
+
+.discovery-header .header-content h2 {
+    margin: 0 0 5px 0;
+    color: #a855f7;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.discovery-header .header-content p {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+.discovery-header .header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* =================== QUICK START SECTION =================== */
+
+.quick-start-section {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(168, 85, 247, 0.1));
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.quick-start-section:hover {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.15));
+    border-color: rgba(124, 58, 237, 0.4);
+    transform: translateY(-2px);
+}
+
+.quick-start-content .quick-start-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.8;
+}
+
+.quick-start-content h3 {
+    color: #e0e0e0;
+    margin: 0 0 15px 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+}
+
+.quick-start-content p {
+    color: #9ca3af;
+    margin: 0 0 30px 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.quick-start-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(124, 58, 237, 0.3);
+    transform: translateY(-2px);
+}
+
+.feature-item .feature-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.feature-item strong {
+    color: #e0e0e0;
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.95rem;
+}
+
+.feature-item small {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.quick-start-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+/* =================== SCANNER MAIN CONTAINER =================== */
+
+.scanner-main-container {
+    flex: 1;
+    background: linear-gradient(135deg, #2a2a40, #1e1e2e);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* =================== SCANNING ANIMATION =================== */
+
+.project-scanner-scanning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+}
+
+.scanning-animation {
+    text-align: center;
+    padding: 40px;
+}
+
+.scanning-animation .spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(124, 58, 237, 0.3);
+    border-top: 4px solid #7c3aed;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.scanning-animation h3 {
+    color: #a855f7;
+    margin: 0 0 15px 0;
+    font-size: 1.5rem;
+}
+
+.scanning-animation p {
+    color: #9ca3af;
+    margin: 10px 0;
+    font-size: 0.95rem;
+}
+
+.scanning-animation code {
+    background: rgba(124, 58, 237, 0.2);
+    color: #a855f7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+/* =================== SCANNER RESULTS =================== */
+
+.project-scanner-results {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.scanner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.scanner-header .header-info h3 {
+    margin: 0 0 5px 0;
+    color: #e0e0e0;
+    font-size: 1.3rem;
+}
+
+.scanner-header .header-info p {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+.scanner-header .header-info code {
+    background: rgba(124, 58, 237, 0.2);
+    color: #a855f7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+.scanner-header .header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* =================== SCANNER CONTROLS =================== */
+
+.scanner-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+    gap: 20px;
+}
+
+.search-controls {
+    flex: 1;
+    max-width: 400px;
+}
+
+.search-controls input {
+    width: 100%;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.search-controls input:focus {
+    outline: none;
+    border-color: #7c3aed;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.search-controls input::placeholder {
+    color: #6b7280;
+}
+
+.view-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.view-controls select {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.view-controls select:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.view-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.view-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.view-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+.view-btn.active {
+    background: #7c3aed;
+    color: white;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+/* =================== SCANNER STATISTICS =================== */
+
+.scanner-statistics {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(168, 85, 247, 0.05));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item {
+    text-align: center;
+    padding: 0 15px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #a855f7;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* =================== PROJECTS CONTAINER =================== */
+
+.projects-container {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.projects-container.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.projects-container.list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* =================== PROJECT ITEMS =================== */
+
+.project-item {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-item:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+    border-color: rgba(124, 58, 237, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(124, 58, 237, 0.2);
+}
+
+.grid .project-item {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.list .project-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+}
+
+.project-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.list .project-icon {
+    font-size: 2rem;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.project-info {
+    flex: 1;
+}
+
+.project-name {
+    color: #e0e0e0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    line-height: 1.3;
+}
+
+.project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.project-meta span {
+    background: rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.project-readme {
+    background: rgba(34, 197, 94, 0.2) !important;
+    color: #22c55e !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+.project-path {
+    color: #6b7280;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    margin-top: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 15px;
+}
+
+.list .project-actions {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.project-actions .btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+/* =================== NO RESULTS STATE =================== */
+
+.no-results {
+    text-align: center;
+    padding: 60px 40px;
+    color: #9ca3af;
+}
+
+.no-results h4 {
+    color: #e0e0e0;
+    margin: 0 0 10px 0;
+    font-size: 1.3rem;
+}
+
+.no-results p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* =================== EMPTY STATE =================== */
+
+.project-scanner-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    text-align: center;
+    padding: 40px;
+}
+
+.project-scanner-empty .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.6;
+}
+
+.project-scanner-empty h3 {
+    color: #e0e0e0;
+    margin: 0 0 15px 0;
+    font-size: 1.5rem;
+}
+
+.project-scanner-empty p {
+    color: #9ca3af;
+    margin: 0 0 30px 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    max-width: 500px;
+}
+
+.project-scanner-empty code {
+    background: rgba(124, 58, 237, 0.2);
+    color: #a855f7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+.empty-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* =================== DISCOVERY ACTIONS PANEL =================== */
+
+.discovery-actions {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 10px;
+}
+
+.discovery-actions .actions-header {
+    margin-bottom: 15px;
+}
+
+.discovery-actions .actions-header h4 {
+    color: #e0e0e0;
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.actions-content {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.8), rgba(168, 85, 247, 0.8));
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.action-btn:hover {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(168, 85, 247, 0.9));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+/* =================== ENHANCED DATA SOURCE SELECTOR =================== */
+
+.data-source-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.data-source-selector .btn {
+    font-size: 0.85rem;
+    padding: 6px 12px;
+}
+
+#visualizeScannedBtn {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border-color: #22c55e;
+}
+
+#visualizeScannedBtn:hover {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    transform: translateY(-1px);
+}
+
+/* =================== RESPONSIVE DESIGN =================== */
+
+@media (max-width: 1200px) {
+    .quick-start-features {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    
+    .projects-container.grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .discovery-container {
+        padding: 15px;
+    }
+    
+    .discovery-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .scanner-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .search-controls {
+        max-width: none;
+    }
+    
+    .scanner-statistics {
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    
+    .projects-container.grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .project-item,
+    .list .project-item {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .quick-start-features {
+        grid-template-columns: 1fr;
+    }
+    
+    .quick-start-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .actions-content {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .discovery-container {
+        padding: 10px;
+    }
+    
+    .quick-start-section {
+        padding: 30px 20px;
+    }
+    
+    .project-actions {
+        flex-direction: column;
+    }
+}

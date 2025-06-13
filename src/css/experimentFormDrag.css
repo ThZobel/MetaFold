@@ -1,0 +1,504 @@
+/* =================== EXPERIMENT FORM DRAG & DROP STYLING =================== */
+
+/* Draggable field container */
+.draggable-field {
+    position: relative;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.05));
+    border: 1px solid rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.draggable-field:hover {
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.08));
+}
+
+/* Field label container with drag handle */
+.field-label-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* Experiment form drag handle */
+.experiment-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    cursor: grab;
+    border-radius: 3px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    transition: all 0.2s ease;
+    user-select: none;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.experiment-drag-handle:hover {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.4);
+    transform: scale(1.1);
+}
+
+.experiment-drag-handle:active {
+    cursor: grabbing;
+    transform: scale(0.95);
+    background: rgba(16, 185, 129, 0.35);
+}
+
+.experiment-drag-icon {
+    font-size: 10px;
+    color: #10b981;
+    font-weight: bold;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+.experiment-drag-handle:hover .experiment-drag-icon {
+    color: #059669;
+}
+
+/* =================== DRAGGING STATES =================== */
+
+.dragging-experiment-field {
+    opacity: 0.7;
+    transform: rotate(1deg) scale(1.02);
+    z-index: 1000;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3), 0 0 0 2px rgba(16, 185, 129, 0.5);
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+}
+
+.dragging-experiment-field * {
+    pointer-events: none;
+}
+
+.drag-over-experiment {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1));
+    transform: translateY(-1px);
+}
+
+/* =================== DROP INDICATOR FOR EXPERIMENT FORM =================== */
+
+.experiment-drag-drop-indicator {
+    width: 100%;
+    height: 3px;
+    margin: 6px 0;
+    display: none;
+    z-index: 999;
+}
+
+.experiment-drop-line {
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 2px;
+    position: relative;
+    animation: pulseExperimentDropLine 1s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.experiment-drop-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 3px rgba(16, 185, 129, 0.8);
+}
+
+.experiment-drop-line::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 3px rgba(16, 185, 129, 0.8);
+}
+
+@keyframes pulseExperimentDropLine {
+    0%, 100% { opacity: 0.8; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.3); }
+}
+
+/* =================== FIELD POSITION INDICATORS =================== */
+
+.experiment-field-position {
+    color: #10b981;
+    font-weight: 500;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+/* =================== SAVE FIELD ORDER BUTTON STYLING =================== */
+
+#saveFieldOrderBtn {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 500 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+#saveFieldOrderBtn:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+}
+
+#saveFieldOrderBtn:active {
+    transform: translateY(0);
+}
+
+/* =================== EXPERIMENT FORM ENHANCEMENTS =================== */
+
+#experimentFields {
+    position: relative;
+    min-height: 50px;
+}
+
+.form-group label {
+    display: flex;
+    align-items: flex-start;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #e0e0e0;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #10b981;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* =================== GROUP HEADER STYLING IN EXPERIMENT FORM =================== */
+
+.form-group-header {
+    margin: 20px 0 10px 0;
+}
+
+.form-group-header div {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border: 1px solid rgba(124, 58, 237, 0.3) !important;
+    border-radius: 8px !important;
+    padding: 15px !important;
+}
+
+.form-group-header h4 {
+    color: #a855f7 !important;
+    margin: 0 0 5px 0 !important;
+}
+
+.form-group-header p {
+    color: #9ca3af !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+}
+
+/* =================== RESPONSIVE EXPERIMENT FORM DRAG & DROP =================== */
+
+@media (max-width: 768px) {
+    .field-label-container {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .experiment-drag-handle {
+        align-self: flex-start;
+        width: 16px;
+        height: 16px;
+    }
+    
+    .experiment-drag-icon {
+        font-size: 9px;
+    }
+    
+    .draggable-field {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    #saveFieldOrderBtn {
+        width: 100%;
+        margin-top: 8px !important;
+        margin-left: 0 !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .experiment-drag-handle {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .field-label-container {
+        align-items: flex-start;
+    }
+    
+    .experiment-field-position {
+        font-size: 8px;
+    }
+}
+
+/* =================== ACCESSIBILITY ENHANCEMENTS =================== */
+
+.experiment-drag-handle:focus {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+}
+
+.draggable-field[aria-grabbed="true"] {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+}
+
+/* =================== VISUAL FEEDBACK ENHANCEMENTS =================== */
+
+.draggable-field.field-reordered {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+    animation: fieldReorderedPulse 0.8s ease-out;
+}
+
+@keyframes fieldReorderedPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* Drag operation global styles for experiment form */
+body.dragging-experiment-field {
+    cursor: grabbing;
+    user-select: none;
+}
+
+body.dragging-experiment-field * {
+    cursor: grabbing !important;
+}
+
+/* =================== TOOLTIP STYLING FOR EXPERIMENT DRAG HANDLES =================== */
+
+.experiment-drag-handle::after {
+    content: "Drag to reorder";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1001;
+    margin-bottom: 4px;
+}
+
+.experiment-drag-handle:hover::after {
+    opacity: 1;
+}
+
+/* =================== FIELD ORDER CHANGE INDICATION =================== */
+
+.field-order-changed {
+    position: relative;
+}
+
+.field-order-changed::before {
+    content: "Order Changed";
+    position: absolute;
+    top: -8px;
+    right: 8px;
+    background: #f59e0b;
+    color: white;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    animation: orderChangedBlink 2s ease-out;
+    z-index: 100;
+}
+
+@keyframes orderChangedBlink {
+    0%, 20%, 40%, 60%, 80% { opacity: 1; }
+    10%, 30%, 50%, 70%, 90% { opacity: 0.3; }
+    100% { opacity: 0; }
+}
+
+/* =================== HIGH CONTRAST AND ACCESSIBILITY =================== */
+
+@media (prefers-contrast: high) {
+    .experiment-drag-handle {
+        border-width: 2px;
+        background: rgba(16, 185, 129, 0.3);
+    }
+    
+    .draggable-field {
+        border-width: 2px;
+    }
+    
+    .experiment-drag-drop-indicator {
+        height: 5px;
+    }
+    
+    .experiment-drop-line {
+        height: 5px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .draggable-field,
+    .experiment-drag-handle,
+    .experiment-drop-line {
+        transition: none;
+        animation: none;
+    }
+    
+    .experiment-drag-drop-indicator {
+        animation: none;
+    }
+    
+    .dragging-experiment-field {
+        transform: none;
+    }
+    
+    #saveFieldOrderBtn {
+        animation: none !important;
+    }
+}
+
+/* =================== SUCCESS STATES FOR EXPERIMENT FORM =================== */
+
+.draggable-field.field-saved {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+}
+
+.draggable-field.field-saved::after {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: #10b981;
+    font-weight: bold;
+    font-size: 12px;
+    animation: experimentCheckmarkPulse 0.6s ease-out;
+}
+
+@keyframes experimentCheckmarkPulse {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* =================== FORM CONTAINER ENHANCEMENTS =================== */
+
+#experimentFields:empty::before {
+    content: "No fields to display";
+    display: block;
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+    padding: 40px 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+}
+
+#experimentFields.has-draggable-fields {
+    border: 1px solid rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(16, 185, 129, 0.02);
+}
+
+/* =================== LOADING STATES =================== */
+
+.draggable-field.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.draggable-field.loading::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-top: 2px solid #10b981;
+    border-radius: 50%;
+    animation: experimentFormSpin 1s linear infinite;
+    z-index: 101;
+}
+
+@keyframes experimentFormSpin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* =================== INTEGRATION WITH EXISTING METAFOLD STYLING =================== */
+
+/* Ensure experiment form drag & drop works well with existing form styles */
+.form-group.draggable-field input,
+.form-group.draggable-field select,
+.form-group.draggable-field textarea {
+    margin-top: 4px;
+}
+
+.form-group.draggable-field label {
+    margin-bottom: 8px;
+}
+
+/* Nested field styling */
+.nested-field.draggable-field {
+    margin-left: 20px;
+    border-left: 3px solid rgba(16, 185, 129, 0.3);
+}
+
+.nested-field.draggable-field .experiment-drag-handle {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.4);
+}

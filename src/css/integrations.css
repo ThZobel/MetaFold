@@ -628,3 +628,199 @@
 .integration-tooltip:hover::before {
     opacity: 1;
 }
+
+/* ===================================
+   JSONCrack Visualization Integration
+   =================================== */
+
+/* JSONCrack Container Visibility Fix */
+.jsoncrack-container {
+    width: 100% !important;
+    height: 100% !important;
+    position: relative !important;
+    background: transparent !important;
+    overflow: visible !important;
+    min-height: 300px !important;
+}
+
+#jsoncrackContainer {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 300px !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    position: relative !important;
+    border-radius: 8px;
+}
+
+#jsoncrackMountPoint {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 300px !important;
+    position: relative !important;
+    background: transparent !important;
+    color: #e0e0e0 !important;
+    padding: 0;
+    margin: 0;
+}
+
+/* JSONCrack Component Content Styles */
+#jsoncrackMountPoint > div {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 300px !important;
+    color: #e0e0e0 !important;
+    background: transparent !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Fallback Viewer Specific Styles */
+#jsoncrackMountPoint pre {
+    color: #e0e0e0 !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    padding: 15px !important;
+    border-radius: 8px !important;
+    overflow: auto !important;
+    white-space: pre-wrap !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    max-height: 400px !important;
+    margin: 10px 0 !important;
+}
+
+/* JSONCrack FallbackViewer Center Content */
+#jsoncrackMountPoint div[style*="display: flex"] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 100% !important;
+    color: #9ca3af !important;
+    text-align: center !important;
+    padding: 40px !important;
+}
+
+/* JSONCrack FallbackViewer Typography */
+#jsoncrackMountPoint h3 {
+    color: #e0e0e0 !important;
+    margin-bottom: 10px !important;
+    font-size: 18px !important;
+}
+
+#jsoncrackMountPoint p {
+    color: #9ca3af !important;
+    margin-bottom: 15px !important;
+    line-height: 1.5 !important;
+}
+
+/* JSONCrack Details/Summary */
+#jsoncrackMountPoint details {
+    margin-top: 20px !important;
+    padding: 10px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    max-width: 600px !important;
+}
+
+#jsoncrackMountPoint summary {
+    cursor: pointer !important;
+    margin-bottom: 10px !important;
+    color: #7c3aed !important;
+    font-weight: bold !important;
+}
+
+/* Visualization Type Selector Enhancements */
+.visualization-type-selector {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.viz-type-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.viz-type-btn.active {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+}
+
+.viz-type-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
+}
+
+.viz-type-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Debug Styles (only when debug class is present) */
+.debug-jsoncrack #jsoncrackContainer {
+    border: 3px solid red !important;
+    background: rgba(255, 0, 0, 0.1) !important;
+}
+
+.debug-jsoncrack #jsoncrackMountPoint {
+    border: 2px solid blue !important;
+    background: rgba(0, 0, 255, 0.1) !important;
+}
+
+.debug-jsoncrack #jsoncrackMountPoint > div {
+    border: 1px solid green !important;
+    background: rgba(0, 255, 0, 0.1) !important;
+}
+
+/* JSONCrack Loading/Error States */
+.jsoncrack-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.jsoncrack-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ef4444;
+    text-align: center;
+    padding: 40px;
+}
+
+/* JSONCrack Success State */
+.jsoncrack-success {
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+}
+
+/* Responsive adjustments for JSONCrack */
+@media (max-width: 768px) {
+    #jsoncrackContainer {
+        min-height: 250px !important;
+    }
+    
+    #jsoncrackMountPoint {
+        min-height: 250px !important;
+    }
+    
+    #jsoncrackMountPoint div[style*="display: flex"] {
+        padding: 20px !important;
+    }
+}

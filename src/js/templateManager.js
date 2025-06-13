@@ -1,4 +1,4 @@
-// Template Manager (Complete - Enhanced with Search & Shared Templates Toggle, MINIMAL Search Index Fix)
+// Template Manager (FIXED: Cache Invalidation for Immediate UI Updates)
 
 const templateManager = {
     templates: [],
@@ -39,7 +39,7 @@ const templateManager = {
 			// Initialize search state
 			this.initializeSearchState();
 			
-			// Clear any stale cache
+			// FIXED: Clear cache on initialization
 			this.allTemplates = [];
 			
 			// Render the list first
@@ -72,6 +72,14 @@ const templateManager = {
         this.searchState.results = [];
         this.searchState.suggestions = [];
         this.searchState.isSearching = false;
+        this.searchState.searchCache.clear();
+        this.searchState.suggestionCache.clear();
+    },
+
+    // FIXED: Force cache invalidation method
+    invalidateCache() {
+        console.log('🔄 Invalidating template cache...');
+        this.allTemplates = [];
         this.searchState.searchCache.clear();
         this.searchState.suggestionCache.clear();
     },
@@ -423,7 +431,7 @@ const templateManager = {
         }
     },
 
-    // ORIGINAL: Add new template (enhanced with index rebuild)
+    // FIXED: Add new template with proper cache invalidation
     add(template) {
         console.log('➕ Adding template:', template);
         
@@ -441,17 +449,18 @@ const templateManager = {
             console.log('💾 Save result:', saved);
         }
         
-        // NEW: Rebuild search index and clear cache
+        // CRITICAL FIX: Invalidate cache BEFORE rebuilding index
+        this.invalidateCache();
+        
+        // Rebuild search index with fresh data
         this.buildSearchIndex();
-        this.searchState.searchCache.clear();
-        this.searchState.suggestionCache.clear();
         
         this.renderList();
         this.updateTemplateInfo();
         console.log('✅ Template added successfully');
     },
 
-    // ORIGINAL: Update template (enhanced with index rebuild)
+    // FIXED: Update template with proper cache invalidation
     update(index, template) {
         if (index >= 0 && index < this.templates.length) {
             const existingTemplate = this.templates[index];
@@ -469,10 +478,11 @@ const templateManager = {
                 window.storage.saveTemplates(this.templates);
             }
             
-            // NEW: Rebuild search index and clear cache
+            // CRITICAL FIX: Invalidate cache BEFORE rebuilding index
+            this.invalidateCache();
+            
+            // Rebuild search index with fresh data
             this.buildSearchIndex();
-            this.searchState.searchCache.clear();
-            this.searchState.suggestionCache.clear();
             
             this.renderList();
             this.updateTemplateInfo();
@@ -488,14 +498,13 @@ const templateManager = {
         return 'folders';
     },
 
-    // ORIGINAL: Get all templates (including group templates) - FIXED: No circular dependency
-    getAllTemplates() {
+    // FIXED: Get all templates with better cache management
+	getAllTemplates() {
 		const currentType = this.getCurrentType();
 		
-		// FIXED: Cache nur verwenden wenn wir Type-spezifische Templates haben
-		// PROBLEM WAR: Cache enthielt alte Templates vom vorherigen Type
+		// FIXED: Only use cache if it exists and is for current type
 		if (this.allTemplates.length > 0) {
-			// CRITICAL FIX: Prüfe ob Cache für aktuellen Type gültig ist
+			// Check if cache is valid for current type
 			const firstTemplate = this.allTemplates[0];
 			const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
 									  (currentType === 'experiments' && firstTemplate.type === 'experiment');
@@ -552,7 +561,7 @@ const templateManager = {
 		}));
 
 		this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
-		console.log(`📋 Total templates: ${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared = ${this.allTemplates.length}`);
+		console.log(`📋 Total templates rebuilt: ${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared = ${this.allTemplates.length}`);
 		
 		// Update toggle visibility
 		this.updateSharedToggleVisibility();
@@ -560,16 +569,11 @@ const templateManager = {
 		return this.allTemplates;
 	},
 
-	
-	
-
-    // NEW: Update visibility of shared templates toggle (FIXED: No circular dependency)
+    // NEW: Update visibility of shared templates toggle
 	updateSharedToggleVisibility() {
 		const toggleElement = document.getElementById('sharedTemplatesToggle');
 		if (!toggleElement) return;
 
-		// FIXED: Toggle IMMER anzeigen wenn User Management aktiv ist
-		// (Auch wenn aktuell keine shared templates für diesen Type da sind)
 		const userManagementEnabled = window.userManager?.isEnabled() || false;
 		
 		console.log('🤝 Toggle visibility check:', {
@@ -578,7 +582,6 @@ const templateManager = {
 			allTemplatesCount: this.allTemplates.length
 		});
 		
-		// FIXED: Zeige Toggle wenn User Management aktiv ist (unabhängig von shared templates)
 		if (userManagementEnabled) {
 			toggleElement.style.display = 'block';
 			console.log('✅ Showing shared templates toggle (user management enabled)');
@@ -830,9 +833,9 @@ const templateManager = {
                 window.storage.saveTemplates(this.templates);
             }
             
-            // NEW: Rebuild search index
+            // FIXED: Invalidate cache and rebuild
+            this.invalidateCache();
             this.buildSearchIndex();
-            this.searchState.searchCache.clear();
             
             this.renderList();
             this.updateTemplateInfo();
@@ -937,7 +940,7 @@ const templateManager = {
         }
     },
 
-    // ORIGINAL: Delete current template (preserved)
+    // FIXED: Delete current template with proper cache invalidation
     deleteCurrent() {
         if (!this.currentTemplate || !this.currentTemplate.isOwn) {
             if (window.app && window.app.showError) {
@@ -959,9 +962,9 @@ const templateManager = {
                     window.storage.saveTemplates(this.templates);
                 }
                 
-                // NEW: Rebuild search index
+                // FIXED: Invalidate cache and rebuild
+                this.invalidateCache();
                 this.buildSearchIndex();
-                this.searchState.searchCache.clear();
                 
                 this.currentTemplate = null;
                 this.selectedIndex = -1;
@@ -986,7 +989,7 @@ const templateManager = {
 	// ENHANCED: Manual refresh function for external calls
     refresh() {
         console.log('🔄 Manually refreshing template manager...');
-        this.allTemplates = []; // Clear cache
+        this.invalidateCache();
         this.buildSearchIndex();
         this.updateSharedToggleVisibility();
         this.renderList();
@@ -994,6 +997,5 @@ const templateManager = {
     }
 };
 
-
 window.templateManager = templateManager;
-console.log('✅ Complete templateManager loaded (Enhanced with Search & Shared Templates Toggle, MINIMAL Search Index Fix)');
+console.log('✅ FIXED templateManager loaded with proper cache invalidation');
