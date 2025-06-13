@@ -4,7 +4,7 @@
 
 MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks and image management systems.
 
-![MetaFold Interface](screenshots/metafold-main-interface.png)
+![MetaFold Interface](/assets/screenshots/metafold-main-interface.png)
 *Screenshot placeholder - Main MetaFold interface*
 
 ---
