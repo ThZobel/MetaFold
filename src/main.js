@@ -714,3 +714,418 @@ function getDefaultValueForType(type) {
         default: return '';
     }
 }
+
+// =================== PROJECT SCANNER API - Add to main.js ===================
+// Add these handlers to the existing main.js file
+
+// Scan directory recursively for MetaFold projects
+ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5) => {
+    try {
+        console.log(`🔍 Scanning for MetaFold projects in: ${basePath}`);
+        
+        const projects = await scanForMetaFoldProjects(basePath, maxDepth);
+        
+        console.log(`✅ Found ${projects.length} MetaFold projects`);
+        return { 
+            success: true, 
+            projects: projects,
+            scannedPath: basePath,
+            projectCount: projects.length
+        };
+    } catch (error) {
+        console.error('❌ Error scanning for MetaFold projects:', error);
+        return { 
+            success: false, 
+            message: `Error scanning projects: ${error.message}`,
+            projects: []
+        };
+    }
+});
+
+// Get detailed project information
+ipcMain.handle('get-project-details', async (event, projectPath) => {
+    try {
+        console.log(`📋 Getting project details for: ${projectPath}`);
+        
+        const details = await getProjectDetails(projectPath);
+        
+        return { 
+            success: true, 
+            details: details
+        };
+    } catch (error) {
+        console.error('❌ Error getting project details:', error);
+        return { 
+            success: false, 
+            message: `Error getting project details: ${error.message}`
+        };
+    }
+});
+
+// Get project statistics
+ipcMain.handle('get-projects-statistics', async (event, projects) => {
+    try {
+        const stats = analyzeProjectStatistics(projects);
+        
+        return { 
+            success: true, 
+            statistics: stats
+        };
+    } catch (error) {
+        console.error('❌ Error analyzing project statistics:', error);
+        return { 
+            success: false, 
+            message: `Error analyzing statistics: ${error.message}`
+        };
+    }
+});
+
+// =================== HELPER FUNCTIONS ===================
+
+// Main scanning function - recursively finds MetaFold projects
+async function scanForMetaFoldProjects(basePath, maxDepth, currentDepth = 0) {
+    const projects = [];
+    
+    if (currentDepth >= maxDepth) {
+        console.log(`⚠️ Maximum depth (${maxDepth}) reached at: ${basePath}`);
+        return projects;
+    }
+    
+    try {
+        // Check if current directory is a MetaFold project
+        const metadataPath = path.join(basePath, 'elabftw-metadata.json');
+        
+        try {
+            await fs.access(metadataPath);
+            // This directory contains elabftw-metadata.json - it's a MetaFold project!
+            const project = await parseMetaFoldProject(basePath);
+            if (project) {
+                projects.push(project);
+                console.log(`📁 Found MetaFold project: ${project.name} (${project.path})`);
+            }
+        } catch (accessError) {
+            // No elabftw-metadata.json in this directory, continue scanning
+        }
+        
+        // Recursively scan subdirectories
+        const entries = await fs.readdir(basePath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const subPath = path.join(basePath, entry.name);
+                
+                // Skip hidden directories and common non-project directories
+                if (shouldSkipDirectory(entry.name)) {
+                    continue;
+                }
+                
+                try {
+                    const subProjects = await scanForMetaFoldProjects(subPath, maxDepth, currentDepth + 1);
+                    projects.push(...subProjects);
+                } catch (subError) {
+                    console.warn(`⚠️ Error scanning subdirectory ${subPath}:`, subError.message);
+                    // Continue with other directories
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.warn(`⚠️ Error accessing directory ${basePath}:`, error.message);
+    }
+    
+    return projects;
+}
+
+// Parse a single MetaFold project directory
+async function parseMetaFoldProject(projectPath) {
+    try {
+        const metadataPath = path.join(projectPath, 'elabftw-metadata.json');
+        const readmePath = path.join(projectPath, 'README.md');
+        
+        // Read metadata
+        const metadataContent = await fs.readFile(metadataPath, 'utf8');
+        const metadata = JSON.parse(metadataContent);
+        
+        // Read README if it exists
+        let readmeContent = null;
+        try {
+            readmeContent = await fs.readFile(readmePath, 'utf8');
+        } catch (readmeError) {
+            // README is optional
+        }
+        
+        // Get directory stats
+        const stats = await fs.stat(projectPath);
+        
+        // Extract project name from directory path
+        const projectName = path.basename(projectPath);
+        
+        // Analyze metadata
+        const metadataAnalysis = analyzeProjectMetadata(metadata);
+        
+        // Build project object
+        const project = {
+            name: projectName,
+            path: projectPath,
+            relativePath: projectPath, // Will be updated by caller if needed
+            created: stats.birthtime || stats.ctime,
+            modified: stats.mtime,
+            size: await getDirectorySize(projectPath),
+            
+            // Metadata information
+            metadata: metadata,
+            metadataFieldCount: metadataAnalysis.fieldCount,
+            metadataTypes: metadataAnalysis.types,
+            
+            // Content information
+            hasReadme: readmeContent !== null,
+            readmePreview: readmeContent ? readmeContent.substring(0, 200) + '...' : null,
+            
+            // Project structure
+            depth: 0, // Will be calculated by caller
+            parentPath: path.dirname(projectPath),
+            
+            // Quick access info
+            type: 'metafold-project',
+            version: '1.1.0' // MetaFold version that created this
+        };
+        
+        return project;
+        
+    } catch (error) {
+        console.error(`❌ Error parsing MetaFold project at ${projectPath}:`, error);
+        return null;
+    }
+}
+
+// Analyze metadata structure
+function analyzeProjectMetadata(metadata) {
+    const analysis = {
+        fieldCount: 0,
+        types: {},
+        hasRequiredFields: false,
+        completedFields: 0
+    };
+    
+    if (metadata && metadata.extra_fields) {
+        const fields = metadata.extra_fields;
+        analysis.fieldCount = Object.keys(fields).length;
+        
+        Object.values(fields).forEach(field => {
+            const type = field.type || 'unknown';
+            analysis.types[type] = (analysis.types[type] || 0) + 1;
+            
+            if (field.required) {
+                analysis.hasRequiredFields = true;
+            }
+            
+            if (field.value && field.value.trim() !== '') {
+                analysis.completedFields++;
+            }
+        });
+    }
+    
+    return analysis;
+}
+
+// Get directory size recursively
+async function getDirectorySize(dirPath) {
+    try {
+        let totalSize = 0;
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const entryPath = path.join(dirPath, entry.name);
+            
+            if (entry.isDirectory()) {
+                totalSize += await getDirectorySize(entryPath);
+            } else {
+                const stats = await fs.stat(entryPath);
+                totalSize += stats.size;
+            }
+        }
+        
+        return totalSize;
+    } catch (error) {
+        console.warn(`⚠️ Error calculating directory size for ${dirPath}:`, error.message);
+        return 0;
+    }
+}
+
+// Check if directory should be skipped during scanning
+function shouldSkipDirectory(dirName) {
+    const skipPatterns = [
+        // Hidden directories
+        /^\./,
+        // Version control
+        /^\.git$/,
+        /^\.svn$/,
+        // Node.js
+        /^node_modules$/,
+        // Build directories
+        /^build$/,
+        /^dist$/,
+        /^target$/,
+        // Temporary directories
+        /^tmp$/,
+        /^temp$/,
+        // Cache directories
+        /^cache$/,
+        /^\.cache$/,
+        // OS specific
+        /^__pycache__$/,
+        /^\.DS_Store$/,
+        /^Thumbs\.db$/
+    ];
+    
+    return skipPatterns.some(pattern => pattern.test(dirName));
+}
+
+// Get detailed information about a specific project
+async function getProjectDetails(projectPath) {
+    try {
+        const project = await parseMetaFoldProject(projectPath);
+        if (!project) {
+            throw new Error('Not a valid MetaFold project');
+        }
+        
+        // Get additional details
+        const entries = await fs.readdir(projectPath, { withFileTypes: true });
+        
+        const details = {
+            ...project,
+            fileCount: entries.filter(entry => entry.isFile()).length,
+            directoryCount: entries.filter(entry => entry.isDirectory()).length,
+            files: entries.filter(entry => entry.isFile()).map(entry => entry.name),
+            directories: entries.filter(entry => entry.isDirectory()).map(entry => entry.name),
+            
+            // Check for nested MetaFold projects
+            hasNestedProjects: false
+        };
+        
+        // Check for nested projects
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const subPath = path.join(projectPath, entry.name);
+                const nestedMetadataPath = path.join(subPath, 'elabftw-metadata.json');
+                
+                try {
+                    await fs.access(nestedMetadataPath);
+                    details.hasNestedProjects = true;
+                    break;
+                } catch {
+                    // No nested project in this directory
+                }
+            }
+        }
+        
+        return details;
+        
+    } catch (error) {
+        throw new Error(`Failed to get project details: ${error.message}`);
+    }
+}
+
+// Analyze statistics across multiple projects
+function analyzeProjectStatistics(projects) {
+    const stats = {
+        totalProjects: projects.length,
+        totalSize: 0,
+        averageFieldCount: 0,
+        fieldTypes: {},
+        projectsByDepth: {},
+        creationDates: [],
+        mostRecentProject: null,
+        oldestProject: null,
+        largestProject: null,
+        
+        // MetaFold specific statistics
+        projectsWithReadme: 0,
+        averageCompletionRate: 0,
+        commonFieldTypes: {},
+        projectHierarchy: {
+            rootProjects: 0,
+            nestedProjects: 0,
+            maxDepth: 0
+        }
+    };
+    
+    if (projects.length === 0) {
+        return stats;
+    }
+    
+    let totalFieldCount = 0;
+    let totalCompletedFields = 0;
+    let totalPossibleFields = 0;
+    
+    projects.forEach(project => {
+        // Basic stats
+        stats.totalSize += project.size || 0;
+        totalFieldCount += project.metadataFieldCount || 0;
+        
+        if (project.hasReadme) {
+            stats.projectsWithReadme++;
+        }
+        
+        // Field types analysis
+        if (project.metadataTypes) {
+            Object.entries(project.metadataTypes).forEach(([type, count]) => {
+                stats.fieldTypes[type] = (stats.fieldTypes[type] || 0) + count;
+            });
+        }
+        
+        // Creation dates
+        if (project.created) {
+            stats.creationDates.push(project.created);
+            
+            if (!stats.mostRecentProject || project.created > stats.mostRecentProject.created) {
+                stats.mostRecentProject = project;
+            }
+            
+            if (!stats.oldestProject || project.created < stats.oldestProject.created) {
+                stats.oldestProject = project;
+            }
+        }
+        
+        // Largest project
+        if (!stats.largestProject || (project.size || 0) > (stats.largestProject.size || 0)) {
+            stats.largestProject = project;
+        }
+        
+        // Completion rate calculation
+        if (project.metadata && project.metadata.extra_fields) {
+            const fields = project.metadata.extra_fields;
+            const fieldCount = Object.keys(fields).length;
+            const completedCount = Object.values(fields).filter(field => 
+                field.value && field.value.toString().trim() !== ''
+            ).length;
+            
+            totalPossibleFields += fieldCount;
+            totalCompletedFields += completedCount;
+        }
+    });
+    
+    // Calculate averages
+    stats.averageFieldCount = totalFieldCount / projects.length;
+    stats.averageCompletionRate = totalPossibleFields > 0 ? 
+        (totalCompletedFields / totalPossibleFields) * 100 : 0;
+    
+    // Format sizes
+    stats.totalSizeFormatted = formatBytes(stats.totalSize);
+    stats.averageSizeFormatted = formatBytes(stats.totalSize / projects.length);
+    
+    return stats;
+}
+
+// Format bytes to human readable format
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}

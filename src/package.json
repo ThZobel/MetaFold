@@ -1,16 +1,18 @@
 {
   "name": "metafold",
   "version": "1.1.0",
-  "description": "MetaFold - A comprehensive template manager for folder structures and experiment metadata",
+  "description": "MetaFold - A comprehensive template manager for folder structures and experiment metadata with interactive visualization",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    "dist": "electron-builder --publish=never",
-    "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac",
-    "build-linux": "electron-builder --linux"
+    "build-visualization": "webpack --mode=production",
+    "dev-visualization": "webpack --mode=development --watch",
+    "dist": "npm run build-visualization && electron-builder --publish=never",
+    "build-win": "npm run build-visualization && electron-builder --win",
+    "build-mac": "npm run build-visualization && electron-builder --mac",
+    "build-linux": "npm run build-visualization && electron-builder --linux"
   },
   "keywords": [
     "electron",
@@ -20,16 +22,31 @@
     "project-management",
     "metadata",
     "experiments",
-    "metafold"
+    "metafold",
+    "visualization",
+    "jsoncrack",
+    "data-analysis"
   ],
-  "author": "Your Name",
+  "author": "NFDI4BioImage Team",
   "license": "MIT",
+  "dependencies": {
+    "jsongraph-react": "^0.0.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "devDependencies": {
-    "electron": "^latest",
-    "electron-builder": "^latest"
+    "@babel/core": "^7.27.4",
+    "@babel/preset-react": "^7.27.1",
+    "babel-loader": "^10.0.0",
+    "css-loader": "^7.1.2",
+    "electron": "",
+    "electron-builder": "",
+    "style-loader": "^4.0.0",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
   },
   "build": {
-    "appId": "com.yourcompany.metafold",
+    "appId": "com.nfdi4bioimage.metafold",
     "productName": "MetaFold",
     "directories": {
       "output": "dist"
@@ -40,7 +57,10 @@
       "index.html",
       "assets/**/*",
       "css/**/*",
-      "js/**/*"
+      "js/**/*",
+      "node_modules/jsoncrack/**/*",
+      "node_modules/react/**/*",
+      "node_modules/react-dom/**/*"
     ],
     "win": {
       "target": "nsis",

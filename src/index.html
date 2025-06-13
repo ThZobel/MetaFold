@@ -10,14 +10,139 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/modals.css">
     <link rel="stylesheet" href="css/integrations.css">
-    <link rel="stylesheet" href="css/responsive.css">
+	<link rel="stylesheet" href="css/responsive.css">
+	<link rel="stylesheet" href="css/projectScanner.css">
+	<link rel="stylesheet" href="css/dragDrop.css">
+	<link rel="stylesheet" href="css/experimentFormDrag.css">
+	<link rel="stylesheet" href="css/enhanced-actions.css">	
     <!-- CRITICAL: Layout override to force full width -->
     <link rel="stylesheet" href="css/layout-override.css">
+    
+    <!-- JSONCrack Visualization CSS (ENHANCED) -->
+    <style>
+        .main-tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .main-tab {
+            flex: 1;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .main-tab.active {
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        }
+        
+        .main-tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+        
+        .main-tab-content {
+            display: none;
+        }
+        
+        .main-tab-content.active {
+            display: block;
+        }
+        
+        .visualization-container {
+            background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .visualization-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .visualization-content {
+            flex: 1;
+			min-height: 500px;
+            position: relative;
+            overflow: auto;
+        }
+        
+        .visualization-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #9ca3af;
+            text-align: center;
+        }
+        
+        .visualization-placeholder svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* NEW: JSONCrack specific styles */
+        .jsoncrack-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: transparent;
+        }
+        
+        .visualization-type-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .viz-type-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .viz-type-btn.active {
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+        }
+        
+        .viz-type-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
 
-	<!-- LEFT SIDEBAR - Template Selection (ENHANCED with Search & Toggle) -->
+	<!-- LEFT SIDEBAR - Template Selection (PRESERVED EXACTLY) -->
 	<div class="sidebar">
 		<div class="header">
 			<h1>📁 MetaFold</h1>
@@ -154,210 +279,425 @@
 		</div>
 	</div>
 
-
-        <!-- RIGHT MAIN CONTENT - Project Manager -->
+        <!-- RIGHT MAIN CONTENT - Enhanced with JSONCrack Integration -->
         <div class="main-content">
             <div class="header">
                 <h1>🚀 Project Manager</h1>
-                <p>Create and manage your project templates for better organization</p>
+                <p>Create, manage and visualize your project templates</p>
             </div>
 
-            <div id="templateDetails" style="display: none;">
-                <div class="project-setup">
-                    <h3>🎯 Project Setup</h3>
-                    <div class="project-input-group">
-                        <div>
-                            <label for="targetPath">📂 Base Directory:</label>
-                            <input type="text" id="targetPath" placeholder="Enter path or browse...">
-                        </div>
-                        <div>
-                            <label for="projectName">📝 Project Name:</label>
-                            <input type="text" id="projectName" placeholder="MyProject">
-                        </div>
-                        <button class="btn btn-secondary" onclick="browsePath()">Browse</button>
-                    </div>
-                    <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
-                        Project will be created in: <span id="fullPathPreview">Choose directory and project name</span>
-                    </p>
+            <!-- Main Content Tabs (PRESERVED) -->
+            <div class="main-tabs">
+				<button class="main-tab active" onclick="switchMainTab('create')" id="createTab">
+					🎯 Create Project
+				</button>
+				<button class="main-tab" onclick="switchMainTab('discover')" id="discoverTab">
+					📁 Discover Projects
+				</button>
+				<button class="main-tab" onclick="switchMainTab('visualize')" id="visualizeTab">
+					📊 Visualize Data
+				</button>
+			</div>
 
-                    <!-- elabFTW Integration Option -->
-					<div id="elabftwOption" style="display: none; margin-top: 15px; padding: 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;">
-						<!-- Auto-sync info message -->
-						<div id="elabftwAutoInfo" style="display: none; color: #0369a1; font-weight: 500; margin-bottom: 10px;">
-							<span style="color: #059669;">✅</span> Auto-sync to elabFTW is enabled - experiments will be created automatically
-						</div>
+            <!-- CREATE PROJECT TAB (PRESERVED EXACTLY FROM WORKING VERSION) -->
+            <div id="createTabContent" class="main-tab-content active">
+                <div id="templateDetails" style="display: none;">
+                    <div class="project-setup">
+                        <h3>🎯 Project Setup</h3>
+                        <div class="project-input-group">
+                            <div>
+                                <label for="targetPath">📂 Base Directory:</label>
+                                <input type="text" id="targetPath" placeholder="Enter path or browse...">
+                            </div>
+                            <div>
+                                <label for="projectName">📝 Project Name:</label>
+                                <input type="text" id="projectName" placeholder="MyProject">
+                            </div>
+                            <button class="btn btn-secondary" onclick="browsePath()">Browse</button>
+                        </div>
+                        <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
+                            Project will be created in: <span id="fullPathPreview">Choose directory and project name</span>
+                        </p>
+
+                        <!-- elabFTW Integration Option -->
+                        <div id="elabftwOption" style="display: none; margin-top: 15px; padding: 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;">
+                            <!-- Auto-sync info message -->
+                            <div id="elabftwAutoInfo" style="display: none; color: #0369a1; font-weight: 500; margin-bottom: 10px;">
+                                <span style="color: #059669;">✅</span> Auto-sync to elabFTW is enabled - experiments will be created automatically
+                            </div>
+                            
+                            <!-- Manual sync checkbox -->
+                            <div id="elabftwManualOption">
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #0369a1;">
+                                    <input type="checkbox" id="sendToElabFTW" style="width: auto;">
+                                    🧪 Send to elabFTW
+                                </label>
+                                <small style="color: #0369a1; margin-left: 24px; display: block; margin-top: 4px;">
+                                    Create this experiment in elabFTW with metadata and structure
+                                </small>
+                            </div>
+                            
+                            <!-- Existing experiment ID field -->
+                            <div id="elabftwExperimentId" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+                                <label for="existingExperimentId" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
+                                    📝 Update Existing Experiment (optional):
+                                </label>
+                                <input type="text" id="existingExperimentId" placeholder="Enter experiment ID (e.g., 149)" style="width: 100%; padding: 6px 10px; border: 1px solid #0ea5e9; border-radius: 4px;">
+                                <small style="color: #0369a1; display: block; margin-top: 4px;">
+                                    If provided, metadata will be added to this existing experiment instead of creating a new one
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- OMERO Integration Option -->
+                        <div id="omeroOption" style="display: none; margin-top: 15px; padding: 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
+                            <!-- OMERO Status Info -->
+                            <div id="omeroStatusInfo" style="margin-bottom: 10px;">
+                                <div id="omeroConnectionStatus" style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                    <span id="omeroStatusIcon">🔬</span>
+                                    <span id="omeroStatusText">OMERO Status: Checking...</span>
+                                </div>
+                            </div>
+
+                            <!-- Auto-sync info message -->
+                            <div id="omeroAutoInfo" style="display: none; color: #92400e; font-weight: 500; margin-bottom: 10px;">
+                                <span style="color: #059669;">✅</span> Auto-sync to OMERO is enabled - datasets will be created automatically
+                            </div>
+                            
+                            <!-- Manual sync checkbox -->
+                            <div id="omeroManualOption">
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                    <input type="checkbox" id="sendToOMERO" style="width: auto;">
+                                    🔬 Send to OMERO
+                                </label>
+                                <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
+                                    Create this experiment as a dataset in OMERO with metadata annotations
+                                </small>
+                            </div>
+                            
+                            <!-- OMERO Group Selection -->
+                            <div id="omeroGroupSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.4); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2); transition: all 0.3s ease;">
+                                <label for="omeroGroupSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
+                                    👥 OMERO Group:
+                                </label>
+                                <select id="omeroGroupSelect" onchange="handleOMEROGroupSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
+                                    <option value="">Loading groups...</option>
+                                </select>
+                                <small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
+                                    Select a group to filter available projects
+                                </small>
+                                <div id="omeroGroupStatus" style="margin-top: 6px; font-size: 12px; font-style: italic; min-height: 16px;"></div>
+                            </div>
+
+                            <!-- OMERO Project Selection -->
+                            <div id="omeroProjectSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); transition: all 0.3s ease;">
+                                <label for="omeroProjectSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
+                                    📁 OMERO Project (optional):
+                                </label>
+                                <select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
+                                    <option value="">-- Create standalone dataset --</option>
+                                    <option value="refresh">🔄 Refresh project list</option>
+                                </select>
+                                <small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
+                                    Select an existing OMERO project to link the dataset to, or leave empty for standalone dataset
+                                </small>
+                            </div>
+
+                            <!-- Dataset Name Override -->
+                            <div id="omeroDatasetName" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+                                <label for="omeroDatasetNameInput" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                    🗂️ Dataset Name (optional):
+                                </label>
+                                <input type="text" id="omeroDatasetNameInput" placeholder="Leave empty to use project name" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px;">
+                                <small style="color: #92400e; display: block; margin-top: 4px;">
+                                    Customize the dataset name in OMERO. If empty, uses the project name.
+                                </small>
+                            </div>
+
+                            <!-- Advanced Options (Collapsible) -->
+                            <details style="margin-top: 15px;">
+                                <summary style="cursor: pointer; font-weight: 500; color: #92400e; padding: 5px 0;">
+                                    🔧 Advanced OMERO Options
+                                </summary>
+                                <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.3); border-radius: 6px;">
+                                    <!-- Map Annotations Info -->
+                                    <div style="margin-bottom: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
+                                            <input type="checkbox" id="omeroMapAnnotations" checked disabled style="width: auto;">
+                                            🗂️ Include Map Annotations
+                                        </label>
+                                        <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
+                                            Metadata will be stored as OMERO Map Annotations for programmatic access (recommended)
+                                        </small>
+                                    </div>
+
+                                    <!-- Namespace Selection -->
+                                    <div style="margin-bottom: 10px;">
+                                        <label for="omeroNamespace" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
+                                            🏷️ Annotation Namespace:
+                                        </label>
+                                        <input type="text" id="omeroNamespace" value="NFDI4BioImage.MetaFold.ExperimentMetadata" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                                        <small style="color: #92400e; display: block; margin-top: 4px;">
+                                            Namespace for metadata annotations (helps organize and filter annotations)
+                                        </small>
+                                    </div>
+
+                                    <!-- Connection Test Button -->
+                                    <div style="margin-top: 15px; text-align: center;">
+                                        <button type="button" onclick="testOMEROConnectionInline()" style="
+                                            background: linear-gradient(45deg, #f59e0b, #d97706);
+                                            color: white;
+                                            border: none;
+                                            padding: 8px 16px;
+                                            border-radius: 6px;
+                                            cursor: pointer;
+                                            font-size: 14px;
+                                            font-weight: 500;
+                                            transition: all 0.3s ease;
+                                            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+                                        " onmouseover="this.style.transform='translateY(-1px)'"
+                                           onmouseout="this.style.transform='translateY(0)'">
+                                            🔍 Test OMERO Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <div class="folder-structure">
+                        <h3>📋 Structure Preview:</h3>
+                        <div id="folderPreview" class="folder-tree"></div>
+                    </div>
+
+                    <!-- Metadata Form for Experiments -->
+                    <div id="experimentForm" class="metadata-editor" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3>🧪 Fill Experiment Metadata:</h3>
+                            <button class="btn btn-secondary btn-small" onclick="saveExperimentTemplate()" style="padding: 6px 12px;" title="Save current metadata values and project paths with this template">
+                                💾 Save Template & Paths
+                            </button>
+                        </div>
+                        <div id="experimentFields"></div>
+                    </div>
+
+                    <!-- ENHANCED ACTIONS SECTION - Replace existing actions div in index.html -->
+					<div class="actions">
+						<button class="btn" onclick="createProject()">🎯 Create Project</button>
+						<button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
 						
-						<!-- Manual sync checkbox -->
-						<div id="elabftwManualOption">
-							<label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #0369a1;">
-								<input type="checkbox" id="sendToElabFTW" style="width: auto;">
-								🧪 Send to elabFTW
-							</label>
-							<small style="color: #0369a1; margin-left: 24px; display: block; margin-top: 4px;">
-								Create this experiment in elabFTW with metadata and structure
-							</small>
-						</div>
-						
-						<!-- Existing experiment ID field -->
-						<div id="elabftwExperimentId" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
-							<label for="existingExperimentId" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
-								📝 Update Existing Experiment (optional):
-							</label>
-							<input type="text" id="existingExperimentId" placeholder="Enter experiment ID (e.g., 149)" style="width: 100%; padding: 6px 10px; border: 1px solid #0ea5e9; border-radius: 4px;">
-							<small style="color: #0369a1; display: block; margin-top: 4px;">
-								If provided, metadata will be added to this existing experiment instead of creating a new one
-							</small>
+						<!-- NEW: More Menu Container -->
+						<div class="more-menu-container">
+							<button class="more-menu-trigger" onclick="toggleMoreMenu()" id="moreMenuTrigger">
+								<span>⚙️ More</span>
+								<span class="more-menu-arrow">▼</span>
+							</button>
 						</div>
 					</div>
 
-                    <!-- OMERO Integration Option -->
-                    <div id="omeroOption" style="display: none; margin-top: 15px; padding: 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
-                        <!-- OMERO Status Info -->
-                        <div id="omeroStatusInfo" style="margin-bottom: 10px;">
-                            <div id="omeroConnectionStatus" style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
-                                <span id="omeroStatusIcon">🔬</span>
-                                <span id="omeroStatusText">OMERO Status: Checking...</span>
+					<!-- NEW: Slide-out Panel -->
+					<div class="slide-out-overlay" id="slideOutOverlay" onclick="closeMoreMenu()"></div>
+					<div class="slide-out-panel" id="slideOutPanel">
+						<div class="panel-header">
+							<h3>
+								<span>⚙️</span>
+								Template Actions
+							</h3>
+							<button class="panel-close" onclick="closeMoreMenu()" aria-label="Close">
+								✕
+							</button>
+						</div>
+						
+						<div class="panel-content">
+							<!-- Template Info Section -->
+							<div class="panel-template-info" id="panelTemplateInfo">
+								<h4 id="panelTemplateName">🧪 Select a template</h4>
+								<div class="template-meta" id="panelTemplateMeta">
+									Choose a template to see available actions
+								</div>
+								<div class="template-stats" id="panelTemplateStats">
+									<!-- Stats will be populated by JavaScript -->
+								</div>
+							</div>
+							
+							<!-- Action Buttons -->
+							<div class="panel-actions">
+								<!-- Copy/Duplicate Action -->
+								<div class="panel-action copy" onclick="duplicateCurrentTemplate()" id="duplicateAction">
+									<button class="panel-action-button" type="button">
+										<div class="panel-action-icon">📋</div>
+										<div class="panel-action-content">
+											<div class="panel-action-title">Duplicate Template</div>
+											<div class="panel-action-description">Create a copy of this template with a new name</div>
+										</div>
+									</button>
+								</div>
+								
+								<!-- Export Action -->
+								<div class="panel-action export" onclick="exportCurrentTemplate()" id="exportAction">
+									<button class="panel-action-button" type="button">
+										<div class="panel-action-icon">📤</div>
+										<div class="panel-action-content">
+											<div class="panel-action-title">Export Template</div>
+											<div class="panel-action-description">Save template as JSON file for backup or sharing</div>
+										</div>
+									</button>
+								</div>
+								
+								<!-- Delete Action -->
+								<div class="panel-action delete" onclick="deleteCurrentTemplate()" id="deleteActionPanel">
+									<button class="panel-action-button" type="button">
+										<div class="panel-action-icon">🗑️</div>
+										<div class="panel-action-content">
+											<div class="panel-action-title">Delete Template</div>
+											<div class="panel-action-description">Permanently remove this template (cannot be undone)</div>
+										</div>
+									</button>
+								</div>
+							</div>
+							
+							<!-- Additional Info -->
+							<div style="margin-top: 30px; padding: 15px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border-left: 3px solid #7c3aed;">
+								<div style="font-size: 0.9rem; color: #9ca3af; line-height: 1.5;">
+									<strong style="color: #a855f7;">💡 Tip:</strong> Use duplicate to create variations of existing templates, or export to share templates with colleagues.
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<style>
+					/* Inline styles for the More Menu Arrow Animation */
+					.more-menu-arrow {
+						transition: transform 0.3s ease;
+						font-size: 12px;
+					}
+
+					.more-menu-trigger.active .more-menu-arrow {
+						transform: rotate(180deg);
+					}
+
+					/* Focus states for accessibility */
+					.more-menu-trigger:focus,
+					.panel-action-button:focus,
+					.panel-close:focus {
+						outline: 2px solid #7c3aed;
+						outline-offset: 2px;
+					}
+
+					/* Smooth transitions for panel actions */
+					.panel-action-button {
+						transition: all 0.3s ease;
+					}
+
+					.panel-action:hover .panel-action-button {
+						transform: translateX(5px);
+					}
+					</style>
+                    
+
+                    <!-- Info Message for additional information -->
+                    <div id="infoMessage" class="message info-message" style="display: none;"></div>
+                    <div id="successMessage" class="success-message" style="display: none;"></div>
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+                </div>
+            </div>
+
+
+			<!-- PROJECT DISCOVERY TAB -->
+			<div id="discoverTabContent" class="main-tab-content">
+				<div class="discovery-container">
+					<div class="discovery-header">
+						<div class="header-content">
+							<h2>📁 MetaFold Project Discovery</h2>
+							<p>Scan directories to discover and analyze your MetaFold projects</p>
+						</div>
+						<div class="header-actions">
+							<button class="btn" onclick="projectScanner.scanDirectory()" id="scanDirectoryBtn">
+								🔍 Scan Directory
+							</button>
+						</div>
+					</div>
+
+					<div id="discoveryQuickStart" class="quick-start-section">
+						<div class="quick-start-content">
+							<div class="quick-start-icon">🔍</div>
+							<h3>Discover Your MetaFold Projects</h3>
+							<p>Scan any directory to find all MetaFold projects with their metadata and get insights into your research data organization.</p>
+							
+							<div class="quick-start-actions">
+								<button class="btn btn-primary" onclick="projectScanner.scanDirectory()">
+									🔍 Start Scanning
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<div id="projectScannerContainer" class="scanner-main-container">
+						<!-- Project scanner content will be rendered here -->
+					</div>
+				</div>
+			</div>
+
+
+            <!-- ENHANCED: VISUALIZE TAB with JSONCrack Integration -->
+            <div id="visualizeTabContent" class="main-tab-content">
+                <div class="visualization-container">
+                    <div class="visualization-header">
+                        <div>
+                            <h3 style="margin: 0; color: #e0e0e0;">📊 Interactive Data Visualization</h3>
+                            <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 14px;">Explore your experiment metadata with advanced visualization</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <!-- NEW: Visualization Type Selector -->
+                            <div class="visualization-type-selector">
+                                <button class="viz-type-btn active" onclick="visualizationManager.setVisualizationType('jsoncrack')" id="jsoncrackTypeBtn" title="JSONCrack Interactive Graph">
+                                    🕸️ JSONCrack
+                                </button>
+                                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('d3graph')" id="d3graphTypeBtn" title="D3.js Force Graph">
+                                    🌐 D3 Graph
+                                </button>
+                                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('tree')" id="treeTypeBtn" title="Collapsible Tree View">
+                                    🌳 Tree
+                                </button>
+                            </div>
+                            <div style="border-left: 1px solid rgba(255,255,255,0.2); margin: 0 10px;"></div>
+                            <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromTemplate()" title="Visualize current template metadata">
+                                🧪 Template Data
+                            </button>
+							
+							<button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromScannedProjects()" title="Visualize discovered projects" id="visualizeScannedBtn" style="display: none;">
+								📁 Scanned Projects
+							</button>
+							
+							
+                            <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromFile()" title="Load JSON file for visualization">
+                                📂 Load JSON
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()" title="Export current visualization">
+                                💾 Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="visualization-content" id="visualizationContent">
+                        <div class="visualization-placeholder">
+                            <svg fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 7.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                            </svg>
+                            <h4>No Data Loaded</h4>
+                            <p>Select a template or load a JSON file to start visualizing your data</p>
+                            <div style="margin-top: 20px;">
+                                <button class="btn btn-secondary" onclick="visualizationManager.showSampleData()">
+                                    🎯 Show Sample
+                                </button>
                             </div>
                         </div>
-
-                        <!-- Auto-sync info message -->
-                        <div id="omeroAutoInfo" style="display: none; color: #92400e; font-weight: 500; margin-bottom: 10px;">
-                            <span style="color: #059669;">✅</span> Auto-sync to OMERO is enabled - datasets will be created automatically
-                        </div>
-                        
-                        <!-- Manual sync checkbox -->
-                        <div id="omeroManualOption">
-                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
-                                <input type="checkbox" id="sendToOMERO" style="width: auto;">
-                                🔬 Send to OMERO
-                            </label>
-                            <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
-                                Create this experiment as a dataset in OMERO with metadata annotations
-                            </small>
-                        </div>
-                        
-                        <!-- OMERO Group Selection -->
-						<div id="omeroGroupSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.4); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2); transition: all 0.3s ease;">
-							<label for="omeroGroupSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
-								👥 OMERO Group:
-							</label>
-							<select id="omeroGroupSelect" onchange="handleOMEROGroupSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
-								<option value="">Loading groups...</option>
-							</select>
-							<small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
-								Select a group to filter available projects
-							</small>
-							<div id="omeroGroupStatus" style="margin-top: 6px; font-size: 12px; font-style: italic; min-height: 16px;"></div>
-						</div>
-
-						<!-- OMERO Project Selection -->
-						<div id="omeroProjectSelection" style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); transition: all 0.3s ease;">
-							<label for="omeroProjectSelect" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 6px; font-size: 14px;">
-								📁 OMERO Project (optional):
-							</label>
-							<select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()" style="width: 100%; padding: 8px 12px; border: 1px solid #f59e0b; border-radius: 6px; background: white; color: #374151; font-size: 14px; transition: all 0.3s ease;">
-								<option value="">-- Create standalone dataset --</option>
-								<option value="refresh">🔄 Refresh project list</option>
-							</select>
-							<small style="color: #92400e; display: block; margin-top: 4px; font-size: 12px;">
-								Select an existing OMERO project to link the dataset to, or leave empty for standalone dataset
-							</small>
-						</div>
-
-                        <!-- Dataset Name Override -->
-                        <div id="omeroDatasetName" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
-                            <label for="omeroDatasetNameInput" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
-                                🗂️ Dataset Name (optional):
-                            </label>
-                            <input type="text" id="omeroDatasetNameInput" placeholder="Leave empty to use project name" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px;">
-                            <small style="color: #92400e; display: block; margin-top: 4px;">
-                                Customize the dataset name in OMERO. If empty, uses the project name.
-                            </small>
-                        </div>
-
-                        <!-- Advanced Options (Collapsible) -->
-                        <details style="margin-top: 15px;">
-                            <summary style="cursor: pointer; font-weight: 500; color: #92400e; padding: 5px 0;">
-                                🔧 Advanced OMERO Options
-                            </summary>
-                            <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.3); border-radius: 6px;">
-                                <!-- Map Annotations Info -->
-                                <div style="margin-bottom: 10px;">
-                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
-                                        <input type="checkbox" id="omeroMapAnnotations" checked disabled style="width: auto;">
-                                        🗂️ Include Map Annotations
-                                    </label>
-                                    <small style="color: #92400e; margin-left: 24px; display: block; margin-top: 4px;">
-                                        Metadata will be stored as OMERO Map Annotations for programmatic access (recommended)
-                                    </small>
-                                </div>
-
-                                <!-- Namespace Selection -->
-                                <div style="margin-bottom: 10px;">
-                                    <label for="omeroNamespace" style="display: block; font-weight: 500; color: #92400e; margin-bottom: 5px;">
-                                        🏷️ Annotation Namespace:
-                                    </label>
-                                    <input type="text" id="omeroNamespace" value="NFDI4BioImage.MetaFold.ExperimentMetadata" style="width: 100%; padding: 6px 10px; border: 1px solid #f59e0b; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                                    <small style="color: #92400e; display: block; margin-top: 4px;">
-                                        Namespace for metadata annotations (helps organize and filter annotations)
-                                    </small>
-                                </div>
-
-                                <!-- Connection Test Button -->
-                                <div style="margin-top: 15px; text-align: center;">
-                                    <button type="button" onclick="testOMEROConnectionInline()" style="
-                                        background: linear-gradient(45deg, #f59e0b, #d97706);
-                                        color: white;
-                                        border: none;
-                                        padding: 8px 16px;
-                                        border-radius: 6px;
-                                        cursor: pointer;
-                                        font-size: 14px;
-                                        font-weight: 500;
-                                        transition: all 0.3s ease;
-                                        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-                                    " onmouseover="this.style.transform='translateY(-1px)'"
-                                       onmouseout="this.style.transform='translateY(0)'">
-                                        🔍 Test OMERO Connection
-                                    </button>
-                                </div>
-                            </div>
-                        </details>
                     </div>
                 </div>
-
-                <div class="folder-structure">
-                    <h3>📋 Structure Preview:</h3>
-                    <div id="folderPreview" class="folder-tree"></div>
-                </div>
-
-                <!-- Metadata Form for Experiments -->
-                <div id="experimentForm" class="metadata-editor" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3>🧪 Fill Experiment Metadata:</h3>
-                        <button class="btn btn-secondary btn-small" onclick="saveExperimentTemplate()" style="padding: 6px 12px;" title="Save current metadata values and project paths with this template">
-                            💾 Save Template & Paths
-                        </button>
-                    </div>
-                    <div id="experimentFields"></div>
-                </div>
-
-                <!-- CRITICAL: Actions MUST be inside main-content -->
-                <div class="actions">
-                    <button class="btn" onclick="createProject()">🎯 Create Project</button>
-                    <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
-                    <button class="btn btn-danger" onclick="deleteCurrentTemplate()">🗑️ Delete</button>
-                </div>
-
-                <!-- Info Message for additional information -->
-                <div id="infoMessage" class="message info-message" style="display: none;"></div>
-                <div id="successMessage" class="success-message" style="display: none;"></div>
-                <div id="errorMessage" class="error-message" style="display: none;"></div>
             </div>
         </div>
     </div>
 
-    <!-- Settings Modal (Enhanced with OMERO) -->
+    <!-- Settings Modal (PRESERVED EXACTLY) -->
     <div id="settingsModal" class="modal" style="display: none;">
         <div class="modal-content">
             <span class="close" onclick="closeSettingsModal()">&times;</span>
@@ -461,156 +801,156 @@
                         <button class="btn btn-secondary" onclick="testElabFTWConnection()">🔍 Test Connection</button>
                         <div id="elabftwConnectionStatus" style="margin-top: 10px; display: none;"></div>
                     </div>
-					
-					<!-- CONFLICT RESOLUTION SETTINGS -->
-					<div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px; margin-top: 15px;">
-						<label style="color: #a855f7; font-size: 1.1rem; margin-bottom: 10px; display: block;">
-							🔄 Field Conflict Handling
-						</label>
-						
-						<div style="margin-bottom: 15px;">
-							<label style="display: flex; align-items: center; gap: 8px;">
-								<input type="checkbox" id="elabftwOverwriteEnabled" onchange="updateElabFTWOverwrite()">
-								<span>⚠️ Overwrite existing fields</span>
-							</label>
-							<small style="color: #9ca3af; margin-left: 24px; display: block; margin-top: 4px;">
-								<strong>Default:</strong> Fields with same names will be versioned (safe mode)<br>
-								<strong>When checked:</strong> Fields with same names will be overwritten (data loss possible)
-							</small>
-						</div>
-						
-						<div id="elabftwVersioningInfo" style="margin-left: 20px; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; border-left: 3px solid #22c55e;">
-							<div style="margin-bottom: 10px;">
-								<strong style="color: #16a34a;">✅ Safe Mode Active (Recommended)</strong>
-								<div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
-									When field names conflict, new versions will be created automatically
-								</div>
-							</div>
-							
-							<label for="elabftwVersioningFormat" style="display: block; font-weight: 500; margin-bottom: 5px; color: #16a34a;">
-								📅 Versioning Format:
-							</label>
-							<select id="elabftwVersioningFormat" onchange="updateElabFTWVersioningFormat()" style="width: 100%; padding: 6px 10px; border: 1px solid #22c55e; border-radius: 4px; background: white; color: #374151;">
-								<option value="timestamp">Timestamp (Field_2024-06-06T14-30-45)</option>
-								<option value="date">Date (Field_2024-06-06)</option>
-								<option value="counter">Counter (Field_v2, Field_v3, ...)</option>
-							</select>
-							<small style="color: #6b7280; display: block; margin-top: 4px;">
-								Choose how versioned field names should be formatted
-							</small>
-							
-							<!-- Safe Mode Preview -->
-							<div style="margin-top: 10px; padding: 8px; background: rgba(34, 197, 94, 0.1); border-radius: 4px; border-left: 3px solid #22c55e;">
-								<strong style="color: #16a34a;">Example (Safe Mode):</strong>
-								<div id="versioningPreview" style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
-									Existing: "Hypothesis" → New: "Hypothesis_2024-06-06"
-								</div>
-							</div>
-						</div>
-						
-						<!-- Overwrite Warning (hidden by default) -->
-						<div id="elabftwOverwriteWarning" style="display: none; margin-left: 20px; padding: 10px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border-left: 3px solid #ef4444;">
-							<div style="margin-bottom: 8px;">
-								<strong style="color: #dc2626;">⚠️ Overwrite Mode Active</strong>
-								<div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
-									Fields with the same name will replace existing data
-								</div>
-							</div>
-							
-							<div style="padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border-left: 3px solid #ef4444;">
-								<strong style="color: #dc2626;">Example (Overwrite Mode):</strong>
-								<div style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
-									Existing: "Hypothesis: Old Value" → Becomes: "Hypothesis: New Value"
-								</div>
-								<div style="color: #dc2626; font-size: 11px; margin-top: 2px; font-weight: 500;">
-									⚠️ Original value will be lost permanently
-								</div>
-							</div>
-						</div>
-						
-						<!-- DEBUG BUTTON -->
-						<div style="margin-top: 15px; text-align: center;">
-							<button type="button" onclick="testConflictSettings()" style="
-								background: #6366f1;
-								color: white;
-								border: none;
-								padding: 6px 12px;
-								border-radius: 4px;
-								cursor: pointer;
-								font-size: 12px;
-							">
-								🧪 Test Settings
-							</button>
-						</div>
-					</div>
+                    
+                    <!-- CONFLICT RESOLUTION SETTINGS -->
+                    <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px; margin-top: 15px;">
+                        <label style="color: #a855f7; font-size: 1.1rem; margin-bottom: 10px; display: block;">
+                            🔄 Field Conflict Handling
+                        </label>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="elabftwOverwriteEnabled" onchange="updateElabFTWOverwrite()">
+                                <span>⚠️ Overwrite existing fields</span>
+                            </label>
+                            <small style="color: #9ca3af; margin-left: 24px; display: block; margin-top: 4px;">
+                                <strong>Default:</strong> Fields with same names will be versioned (safe mode)<br>
+                                <strong>When checked:</strong> Fields with same names will be overwritten (data loss possible)
+                            </small>
+                        </div>
+                        
+                        <div id="elabftwVersioningInfo" style="margin-left: 20px; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; border-left: 3px solid #22c55e;">
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #16a34a;">✅ Safe Mode Active (Recommended)</strong>
+                                <div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
+                                    When field names conflict, new versions will be created automatically
+                                </div>
+                            </div>
+                            
+                            <label for="elabftwVersioningFormat" style="display: block; font-weight: 500; margin-bottom: 5px; color: #16a34a;">
+                                📅 Versioning Format:
+                            </label>
+                            <select id="elabftwVersioningFormat" onchange="updateElabFTWVersioningFormat()" style="width: 100%; padding: 6px 10px; border: 1px solid #22c55e; border-radius: 4px; background: white; color: #374151;">
+                                <option value="timestamp">Timestamp (Field_2024-06-06T14-30-45)</option>
+                                <option value="date">Date (Field_2024-06-06)</option>
+                                <option value="counter">Counter (Field_v2, Field_v3, ...)</option>
+                            </select>
+                            <small style="color: #6b7280; display: block; margin-top: 4px;">
+                                Choose how versioned field names should be formatted
+                            </small>
+                            
+                            <!-- Safe Mode Preview -->
+                            <div style="margin-top: 10px; padding: 8px; background: rgba(34, 197, 94, 0.1); border-radius: 4px; border-left: 3px solid #22c55e;">
+                                <strong style="color: #16a34a;">Example (Safe Mode):</strong>
+                                <div id="versioningPreview" style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                    Existing: "Hypothesis" → New: "Hypothesis_2024-06-06"
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Overwrite Warning (hidden by default) -->
+                        <div id="elabftwOverwriteWarning" style="display: none; margin-left: 20px; padding: 10px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border-left: 3px solid #ef4444;">
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #dc2626;">⚠️ Overwrite Mode Active</strong>
+                                <div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
+                                    Fields with the same name will replace existing data
+                                </div>
+                            </div>
+                            
+                            <div style="padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border-left: 3px solid #ef4444;">
+                                <strong style="color: #dc2626;">Example (Overwrite Mode):</strong>
+                                <div style="font-family: monospace; font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                    Existing: "Hypothesis: Old Value" → Becomes: "Hypothesis: New Value"
+                                </div>
+                                <div style="color: #dc2626; font-size: 11px; margin-top: 2px; font-weight: 500;">
+                                    ⚠️ Original value will be lost permanently
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- DEBUG BUTTON -->
+                        <div style="margin-top: 15px; text-align: center;">
+                            <button type="button" onclick="testConflictSettings()" style="
+                                background: #6366f1;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">
+                                🧪 Test Settings
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- OMERO Settings Tab -->
-			<div id="omeroSettings" class="settings-tab-content">
-				<div class="form-group">
-					<label style="display: flex; align-items: center; gap: 8px;">
-						<input type="checkbox" id="omeroEnabled" onchange="updateOMEROSetting()">
-						<span>🔬 Enable OMERO Integration</span>
-					</label>
-					<small>Connect MetaFold with your OMERO image data management system.</small>
-				</div>
+            <div id="omeroSettings" class="settings-tab-content">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="omeroEnabled" onchange="updateOMEROSetting()">
+                        <span>🔬 Enable OMERO Integration</span>
+                    </label>
+                    <small>Connect MetaFold with your OMERO image data management system.</small>
+                </div>
 
-				<div id="omeroConfig" style="display: none;">
-					<div class="form-group">
-						<label for="omeroServerUrl">🌐 OMERO Server URL:</label>
-						<input type="url" id="omeroServerUrl" placeholder="https://your-omero-server.com" onchange="updateOMEROServerUrl()">
-						<small>Full URL to your OMERO.web server (including https://)</small>
-					</div>
+                <div id="omeroConfig" style="display: none;">
+                    <div class="form-group">
+                        <label for="omeroServerUrl">🌐 OMERO Server URL:</label>
+                        <input type="url" id="omeroServerUrl" placeholder="https://your-omero-server.com" onchange="updateOMEROServerUrl()">
+                        <small>Full URL to your OMERO.web server (including https://)</small>
+                    </div>
 
-					<div class="form-group">
-						<label for="omeroUsername">👤 Username:</label>
-						<input type="text" id="omeroUsername" placeholder="Your OMERO username" onchange="updateOMEROUsername()">
-						<small>Your OMERO username for authentication</small>
-					</div>
+                    <div class="form-group">
+                        <label for="omeroUsername">👤 Username:</label>
+                        <input type="text" id="omeroUsername" placeholder="Your OMERO username" onchange="updateOMEROUsername()">
+                        <small>Your OMERO username for authentication</small>
+                    </div>
 
-					<div class="form-group">
-						<label for="omeroPassword">🔑 Password:</label>
-						<input type="password" id="omeroPassword" placeholder="Your OMERO password" onchange="updateOMEROPassword()">
-						<small>Your OMERO password (stored locally - use secure setup in production)</small>
-					</div>
+                    <div class="form-group">
+                        <label for="omeroPassword">🔑 Password:</label>
+                        <input type="password" id="omeroPassword" placeholder="Your OMERO password" onchange="updateOMEROPassword()">
+                        <small>Your OMERO password (stored locally - use secure setup in production)</small>
+                    </div>
 
-					<div class="form-group">
-						<label style="display: flex; align-items: center; gap: 8px;">
-							<input type="checkbox" id="omeroAutoSync" onchange="updateOMEROAutoSync()">
-							<span>🔄 Auto-sync experiments</span>
-						</label>
-						<small>Automatically create datasets in OMERO when creating experiment projects.</small>
-					</div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroAutoSync" onchange="updateOMEROAutoSync()">
+                            <span>🔄 Auto-sync experiments</span>
+                        </label>
+                        <small>Automatically create datasets in OMERO when creating experiment projects.</small>
+                    </div>
 
-					<div class="form-group">
-						<label for="omeroDefaultProject">📁 Default Project ID:</label>
-						<input type="number" id="omeroDefaultProject" placeholder="Leave empty for standalone datasets" onchange="updateOMERODefaultProject()">
-						<small>Default OMERO project ID to link new datasets to (optional).</small>
-					</div>
+                    <div class="form-group">
+                        <label for="omeroDefaultProject">📁 Default Project ID:</label>
+                        <input type="number" id="omeroDefaultProject" placeholder="Leave empty for standalone datasets" onchange="updateOMERODefaultProject()">
+                        <small>Default OMERO project ID to link new datasets to (optional).</small>
+                    </div>
 
-					<div class="form-group">
-						<label style="display: flex; align-items: center; gap: 8px;">
-							<input type="checkbox" id="omeroCreateDatasets" onchange="updateOMEROCreateDatasets()">
-							<span>🗂️ Create datasets</span>
-						</label>
-						<small>Create datasets in OMERO (disable if you only want metadata annotations).</small>
-					</div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroCreateDatasets" onchange="updateOMEROCreateDatasets()">
+                            <span>🗂️ Create datasets</span>
+                        </label>
+                        <small>Create datasets in OMERO (disable if you only want metadata annotations).</small>
+                    </div>
 
-					<div class="form-group">
-						<label style="display: flex; align-items: center; gap: 8px;">
-							<input type="checkbox" id="omeroVerifySSL" onchange="updateOMEROVerifySSL()">
-							<span>🔒 Verify SSL certificates</span>
-						</label>
-						<small>Disable only for development servers with self-signed certificates.</small>
-					</div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="omeroVerifySSL" onchange="updateOMEROVerifySSL()">
+                            <span>🔒 Verify SSL certificates</span>
+                        </label>
+                        <small>Disable only for development servers with self-signed certificates.</small>
+                    </div>
 
-					<div class="form-group">
-						<button class="btn btn-secondary" onclick="testOMEROConnection()">🔍 Test Connection</button>
-						<div id="omeroConnectionStatus" style="margin-top: 10px; display: none;"></div>
-					</div>
-				</div>
-			</div>
+                    <div class="form-group">
+                        <button class="btn btn-secondary" onclick="testOMEROConnection()">🔍 Test Connection</button>
+                        <div id="omeroConnectionStatus" style="margin-top: 10px; display: none;"></div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Settings Actions -->
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
@@ -622,7 +962,7 @@
         </div>
     </div>
 
-    <!-- Modal for new/edited template -->
+    <!-- Modal for new/edited template (PRESERVED EXACTLY) -->
     <div id="templateModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeTemplateModal()">&times;</span>
@@ -712,28 +1052,48 @@ experiment_log.md"></textarea>
         </div>
     </div>
 
-   <!-- JavaScript Modules - Updated with Secure Storage -->
+   <!-- JavaScript Modules - ENHANCED with JSONCrack -->
     
-    <!-- Basis-Module zuerst -->
+    <!-- React and ReactDOM for JSONCrack (CRITICAL - LOAD FIRST) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+    
+    
+	<script>// Manual jsongraph-react export für FallbackViewer
+	window.jsongraphReact = {
+		// Dummy für jetzt - wird später richtig implementiert
+		version: "0.0.12"
+	};
+	</script>
+	
+	<!-- VOR <script src="build/jsoncrack-viewer.js"></script> -->
+	<script src="https://unpkg.com/jsongraph-react@0.0.12/dist/index.umd.js"></script>
+	<!-- JSONCrack Viewer Bundle (NEW - CRITICAL) -->
+    <script src="build/jsoncrack-viewer.js"></script>
+    
+    <!-- D3.js for fallback visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    
+    <!-- Basis-Module zuerst (PRESERVED) -->
     <script src="js/utils.js"></script>
     <script src="js/storage.js"></script>
-	<script src="js/userManager.js"></script>
-	<script src="js/loginModal.js"></script>
-	<script src="js/userManagementModal.js"></script>
+    <script src="js/userManager.js"></script>
+    <script src="js/loginModal.js"></script>
+    <script src="js/userManagementModal.js"></script>
     
-    <!-- 🔐 SECURE STORAGE MODULES (NEW) - Must load BEFORE settingsManager -->
+    <!-- 🔐 SECURE STORAGE MODULES (PRESERVED) -->
     <script src="js/secureStorage.js"></script>
     <script src="js/securityUI.js"></script>
     
-    <!-- Settings Manager (Enhanced with Secure Storage) -->
+    <!-- Settings Manager (PRESERVED) -->
     <script src="js/settingsManager.js"></script>
     
-    <!-- 🚀 SECURE INTEGRATION COORDINATOR (NEW) - After settingsManager -->
+    <!-- 🚀 SECURE INTEGRATION COORDINATOR (PRESERVED) -->
     <script src="js/secureIntegration.js"></script>
     
-    <!-- OMERO Integration Modules - Updated to modular structure -->
+    <!-- OMERO Integration Modules (PRESERVED) -->
     <script src="js/omero/metaFoldOMEROIntegration.js"></script>
-	<script src="js/omero/omeroAuth.js"></script>
+    <script src="js/omero/omeroAuth.js"></script>
     <script src="js/omero/omeroAPI.js"></script>
     <script src="js/omero/omeroGroups.js"></script>
     <script src="js/omero/omeroProjects.js"></script>
@@ -741,21 +1101,27 @@ experiment_log.md"></textarea>
     <script src="js/omero/omeroDatasetCreation.js"></script>
     <script src="js/omero/omeroUIIntegration.js"></script>
     <script src="js/omero/omeroTestFunctions.js"></script>
-	<script src="js/omero/omeroStepByStepTest.js"></script>
-	<script src="js/omero/omeroIntegrationTest.js"></script>
+    <script src="js/omero/omeroStepByStepTest.js"></script>
+    <script src="js/omero/omeroIntegrationTest.js"></script>
     
-    <!-- Template und Form Module -->
+    <!-- ENHANCED: Visualization Manager with JSONCrack (LOADED BEFORE OTHER MODULES) -->
+    <script src="js/visualizationManager.js"></script>
+    
+    <!-- Template und Form Module (PRESERVED) -->
     <script src="js/templateManager.js"></script>
     <script src="js/templateTypeManager.js"></script>
     <script src="js/metadataEditor.js"></script>
     <script src="js/experimentForm.js"></script>
     <script src="js/templateModal.js"></script>
     <script src="js/projectManager.js"></script>
-	
-    <!-- App Initialisierung zuletzt -->
+	<script src="js/enhancedActions.js"></script>
+    
+    <!-- App Initialisierung zuletzt (PRESERVED) -->
+    <script src="js/projectScanner.js"></script>
 	<script src="js/app.js"></script>
+	
 
-    <!-- FIXED Global Functions -->
+    <!-- PRESERVED WORKING FUNCTIONS FROM OLDER VERSION -->
     <script>
         // =================== TEMPLATE TYPE MANAGEMENT ===================
         
@@ -763,11 +1129,75 @@ experiment_log.md"></textarea>
             try {
                 if (window.templateTypeManager && window.templateTypeManager.switchType) {
                     window.templateTypeManager.switchType(type);
+                    
+                    // Update integration options after type switch
+                    setTimeout(() => {
+                        if (window.updateIntegrationOptions) {
+                            window.updateIntegrationOptions();
+                        }
+                    }, 200);
                 }
             } catch (error) {
                 console.error('Error in switchTemplateType:', error);
             }
         };
+
+        // =================== ENHANCED: MAIN TAB SWITCHING with Visualization Init ===================
+        
+		window.switchMainTab = function(tabName) {
+			try {
+				// Hide all main-tab-content elements
+				document.querySelectorAll('.main-tab-content').forEach(content => {
+					content.classList.remove('active');
+				});
+				
+				// Remove active class from all main tabs
+				document.querySelectorAll('.main-tab').forEach(tab => {
+					tab.classList.remove('active');
+				});
+				
+				// Show selected tab content
+				const tabContent = document.getElementById(tabName + 'TabContent');
+				const tabButton = document.getElementById(tabName + 'Tab');
+				
+				if (tabContent) tabContent.classList.add('active');
+				if (tabButton) tabButton.classList.add('active');
+				
+				// Tab-specific initialization
+				if (tabName === 'discover') {
+					console.log('📁 Initializing Discovery tab...');
+					if (window.projectScanner) {
+						window.projectScanner.init();
+					}
+				} else if (tabName === 'visualize') {
+					console.log('📊 Initializing Visualization tab...');
+					if (window.visualizationManager) {
+						window.visualizationManager.init();
+						
+						// Show/hide scanned projects button
+						const scannedBtn = document.getElementById('visualizeScannedBtn');
+						if (window.projectScanner && window.projectScanner.projects && window.projectScanner.projects.length > 0) {
+							if (scannedBtn) {
+								scannedBtn.style.display = 'inline-block';
+								scannedBtn.textContent = `📁 Projects (${window.projectScanner.projects.length})`;
+							}
+						} else {
+							if (scannedBtn) scannedBtn.style.display = 'none';
+						}
+					}
+					
+					setTimeout(() => {
+						if (window.visualizationManager && window.visualizationManager.checkJSONCrackAvailability) {
+							window.visualizationManager.checkJSONCrackAvailability();
+						}
+					}, 200);
+				}
+				
+				console.log('Switched to tab:', tabName);
+			} catch (error) {
+				console.error('Error in switchMainTab:', error);
+			}
+		};
 
         // =================== TEMPLATE MODAL MANAGEMENT ===================
         
@@ -1116,7 +1546,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== SETTING UPDATE FUNCTIONS - FIXED ===================
+        // =================== SETTING UPDATE FUNCTIONS - ALL PRESERVED ===================
 
         // General Settings
         window.updateUserManagementSetting = async function() {
@@ -1175,7 +1605,7 @@ experiment_log.md"></textarea>
             }
         };
 
-        // =================== ELABFTW SETTINGS - RESTORED MISSING FUNCTIONS ===================
+        // =================== ELABFTW SETTINGS ===================
 
         window.updateElabFTWSetting = async function() {
             try {
@@ -1213,7 +1643,6 @@ experiment_log.md"></textarea>
             }
         };
 
-        // FIXED: Missing updateElabFTWAutoSync function
         window.updateElabFTWAutoSync = async function() {
             try {
                 const enabled = document.getElementById('elabftwAutoSync').checked;
@@ -1228,7 +1657,6 @@ experiment_log.md"></textarea>
             }
         };
 
-        // FIXED: Missing updateElabFTWDefaultCategory function
         window.updateElabFTWDefaultCategory = async function() {
             try {
                 const category = parseInt(document.getElementById('elabftwDefaultCategory').value);
@@ -1247,7 +1675,6 @@ experiment_log.md"></textarea>
             }
         };
 
-        // FIXED: Missing testElabFTWConnection function  
         window.testElabFTWConnection = async function() {
             const statusDiv = document.getElementById('elabftwConnectionStatus');
             if (statusDiv) {
@@ -1268,7 +1695,6 @@ experiment_log.md"></textarea>
 
         // =================== ELABFTW CONFLICT RESOLUTION SETTINGS ===================
 
-        // MISSING: updateElabFTWOverwrite function
         window.updateElabFTWOverwrite = async function() {
             try {
                 const enabled = document.getElementById('elabftwOverwriteEnabled').checked;
@@ -1294,7 +1720,6 @@ experiment_log.md"></textarea>
             }
         };
 
-        // MISSING: updateElabFTWVersioningFormat function
         window.updateElabFTWVersioningFormat = async function() {
             try {
                 const format = document.getElementById('elabftwVersioningFormat').value;
@@ -1309,7 +1734,6 @@ experiment_log.md"></textarea>
             }
         };
 
-        // MISSING: updateVersioningPreview function
         window.updateVersioningPreview = function() {
             const previewEl = document.getElementById('versioningPreview');
             if (!previewEl) return;
@@ -1337,7 +1761,6 @@ experiment_log.md"></textarea>
             previewEl.textContent = `Existing: "Hypothesis" → New: "Hypothesis_${exampleSuffix}"`;
         };
 
-        // MISSING: testConflictSettings function (Debug)
         window.testConflictSettings = async function() {
             try {
                 const overwriteEnabled = await window.settingsManager.get('elabftw.overwrite_enabled');
@@ -1755,6 +2178,15 @@ experiment_log.md"></textarea>
                         window.updateIntegrationOptions();
                     }
                 }, 500);
+
+                // ENHANCED: Initialize JSONCrack availability check after DOM load
+                setTimeout(() => {
+                    console.log('📊 Checking JSONCrack availability after DOM load...');
+                    if (window.visualizationManager) {
+                        window.visualizationManager.checkJSONCrackAvailability();
+                        console.log('📊 JSONCrack availability:', window.visualizationManager.usesFallback ? 'Fallback mode' : 'Full JSONCrack mode');
+                    }
+                }, 1500);
             } catch (error) {
                 console.error('Error in DOMContentLoaded:', error);
             }
@@ -1782,8 +2214,77 @@ experiment_log.md"></textarea>
             }
         }
 
-        console.log('✅ LAYOUT FIXED MetaFold UI Integration loaded successfully');
-    </script>
+        // =================== NEW: JSONCrack Integration Debug Functions ===================
 
+        // Global debug function to check JSONCrack status
+        window.debugJSONCrack = function() {
+            console.log('🔍 JSONCrack Debug Information:');
+            console.log('- React available:', typeof React !== 'undefined');
+            console.log('- ReactDOM available:', typeof ReactDOM !== 'undefined');
+            console.log('- JSONCrackViewer available:', typeof window.JSONCrackViewer !== 'undefined');
+            console.log('- D3.js available:', typeof d3 !== 'undefined');
+            
+            if (window.visualizationManager) {
+                console.log('- Visualization Manager initialized:', window.visualizationManager.initialized);
+                console.log('- Using fallback mode:', window.visualizationManager.usesFallback);
+                console.log('- Current data loaded:', window.visualizationManager.currentData !== null);
+            }
+            
+            // Test JSONCrack component loading
+            if (typeof window.JSONCrackViewer !== 'undefined') {
+                console.log('✅ JSONCrackViewer is available and ready to use');
+                try {
+                    const testElement = React.createElement(window.JSONCrackViewer, {
+                        data: { test: 'value' },
+                        width: 400,
+                        height: 300
+                    });
+                    console.log('✅ JSONCrackViewer component can be created successfully');
+                } catch (error) {
+                    console.error('❌ Error creating JSONCrackViewer component:', error);
+                }
+            } else {
+                console.warn('⚠️ JSONCrackViewer not available - check bundle loading');
+            }
+        };
+
+        // Test JSONCrack with sample data
+        window.testJSONCrackIntegration = async function() {
+            if (!window.visualizationManager) {
+                alert('Visualization Manager not available');
+                return;
+            }
+            
+            try {
+                console.log('🧪 Testing JSONCrack integration...');
+                
+                // Switch to visualize tab
+                window.switchMainTab('visualize');
+                
+                // Wait for tab to load
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Initialize visualization manager
+                window.visualizationManager.init();
+                
+                // Set visualization type to JSONCrack
+                if (window.visualizationManager.setVisualizationType) {
+                    window.visualizationManager.setVisualizationType('jsoncrack');
+                }
+                
+                // Load sample data
+                window.visualizationManager.showSampleData();
+                
+                alert('✅ JSONCrack integration test completed!\n\nCheck the Visualize tab to see the results.');
+                
+            } catch (error) {
+                console.error('❌ JSONCrack integration test failed:', error);
+                alert(`❌ JSONCrack test failed:\n\n${error.message}\n\nCheck console for details.`);
+            }
+        };
+
+        console.log('✅ ENHANCED MetaFold UI Integration loaded with JSONCrack support');
+        console.log('🔧 Debug functions available: debugJSONCrack(), testJSONCrackIntegration()');
+    </script>
 </body>
 </html>

@@ -1,0 +1,385 @@
+/* Enhanced Actions with Slide-out More Menu - MetaFold */
+
+/* ENHANCED ACTIONS CONTAINER */
+.actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    position: relative;
+}
+
+/* PRIMARY ACTION BUTTONS (unchanged) */
+.actions .btn {
+    background: linear-gradient(45deg, #7c3aed, #a855f7);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+
+.actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+}
+
+.actions .btn-secondary {
+    background: linear-gradient(45deg, #374151, #4b5563);
+    box-shadow: 0 4px 15px rgba(75, 85, 99, 0.3);
+}
+
+/* MORE MENU BUTTON */
+.more-menu-container {
+    position: relative;
+    display: inline-block;
+}
+
+.more-menu-trigger {
+    background: linear-gradient(45deg, #374151, #4b5563);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(75, 85, 99, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.more-menu-trigger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(75, 85, 99, 0.4);
+    background: linear-gradient(45deg, #4b5563, #6b7280);
+}
+
+.more-menu-trigger.active {
+    background: linear-gradient(45deg, #7c3aed, #a855f7);
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+
+/* SLIDE-OUT PANEL - From More Button to Right */
+.slide-out-panel {
+    position: fixed;
+    top: 0;
+    left: -350px; /* Start hidden off-screen to the left */
+    width: 350px;
+    height: 100vh;
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 8px 0 25px rgba(0, 0, 0, 0.3);
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+}
+
+.slide-out-panel.active {
+    left: 0; /* Slide in from left */
+}
+
+/* PANEL CLOSE BUTTON - Positioned for left-side panel */
+.panel-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #e0e0e0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-size: 18px;
+}
+
+.panel-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+/* PANEL CONTENT */
+.panel-content {
+    padding: 20px;
+}
+
+/* TEMPLATE INFO IN PANEL */
+.panel-template-info {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.panel-template-info h4 {
+    margin: 0 0 8px 0;
+    color: #7c3aed;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-template-info .template-meta {
+    color: #9ca3af;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.panel-template-info .template-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.panel-template-info .template-stats span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* PANEL ACTIONS */
+.panel-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.panel-action {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.panel-action:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateX(-3px);
+}
+
+.panel-action-button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 16px 20px;
+    text-align: left;
+    cursor: pointer;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s ease;
+}
+
+.panel-action-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.panel-action-content {
+    flex: 1;
+}
+
+.panel-action-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.panel-action-description {
+    font-size: 12px;
+    color: #9ca3af;
+    line-height: 1.4;
+}
+
+/* SPECIFIC ACTION STYLES */
+.panel-action.copy .panel-action-icon {
+    background: linear-gradient(45deg, #059669, #10b981);
+}
+
+.panel-action.export .panel-action-icon {
+    background: linear-gradient(45deg, #0ea5e9, #3b82f6);
+}
+
+.panel-action.delete .panel-action-icon {
+    background: linear-gradient(45deg, #dc2626, #ef4444);
+}
+
+.panel-action.delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* OVERLAY FOR MOBILE */
+.slide-out-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 999;
+}
+
+.slide-out-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* PANEL HEADER */
+.panel-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-header h3 {
+    margin: 0;
+    color: #e0e0e0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* RESPONSIVE ADJUSTMENTS FOR LEFT SLIDE-OUT */
+@media (max-width: 768px) {
+    .slide-out-panel {
+        width: 100vw;
+        left: -100vw;
+    }
+    
+    .slide-out-panel.active {
+        left: 0;
+    }
+    
+    .actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .more-menu-trigger {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .panel-header {
+        padding: 15px;
+    }
+    
+    .panel-content {
+        padding: 15px;
+    }
+    
+    .panel-action-button {
+        padding: 14px 16px;
+    }
+    
+    .panel-action-icon {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+}
+
+/* ANIMATION ENHANCEMENTS */
+.panel-action {
+    position: relative;
+    overflow: hidden;
+}
+
+.panel-action::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.panel-action:hover::before {
+    left: 100%;
+}
+
+/* LOADING STATES */
+.panel-action.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.panel-action.loading .panel-action-icon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top: 2px solid #7c3aed;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* SUCCESS/ERROR FEEDBACK */
+.panel-action.success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.panel-action.error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* DISABLED STATE */
+.panel-action:disabled,
+.panel-action.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.panel-action:disabled:hover,
+.panel-action.disabled:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.05);
+}

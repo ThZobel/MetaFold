@@ -1,0 +1,128 @@
+site_name: MetaFold User Guide
+site_description: Complete user documentation for MetaFold - Laboratory Data Management & Experiment Organization
+site_author: NFDI4BioImage Team
+site_url: https://metafold-docs.example.com
+
+# Repository
+repo_name: metafold/documentation
+repo_url: https://github.com/nfdi4bioimage/metafold
+
+# Configuration
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
+
+  icon:
+    repo: fontawesome/brands/github
+
+# Extensions
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+# Navigation
+nav:
+  - Home: index.md
+  
+  - Getting Started:
+    - Installation: installation.md
+    - First Steps: first-steps.md
+    - Interface Overview: interface-overview.md
+  
+  - Basic Usage:
+    - Template Management: templates.md
+    - Creating Projects: project-creation.md
+    - Working with Metadata: metadata-guide.md
+  
+  - Laboratory Integration:
+    - elabFTW Integration: elabftw-integration.md
+    - OMERO Integration: omero-integration.md
+    - Combined Workflows: combined-integrations.md
+  
+  - Advanced Features:
+    - Project Discovery: project-scanner.md
+    - Data Visualization: data-visualization.md
+    - User Management: user-management.md
+    - Security & Credentials: security.md
+  
+  - Tutorials:
+    - Basic Experiment Setup: tutorials/basic-experiment.md
+    - Advanced Metadata Schemas: tutorials/advanced-metadata.md
+    - Integration Workflows: tutorials/integration-workflows.md
+    - Multi-User Setup: tutorials/multi-user-setup.md
+  
+  - Reference:
+    - Template Schema Reference: reference/template-schema.md
+    - Integration APIs: reference/integration-apis.md
+    - File Formats: reference/file-formats.md
+    - Troubleshooting: reference/troubleshooting.md
+
+# Plugins
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+  - minify:
+      minify_html: true
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nfdi4bioimage/metafold
+    - icon: fontawesome/solid/envelope
+      link: mailto:support@nfdi4bioimage.de
+  
+  version:
+    provider: mike
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript  
+extra_javascript:
+  - javascripts/extra.js

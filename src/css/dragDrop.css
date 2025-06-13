@@ -1,0 +1,534 @@
+/* Enhanced Drag & Drop Styling for MetaFold Metadata Editor */
+
+/* =================== DRAG HANDLE STYLING =================== */
+
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    cursor: grab;
+    border-radius: 4px;
+    margin-right: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.drag-handle:hover {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: rgba(124, 58, 237, 0.4);
+    transform: scale(1.05);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    transform: scale(0.95);
+    background: rgba(124, 58, 237, 0.3);
+}
+
+.drag-icon {
+    font-size: 12px;
+    color: #9ca3af;
+    font-weight: bold;
+    letter-spacing: -1px;
+    line-height: 1;
+}
+
+.drag-handle:hover .drag-icon {
+    color: #7c3aed;
+}
+
+/* =================== METADATA FIELD ENHANCEMENTS =================== */
+
+.metadata-field {
+    position: relative;
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.metadata-field:hover {
+    border-color: rgba(124, 58, 237, 0.3);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+}
+
+.metadata-field-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+/* =================== DRAG STATE STYLING =================== */
+
+.metadata-field.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(1.02);
+    z-index: 1000;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(124, 58, 237, 0.5);
+    border-color: #7c3aed;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+}
+
+.metadata-field.dragging * {
+    pointer-events: none;
+}
+
+.metadata-field.drag-over {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+    transform: translateY(-2px);
+}
+
+/* =================== DROP INDICATOR STYLING =================== */
+
+.drag-drop-indicator {
+    width: 100%;
+    height: 4px;
+    margin: 8px 0;
+    display: none;
+    z-index: 999;
+}
+
+.drop-line {
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 2px;
+    position: relative;
+    animation: pulseDropLine 1s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.drop-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.8);
+}
+
+.drop-line::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.8);
+}
+
+@keyframes pulseDropLine {
+    0%, 100% { opacity: 0.8; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.2); }
+}
+
+/* =================== POSITION INDICATOR STYLING =================== */
+
+.field-position-indicator {
+    display: inline-block;
+    background: rgba(124, 58, 237, 0.15);
+    color: #a855f7;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(124, 58, 237, 0.25);
+    user-select: none;
+    margin-left: 8px;
+    vertical-align: middle;
+    opacity: 0.8;
+}
+
+.position-number {
+    white-space: nowrap;
+}
+
+/* Position indicator in header next to field name */
+.metadata-field-header .field-position-indicator {
+    margin-left: 8px;
+    margin-right: auto;
+    flex-shrink: 0;
+}
+
+/* For group fields, show position next to label */
+.metadata-field-group .field-position-indicator {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: rgba(124, 58, 237, 0.4);
+}
+
+/* =================== FIELD TYPE SPECIFIC STYLING =================== */
+
+.metadata-field-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.field-type-selector {
+    min-width: 100px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+.field-options {
+    margin-top: 8px;
+}
+
+.field-options input,
+.field-options select {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.field-options input:focus,
+.field-options select:focus {
+    border-color: #7c3aed;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+/* =================== ANIMATION ENHANCEMENTS =================== */
+
+.metadata-field {
+    animation: slideInField 0.3s ease-out;
+}
+
+@keyframes slideInField {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Field removal animation */
+.metadata-field.removing {
+    animation: slideOutField 0.3s ease-in forwards;
+}
+
+@keyframes slideOutField {
+    to {
+        opacity: 0;
+        transform: translateX(-100%) scale(0.8);
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}
+
+/* =================== RESPONSIVE DRAG & DROP =================== */
+
+@media (max-width: 768px) {
+    .metadata-field-header {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .drag-handle {
+        width: 20px;
+        height: 20px;
+        margin-right: 6px;
+    }
+    
+    .drag-icon {
+        font-size: 10px;
+    }
+    
+    .metadata-field-controls {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .field-position-indicator {
+        position: static;
+        display: inline-block;
+        margin-top: 8px;
+        align-self: flex-start;
+    }
+    
+    .metadata-field {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .drag-handle {
+        width: 18px;
+        height: 18px;
+        margin-right: 4px;
+    }
+    
+    .metadata-field-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .metadata-field-controls {
+        margin-top: 8px;
+        justify-content: space-between;
+    }
+    
+    .field-type-selector {
+        min-width: 80px;
+    }
+}
+
+/* =================== DARK MODE OPTIMIZATIONS =================== */
+
+.metadata-field:focus-within {
+    border-color: rgba(124, 58, 237, 0.5);
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .drag-handle {
+        border-width: 2px;
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .metadata-field {
+        border-width: 2px;
+    }
+    
+    .drag-drop-indicator {
+        height: 6px;
+    }
+    
+    .drop-line {
+        height: 6px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .metadata-field,
+    .drag-handle,
+    .drop-line {
+        transition: none;
+        animation: none;
+    }
+    
+    .drag-drop-indicator {
+        animation: none;
+    }
+    
+    .metadata-field.dragging {
+        transform: none;
+    }
+}
+
+/* =================== ACCESSIBILITY ENHANCEMENTS =================== */
+
+.drag-handle:focus {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+.metadata-field[aria-grabbed="true"] {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+}
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* =================== ENHANCED VISUAL FEEDBACK =================== */
+
+.metadata-fields-container {
+    position: relative;
+    min-height: 100px;
+}
+
+.metadata-fields-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.metadata-fields-empty::before {
+    content: "🎯";
+    font-size: 2rem;
+    margin-bottom: 8px;
+}
+
+/* Drag operation global styles */
+body.dragging-field {
+    cursor: grabbing;
+    user-select: none;
+}
+
+body.dragging-field * {
+    cursor: grabbing !important;
+}
+
+/* JSON Preview Enhancement */
+#jsonPreview {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    background: rgba(0, 0, 0, 0.3);
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre;
+}
+
+/* =================== FIELD ORDER DEBUG INFO =================== */
+
+.field-position-debug {
+    opacity: 0.7;
+    font-style: italic;
+    display: none; /* Hidden by default, show in debug mode */
+}
+
+.debug-mode .field-position-debug {
+    display: inline;
+}
+
+/* =================== FORM GROUP STYLING FOR EXPERIMENT FORM =================== */
+
+.form-group[data-field-position] {
+    position: relative;
+}
+
+.form-group[data-field-position]::before {
+    content: attr(data-field-position);
+    position: absolute;
+    top: -8px;
+    right: 0;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.debug-mode .form-group[data-field-position]::before {
+    opacity: 1;
+}
+
+/* =================== SUCCESS STATES =================== */
+
+.metadata-field.field-saved {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+}
+
+.metadata-field.field-saved::after {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    color: #10b981;
+    font-weight: bold;
+    font-size: 12px;
+    animation: checkmarkPulse 0.6s ease-out;
+}
+
+@keyframes checkmarkPulse {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* =================== TOOLTIPS FOR DRAG HANDLES =================== */
+
+.drag-handle::after {
+    content: "Drag to reorder";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1001;
+}
+
+.drag-handle:hover::after {
+    opacity: 1;
+}
+
+/* =================== LOADING STATES =================== */
+
+.metadata-field.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.metadata-field.loading::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(124, 58, 237, 0.3);
+    border-top: 2px solid #7c3aed;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1001;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}

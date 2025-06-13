@@ -57,6 +57,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
     retrieveSecureCredential: (encryptedData, method = 'safeStorage') => 
         ipcRenderer.invoke('retrieve-secure-credential', encryptedData, method),
     
+    // =================== PROJECT SCANNER APIS ===================
+    
+    // Project Scanner APIs
+    scanMetaFoldProjects: (basePath, maxDepth = 5) => 
+        ipcRenderer.invoke('scan-metafold-projects', basePath, maxDepth),
+    
+    getProjectDetails: (projectPath) => 
+        ipcRenderer.invoke('get-project-details', projectPath),
+    
+    getProjectsStatistics: (projects) => 
+        ipcRenderer.invoke('get-projects-statistics', projects),
+    
+    // Project utilities
+    formatProjectPath: (fullPath, basePath = '') => {
+        if (basePath && fullPath.startsWith(basePath)) {
+            return fullPath.substring(basePath.length + 1);
+        }
+        return fullPath;
+    },
+    
+    looksLikeMetaFoldProject: (dirName) => {
+        const patterns = [
+            /^\d{4}-\d{2}-/, // Date prefix: 2025-06-
+            /experiment/i,
+            /study/i,
+            /analysis/i,
+            /project/i,
+            /lab-/i,
+            /-lab$/i
+        ];
+        return patterns.some(pattern => pattern.test(dirName));
+    },
+    
+    parseProjectName: (projectPath) => {
+        const dirName = projectPath.split(process.platform === 'win32' ? '\\' : '/').pop();
+        return dirName
+            .replace(/[-_]/g, ' ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/\b\w/g, l => l.toUpperCase());
+    },
+    
     // Generic invoke for future extensions
     invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 });
@@ -277,5 +318,117 @@ contextBridge.exposeInMainWorld('utils', {
         }
         
         return result === 0;
+    },
+    
+    // =================== PROJECT SCANNER UTILITIES ===================
+    
+    // Project analysis utilities
+    groupProjects: (projects, groupBy = 'type') => {
+        const groups = {};
+        projects.forEach(project => {
+            let key;
+            switch (groupBy) {
+                case 'date':
+                    const date = new Date(project.created);
+                    key = date.toISOString().split('T')[0];
+                    break;
+                case 'month':
+                    const month = new Date(project.created);
+                    key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
+                    break;
+                case 'size':
+                    const size = project.size || 0;
+                    if (size < 1024 * 1024) key = 'Small (<1MB)';
+                    else if (size < 1024 * 1024 * 100) key = 'Medium (1-100MB)';
+                    else key = 'Large (>100MB)';
+                    break;
+                default:
+                    key = project.type || 'Unknown';
+            }
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(project);
+        });
+        return groups;
+    },
+    
+    filterProjects: (projects, filters = {}) => {
+        return projects.filter(project => {
+            // Search filter
+            if (filters.search) {
+                const searchTerm = filters.search.toLowerCase();
+                const projectText = `${project.name} ${project.path}`.toLowerCase();
+                if (!projectText.includes(searchTerm)) return false;
+            }
+            
+            // Date range filter
+            if (filters.dateFrom && project.created < filters.dateFrom) return false;
+            if (filters.dateTo && project.created > filters.dateTo) return false;
+            
+            // Size filter
+            if (filters.minSize && (project.size || 0) < filters.minSize) return false;
+            if (filters.maxSize && (project.size || 0) > filters.maxSize) return false;
+            
+            // Field count filter
+            if (filters.minFields && (project.metadataFieldCount || 0) < filters.minFields) return false;
+            if (filters.maxFields && (project.metadataFieldCount || 0) > filters.maxFields) return false;
+            
+            return true;
+        });
+    },
+    
+    searchProjects: (projects, query, options = {}) => {
+        if (!query || query.trim() === '') return projects;
+        const searchTerm = query.toLowerCase().trim();
+        return projects.filter(project => {
+            const searchableText = [
+                project.name,
+                project.path,
+                project.readmePreview
+            ].join(' ').toLowerCase();
+            return searchableText.includes(searchTerm);
+        });
+    },
+    
+    sortProjects: (projects, field, ascending = true) => {
+        return [...projects].sort((a, b) => {
+            let aVal = a[field];
+            let bVal = b[field];
+            
+            if (field === 'created' || field === 'modified') {
+                aVal = new Date(aVal);
+                bVal = new Date(bVal);
+            }
+            
+            if (aVal < bVal) return ascending ? -1 : 1;
+            if (aVal > bVal) return ascending ? 1 : -1;
+            return 0;
+        });
+    },
+    
+    formatBytes: (bytes, decimals = 1) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+    },
+    
+    formatProjectForDisplay: (project) => {
+        const displayName = project.name
+            .replace(/[-_]/g, ' ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/\b\w/g, l => l.toUpperCase());
+        
+        let icon = '📁';
+        if (project.name.toLowerCase().includes('experiment')) icon = '🧪';
+        else if (project.name.toLowerCase().includes('analysis')) icon = '📊';
+        else if (project.name.toLowerCase().includes('study')) icon = '📋';
+        else if (project.name.toLowerCase().includes('lab')) icon = '🔬';
+        
+        return {
+            name: project.name,
+            displayName: displayName,
+            icon: icon
+        };
     }
 });

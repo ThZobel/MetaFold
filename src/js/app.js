@@ -124,6 +124,30 @@ const app = {
                 console.error('❌ Error initializing templateModal:', error);
             }
         }
+		
+		if (window.metadataEditor && typeof window.metadataEditor.init === 'function') {
+			try {
+				window.metadataEditor.init();
+				console.log('✅ metadataEditor initialized');
+			} catch (error) {
+				console.error('❌ Error initializing metadataEditor:', error);
+			}
+		}
+		
+		if (window.experimentForm && typeof window.experimentForm.init === 'function') {
+			window.experimentForm.init();
+			console.log('✅ experimentForm initialized');
+		}
+		
+		if (window.enhancedActions && typeof window.enhancedActions.init === 'function') {
+			try {
+				window.enhancedActions.init();
+				console.log('✅ enhancedActions initialized');
+			} catch (error) {
+				console.error('❌ Error initializing enhancedActions:', error);
+			}
+		}
+		
     },
     
     setupEventListeners() {
