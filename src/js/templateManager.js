@@ -1,4 +1,5 @@
-// Template Manager (FIXED: Cache Invalidation for Immediate UI Updates)
+
+    const filteredTemplates = this.get// Template Manager with File Storage Integration and Cache Management
 
 const templateManager = {
     templates: [],
@@ -6,15 +7,15 @@ const templateManager = {
     selectedIndex: -1,
     allTemplates: [],
     
-    // NEW: Search and filter state with performance optimizations
+    // Search and filter state
     searchState: {
         query: '',
         results: [],
         showSharedTemplates: true,
         suggestions: [],
         isSearching: false,
-        searchIndex: new Map(), // Pre-built search index
-        searchCache: new Map(), // Cache for search results
+        searchIndex: new Map(),
+        searchCache: new Map(),
         debounceTimer: null,
         lastQuery: '',
         suggestionCache: new Map()
@@ -22,47 +23,82 @@ const templateManager = {
 
     // Performance settings
     performance: {
-        debounceDelay: 300, // milliseconds
+        debounceDelay: 300,
         maxCacheSize: 100,
         maxSuggestions: 8,
-        renderBatchSize: 50, // For large template lists
-        enableVirtualization: false // Auto-enabled for >200 templates
+        renderBatchSize: 50,
+        enableVirtualization: false
     },
 
-    // ORIGINAL: Initialize template manager (enhanced with search features)
-	init() {
-		console.log('🔧 Initializing templateManager...');
-		try {
-			// Load templates
-			this.templates = window.storage ? window.storage.loadTemplates() : [];
-			
-			// Initialize search state
-			this.initializeSearchState();
-			
-			// FIXED: Clear cache on initialization
-			this.allTemplates = [];
-			
-			// Render the list first
-			this.renderList();
-			this.updateTemplateInfo();
-			
-			// Build search index AFTER templates are loaded and rendered
-			setTimeout(() => {
-				console.log('📊 Building initial search index...');
-				this.buildSearchIndex();
-				console.log(`✅ Initial search index built with ${this.searchState.searchIndex.size} entries`);
-			}, 100);
-			
-			console.log('✅ templateManager initialized with', this.templates.length, 'templates');
-		} catch (error) {
-			console.error('❌ Error in templateManager.init:', error);
-			this.templates = [];
-			this.initializeSearchState();
-			this.renderList();
-		}
-	},
+    // Initialize template manager
+    async init() {
+        console.log('🔧 Initializing templateManager (file-only mode)...');
+        try {
+            // Initialize storage first
+            if (window.storage) {
+                await window.storage.initFileStorage();
+            }
+            
+            // Load templates
+            this.templates = await this.loadTemplates();
+            
+            // Initialize search state
+            this.initializeSearchState();
+            
+            // Clear cache
+            this.allTemplates = [];
+            
+            // Render the list
+            this.renderList();
+            this.updateTemplateInfo();
+            
+            // NO MIGRATION CHECK - removed!
+            // this.checkMigrationNotice(); // <-- DIESE ZEILE ENTFERNEN
+            
+            // Build search index after templates are loaded
+            setTimeout(() => {
+                console.log('📊 Building initial search index...');
+                this.buildSearchIndex();
+                console.log(`✅ Initial search index built with ${this.searchState.searchIndex.size} entries`);
+            }, 100);
+            
+            console.log('✅ templateManager initialized with', this.templates.length, 'templates');
+        } catch (error) {
+            console.error('❌ Error in templateManager.init:', error);
+            this.templates = [];
+            this.initializeSearchState();
+            this.renderList();
+        }
+    },
 
-    // NEW: Initialize search state
+    // Enhance template with storage status
+    enhanceTemplateWithStatus(template) {
+        // Determine storage type based on _fileInfo
+        if (template._fileInfo && template._fileInfo.filePath) {
+            template.savedLocally = true;
+            template.storageType = 'file';
+            template.storageDisplay = 'Saved as file';
+            template.storageIcon = '📁';
+        } else if (template.storageType === 'default' || template.createdBy === 'System') {
+            template.savedLocally = false;
+            template.storageType = 'default';
+            template.storageDisplay = 'System template';
+            template.storageIcon = '⚙️';
+        } else {
+            template.savedLocally = false;
+            template.storageType = 'localStorage';
+            template.storageDisplay = 'Stored in browser';
+            template.storageIcon = '💾';
+        }
+        
+        // Add user display info
+        template.userDisplayName = template.createdBy || 'Unknown';
+        template.groupDisplayName = template.createdByGroup || 'Unknown';
+        
+        return template;
+    },
+
+    // Initialize search state
     initializeSearchState() {
         const searchInput = document.getElementById('templateSearchInput');
         if (searchInput) {
@@ -76,7 +112,7 @@ const templateManager = {
         this.searchState.suggestionCache.clear();
     },
 
-    // FIXED: Force cache invalidation method
+    // Force cache invalidation
     invalidateCache() {
         console.log('🔄 Invalidating template cache...');
         this.allTemplates = [];
@@ -84,14 +120,12 @@ const templateManager = {
         this.searchState.suggestionCache.clear();
     },
 
-    // NEW: Build search index for fast searching - FIXED with better logging
+    // Build search index
     buildSearchIndex() {
         console.log('🔍 Building search index...');
         this.searchState.searchIndex.clear();
         
         const allTemplates = this.getAllTemplates();
-        
-        console.log(`📊 Building index for ${allTemplates.length} templates (type: ${this.getCurrentType()})`);
         
         allTemplates.forEach((template, index) => {
             const searchableContent = this.extractSearchableContent(template);
@@ -105,22 +139,17 @@ const templateManager = {
         console.log(`✅ Search index built for ${allTemplates.length} templates`);
     },
 
-    // NEW: Extract all searchable content from a template
+    // Extract searchable content from template
     extractSearchableContent(template) {
         const content = [];
         
-        // Template name and description
         if (template.name) content.push(template.name);
         if (template.description) content.push(template.description);
-        
-        // Creator info
         if (template.createdBy) content.push(template.createdBy);
         if (template.createdByGroup) content.push(template.createdByGroup);
         
-        // Template type
         content.push(template.type || 'folders');
         
-        // Metadata content
         if (template.metadata) {
             this.extractMetadataContent(template.metadata, content);
         }
@@ -128,19 +157,17 @@ const templateManager = {
         return content;
     },
 
-    // NEW: Extract searchable content from metadata recursively
+    // Extract metadata content
     extractMetadataContent(metadata, content) {
         if (!metadata || typeof metadata !== 'object') return;
         
         for (const [key, value] of Object.entries(metadata)) {
             if (typeof value === 'object' && value !== null) {
-                // Field properties
                 if (value.label) content.push(value.label);
                 if (value.value) content.push(String(value.value));
                 if (value.description) content.push(value.description);
                 if (value.type) content.push(value.type);
                 
-                // Dropdown options
                 if (value.options && Array.isArray(value.options)) {
                     content.push(...value.options);
                 }
@@ -150,34 +177,141 @@ const templateManager = {
         }
     },
 
-    // NEW: Handle search input with debouncing
+    // Handle search input
     handleSearch() {
         const searchInput = document.getElementById('templateSearchInput');
         if (!searchInput) return;
 
         const query = searchInput.value.trim();
         
-        // Clear previous debounce timer
         if (this.searchState.debounceTimer) {
             clearTimeout(this.searchState.debounceTimer);
         }
 
-        // If query is empty, clear immediately
         if (query.length === 0) {
             this.clearSearch();
             return;
         }
 
-        // Show searching status immediately
         this.showSearchingStatus();
 
-        // Debounce the actual search
         this.searchState.debounceTimer = setTimeout(() => {
             this.performSearch(query);
         }, this.performance.debounceDelay);
     },
+	
+	// Füge diese Funktionen zur templateManager.js hinzu
+	// Suche nach der Stelle wo die anderen Search-Funktionen sind (z.B. nach handleSearch)
 
-    // NEW: Show searching status
+	// Show search suggestions dropdown
+	showSearchSuggestions() {
+		console.log('🔍 Showing search suggestions...');
+		
+		const suggestionsDiv = document.getElementById('searchSuggestions');
+		const searchInput = document.getElementById('templateSearchInput');
+		
+		if (!suggestionsDiv || !searchInput) {
+			console.warn('⚠️ Search suggestions elements not found');
+			return;
+		}
+		
+		const query = searchInput.value.trim().toLowerCase();
+		
+		// Don't show suggestions if query is empty or too short
+		if (query.length < 2) {
+			suggestionsDiv.style.display = 'none';
+			return;
+		}
+		
+		// Generate suggestions if we have them
+		if (this.searchState.suggestions.length > 0) {
+			this.renderSearchSuggestions();
+			suggestionsDiv.style.display = 'block';
+		} else {
+			// Generate suggestions for current query
+			this.generateSearchSuggestionsAsync(query);
+			// Show them after a short delay
+			setTimeout(() => {
+				if (this.searchState.suggestions.length > 0) {
+					this.renderSearchSuggestions();
+					suggestionsDiv.style.display = 'block';
+				}
+			}, 100);
+		}
+	},
+
+	// Hide search suggestions dropdown
+	hideSearchSuggestions() {
+		console.log('🔍 Hiding search suggestions...');
+		
+		// Add a small delay to allow for suggestion clicks
+		setTimeout(() => {
+			const suggestionsDiv = document.getElementById('searchSuggestions');
+			if (suggestionsDiv) {
+				suggestionsDiv.style.display = 'none';
+			}
+		}, 150);
+	},
+
+	// Render search suggestions in dropdown
+	renderSearchSuggestions() {
+		const suggestionsDiv = document.getElementById('searchSuggestions');
+		if (!suggestionsDiv) return;
+		
+		if (this.searchState.suggestions.length === 0) {
+			suggestionsDiv.innerHTML = '<div style="padding: 12px; color: #9ca3af; text-align: center; font-size: 0.85rem;">No suggestions</div>';
+			return;
+		}
+		
+		const suggestionsHTML = this.searchState.suggestions.map(suggestion => `
+			<div class="search-suggestion-item" 
+				 onclick="templateManager.applySuggestion('${this.escapeHtml(suggestion)}')"
+				 style="
+					 padding: 10px 12px;
+					 cursor: pointer;
+					 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+					 transition: background-color 0.2s ease;
+					 font-size: 0.9rem;
+					 color: #e0e0e0;
+				 "
+				 onmouseover="this.style.backgroundColor='rgba(124, 58, 237, 0.2)'"
+				 onmouseout="this.style.backgroundColor='transparent'">
+				<span style="color: #a855f7;">🔍</span> ${this.escapeHtml(suggestion)}
+			</div>
+		`).join('');
+		
+		suggestionsDiv.innerHTML = suggestionsHTML;
+	},
+
+	// Apply suggestion to search input
+	applySuggestion(suggestion) {
+		console.log('🔍 Applying suggestion:', suggestion);
+		
+		const searchInput = document.getElementById('templateSearchInput');
+		if (searchInput) {
+			searchInput.value = suggestion;
+			
+			// Trigger search
+			this.handleSearch();
+			
+			// Hide suggestions
+			this.hideSearchSuggestions();
+			
+			// Focus back on input
+			searchInput.focus();
+		}
+	},
+
+	// Helper function to escape HTML (if not already present)
+	escapeHtml(text) {
+		const div = document.createElement('div');
+		div.textContent = text || '';
+		return div.innerHTML;
+	},
+		
+		
+
+    // Show searching status
     showSearchingStatus() {
         const statusDiv = document.getElementById('searchStatus');
         if (statusDiv) {
@@ -187,7 +321,7 @@ const templateManager = {
         }
     },
 
-    // NEW: Optimized search with caching
+    // Perform search
     performSearch(query) {
         const startTime = performance.now();
         
@@ -195,7 +329,6 @@ const templateManager = {
             this.searchState.query = query;
             this.searchState.isSearching = true;
             
-            // Check cache first
             const cacheKey = `${query}_${this.searchState.showSharedTemplates}`;
             if (this.searchState.searchCache.has(cacheKey)) {
                 console.log('🔍 Using cached search results for:', query);
@@ -205,13 +338,11 @@ const templateManager = {
                 return;
             }
 
-            // Perform search using index
             const queryLower = query.toLowerCase();
             const results = [];
             
             for (const [index, entry] of this.searchState.searchIndex.entries()) {
                 if (this.matchesSearchQuery(entry, queryLower)) {
-                    // Apply shared templates filter
                     if (!this.searchState.showSharedTemplates && !entry.template.isOwn) {
                         continue;
                     }
@@ -221,15 +352,12 @@ const templateManager = {
             
             this.searchState.results = results;
             
-            // Cache results (with size limit)
             if (this.searchState.searchCache.size >= this.performance.maxCacheSize) {
-                // Remove oldest entry
                 const firstKey = this.searchState.searchCache.keys().next().value;
                 this.searchState.searchCache.delete(firstKey);
             }
             this.searchState.searchCache.set(cacheKey, results);
             
-            // Generate suggestions asynchronously
             this.generateSearchSuggestionsAsync(queryLower);
             
             const endTime = performance.now();
@@ -245,21 +373,18 @@ const templateManager = {
         }
     },
 
-    // NEW: Fast search matching using pre-indexed content
+    // Match search query
     matchesSearchQuery(entry, queryLower) {
-        // Fast string includes check on pre-built searchable text
         return entry.searchableText.includes(queryLower);
     },
 
-    // NEW: Generate search suggestions asynchronously with caching
+    // Generate search suggestions
     generateSearchSuggestionsAsync(query) {
-        // Check suggestion cache
         if (this.searchState.suggestionCache.has(query)) {
             this.searchState.suggestions = this.searchState.suggestionCache.get(query);
             return;
         }
 
-        // Use requestIdleCallback for non-blocking suggestion generation
         const generateSuggestions = () => {
             const suggestions = new Set();
             let count = 0;
@@ -267,7 +392,6 @@ const templateManager = {
             for (const [index, entry] of this.searchState.searchIndex.entries()) {
                 if (count >= this.performance.maxSuggestions) break;
                 
-                // Find matching keywords
                 for (const keyword of entry.keywords) {
                     const keywordLower = keyword.toLowerCase();
                     if (keywordLower.includes(query) && keywordLower !== query) {
@@ -280,7 +404,6 @@ const templateManager = {
             
             const suggestionArray = Array.from(suggestions).slice(0, this.performance.maxSuggestions);
             
-            // Cache suggestions
             this.searchState.suggestionCache.set(query, suggestionArray);
             this.searchState.suggestions = suggestionArray;
         };
@@ -292,52 +415,7 @@ const templateManager = {
         }
     },
 
-    // NEW: Show search suggestions with improved performance
-    showSearchSuggestions() {
-        const suggestionsDiv = document.getElementById('searchSuggestions');
-        if (!suggestionsDiv || this.searchState.suggestions.length === 0) return;
-
-        // Use DocumentFragment for efficient DOM manipulation
-        const fragment = document.createDocumentFragment();
-        
-        this.searchState.suggestions.forEach(suggestion => {
-            const suggestionDiv = document.createElement('div');
-            suggestionDiv.className = 'search-suggestion';
-            suggestionDiv.innerHTML = `
-                <div class="search-suggestion-name">${this.escapeHtml(suggestion)}</div>
-            `;
-            suggestionDiv.addEventListener('click', () => {
-                this.selectSuggestion(suggestion);
-            });
-            fragment.appendChild(suggestionDiv);
-        });
-
-        suggestionsDiv.innerHTML = '';
-        suggestionsDiv.appendChild(fragment);
-        suggestionsDiv.style.display = 'block';
-    },
-
-    // NEW: Hide search suggestions with delay
-    hideSearchSuggestions() {
-        setTimeout(() => {
-            const suggestionsDiv = document.getElementById('searchSuggestions');
-            if (suggestionsDiv) {
-                suggestionsDiv.style.display = 'none';
-            }
-        }, 200);
-    },
-
-    // NEW: Select a search suggestion
-    selectSuggestion(suggestion) {
-        const searchInput = document.getElementById('templateSearchInput');
-        if (searchInput) {
-            searchInput.value = suggestion;
-            this.performSearch(suggestion); // Direct search, no debounce
-        }
-        this.hideSearchSuggestions();
-    },
-
-    // NEW: Clear search
+    // Clear search
     clearSearch() {
         this.searchState.query = '';
         this.searchState.results = [];
@@ -346,7 +424,7 @@ const templateManager = {
         this.updateSearchStatus();
     },
 
-    // NEW: Update search status display
+    // Update search status
     updateSearchStatus() {
         const statusDiv = document.getElementById('searchStatus');
         if (!statusDiv) return;
@@ -371,33 +449,85 @@ const templateManager = {
         }
     },
 
-    // NEW: Toggle shared templates visibility
-    toggleSharedTemplates() {
+    // Toggle shared templates
+    async toggleSharedTemplates() {
         const checkbox = document.getElementById('showSharedTemplates');
         if (!checkbox) return;
 
-        this.searchState.showSharedTemplates = checkbox.checked;
-        console.log('🤝 Shared templates toggle:', this.searchState.showSharedTemplates);
+        const newValue = checkbox.checked;
+        this.searchState.showSharedTemplates = newValue;
         
-        // Clear cache as filter changed
+        console.log('🤝 Shared templates toggle:', newValue);
+        
+        // NEUE FUNKTION: Userspezifisch speichern
+        try {
+            if (window.settingsManager) {
+                await window.settingsManager.set('general.show_shared_templates', newValue);
+                console.log('💾 Shared templates preference saved for user:', newValue);
+            }
+        } catch (error) {
+            console.error('❌ Error saving shared templates preference:', error);
+        }
+        
+        // Cache leeren und neu rendern
         this.searchState.searchCache.clear();
-        
         this.renderList();
         this.updateSearchStatus();
     },
 
-    // NEW: Get filtered templates based on search and toggle state
+    async loadSharedTemplatesPreference() {
+    try {
+        if (!window.settingsManager) {
+            console.warn('⚠️ Settings manager not available, using default');
+            return;
+        }
+        
+        // Standard: true (Shared Templates anzeigen)
+        const showShared = await window.settingsManager.get('general.show_shared_templates');
+        const finalValue = showShared !== undefined ? showShared : true;
+        
+        console.log('📂 Loading shared templates preference for user:', finalValue);
+        
+        // Checkbox Status setzen
+        const checkbox = document.getElementById('showSharedTemplates');
+        if (checkbox) {
+            checkbox.checked = finalValue;
+        }
+        
+        // Internen Status setzen
+        this.searchState.showSharedTemplates = finalValue;
+        
+        console.log('✅ Shared templates preference loaded:', finalValue);
+        
+    } catch (error) {
+        console.error('❌ Error loading shared templates preference:', error);
+        // Fallback auf Standard-Wert
+        this.searchState.showSharedTemplates = true;
+        const checkbox = document.getElementById('showSharedTemplates');
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    }
+},
+
+    async refreshUserPreferences() {
+        console.log('👥 Refreshing user-specific preferences...');
+        await this.loadSharedTemplatesPreference();
+        
+        // Liste neu rendern mit neuen Einstellungen
+        this.renderList();
+        this.updateSearchStatus();
+    },
+
+    // Get filtered templates
     getFilteredTemplates() {
         let templates;
 
         if (this.searchState.isSearching) {
-            // Use cached search results
             templates = this.searchState.results;
         } else {
-            // Use all templates
             templates = this.getAllTemplates();
             
-            // Apply shared templates filter only
             if (!this.searchState.showSharedTemplates) {
                 templates = templates.filter(t => t.isOwn);
             }
@@ -406,91 +536,7 @@ const templateManager = {
         return templates;
     },
 
-    // NEW: Escape HTML to prevent XSS
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-
-    // NEW: Escape regex special characters
-    escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    },
-
-    // NEW: Highlight search matches in text (optimized)
-    highlightSearchMatches(text, query) {
-        if (!query || !text) return text;
-        
-        try {
-            const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
-            return text.replace(regex, '<span class="search-highlight">$1</span>');
-        } catch (e) {
-            // Fallback for invalid regex
-            return text;
-        }
-    },
-
-    // FIXED: Add new template with proper cache invalidation
-    add(template) {
-        console.log('➕ Adding template:', template);
-        
-        const enhancedTemplate = {
-            ...template,
-            createdBy: window.userManager?.currentUser || 'Unknown',
-            createdByGroup: window.userManager?.currentGroup || 'Unknown',
-            createdAt: new Date().toISOString()
-        };
-        
-        this.templates.push(enhancedTemplate);
-        
-        if (window.storage) {
-            const saved = window.storage.saveTemplates(this.templates);
-            console.log('💾 Save result:', saved);
-        }
-        
-        // CRITICAL FIX: Invalidate cache BEFORE rebuilding index
-        this.invalidateCache();
-        
-        // Rebuild search index with fresh data
-        this.buildSearchIndex();
-        
-        this.renderList();
-        this.updateTemplateInfo();
-        console.log('✅ Template added successfully');
-    },
-
-    // FIXED: Update template with proper cache invalidation
-    update(index, template) {
-        if (index >= 0 && index < this.templates.length) {
-            const existingTemplate = this.templates[index];
-            const updatedTemplate = {
-                ...template,
-                createdBy: existingTemplate.createdBy,
-                createdByGroup: existingTemplate.createdByGroup,
-                createdAt: existingTemplate.createdAt,
-                updatedAt: new Date().toISOString()
-            };
-            
-            this.templates[index] = updatedTemplate;
-            
-            if (window.storage) {
-                window.storage.saveTemplates(this.templates);
-            }
-            
-            // CRITICAL FIX: Invalidate cache BEFORE rebuilding index
-            this.invalidateCache();
-            
-            // Rebuild search index with fresh data
-            this.buildSearchIndex();
-            
-            this.renderList();
-            this.updateTemplateInfo();
-            console.log('✅ Template updated:', template.name);
-        }
-    },
-
-    // ORIGINAL: Get current type safely
+    // Get current type
     getCurrentType() {
         if (window.templateTypeManager && window.templateTypeManager.currentType) {
             return window.templateTypeManager.currentType;
@@ -498,100 +544,152 @@ const templateManager = {
         return 'folders';
     },
 
-    // FIXED: Get all templates with better cache management
-	getAllTemplates() {
-		const currentType = this.getCurrentType();
-		
-		// FIXED: Only use cache if it exists and is for current type
-		if (this.allTemplates.length > 0) {
-			// Check if cache is valid for current type
-			const firstTemplate = this.allTemplates[0];
-			const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
-									  (currentType === 'experiments' && firstTemplate.type === 'experiment');
-			
-			if (cacheValidForType) {
-				console.log(`📋 Using valid cached templates: ${this.allTemplates.length} for type: ${currentType}`);
-				return this.allTemplates;
-			} else {
-				console.log(`🔄 Cache invalid for type ${currentType}, rebuilding...`);
-				this.allTemplates = []; // Clear invalid cache
-			}
-		}
-		
-		console.log(`🔄 Rebuilding templates for type: ${currentType}`);
-		
-		// Get own templates
-		const ownTemplates = this.templates.filter(t => 
-			(currentType === 'folders' && t.type !== 'experiment') ||
-			(currentType === 'experiments' && t.type === 'experiment')
-		);
+    
+    // Get all templates (ENHANCED for better Group Template Loading)
+    getAllTemplates() {
+        const currentType = this.getCurrentType();
+        
+        if (this.allTemplates.length > 0) {
+            const firstTemplate = this.allTemplates[0];
+            const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
+                                    (currentType === 'experiments' && firstTemplate.type === 'experiment');
+            
+            if (cacheValidForType) {
+                return this.allTemplates;
+            } else {
+                this.allTemplates = [];
+            }
+        }
+        
+        // 1. Get own templates first
+        const ownTemplates = this.templates.filter(t => 
+            (currentType === 'folders' && t.type !== 'experiment') ||
+            (currentType === 'experiments' && t.type === 'experiment')
+        );
 
-		// Load group templates
-		let groupTemplates = [];
-		try {
-			const currentGroup = window.userManager?.currentGroup;
-			if (window.storage && window.storage.loadGroupTemplates && currentGroup && currentGroup !== 'Unknown') {
-				console.log(`📚 Loading group templates for group: "${currentGroup}"`);
-				groupTemplates = window.storage.loadGroupTemplates(currentGroup)
-					.filter(t => 
-						((currentType === 'folders' && t.type !== 'experiment') ||
-						(currentType === 'experiments' && t.type === 'experiment')) &&
-						t.createdBy !== window.userManager?.currentUser &&
-						t.createdBy !== 'System'
-					);
-				console.log(`🤝 Found ${groupTemplates.length} shared templates from group "${currentGroup}"`);
-			}
-		} catch (error) {
-			console.warn('Could not load group templates:', error);
-			groupTemplates = [];
-		}
+        // 2. Load group templates with enhanced error handling
+        let groupTemplates = [];
+        try {
+            // ENHANCED: Better user context checking
+            const currentUser = window.userManager?.currentUser;
+            const currentGroup = window.userManager?.currentGroup;
+            const userManagementEnabled = window.userManager?.isEnabled();
+            
+            console.log(`👤 Group template context: ${currentUser} (${currentGroup}), Enabled: ${userManagementEnabled}`);
+            
+            if (userManagementEnabled && currentUser && currentUser !== 'Unknown' && currentUser !== 'User' && 
+                currentGroup && currentGroup !== 'Unknown' && currentGroup !== 'Default') {
+                
+                console.log(`🤝 Loading group templates for group: ${currentGroup}`);
+                
+                // Load from storage with better error handling
+                if (window.storage && typeof window.storage.loadGroupTemplates === 'function') {
+                    const rawGroupTemplates = window.storage.loadGroupTemplates(currentGroup);
+                    
+                    // Filter out current user's templates and invalid templates
+                    groupTemplates = rawGroupTemplates.filter(t => {
+                        if (!t || !t.name || t.name === 'undefined') {
+                            console.log('🗑️ Filtered out invalid group template:', t);
+                            return false;
+                        }
+                        if (t.createdBy === currentUser || t.createdBy === 'System') {
+                            return false;
+                        }
+                        
+                        // Apply type filter if active
+                        if (currentType === 'folders' && t.type === 'experiment') {
+                            return false;
+                        }
+                        if (currentType === 'experiments' && t.type !== 'experiment') {
+                            return false;
+                        }
+                        
+                        return true;
+                    });
+                    
+                    console.log(`🤝 Loaded ${groupTemplates.length} group templates after filtering`);
+                } else {
+                    console.warn('⚠️ loadGroupTemplates function not available');
+                }
+            } else {
+                console.log('🚫 Group template loading skipped - invalid user context or disabled');
+            }
+        } catch (error) {
+            console.warn('Could not load group templates:', error);
+            groupTemplates = [];
+        }
 
-		// Mark templates with proper indices and ownership
-		const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
-			...t, 
-			isOwn: true, 
-			originalIndex: i
-		}));
-		
-		const groupTemplatesMarked = groupTemplates.map(t => ({ 
-			...t, 
-			isOwn: false, 
-			originalIndex: -1,
-			isShared: true
-		}));
+        // 3. Mark templates with ownership and enhance metadata
+        const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
+            ...t, 
+            isOwn: true, 
+            originalIndex: i,
+            userDisplayName: t.createdBy || window.userManager?.currentUser || 'Unknown',
+            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown'
+        }));
+        
+        const groupTemplatesMarked = groupTemplates.map(t => ({ 
+            ...t, 
+            isOwn: false, 
+            originalIndex: -1,
+            isShared: true,
+            userDisplayName: t.createdBy || 'Unknown',
+            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown'
+        }));
 
-		this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
-		console.log(`📋 Total templates rebuilt: ${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared = ${this.allTemplates.length}`);
-		
-		// Update toggle visibility
-		this.updateSharedToggleVisibility();
-		
-		return this.allTemplates;
-	},
+        // 4. Combine and cache
+        this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
+        
+        console.log(`📂 Total templates loaded: ${this.allTemplates.length} (${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared)`);
+        
+        // 5. Update UI elements
+        this.updateSharedToggleVisibility();
+        
+        return this.allTemplates;
+    },
 
-    // NEW: Update visibility of shared templates toggle
-	updateSharedToggleVisibility() {
-		const toggleElement = document.getElementById('sharedTemplatesToggle');
-		if (!toggleElement) return;
+    // ENHANCED: Better template type detection (füge diese Funktion hinzu falls sie fehlt)
+    getCurrentTemplateType() {
+        try {
+            // Check if templateTypeManager is available
+            if (window.templateTypeManager && window.templateTypeManager.currentType) {
+                return window.templateTypeManager.currentType;
+            }
+            
+            // Check active tab in UI
+            const folderTab = document.getElementById('folderTemplatesTab');
+            const experimentTab = document.getElementById('experimentTemplatesTab');
+            
+            if (folderTab && folderTab.classList.contains('active')) {
+                return 'folders';
+            }
+            if (experimentTab && experimentTab.classList.contains('active')) {
+                return 'experiments';
+            }
+            
+            // Default fallback
+            return 'experiments';
+        } catch (error) {
+            console.warn('Error getting current template type:', error);
+            return 'experiments';
+        }
+    },
 
-		const userManagementEnabled = window.userManager?.isEnabled() || false;
-		
-		console.log('🤝 Toggle visibility check:', {
-			userManagementEnabled,
-			currentType: this.getCurrentType(),
-			allTemplatesCount: this.allTemplates.length
-		});
-		
-		if (userManagementEnabled) {
-			toggleElement.style.display = 'block';
-			console.log('✅ Showing shared templates toggle (user management enabled)');
-		} else {
-			toggleElement.style.display = 'none';
-			console.log('❌ Hiding shared templates toggle (user management disabled)');
-		}
-	},
+    // Update shared toggle visibility
+    updateSharedToggleVisibility() {
+        const toggleElement = document.getElementById('sharedTemplatesToggle');
+        if (!toggleElement) return;
 
-    // ORIGINAL: Safe user color generation
+        const userManagementEnabled = window.userManager?.isEnabled() || false;
+        
+        if (userManagementEnabled) {
+            toggleElement.style.display = 'block';
+        } else {
+            toggleElement.style.display = 'none';
+        }
+    },
+
+    // Safe user color generation
     getUserColor(username) {
         if (window.userManager && window.userManager.generateUserColor) {
             return window.userManager.generateUserColor(username);
@@ -599,7 +697,7 @@ const templateManager = {
         return '#7c3aed';
     },
 
-    // ORIGINAL: Safe user initials
+    // Safe user initials
     getUserInitials(username) {
         if (window.userManager && window.userManager.getUserInitials) {
             return window.userManager.getUserInitials(username);
@@ -607,7 +705,7 @@ const templateManager = {
         return username ? username.substring(0, 2).toUpperCase() : '??';
     },
 
-    // ORIGINAL: Update template info display
+    // Update template info display
     updateTemplateInfo() {
         const infoElement = document.getElementById('templateInfo');
         if (!infoElement) return;
@@ -653,7 +751,7 @@ const templateManager = {
         infoElement.className = infoClass;
     },
 
-    // ORIGINAL: Render template list with enhanced UI - ENHANCED with search and filtering
+    // Render template list
     renderList() {
         const listContainer = document.getElementById('templateList');
         if (!listContainer) {
@@ -661,12 +759,10 @@ const templateManager = {
             return;
         }
 
-        // NEW: Use filtered templates instead of all templates
         const filteredTemplates = this.getFilteredTemplates();
         const currentType = this.getCurrentType();
         
         if (filteredTemplates.length === 0) {
-            // NEW: Enhanced empty state messages
             let emptyMessage = 'No templates available yet.';
             
             if (this.searchState.isSearching) {
@@ -700,7 +796,6 @@ const templateManager = {
             const createdDate = new Date(template.createdAt).toLocaleDateString();
             const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
             
-            // NEW: Highlight search matches
             const displayName = this.searchState.isSearching ? 
                 this.highlightSearchMatches(template.name, this.searchState.query) : 
                 this.escapeHtml(template.name);
@@ -709,7 +804,15 @@ const templateManager = {
                 this.highlightSearchMatches(template.description, this.searchState.query) : 
                 (template.description ? this.escapeHtml(template.description) : '');
             
-            // ORIGINAL: Copy link for shared templates
+            // Storage indicator
+            const storageIndicator = `
+                <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
+                    <span class="storage-icon">${template.storageIcon}</span>
+                    <span class="storage-text">${template.storageDisplay}</span>
+                </div>
+            `;
+            
+            // Copy link for shared templates
             const copyLink = !template.isOwn && template.isShared ? 
                 `<div style="margin-top: 8px;">
                     <span class="copy-link" data-template-index="${index}" 
@@ -718,7 +821,6 @@ const templateManager = {
                     </span>
                 </div>` : '';
             
-            // NEW: Search result styling
             const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
             
             return `
@@ -745,6 +847,7 @@ const templateManager = {
                             ${displayDescription ? `
                                 <p class="template-description">${displayDescription}</p>
                             ` : ''}
+                            ${storageIndicator}
                             ${copyLink}
                         </div>
                     </div>
@@ -755,27 +858,45 @@ const templateManager = {
             `;
         }).join('');
 
-        // ORIGINAL: Attach event listeners (preserved)
         this.attachEventListeners();
-        
-        // NEW: Update search status
         this.updateSearchStatus();
     },
 
-    // ORIGINAL: Safe event listener attachment (preserved)
+    // Escape HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    // Escape regex
+    escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    },
+
+    // Highlight search matches
+    highlightSearchMatches(text, query) {
+        if (!query || !text) return text;
+        
+        try {
+            const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        } catch (e) {
+            return text;
+        }
+    },
+
+    // Attach event listeners
     attachEventListeners() {
         const listContainer = document.getElementById('templateList');
         if (!listContainer) return;
 
-        // Remove old listeners
         listContainer.removeEventListener('click', this.handleTemplateClick);
         
-        // Template selection click
         this.handleTemplateClick = (event) => {
             const templateItem = event.target.closest('.template-item');
             if (!templateItem) return;
 
-            // Handle copy link clicks
             if (event.target.classList.contains('copy-link')) {
                 event.stopPropagation();
                 const index = parseInt(templateItem.getAttribute('data-template-index'));
@@ -785,21 +906,18 @@ const templateManager = {
                 return;
             }
 
-            // Handle template selection
             const index = parseInt(templateItem.getAttribute('data-template-index'));
             if (!isNaN(index)) {
                 this.select(index);
             }
         };
 
-        // Add new listener
         listContainer.addEventListener('click', this.handleTemplateClick);
     },
 
-    // ORIGINAL: Enhanced copy template with better error handling (preserved)
+    // Copy template
     copyTemplate(index) {
         try {
-            // NEW: Use filtered templates instead of allTemplates
             const filteredTemplates = this.getFilteredTemplates();
             const template = filteredTemplates[index];
             
@@ -826,6 +944,7 @@ const templateManager = {
             delete copiedTemplate.userInitials;
             delete copiedTemplate.originalIndex;
             delete copiedTemplate.isShared;
+            delete copiedTemplate._fileInfo; // Remove file info for new copy
 
             this.templates.push(copiedTemplate);
             
@@ -833,14 +952,12 @@ const templateManager = {
                 window.storage.saveTemplates(this.templates);
             }
             
-            // FIXED: Invalidate cache and rebuild
             this.invalidateCache();
             this.buildSearchIndex();
             
             this.renderList();
             this.updateTemplateInfo();
             
-            // Show success message
             if (window.app && window.app.showSuccess) {
                 window.app.showSuccess(`Template "${template.name}" copied to your collection!`);
             }
@@ -855,13 +972,20 @@ const templateManager = {
         }
     },
 
-    // ORIGINAL: Select template with enhanced feedback (preserved)
+    // Select template
     select(index) {
-        // NEW: Use filtered templates
         const filteredTemplates = this.getFilteredTemplates();
         const template = filteredTemplates[index];
         
         if (!template) return;
+
+        console.log(`🔄 Selecting template: ${template.name}`);
+        
+        // CRITICAL FIX: Reset form completely before switching templates
+        if (window.experimentForm && window.experimentForm.resetFormForNewTemplate) {
+            console.log('🧹 Resetting form before template switch...');
+            window.experimentForm.resetFormForNewTemplate();
+        }
 
         this.selectedIndex = index;
         this.currentTemplate = template;
@@ -869,7 +993,6 @@ const templateManager = {
         this.renderList();
         this.updateTemplateInfo();
         
-        // Safe DOM updates
         const detailsElement = document.getElementById('templateDetails');
         if (detailsElement) {
             detailsElement.style.display = 'block';
@@ -881,12 +1004,14 @@ const templateManager = {
             preview.textContent = structure;
         }
         
-        // Handle experiment form safely
         const experimentFormDiv = document.getElementById('experimentForm');
         if (experimentFormDiv) {
             if (this.currentTemplate.type === 'experiment' && this.currentTemplate.metadata) {
                 experimentFormDiv.style.display = 'block';
+                
+                // Now render the new template with clean form
                 if (window.experimentForm && window.experimentForm.render) {
+                    console.log(`📋 Rendering template: ${template.name}`);
                     window.experimentForm.render(this.currentTemplate.metadata);
                 }
             } else {
@@ -894,13 +1019,12 @@ const templateManager = {
             }
         }
         
-        // Update action buttons
         this.updateActionButtons();
         
         console.log('✅ Template selected:', template.name);
     },
 
-    // ORIGINAL: Update action buttons based on template ownership (preserved)
+    // Update action buttons
     updateActionButtons() {
         const editBtn = document.querySelector('.actions button[onclick*="editCurrentTemplate"]');
         const deleteBtn = document.querySelector('.actions button[onclick*="deleteCurrentTemplate"]');
@@ -919,7 +1043,317 @@ const templateManager = {
         }
     },
 
-    // ORIGINAL: Edit current template (preserved)
+// UPDATED: Add new template with immediate file storage
+
+    async add(template) {
+        console.log('➕ Adding template (fixed version):', template.name);
+        
+        try {
+            // Prepare template with user context
+            const enhancedTemplate = {
+                ...template,
+                id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                createdBy: window.userManager?.currentUser || 'Unknown',
+                createdByGroup: window.userManager?.currentGroup || 'Unknown',
+                createdAt: template.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            // Check for duplicates before adding
+            const existing = this.templates.find(t => 
+                t.name === enhancedTemplate.name && 
+                t.createdBy === enhancedTemplate.createdBy &&
+                t.type === enhancedTemplate.type
+            );
+            
+            if (existing) {
+                console.warn(`⚠️ Template "${enhancedTemplate.name}" already exists for user ${enhancedTemplate.createdBy}`);
+                throw new Error(`Template "${enhancedTemplate.name}" already exists. Please choose a different name.`);
+            }
+            
+            // Add to memory first
+            this.templates.push(enhancedTemplate);
+            
+            // Save to file using the stable method
+            if (window.storage && window.storage.saveTemplateToFileImmediately) {
+                const saveResult = await window.storage.saveTemplateToFileImmediately(enhancedTemplate);
+                
+                if (saveResult.success) {
+                    // Update template with file info
+                    enhancedTemplate._fileInfo = {
+                        filename: saveResult.filename,
+                        filePath: saveResult.filePath,
+                        savedAt: new Date().toISOString(),
+                        source: 'file',
+                        stable: true
+                    };
+                    console.log(`✅ Template "${enhancedTemplate.name}" saved to stable file`);
+                } else {
+                    console.error(`❌ Failed to save template to file: ${saveResult.message}`);
+                    // Remove from memory if file save failed
+                    const index = this.templates.indexOf(enhancedTemplate);
+                    if (index >= 0) {
+                        this.templates.splice(index, 1);
+                    }
+                    throw new Error(`Failed to save template: ${saveResult.message}`);
+                }
+            } else {
+                console.warn('⚠️ File storage not available, template only in memory');
+            }
+            
+            // Update UI
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+            this.updateTemplateInfo();
+            
+            console.log(`✅ Template "${enhancedTemplate.name}" added successfully`);
+            return enhancedTemplate;
+            
+        } catch (error) {
+            console.error('❌ Error adding template:', error);
+            throw error;
+        }
+    },
+
+    // UPDATED: Update template with immediate file storage
+    async update(index, updatedTemplate) {
+        console.log('📝 Updating template (fixed version):', updatedTemplate.name);
+        
+        try {
+            if (index < 0 || index >= this.templates.length) {
+                throw new Error('Invalid template index');
+            }
+            
+            const existingTemplate = this.templates[index];
+            
+            // Preserve original metadata but update content
+            const finalTemplate = {
+                ...updatedTemplate,
+                id: existingTemplate.id,                    // Keep original ID
+                createdBy: existingTemplate.createdBy,      // Keep original creator
+                createdByGroup: existingTemplate.createdByGroup, // Keep original group
+                createdAt: existingTemplate.createdAt,      // Keep original creation time
+                updatedAt: new Date().toISOString(),        // Update modification time
+                _fileInfo: existingTemplate._fileInfo       // Preserve file info
+            };
+            
+            // Update in memory
+            this.templates[index] = finalTemplate;
+            
+            // Save to file using stable method (will overwrite existing file)
+            if (window.storage && window.storage.saveTemplateToFileImmediately) {
+                const saveResult = await window.storage.saveTemplateToFileImmediately(finalTemplate);
+                
+                if (saveResult.success) {
+                    // Update file info if needed
+                    finalTemplate._fileInfo = {
+                        ...(finalTemplate._fileInfo || {}),
+                        savedAt: new Date().toISOString(),
+                        stable: true
+                    };
+                    console.log(`✅ Template "${finalTemplate.name}" updated in file`);
+                } else {
+                    console.error(`❌ Failed to update template file: ${saveResult.message}`);
+                    // Revert memory change if file save failed
+                    this.templates[index] = existingTemplate;
+                    throw new Error(`Failed to update template: ${saveResult.message}`);
+                }
+            } else {
+                console.warn('⚠️ File storage not available, template updated in memory only');
+            }
+            
+            // Update UI
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+            this.updateTemplateInfo();
+            
+            console.log(`✅ Template "${finalTemplate.name}" updated successfully`);
+            return finalTemplate;
+            
+        } catch (error) {
+            console.error('❌ Error updating template:', error);
+            throw error;
+        }
+    },
+
+
+    // NEW: Clear template values (reset all field values to empty)
+    clearCurrentTemplate() {
+        if (!this.currentTemplate) {
+            alert('No template selected to clear.');
+            return;
+        }
+
+        if (!this.currentTemplate.isOwn) {
+            alert('You can only clear your own templates. Please copy this template first.');
+            return;
+        }
+
+        // NO CONFIRM - confirmation already handled by menu
+
+        try {
+            // Find template index
+            const templateIndex = this.templates.findIndex(t => 
+                t.name === this.currentTemplate.name && 
+                t.createdBy === this.currentTemplate.createdBy &&
+                t.createdAt === this.currentTemplate.createdAt
+            );
+
+            if (templateIndex < 0) {
+                throw new Error('Template not found');
+            }
+
+            // Create deep copy and clear all values
+            const clearedTemplate = this.createDeepCopy(this.templates[templateIndex]);
+            
+            // Clear values from metadata fields
+            this.clearTemplateValues(clearedTemplate);
+            
+            // Clear project defaults
+            if (clearedTemplate.projectDefaults) {
+                clearedTemplate.projectDefaults = {};
+            }
+            
+            clearedTemplate.updatedAt = new Date().toISOString();
+
+            // Update template
+            this.update(templateIndex, clearedTemplate);
+            this.currentTemplate = clearedTemplate;
+
+            // Refresh the form if it's showing
+            if (document.getElementById('experimentForm').style.display !== 'none') {
+                if (window.experimentForm && window.experimentForm.render) {
+                    window.experimentForm.render(clearedTemplate.metadata);
+                }
+            }
+
+            // Clear project paths in UI
+            const targetPathEl = document.getElementById('targetPath');
+            const projectNameEl = document.getElementById('projectName');
+            if (targetPathEl) targetPathEl.value = '';
+            if (projectNameEl) projectNameEl.value = '';
+
+            alert(`✅ Template "${clearedTemplate.name}" has been cleared successfully!`);
+            console.log('✅ Template values cleared successfully');
+
+        } catch (error) {
+            console.error('❌ Error clearing template:', error);
+            alert('Error clearing template: ' + error.message);
+        }
+    },
+
+    // NEW: Clear all values from template metadata
+    clearTemplateValues(template) {
+        if (!template.metadata) return;
+
+        const clearFields = (fieldsObject) => {
+            Object.keys(fieldsObject).forEach(fieldName => {
+                const field = fieldsObject[fieldName];
+                if (field && typeof field === 'object') {
+                    if (field.type === 'group') {
+                        // Skip groups
+                        return;
+                    }
+                    
+                    // Clear the value based on field type
+                    switch (field.type) {
+                        case 'checkbox':
+                            field.value = false;
+                            break;
+                        case 'number':
+                            field.value = '';
+                            break;
+                        default:
+                            field.value = '';
+                    }
+                }
+            });
+        };
+
+        // Handle both enhanced and legacy metadata formats
+        if (template.metadata.fields) {
+            // Enhanced format
+            clearFields(template.metadata.fields);
+        } else {
+            // Legacy format
+            clearFields(template.metadata);
+        }
+
+        console.log('🧹 Template values cleared from metadata');
+    },
+
+    // NEW: Deep copy utility function for template operations
+    createDeepCopy(obj) {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+        
+        if (obj instanceof Date) {
+            return new Date(obj.getTime());
+        }
+        
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.createDeepCopy(item));
+        }
+        
+        if (typeof obj === 'object') {
+            const copy = {};
+            Object.keys(obj).forEach(key => {
+                copy[key] = this.createDeepCopy(obj[key]);
+            });
+            return copy;
+        }
+        
+        return obj;
+    },
+
+    // NEW: Batch operations for file storage
+    async saveAllTemplatesToFiles() {
+        if (!window.storage || !window.storage.fileStorageEnabled) {
+            console.warn('⚠️ File storage not available for batch save');
+            return false;
+        }
+
+        try {
+            console.log('💾 Starting batch save of all templates to files...');
+            const userTemplates = this.templates.filter(t => !window.storage.isDefaultTemplate(t));
+            
+            let successCount = 0;
+            for (const template of userTemplates) {
+                const success = await window.storage.saveTemplateToFileImmediately(template);
+                if (success) successCount++;
+            }
+
+            console.log(`✅ Batch save completed: ${successCount}/${userTemplates.length} templates saved`);
+            return successCount === userTemplates.length;
+        } catch (error) {
+            console.error('❌ Error in batch save:', error);
+            return false;
+        }
+    },
+
+    // NEW: Force refresh from files
+    async refreshFromFiles() {
+        if (!window.storage || !window.storage.fileStorageEnabled) {
+            console.warn('⚠️ File storage not available for refresh');
+            return;
+        }
+
+        try {
+            console.log('🔄 Refreshing templates from files...');
+            this.templates = await this.loadTemplates();
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+            this.updateTemplateInfo();
+            console.log('✅ Templates refreshed from files');
+        } catch (error) {
+            console.error('❌ Error refreshing from files:', error);
+        }
+    },
+    // Edit current template
     editCurrent() {
         if (!this.currentTemplate || !this.currentTemplate.isOwn) {
             if (window.app && window.app.showError) {
@@ -940,62 +1374,629 @@ const templateManager = {
         }
     },
 
-    // FIXED: Delete current template with proper cache invalidation
-    deleteCurrent() {
-        if (!this.currentTemplate || !this.currentTemplate.isOwn) {
-            if (window.app && window.app.showError) {
-                window.app.showError('You can only delete your own templates.');
+    // Delete current template
+        async deleteCurrent() {
+            if (!this.currentTemplate || !this.currentTemplate.isOwn) {
+                if (window.app && window.app.showError) {
+                    window.app.showError('You can only delete your own templates.');
+                }
+                return;
             }
+
+            try {
+                // Find template index
+                const templateIndex = this.templates.findIndex(t => 
+                    t.name === this.currentTemplate.name && 
+                    t.createdBy === this.currentTemplate.createdBy &&
+                    t.createdAt === this.currentTemplate.createdAt
+                );
+
+                if (templateIndex < 0) {
+                    throw new Error('Template not found in list');
+                }
+
+                const templateToDelete = this.templates[templateIndex];
+                console.log(`🗑️ Deleting template: ${templateToDelete.name} by ${templateToDelete.createdBy}`);
+
+                // Remove from memory first
+                this.templates.splice(templateIndex, 1);
+
+                // Delete file if it exists
+                if (templateToDelete._fileInfo && templateToDelete._fileInfo.filePath && window.electronAPI.deleteTemplateFile) {
+                    try {
+                        const deleteResult = await window.electronAPI.deleteTemplateFile(templateToDelete._fileInfo.filePath);
+                        if (deleteResult.success) {
+                            console.log(`✅ Template file deleted: ${templateToDelete._fileInfo.filePath}`);
+                        } else {
+                            console.warn(`⚠️ Failed to delete template file: ${deleteResult.message}`);
+                        }
+                    } catch (fileError) {
+                        console.warn('⚠️ Template file deletion failed:', fileError);
+                        // Continue - template still removed from memory
+                    }
+                }
+
+                // Clear current selection
+                this.currentTemplate = null;
+                this.selectedIndex = -1;
+
+                // Update UI
+                this.invalidateCache();
+                this.buildSearchIndex();
+                this.renderList();
+                this.updateTemplateInfo();
+
+                // Hide template details
+                const templateDetails = document.getElementById('templateDetails');
+                if (templateDetails) {
+                    templateDetails.style.display = 'none';
+                }
+
+                console.log(`✅ Template "${templateToDelete.name}" deleted successfully`);
+
+            } catch (error) {
+                console.error('❌ Error deleting template:', error);
+                if (window.app && window.app.showError) {
+                    window.app.showError(`Failed to delete template: ${error.message}`);
+                }
+            }
+        },
+
+    // NEW: Validate template before operations to prevent "undefined" templates
+    validateTemplateForOperation(template, operation = 'operation') {
+        if (!template) {
+            console.warn(`⚠️ ${operation} prevented: No template provided`);
+            return false;
+        }
+        
+        // NUR wirklich problematische Namen herausfiltern
+        if (!template.name || template.name.trim() === '') {
+            console.warn(`⚠️ ${operation} prevented: Empty template name`);
+            return false;
+        }
+        
+        // NUR Templates mit 'undefined' am Anfang herausfiltern (aber nicht "(Copy)" erlauben)
+        if (template.name === 'undefined' || template.name.startsWith('undefined ')) {
+            console.warn(`⚠️ ${operation} prevented: Invalid template name:`, template.name);
+            return false;
+        }
+        
+        // Templates mit 'Unknown' User sind OK wenn sie aus Dateien kommen
+        // NUR komplett fehlende User-Info ist problematisch
+        if (!template.createdBy) {
+            console.warn(`⚠️ ${operation} prevented: Missing creator`);
+            return false;
+        }
+        
+        if (!template.createdByGroup) {
+            console.warn(`⚠️ ${operation} prevented: Missing group`);
+            return false;
+        }
+        
+        // ALLES ANDERE IST OK - auch "Unknown" User sind erlaubt
+        return true;
+    },
+    // ENHANCED: Update template list rendering to filter out invalid templates
+    renderList() {
+        const listContainer = document.getElementById('templateList');
+        if (!listContainer) {
+            console.warn('templateList element not found');
+            return;
+        }
+
+        let filteredTemplates = this.getFilteredTemplates();
+        const currentType = this.getCurrentType();
+        
+        // SANFTE FILTERUNG: Nur wirklich problematische Templates herausfiltern
+        const validTemplates = filteredTemplates.filter(template => {
+            // Nur wirklich ungültige Templates herausfiltern
+            if (!template.name || 
+                template.name === 'undefined' || 
+                template.name.startsWith('undefined ')) {
+                console.warn('🗑️ Filtering out problematic template:', template.name);
+                return false;
+            }
+            return true; // ALLES ANDERE IST OK
+        });
+        
+        // Use validTemplates instead of filteredTemplates for the rest of the function
+        filteredTemplates = validTemplates;
+        
+        if (filteredTemplates.length === 0) {
+            let emptyMessage = 'No templates available yet.';
+            
+            if (this.searchState.isSearching) {
+                emptyMessage = `No templates found for "${this.searchState.query}".`;
+            } else if (!this.searchState.showSharedTemplates) {
+                emptyMessage = 'No personal templates available yet.';
+            }
+            
+            const typeLabel = currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
+            listContainer.innerHTML = `
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.6;">
+                        ${this.searchState.isSearching ? '🔍' : (currentType === 'folders' ? '📁' : '🧪')}
+                    </div>
+                    <h3 style="color: #6b7280; margin-bottom: 0.5rem;">${typeLabel}</h3>
+                    <p style="color: #9ca3af; margin-bottom: 1.5rem;">${emptyMessage}</p>
+                    ${!this.searchState.isSearching ? `
+                        <button onclick="document.getElementById('createTemplateBtn').click()" 
+                                style="background: #8b5cf6; color: white; border: none; padding: 12px 24px; 
+                                    border-radius: 8px; cursor: pointer; font-weight: 500;">
+                            + Create ${currentType === 'folders' ? 'Folder' : 'Experiment'} Template
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            this.updateTemplateInfo();
             return;
         }
         
-        if (confirm(`Delete template "${this.currentTemplate.name}"?\n\nThis action cannot be undone.`)) {
-            const index = this.templates.findIndex(t => 
-                t.name === this.currentTemplate.name && 
-                t.createdBy === this.currentTemplate.createdBy
-            );
+        // CONTINUE with original renderList logic...
+        listContainer.innerHTML = filteredTemplates.map((template, index) => {
+            const badge = template.type === 'experiment' ? 
+                '<span class="template-badge experiment">🧪</span>' : 
+                '<span class="template-badge">📁</span>';
             
-            if (index >= 0) {
-                this.templates.splice(index, 1);
-                
-                if (window.storage) {
-                    window.storage.saveTemplates(this.templates);
-                }
-                
-                // FIXED: Invalidate cache and rebuild
-                this.invalidateCache();
-                this.buildSearchIndex();
-                
-                this.currentTemplate = null;
-                this.selectedIndex = -1;
-                
-                const detailsElement = document.getElementById('templateDetails');
-                if (detailsElement) {
-                    detailsElement.style.display = 'none';
-                }
-                
-                this.renderList();
-                this.updateTemplateInfo();
-                
-                if (window.app && window.app.showSuccess) {
-                    window.app.showSuccess('Template deleted successfully.');
-                }
-                
-                console.log('✅ Template deleted');
+            const color = this.getUserColor(template.createdBy);
+            const initials = this.getUserInitials(template.createdBy);
+            const isSelected = this.selectedIndex === index;
+            
+            const createdDate = new Date(template.createdAt).toLocaleDateString();
+            const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
+            
+            const displayName = this.searchState.isSearching ? 
+                this.highlightSearchMatches(template.name, this.searchState.query) : 
+                this.escapeHtml(template.name);
+            
+            const displayDescription = this.searchState.isSearching && template.description ? 
+                this.highlightSearchMatches(template.description, this.searchState.query) : 
+                (template.description ? this.escapeHtml(template.description) : '');
+            
+            // Storage indicator
+            const storageIndicator = `
+                <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
+                    <span class="storage-icon">${template.storageIcon}</span>
+                    <span class="storage-text">${template.storageDisplay}</span>
+                </div>
+            `;
+            
+            // Copy link for shared templates
+            const copyLink = !template.isOwn && template.isShared ? 
+                `<div style="margin-top: 8px;">
+                    <span class="copy-link" data-template-index="${index}" 
+                        style="color: #10b981; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
+                        📋 Copy to my templates
+                    </span>
+                </div>` : '';
+            
+            const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
+            
+            return `
+                <div class="template-item ${isSelected ? 'active' : ''} ${searchResultClass}" 
+                    data-is-own="${template.isOwn}"
+                    data-template-index="${index}">
+                    <div class="template-header">
+                        <div class="template-avatar" style="background-color: ${color}">
+                            ${initials}
+                        </div>
+                        <div class="template-info">
+                            <h3>
+                                ${displayName}
+                                ${badge}
+                                ${!template.isOwn ? '<span class="shared-badge">shared</span>' : ''}
+                            </h3>
+                            <div class="template-meta">
+                                <span class="creator-info">by ${this.escapeHtml(template.createdBy)} (${this.escapeHtml(template.createdByGroup)})</span>
+                                <span class="date-info">
+                                    Created: ${createdDate}
+                                    ${updatedDate ? ` • Updated: ${updatedDate}` : ''}
+                                </span>
+                            </div>
+                            ${displayDescription ? `
+                                <p class="template-description">${displayDescription}</p>
+                            ` : ''}
+                            ${storageIndicator}
+                            ${copyLink}
+                        </div>
+                    </div>
+                    ${template.isOwn ? `
+                        <div class="owner-indicator" title="Your template"></div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+
+        this.attachEventListeners();
+        this.updateSearchStatus();
+    },
+    // ENHANCED: Validate template before setting as current
+    selectTemplate(index) {
+        if (index < 0 || index >= this.templates.length) {
+            console.warn('Invalid template index:', index);
+            return;
+        }
+
+        const template = this.templates[index];
+        
+        // VALIDATION: Check if template is valid before selecting
+        if (!this.validateTemplateForOperation(template, 'selection')) {
+            console.warn('⚠️ Template selection prevented: Invalid template');
+            
+            // Show error message to user
+            const templateInfo = document.getElementById('templateInfo');
+            if (templateInfo) {
+                templateInfo.textContent = 'Invalid template - cannot select';
+                templateInfo.className = 'template-info error';
+            }
+            
+            return;
+        }
+
+        // Continue with original selectTemplate logic if validation passes...
+        this.currentTemplate = template;
+        this.selectedIndex = index;
+        
+        // Rest of original selectTemplate function...
+    },
+
+    // ENHANCED: Clean templates on load to remove any invalid ones
+    async loadTemplates() {
+        if (!window.storage) {
+            console.warn('⚠️ Storage not available');
+            return [];
+        }
+
+        try {
+            const templates = await window.storage.loadTemplates();
+            
+            // NUR problematische Templates herausfiltern
+            let filteredTemplates = templates;
+            if (window.storage.storageMode === 'files') {
+                filteredTemplates = templates.filter(template => {
+                    // Nur wirklich problematische Templates herausfiltern
+                    if (!template.name || 
+                        template.name === 'undefined' || 
+                        template.name.startsWith('undefined ')) {
+                        console.log(`🗑️ Filtering out problematic template: "${template.name}"`);
+                        return false;
+                    }
+                    return true; // ALLES ANDERE IST OK
+                });
+            }
+            
+            // Enhance each template with display properties
+            const enhancedTemplates = filteredTemplates.map(template => this.enhanceTemplateWithStatus(template));
+            
+            console.log(`📂 Loaded ${enhancedTemplates.length} templates (filtered from ${templates.length})`);
+            
+            return enhancedTemplates;
+        } catch (error) {
+            console.error('❌ Error loading templates:', error);
+            return [];
+        }
+    },
+
+    // ENHANCED: Refresh function with error handling and UI updates
+    async refresh() {
+        console.log('🔄 Manually refreshing template manager...');
+        
+        try {
+            // 1. Clear all caches
+            this.invalidateCache();
+            
+            // 2. Reload own templates from storage
+            this.templates = await this.loadTemplates();
+            console.log(`📂 Reloaded ${this.templates.length} own templates`);
+            
+            // 3. Force update shared toggle visibility
+            this.updateSharedToggleVisibility();
+            
+            // 4. Rebuild search index with fresh data
+            this.buildSearchIndex();
+            
+            // 5. Re-render the list (will include group templates via getAllTemplates)
+            this.renderList();
+            
+            // 6. Update template info
+            this.updateTemplateInfo();
+            
+            console.log('✅ Template manager refresh completed');
+            
+        } catch (error) {
+            console.error('❌ Error during template refresh:', error);
+            
+            // Show error to user if possible
+            if (window.app && window.app.showError) {
+                window.app.showError('Template refresh failed: ' + error.message);
             }
         }
     },
-	
-	// ENHANCED: Manual refresh function for external calls
-    refresh() {
-        console.log('🔄 Manually refreshing template manager...');
+
+// FORCE REFRESH with Group Template Re-sharing (neue Funktion hinzufügen)
+async forceRefreshWithGroupSync() {
+    console.log('🔄 Force refreshing with group synchronization...');
+    
+    try {
+        // 1. Normal refresh first
+        await this.refresh();
+        
+        // 2. Force re-share current user templates to group storage
+        if (window.storage && typeof window.storage.saveToGroupStorage === 'function') {
+            const userTemplates = this.templates.filter(t => !window.storage.isDefaultTemplate?.(t));
+            if (userTemplates.length > 0) {
+                window.storage.saveToGroupStorage(userTemplates);
+                console.log(`🤝 Re-shared ${userTemplates.length} templates to group storage`);
+            }
+        }
+        
+        // 3. Clear cache again to force reload of group templates
         this.invalidateCache();
-        this.buildSearchIndex();
-        this.updateSharedToggleVisibility();
+        
+        // 4. Final render
         this.renderList();
         this.updateTemplateInfo();
+        
+        console.log('✅ Force refresh with group sync completed');
+        
+    } catch (error) {
+        console.error('❌ Error during force refresh:', error);
     }
+},
+
+    // Add these new functions to templateManager.js
+
+    // NEW: Force cleanup of localStorage templates and reload from files only
+    async forceCleanupAndReload() {
+        try {
+            console.log('🧹 Starting template cleanup and reload...');
+            
+            // Show loading indicator
+            this.showLoadingState();
+            
+            // Use storage cleanup function
+            if (window.storage && window.storage.forceCleanReload) {
+                this.templates = await window.storage.forceCleanReload();
+            } else {
+                console.warn('⚠️ Storage cleanup not available');
+                this.templates = await this.loadTemplates();
+            }
+            
+            // Update UI
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+            this.updateTemplateInfo();
+            
+            console.log(`✅ Template cleanup completed. Now showing ${this.templates.length} templates.`);
+            
+            // Show success message
+            this.showCleanupSuccessMessage(this.templates.length);
+            
+        } catch (error) {
+            console.error('❌ Error during template cleanup:', error);
+            this.showErrorMessage('Cleanup failed: ' + error.message);
+        }
+    },
+
+    // NEW: Show loading state during cleanup
+    showLoadingState() {
+        const container = document.getElementById('templatesContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="loading-state" style="text-align: center; padding: 40px;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">🧹</div>
+                    <div>Cleaning up templates...</div>
+                    <div style="font-size: 14px; color: #666; margin-top: 10px;">
+                        Removing localStorage duplicates
+                    </div>
+                </div>
+            `;
+        }
+    },
+
+    // NEW: Show cleanup success message
+    showCleanupSuccessMessage(templateCount) {
+        const message = `✅ Templates cleaned! Now showing ${templateCount} file-based templates only.`;
+        
+        // Try to use existing notification system
+        if (window.showNotification) {
+            window.showNotification(message, 'success');
+        } else if (window.enhancedActions && window.enhancedActions.showNotification) {
+            window.enhancedActions.showNotification(message, 'success');
+        } else {
+            // Fallback: console + temporary div
+            console.log(message);
+            this.showTemporaryMessage(message, 'success');
+        }
+    },
+
+    // NEW: Show temporary message overlay
+    showTemporaryMessage(message, type = 'info') {
+        // Create temporary message element
+        const messageEl = document.createElement('div');
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
+            color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
+            border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb'};
+            border-radius: 4px;
+            padding: 12px 20px;
+            z-index: 10000;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        `;
+        messageEl.textContent = message;
+        
+        document.body.appendChild(messageEl);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            if (messageEl.parentNode) {
+                messageEl.parentNode.removeChild(messageEl);
+            }
+        }, 5000);
+    },
+
+    // NEW: Check for localStorage templates and offer cleanup
+    async checkForLocalStorageTemplates() {
+        try {
+            // Only check if we're in files mode
+            if (!window.storage || window.storage.storageMode !== 'files') {
+                return false;
+            }
+            
+            // Check if localStorage contains any template data
+            let hasLocalStorageTemplates = false;
+            const keysToCheck = [
+                'folderTemplates',
+                'experimentTemplates',
+                window.storage.getStorageKey('templates')
+            ];
+            
+            keysToCheck.forEach(key => {
+                if (localStorage.getItem(key)) {
+                    hasLocalStorageTemplates = true;
+                }
+            });
+            
+            // Also check for any metafold_ or group keys
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('metafold_') || key.includes('_group_')) && key.includes('templates')) {
+                    hasLocalStorageTemplates = true;
+                    break;
+                }
+            }
+            
+            if (hasLocalStorageTemplates) {
+                console.log('⚠️ Found localStorage templates in files-only mode');
+                this.showCleanupPrompt();
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.warn('Error checking localStorage templates:', error);
+            return false;
+        }
+    },
+
+    // NEW: Show cleanup prompt to user
+    showCleanupPrompt() {
+        const promptHtml = `
+            <div class="cleanup-prompt" style="
+                background: #fff3cd; 
+                border: 1px solid #ffeaa7; 
+                border-radius: 4px; 
+                padding: 15px; 
+                margin: 10px 0;
+                position: relative;
+            ">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🧹</span>
+                    <div>
+                        <strong>Duplicate Templates Detected</strong>
+                        <div style="font-size: 14px; color: #856404; margin-top: 5px;">
+                            Old localStorage templates found. Clean them up to remove duplicates?
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button onclick="window.templateManager.forceCleanupAndReload()" 
+                            style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        🧹 Clean Up Now
+                    </button>
+                    <button onclick="document.querySelector('.cleanup-prompt').style.display='none'" 
+                            style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        Later
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Insert prompt at the top of templates container
+        const container = document.getElementById('templatesContainer');
+        if (container) {
+            const promptEl = document.createElement('div');
+            promptEl.innerHTML = promptHtml;
+            container.insertBefore(promptEl, container.firstChild);
+        }
+    },
+
+    // ENHANCED: Modified init function to check for cleanup needs
+    async init() {
+        console.log('🔄 Initializing template manager...');
+        
+        try {
+            // Load templates
+            this.templates = await this.loadTemplates();
+            
+            // Check for localStorage cleanup needs
+            await this.checkForLocalStorageTemplates();
+            
+            // Continue with normal initialization
+            this.filteredTemplates = [...this.templates];
+            this.initializeSearchState();
+            await this.loadSharedTemplatesPreference();
+            this.renderList();
+            this.updateTemplateInfo();
+            this.updateSharedToggleVisibility();
+            
+            console.log(`✅ Template manager initialized with ${this.templates.length} templates`);
+        } catch (error) {
+            console.error('❌ Error initializing template manager:', error);
+            this.showErrorMessage('Failed to initialize templates: ' + error.message);
+        }
+    },
+
+    // ENHANCED: Modified loadTemplates to filter out Unknown templates
+        async loadTemplates() {
+        console.log('📂 Loading templates (fixed version)...');
+        
+        try {
+            let templates = [];
+            
+            // Use the new file-only loading method
+            if (window.storage && window.storage.loadTemplates) {
+                templates = await window.storage.loadTemplates();
+                console.log(`📂 Loaded ${templates.length} templates from storage`);
+            } else {
+                console.warn('⚠️ No storage method available');
+                return [];
+            }
+            
+            // Filter out problematic templates
+            const validTemplates = templates.filter(template => {
+                // Basic validation
+                if (!template.name || template.name === 'undefined') {
+                    console.log(`🗑️ Filtering out invalid template: ${template.name}`);
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            // Enhance templates with display properties
+            const enhancedTemplates = validTemplates.map(template => this.enhanceTemplateWithStatus(template));
+            
+            console.log(`📂 Loaded ${enhancedTemplates.length} valid templates (filtered from ${templates.length})`);
+            return enhancedTemplates;
+            
+        } catch (error) {
+            console.error('❌ Error loading templates:', error);
+            return [];
+        }
+    },
+
+
+
+
 };
 
 window.templateManager = templateManager;
-console.log('✅ FIXED templateManager loaded with proper cache invalidation');
+console.log('✅ Template manager loaded with file storage support');

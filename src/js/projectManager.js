@@ -1,4 +1,4 @@
-// Project Manager - FIXED elabFTW Auto-sync Logic
+// Project Manager - FUNKTIONSFÄHIGE KORRIGIERTE VERSION
 
 const projectManager = {
     // Initialize project manager
@@ -57,7 +57,7 @@ const projectManager = {
         }
     },
 
-    // Create project - FIXED elabFTW Logic
+    // Create project - KORRIGIERTE VERSION
     async createProject() {
         if (!templateManager.currentTemplate) return;
         
@@ -68,184 +68,204 @@ const projectManager = {
             this.showError('Please choose a base directory and enter a project name!');
             return;
         }
-
-        // Evaluate template information
-        const template = templateManager.currentTemplate;
-        const hasStructure = template.structure && template.structure.trim() !== '';
-        const hasMetadata = template.type === 'experiment' && template.metadata && Object.keys(template.metadata).length > 0;
-
-        // Validate experiment fields (if present)
-        let experimentMetadata = null;
-        if (template.type === 'experiment' && hasMetadata) {
-            const validationResult = experimentForm.validate();
-            if (!validationResult.valid) {
-                this.showError(validationResult.message);
-                return;
-            }
-            experimentMetadata = experimentForm.collectData();
-        }
-
-        // Inform user if only metadata will be created
-        if (!hasStructure && hasMetadata) {
-            this.showInfo('ℹ️ This template creates only metadata files (no folder structure).');
-        }
-
-        // Hide previous messages
-        this.hideMessages();
         
-        if (window.electronAPI) {
-            try {
-                const result = await window.electronAPI.createProject(
-                    basePath, 
-                    projectName, 
-                    template.structure || '',
-                    experimentMetadata
-                );
-                
-                if (result.success) {
-                    // =========================
-                    // OMERO INTEGRATION - unchanged
-                    // =========================
-                    let omeroResult = null;
-                    const omeroEnabled = await settingsManager.get('omero.enabled');
-					if (template.type === 'experiment' && hasMetadata && omeroEnabled) {
-                        console.log('🔬 Starting OMERO integration...');
-                        
-                        // Check if auto-sync is enabled or manual checkbox is checked
-                        const shouldSyncToOMERO = await this.shouldSyncToOMERO();
-                        
-                        if (shouldSyncToOMERO) {
-                            try {
-                                // Get OMERO options from UI
-                                const omeroOptions = this.getOMEROOptions();
-                                
-                                console.log('🔬 Creating OMERO dataset with options:', omeroOptions);
-                                
-                                // Create OMERO dataset with Map Annotations
-                                omeroResult = await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(
-                                    projectName,
-                                    experimentMetadata,
-                                    omeroOptions
-                                );
-                                
-                                console.log('🔬 OMERO result:', omeroResult);
-                                
-                            } catch (omeroError) {
-                                console.error('❌ OMERO integration failed:', omeroError);
-                                omeroResult = {
-                                    success: false,
-                                    message: omeroError.message || 'Unknown OMERO error'
-                                };
-                            }
-                        } else {
-                            console.log('🔬 OMERO sync skipped (not enabled or not checked)');
-                        }
-                    }
-                    
-                    // ==========================================
-                    // FIXED elabFTW INTEGRATION LOGIC
-                    // ==========================================
-                    let elabFTWResult = null;
-                    if (template.type === 'experiment' && hasMetadata && settingsManager.get('elabftw.enabled')) {
-                        console.log('🧪 Starting elabFTW integration...');
-                        
-                        // Check if should sync to elabFTW
-                        const shouldSyncToElabFTW = await this.shouldSyncToElabFTW();
-                        
-                        if (shouldSyncToElabFTW) {
-                            try {
-                                // Check for existing experiment ID
-                                const existingExpId = document.getElementById('existingExperimentId')?.value?.trim();
-                                
-                                if (existingExpId) {
-                                    // Update existing experiment (with merge logic)
-                                    console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
-                                    elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
-                                        existingExpId,
-                                        experimentMetadata
-                                    );
-                                } else {
-                                    // Create new experiment
-                                    console.log('🧪 Creating new elabFTW experiment');
-                                    elabFTWResult = await settingsManager.createElabFTWExperiment(
-                                        projectName, 
-                                        experimentMetadata, 
-                                        template.structure
-                                    );
-                                }
-                                
-                                console.log('🧪 elabFTW result:', elabFTWResult);
-                                
-                            } catch (elabFTWError) {
-                                console.error('❌ elabFTW integration failed:', elabFTWError);
-                                elabFTWResult = {
-                                    success: false,
-                                    message: elabFTWError.message || 'Unknown elabFTW error'
-                                };
-                            }
-                        } else {
-                            console.log('🧪 elabFTW sync skipped (not enabled or not requested)');
-                        }
-                    }
-
-                    // ==========================================
-                    // ENHANCED SUCCESS MESSAGE WITH BOTH LINKS
-                    // ==========================================
-                    let successMessage = result.message;
-                    const links = [];
-                    
-                    // Add elabFTW link
-                    if (elabFTWResult && elabFTWResult.success) {
-                        successMessage += ' Experiment also created in elabFTW!';
-                        links.push({
-                            type: 'elabFTW',
-                            url: elabFTWResult.url,
-                            text: '🧪 Open in elabFTW'
-                        });
-                    } else if (elabFTWResult && !elabFTWResult.success) {
-                        successMessage += ` (elabFTW sync failed: ${elabFTWResult.message})`;
-                    }
-                    
-                    // Add OMERO link
-                    if (omeroResult && omeroResult.success) {
-                        successMessage += ' Dataset also created in OMERO!';
-                        links.push({
-                            type: 'OMERO',
-                            url: omeroResult.url,
-                            text: '🔬 Open in OMERO'
-                        });
-                    } else if (omeroResult && !omeroResult.success) {
-                        successMessage += ` (OMERO sync failed: ${omeroResult.message})`;
-                    }
-                    
-                    // Show enhanced success message
-                    this.showEnhancedSuccess(successMessage, result.projectPath, links);
-                    
-                } else {
-                    this.showError(result.message);
-                }
-            } catch (error) {
-                this.showError('Error creating project: ' + error.message);
+        // Verbesserte Electron-Erkennung
+        console.log('🔍 Checking electronAPI availability...');
+        console.log('📋 window.electronAPI exists:', !!window.electronAPI);
+        console.log('📋 window.electronAPI.createProject exists:', !!(window.electronAPI && window.electronAPI.createProject));
+        
+        const isElectron = !!(window.electronAPI && window.electronAPI.createProject);
+        
+        if (!isElectron) {
+            console.error('❌ Not running in Electron mode!');
+            this.showError('Project creation is only available in the Electron app, not in browser mode.');
+            return;
+        }
+        
+        try {
+            // Get template info
+            const template = templateManager.currentTemplate;
+            
+            // Handle template structure
+            let templateStructure = template.folderStructure || template.structure || '';
+            if (Array.isArray(templateStructure)) {
+                templateStructure = templateStructure.join('\n');
             }
-        } else {
-            this.showError('Project creation not available in browser mode');
+            templateStructure = String(templateStructure || '');
+            
+            console.log('📋 templateStructure (processed):', templateStructure);
+            console.log('📋 templateStructure type:', typeof templateStructure);
+            console.log('📋 templateStructure length:', templateStructure.length);
+            
+            // Check if metadata exists
+            const hasMetadata = template.type === 'experiment' && 
+                            template.metadata && 
+                            Object.keys(template.metadata).length > 0;
+            
+            // Get experiment metadata
+            const experimentMetadata = window.experimentForm && window.experimentForm.collectData ? 
+                window.experimentForm.collectData() : null;
+
+                // VALIDATION: Check required fields before creating project
+                if (hasMetadata && window.experimentForm && window.experimentForm.validate) {
+                    console.log('🔍 Validating required fields...');
+                    
+                    const validationResult = window.experimentForm.validate();
+                    
+                    if (!validationResult.valid) {
+                        console.warn('❌ Validation failed:', validationResult.message);
+                        this.showError(validationResult.message);
+                        return; // Stop project creation
+                    }
+                    
+                    console.log('✅ Validation passed - all required fields filled');
+                }
+            
+            console.log('🚀 Starting project creation...');
+            console.log('📁 basePath:', basePath);
+            console.log('📁 projectName:', projectName);
+            console.log('📋 templateStructure:', templateStructure);
+            console.log('📋 experimentMetadata:', experimentMetadata);
+            console.log('📋 hasMetadata:', hasMetadata);
+            
+            // Create project
+            const result = await window.electronAPI.createProject(
+                basePath,
+                projectName,
+                templateStructure,
+                experimentMetadata
+            );
+            
+            console.log('✅ Project creation result:', result);
+            
+            if (result && result.success) {
+                let successMessage = result.message;
+                let elabFTWResult = null;
+                let omeroResult = null;
+                
+                // elabFTW Integration
+                if (template.type === 'experiment' && hasMetadata && await settingsManager.get('elabftw.enabled')) {
+                    console.log('🧪 Starting elabFTW integration...');
+                    
+                    const shouldSyncToElabFTW = await this.shouldSyncToElabFTW();
+                    
+                    if (shouldSyncToElabFTW) {
+                        try {
+                            const existingExpIdElement = document.getElementById('existingExperimentId');
+                            const existingExpId = existingExpIdElement?.value?.trim();
+                            
+                            console.log('🔧 DEBUG: Experiment ID check:', {
+                                element: !!existingExpIdElement,
+                                rawValue: existingExpIdElement?.value,
+                                trimmedValue: existingExpId,
+                                isEmpty: !existingExpId,
+                                length: existingExpId?.length || 0
+                            });
+                            
+                            if (existingExpId && existingExpId.length > 0) {
+                                // Update existing experiment
+                                console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
+                                elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
+                                    existingExpId,
+                                    experimentMetadata
+                                );
+                            } else {
+                                // Create new experiment
+                                console.log('🧪 Creating new elabFTW experiment');
+                                elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                    projectName, 
+                                    experimentMetadata,
+                                    templateStructure
+                                );
+                            }
+                            
+                            console.log('🧪 elabFTW result:', elabFTWResult);
+                            
+                            if (elabFTWResult && elabFTWResult.success) {
+                                successMessage += ' (Synced to elabFTW)';
+                            }
+                            
+                        } catch (elabFTWError) {
+                            console.error('❌ elabFTW integration failed:', elabFTWError);
+                            elabFTWResult = {
+                                success: false,
+                                message: elabFTWError.message || 'Unknown elabFTW error'
+                            };
+                        }
+                    } else {
+                        console.log('🧪 elabFTW sync skipped');
+                    }
+                }
+                
+                // OMERO Integration
+                if (template.type === 'experiment' && hasMetadata && await settingsManager.get('omero.enabled')) {
+                    const shouldSyncToOMERO = await this.shouldSyncToOMERO();
+                    
+                    if (shouldSyncToOMERO) {
+                        console.log('🔬 Starting OMERO upload...');
+                        try {
+                            const omeroOptions = this.getOMEROOptions();
+                            
+                            omeroResult = await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(
+                                projectName,
+                                experimentMetadata,
+                                omeroOptions
+                            );
+                            
+                            console.log('🔬 OMERO result:', omeroResult);
+                            
+                            if (omeroResult && omeroResult.success) {
+                                successMessage += ' (Synced to OMERO)';
+                            }
+                        } catch (error) {
+                            console.error('❌ OMERO upload failed:', error);
+                            omeroResult = { success: false, message: error.message };
+                        }
+                    } else {
+                        console.log('🔬 OMERO sync not requested');
+                    }
+                }
+                
+                // Process integration links
+                try {
+                    const uploadResults = {
+                        elabftw: elabFTWResult,
+                        omero: omeroResult
+                    };
+
+                    const projectData = {
+                        metadata: experimentMetadata || {},
+                        projectName: projectName,
+                        basePath: basePath,
+                        template: template
+                    };
+
+                    await this.processIntegrationLinksPostUpload(projectData, result.projectPath, uploadResults);
+                } catch (linkError) {
+                    console.error('❌ Error processing integration links (non-critical):', linkError);
+                }
+
+                // Build links and show success
+                const links = this.buildLinksFromResults({ elabftw: elabFTWResult, omero: omeroResult });
+                this.showEnhancedSuccess(successMessage, result.projectPath, links);
+                
+            } else {
+                this.showError(result ? result.message : 'Unknown error occurred during project creation');
+            }
+        } catch (error) {
+            console.error('❌ Error creating project:', error);
+            this.showError('Error creating project: ' + error.message);
         }
     },
 
-    // ==========================================
-    // FIXED elabFTW Helper Function
-    // ==========================================
-
-    // Check if should sync to elabFTW - FIXED LOGIC
+    // Check if should sync to elabFTW
     async shouldSyncToElabFTW() {
-        // Auto-sync enabled?
         const autoSync = await settingsManager.get('elabftw.auto_sync');
         if (autoSync) {
             console.log('🧪 elabFTW auto-sync is enabled');
             return true;
         }
         
-        // Manual checkbox checked?
         const sendToElabFTW = document.getElementById('sendToElabFTW');
         if (sendToElabFTW && sendToElabFTW.checked) {
             console.log('🧪 elabFTW manual sync checkbox is checked');
@@ -256,43 +276,50 @@ const projectManager = {
         return false;
     },
 
-    // ==========================================
-    // OMERO HELPER FUNCTIONS (unchanged)
-    // ==========================================
-
-		// Check if should sync to OMERO
-	// Check if should sync to OMERO - FIXED ASYNC
-	async shouldSyncToOMERO() {
-		// Auto-sync enabled?
-		const autoSync = await settingsManager.get('omero.auto_sync');
-		if (autoSync) {
-			console.log('🔬 OMERO auto-sync is enabled');
-			return true;
-		}
-		
-		// Manual checkbox checked?
-		const sendToOMERO = document.getElementById('sendToOMERO');
-		if (sendToOMERO && sendToOMERO.checked) {
-			console.log('🔬 OMERO manual sync checkbox is checked');
-			return true;
-		}
-		
-		console.log('🔬 OMERO sync not requested');
-		return false;
-	},
-
-    // Get OMERO options from UI
-    getOMEROOptions() {
-        const options = {};
-        
-        // Get selected project ID from dropdown
-        const projectSelect = document.getElementById('omeroProjectSelect');
-        if (projectSelect && projectSelect.value && projectSelect.value !== '' && projectSelect.value !== 'refresh') {
-            options.projectId = projectSelect.value;
-            console.log('🔬 OMERO project selected:', options.projectId);
+    // Check if should sync to OMERO
+    async shouldSyncToOMERO() {
+        const autoSync = await settingsManager.get('omero.auto_sync');
+        if (autoSync) {
+            console.log('🔬 OMERO auto-sync is enabled');
+            return true;
         }
         
-        // Get custom namespace if available
+        const sendToOMERO = document.getElementById('sendToOMERO');
+        if (sendToOMERO && sendToOMERO.checked) {
+            console.log('🔬 OMERO manual sync checkbox is checked');
+            return true;
+        }
+        
+        console.log('🔬 OMERO sync not requested');
+        return false;
+    },
+
+
+    // Build OMERO options with enhanced metadata support
+    getOMEROOptions() {
+        console.log('🔬 Building OMERO options...');
+        
+        const options = {};
+        
+        // Group selection
+        const groupSelect = document.getElementById('omeroGroupSelect');
+        if (groupSelect && groupSelect.value) {
+            options.groupId = groupSelect.value;
+            console.log('🔬 OMERO group selected:', options.groupId);
+        } else {
+            console.log('🔬 OMERO group: Using default/current');
+        }
+        
+        // Project selection
+        const projectSelect = document.getElementById('omeroProjectSelect');
+        if (projectSelect && projectSelect.value && projectSelect.value !== 'refresh' && projectSelect.value !== '') {
+            options.projectId = projectSelect.value;
+            console.log('🔬 OMERO project selected:', options.projectId);
+        } else {
+            console.log('🔬 OMERO project: Creating standalone dataset');
+        }
+        
+        // Namespace
         const namespaceInput = document.getElementById('omeroNamespace');
         if (namespaceInput && namespaceInput.value.trim()) {
             options.namespace = namespaceInput.value.trim();
@@ -300,14 +327,262 @@ const projectManager = {
             options.namespace = 'NFDI4BioImage.MetaFold.ExperimentMetadata';
         }
         
+        // *** JSON Triplets Checkbox Abfrage ***
+        const jsonTripletsCheckbox = document.getElementById('omeroUseJsonTriplets');
+        if (jsonTripletsCheckbox) {
+            options.useJsonTriplets = jsonTripletsCheckbox.checked;
+            console.log('🔬 JSON Triplets mode from UI:', options.useJsonTriplets);
+        } else {
+            console.log('🔬 JSON Triplets checkbox not found in UI');
+        }
+        
+        // *** KORREKTUR: Template-Metadaten korrekt abrufen ***
+        let currentTemplate = null;
+        
+        // FIX: Verwende templateManager.currentTemplate statt getCurrentTemplate()
+        if (window.templateManager && window.templateManager.currentTemplate) {
+            currentTemplate = window.templateManager.currentTemplate;
+            console.log('🔬 Current template found:', currentTemplate.name);
+            console.log('🔬 Template type:', currentTemplate.type);
+        } else {
+            console.warn('⚠️ No current template found');
+            console.log('🔍 templateManager exists:', !!window.templateManager);
+            console.log('🔍 currentTemplate exists:', !!(window.templateManager && window.templateManager.currentTemplate));
+        }
+        
+        if (currentTemplate) {
+            options.templateMetadata = currentTemplate;
+            options.templateName = currentTemplate.name;
+            console.log('🔬 Template metadata added for groups support:', currentTemplate.name);
+            
+            // Debug: Template groups detection
+            if (currentTemplate.metadata) {
+                const groupFields = Object.entries(currentTemplate.metadata)
+                    .filter(([key, field]) => field && field.type === 'group')
+                    .map(([key, field]) => ({
+                        key: key,
+                        label: field.label || key,
+                        fieldCount: field.fields ? field.fields.length : 0
+                    }));
+                    
+                if (groupFields.length > 0) {
+                    console.log('🔬 Template groups detected:', groupFields.length);
+                    groupFields.forEach(group => {
+                        console.log(`🔬    - Group: "${group.label}" (${group.fieldCount} fields)`);
+                    });
+                } else {
+                    console.log('🔬 No template groups found in current template');
+                }
+            } else {
+                console.log('🔬 Current template has no metadata structure');
+            }
+        } else {
+            console.log('⚠️ No current template found for groups support');
+        }
+        
+        // Add project path and user context (if needed)
+        if (window.userManager && typeof window.userManager.getCurrentUser === 'function') {
+            try {
+                const currentUser = window.userManager.getCurrentUser();
+                if (currentUser) {
+                    options.username = currentUser.username;
+                    options.groupname = currentUser.groupname;
+                    console.log('🔬 User context added:', currentUser.username);
+                }
+            } catch (error) {
+                console.warn('⚠️ Error getting current user:', error);
+            }
+        }
+        
+        console.log('🔬 Complete OMERO options (with template metadata):', options);
         return options;
     },
 
-    // ==========================================
-    // ENHANCED SUCCESS MESSAGE DISPLAY (unchanged)
-    // ==========================================
 
-    // Show enhanced success message with multiple links
+    // Enhanced sync to OMERO with correct template metadata passing
+async syncToOMERO(projectName, targetPath, metadata) {
+        console.log('🔬 Enhanced OMERO sync starting...', projectName);
+        
+        if (!window.settingsManager) {
+            throw new Error('Settings manager not available');
+        }
+        
+        const omeroOptions = this.getOMEROOptions();
+        
+        // *** KORREKTUR: Template-Metadaten für Groups Support hinzufügen ***
+        let currentTemplate = null;
+        
+        // FIX: Korrekte Template-Abfrage
+        if (window.templateManager && window.templateManager.currentTemplate) {
+            currentTemplate = window.templateManager.currentTemplate;
+            console.log('🔬 Current template retrieved for OMERO sync:', currentTemplate.name);
+        } else {
+            console.warn('⚠️ No current template available for OMERO sync');
+        }
+        
+        if (currentTemplate) {
+            omeroOptions.templateMetadata = currentTemplate;
+            omeroOptions.templateName = currentTemplate.name;
+            console.log('🔬 Template metadata added for groups support:', currentTemplate.name);
+            console.log('🔬 Template groups found:', Object.keys(currentTemplate.metadata || {}));
+            
+            // Debug: Suche nach Group-Feldern
+            if (currentTemplate.metadata) {
+                const groupFields = Object.entries(currentTemplate.metadata)
+                    .filter(([key, field]) => field && field.type === 'group');
+                
+                if (groupFields.length > 0) {
+                    console.log('🔬 Group fields detected for OMERO sync:');
+                    groupFields.forEach(([key, field]) => {
+                        const groupName = field.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        console.log(`🔬    - "${groupName}": ${field.fields ? field.fields.length : 0} fields`);
+                    });
+                } else {
+                    console.log('🔬 No group fields found in template metadata');
+                }
+            }
+        } else {
+            console.log('⚠️ No current template found for groups support');
+        }
+        
+        // Add project path and user context
+        omeroOptions.projectPath = targetPath;
+        if (window.userManager) {
+            const currentUser = window.userManager.getCurrentUser();
+            if (currentUser) {
+                omeroOptions.username = currentUser.username;
+                omeroOptions.groupname = currentUser.groupname;
+            }
+        }
+        
+        console.log('🔬 Enhanced OMERO options:', omeroOptions);
+        
+        // *** FIX: IMPROVED FUNCTION DETECTION AND CALLS ***
+        try {
+            // Method 1: Try Enhanced Integration method
+            if (window.metaFoldOMEROIntegration && window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced) {
+                console.log('🔬 Using ENHANCED OMERO integration method...');
+                return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced(projectName, metadata, omeroOptions);
+            }
+            
+            // Method 2: Try Standard Integration method with Enhanced Map Annotations
+            else if (window.metaFoldOMEROIntegration && window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject) {
+                console.log('🔬 Using STANDARD OMERO integration with enhanced annotations...');
+                
+                // Create dataset using standard method
+                const result = await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, omeroOptions);
+                
+                // If successful and we have template metadata, try to add enhanced annotations
+                if (result.success && currentTemplate && result.dataset && result.dataset.id) {
+                    console.log('🔬 Dataset created successfully, adding enhanced annotations...');
+                    
+                    try {
+                        // Try to replace annotations with enhanced version
+                        const enhancedAnnotations = await window.metaFoldOMEROIntegration.addMapAnnotationsNew(
+                            result.dataset.id,
+                            metadata,
+                            omeroOptions.namespace,
+                            {
+                                templateMetadata: currentTemplate,
+                                useJsonTriplets: omeroOptions.useJsonTriplets,
+                                useTemplateGroupsAsNamespaces: true,
+                                integrationLinksAsKeyValue: true
+                            }
+                        );
+                        
+                        if (enhancedAnnotations.success) {
+                            console.log('✅ Enhanced annotations added successfully!');
+                            result.annotations = {
+                                ...result.annotations,
+                                enhanced: enhancedAnnotations
+                            };
+                        }
+                    } catch (enhancedError) {
+                        console.warn('⚠️ Enhanced annotations failed, keeping standard annotations:', enhancedError);
+                    }
+                }
+                
+                return result;
+            }
+            
+            // Method 3: Fallback to settings manager
+            else if (window.settingsManager.createOMERODatasetEnhanced) {
+                console.log('🔬 Using settings manager enhanced OMERO method...');
+                return await window.settingsManager.createOMERODatasetEnhanced(projectName, metadata, omeroOptions);
+            }
+            
+            // Method 4: Last resort fallback
+            else if (window.settingsManager.createOMERODataset) {
+                console.log('🔬 Using settings manager standard OMERO method (groups not supported)...');
+                return await window.settingsManager.createOMERODataset(projectName, metadata, omeroOptions);
+            }
+            
+            else {
+                throw new Error('No OMERO integration method available');
+            }
+            
+        } catch (error) {
+            console.error('❌ OMERO sync failed:', error);
+            throw error;
+        }
+    },
+
+    // Build links from integration results
+    buildLinksFromResults(uploadResults) {
+        const links = [];
+        
+        // elabFTW Link
+        if (uploadResults.elabftw && uploadResults.elabftw.success) {
+            let elabUrl = null;
+            
+            if (uploadResults.elabftw.experimentUrl) {
+                elabUrl = uploadResults.elabftw.experimentUrl;
+            } else if (uploadResults.elabftw.url) {
+                elabUrl = uploadResults.elabftw.url;
+            } else if (uploadResults.elabftw.experiment && uploadResults.elabftw.experiment.url) {
+                elabUrl = uploadResults.elabftw.experiment.url;
+            }
+            
+            if (elabUrl) {
+                links.push({
+                    type: 'elabFTW',
+                    url: elabUrl,
+                    text: '🧪 Open in elabFTW'
+                });
+            }
+        }
+        
+        // OMERO Link - KORRIGIERTE VERSION
+        if (uploadResults.omero && uploadResults.omero.success) {
+            let omeroUrl = null;
+            
+            if (uploadResults.omero.dataset && uploadResults.omero.dataset.omeroWebUrl) {
+                omeroUrl = uploadResults.omero.dataset.omeroWebUrl;
+            } else if (uploadResults.omero.omeroWebUrl) {
+                omeroUrl = uploadResults.omero.omeroWebUrl;
+            } else if (uploadResults.omero.url) {
+                omeroUrl = uploadResults.omero.url;
+            } else if (uploadResults.omero.dataset && uploadResults.omero.dataset.id) {
+                // Fallback: URL aus Dataset-ID konstruieren
+                const datasetId = uploadResults.omero.dataset.id;
+                omeroUrl = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`;
+            }
+            
+            if (omeroUrl) {
+                links.push({
+                    type: 'OMERO',
+                    url: omeroUrl,
+                    text: '🔬 Open in OMERO'
+                });
+            } else {
+                console.warn('⚠️ OMERO URL not found in result:', uploadResults.omero);
+            }
+        }
+        
+        return links;
+    },
+
+    // Show enhanced success message - KORRIGIERTE OBJEKTMETHODE
     showEnhancedSuccess(message, projectPath = null, links = []) {
         const successDiv = document.getElementById('successMessage');
         if (successDiv) {
@@ -322,10 +597,35 @@ const projectManager = {
                 buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-top: 8px; margin-right: 8px;">📂 Open Folder</button>`;
             }
             
-            // Add external links
-            links.forEach(link => {
-                const escapedUrl = link.url.replace(/'/g, "\\'");
-                buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openExternalLink('${escapedUrl}')" style="margin-top: 8px; margin-right: 8px;">${link.text}</button>`;
+            // Add external links - ROBUSTE VERSION
+            links.forEach((link, index) => {
+                try {
+                    let urlToUse = '';
+                    
+                    if (typeof link.url === 'string') {
+                        urlToUse = link.url;
+                    } else if (link.url && typeof link.url === 'object') {
+                        urlToUse = link.url.main || link.url.web || link.url.url || link.url.omeroWebUrl || '';
+                    } else {
+                        console.warn(`⚠️ Link ${index} URL format not recognized:`, link);
+                        urlToUse = String(link.url || '');
+                    }
+                    
+                    if (!urlToUse || urlToUse.trim() === '') {
+                        console.warn(`⚠️ Empty URL for link ${index}:`, link);
+                        return;
+                    }
+                    
+                    const escapedUrl = urlToUse.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    const linkText = link.text || 'Open Link';
+                    
+                    buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openExternalLink('${escapedUrl}')" style="margin-top: 8px; margin-right: 8px;">${linkText}</button>`;
+                    
+                    console.log(`✅ Added link ${index}: ${linkText} -> ${urlToUse}`);
+                    
+                } catch (error) {
+                    console.error(`❌ Error processing link ${index}:`, link, error);
+                }
             });
             
             if (buttonsHtml) {
@@ -335,43 +635,34 @@ const projectManager = {
             successDiv.innerHTML = content;
             successDiv.style.display = 'block';
             
-            // Hide other messages
             this.hideOtherMessages('successMessage');
             
-            // Auto-hide after 20 seconds (longer for success with multiple buttons)
             setTimeout(() => {
                 successDiv.style.display = 'none';
             }, 20000);
         }
     },
 
-    // Open external link (unified method)
+    // Open external link
     async openExternalLink(url) {
         try {
             console.log('Attempting to open URL:', url);
             
             if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
-                // Use Electron's openExternal via IPC
                 console.log('Using Electron openExternal via IPC');
                 const result = await window.electronAPI.openExternal(url);
                 if (result && !result.success) {
                     throw new Error(result.error || 'Failed to open URL');
                 }
             } else {
-                // Fallback to window.open for browser
                 console.log('Using fallback window.open');
                 window.open(url, '_blank', 'noopener,noreferrer');
             }
         } catch (error) {
             console.error('Error opening external link:', error);
-            // Final fallback - copy URL to clipboard or show it to user
             this.showError(`Cannot open link automatically. Please open this URL manually: ${url}`);
         }
     },
-
-    // ==========================================
-    // EXISTING METHODS (unchanged)
-    // ==========================================
 
     // Show error message
     showError(message) {
@@ -380,17 +671,15 @@ const projectManager = {
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
             
-            // Hide other messages
             this.hideOtherMessages('errorMessage');
             
-            // Auto-hide after 5 seconds
             setTimeout(() => {
                 errorDiv.style.display = 'none';
             }, 5000);
         }
     },
 
-    // Show success message with optional elabFTW link (LEGACY - for backward compatibility)
+    // Show success message (legacy)
     showSuccess(message, projectPath = null, elabFTWUrl = null) {
         const links = [];
         if (elabFTWUrl) {
@@ -410,10 +699,8 @@ const projectManager = {
             infoDiv.textContent = message;
             infoDiv.style.display = 'block';
             
-            // Hide other messages
             this.hideOtherMessages('infoMessage');
             
-            // Auto-hide after 4 seconds
             setTimeout(() => {
                 infoDiv.style.display = 'none';
             }, 4000);
@@ -431,7 +718,7 @@ const projectManager = {
         });
     },
 
-    // Hide other messages except the specified one
+    // Hide other messages
     hideOtherMessages(keepVisible) {
         const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
         messageIds.forEach(id => {
@@ -457,9 +744,276 @@ const projectManager = {
         }
     },
 
-    // Open elabFTW experiment in browser (LEGACY - kept for backward compatibility)
+    // Legacy method
     async openElabFTWExperiment(url) {
         return this.openExternalLink(url);
+    },
+
+    // =================== METADATA LINKS MANAGEMENT ===================
+    
+    async handleEnhancedMetadataUpload(originalMetadata, projectPath, uploadResults) {
+        console.log('🔗 projectManager: Starting enhanced metadata upload with integration links');
+        
+        try {
+            if (!window.metadataLinksManager || !window.metadataLinksManager.shouldAddIntegrationInfo(uploadResults.elabftw, uploadResults.omero)) {
+                console.log('🔗 projectManager: No successful uploads to process - skipping enhanced upload');
+                return;
+            }
+            
+            const enhancedMetadata = await window.metadataLinksManager.addIntegrationInfo(
+                originalMetadata,
+                projectPath,
+                uploadResults.elabftw,
+                uploadResults.omero
+            );
+            
+            const integrationFields = window.metadataLinksManager.createIntegrationFields(
+                enhancedMetadata.metafold_integration
+            );
+            
+            await this.uploadIntegrationFieldsToExternalServices(integrationFields, uploadResults);
+            
+            console.log('✅ projectManager: Enhanced metadata upload completed successfully');
+            
+        } catch (error) {
+            console.error('❌ projectManager: Error in enhanced metadata upload:', error);
+        }
+    },
+    
+    async uploadIntegrationFieldsToExternalServices(integrationFields, uploadResults) {
+        console.log('🔄 projectManager: Uploading integration fields to external services');
+        console.log(`🔄 projectManager: ${Object.keys(integrationFields).length} integration fields to upload`);
+        
+        // Upload to elabFTW if successful
+        if (uploadResults.elabftw && uploadResults.elabftw.success && (uploadResults.elabftw.experimentId || uploadResults.elabftw.id)) {
+            console.log('🧪 projectManager: Adding integration fields to elabFTW experiment');
+            
+            try {
+                const experimentId = uploadResults.elabftw.experimentId || uploadResults.elabftw.id;
+                await this.addIntegrationFieldsToElabFTW(experimentId, integrationFields);
+                console.log('✅ projectManager: Integration fields added to elabFTW successfully');
+            } catch (error) {
+                console.error('❌ projectManager: Error adding integration fields to elabFTW:', error);
+            }
+        }
+        
+        // Upload to OMERO if successful
+        if (uploadResults.omero && uploadResults.omero.success && uploadResults.omero.dataset?.id) {
+            console.log('🔬 projectManager: Adding integration fields to OMERO dataset');
+            
+            try {
+                await this.addIntegrationFieldsToOMERO(uploadResults.omero.dataset.id, integrationFields);
+                console.log('✅ projectManager: Integration fields added to OMERO successfully');
+            } catch (error) {
+                console.error('❌ projectManager: Error adding integration fields to OMERO:', error);
+            }
+        }
+    },
+    
+    async addIntegrationFieldsToElabFTW(experimentId, integrationFields) {
+        console.log(`🧪 projectManager: Adding integration fields to elabFTW experiment ${experimentId}`);
+        
+        if (!window.settingsManager || typeof window.settingsManager.updateExistingElabFTWExperiment !== 'function') {
+            throw new Error('settingsManager.updateExistingElabFTWExperiment not available');
+        }
+        
+        try {
+            const result = await window.settingsManager.updateExistingElabFTWExperiment(
+                experimentId,
+                integrationFields
+            );
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to update elabFTW experiment');
+            }
+            
+            console.log('✅ projectManager: Integration fields successfully added to elabFTW');
+            return result;
+            
+        } catch (error) {
+            console.error('❌ projectManager: Error in addIntegrationFieldsToElabFTW:', error);
+            throw error;
+        }
+    },
+
+    async addIntegrationFieldsToOMERO(datasetId, integrationFields) {
+        console.log(`🔬 projectManager: Adding enhanced integration fields to OMERO dataset ${datasetId}`);
+        
+        // FIX: Check format of integrationFields
+        console.log('🔍 Integration fields type:', typeof integrationFields);
+        console.log('🔍 Integration fields keys:', Object.keys(integrationFields));
+        
+        if (!window.omeroAnnotations || typeof window.omeroAnnotations.convertIntegrationLinksToKeyValue !== 'function') {
+            console.warn('⚠️ Phase 2 integration links method not available, using fallback');
+            // Fallback to old method
+            if (window.metaFoldOMEROIntegration && typeof window.metaFoldOMEROIntegration.addWorkingMapAnnotations === 'function') {
+                const mapAnnotationData = this.convertIntegrationFieldsToOMEROFormat(integrationFields);
+                return await window.metaFoldOMEROIntegration.addWorkingMapAnnotations(
+                    datasetId,
+                    mapAnnotationData,
+                    'NFDI4BioImage.MetaFold.IntegrationLinks'
+                );
+            } else {
+                throw new Error('No integration fields method available');
+            }
+        }
+        
+        try {
+            // Phase 2: Use new Key-Value integration links method
+            console.log('🔗 Using Phase 2 Key-Value integration links method...');
+            
+            // FIX: Convert integration fields to the format expected by Phase 2 method
+            const integrationData = {};
+            
+            // FIX: Use Object.entries instead of forEach (integrationFields is Object, not Array)
+            Object.entries(integrationFields).forEach(([fieldName, fieldData]) => {
+                let key = fieldName.toLowerCase().replace(/\s+/g, '_');
+                let value = fieldData.value || fieldData;
+                
+                // Convert common field names to standard integration data keys
+                if (fieldName.includes('Path') || fieldName.includes('path')) {
+                    key = 'project_local_path';
+                } else if (fieldName.includes('Created') || fieldName.includes('timestamp')) {
+                    key = 'metafold_export_timestamp';  
+                } else if (fieldName.includes('OMERO') && fieldName.includes('Link')) {
+                    key = 'omero_link';
+                } else if (fieldName.includes('elabFTW') || fieldName.includes('elab')) {
+                    key = 'elabftw_link';
+                }
+                
+                integrationData[key] = value;
+                console.log(`🔗 Mapped: ${fieldName} → ${key} = "${value}"`);
+            });
+            
+            console.log('🔗 Integration data prepared:', integrationData);
+            
+            // Use Phase 2 conversion method  
+            const keyValuePairs = window.omeroAnnotations.convertIntegrationLinksToKeyValue(integrationData);
+            
+            if (keyValuePairs.length > 0) {
+                // Create annotation using Phase 2 method
+                const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
+                
+                if (result.success) {
+                    console.log('✅ projectManager: Enhanced integration fields successfully added to OMERO');
+                    return {
+                        success: true,
+                        message: `Added ${keyValuePairs.length} integration links as clean key-value pairs`,
+                        keyValuePairs: keyValuePairs.length,
+                        annotationId: result.annotationId,
+                        method: 'phase2_key_value'
+                    };
+                } else {
+                    throw new Error(result.error || 'Failed to create key-value annotation');
+                }
+            } else {
+                console.warn('⚠️ No key-value pairs generated from integration fields');
+                return {
+                    success: false,
+                    message: 'No valid integration fields to process'
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ projectManager: Error in enhanced addIntegrationFieldsToOMERO:', error);
+            throw error;
+        }
+    },
+    
+    convertIntegrationFieldsToOMEROFormat(integrationFields) {
+        console.log('🔄 projectManager: Converting integration fields to OMERO format');
+        
+        const omeroFormat = {};
+        
+        Object.entries(integrationFields).forEach(([key, field]) => {
+            omeroFormat[key] = {
+                type: field.type || 'text',
+                value: field.value || '',
+                description: field.description || ''
+            };
+        });
+        
+        console.log(`🔄 projectManager: Converted ${Object.keys(omeroFormat).length} fields to OMERO format`);
+        return omeroFormat;
+    },
+    
+    async processIntegrationLinksPostUpload(projectData, projectPath, uploadResults) {
+        console.log('🔗 projectManager: Processing integration links post-upload');
+        
+        try {
+            if (!window.metadataLinksManager) {
+                console.warn('⚠️ projectManager: metadataLinksManager not available - skipping link processing');
+                return;
+            }
+            
+            const hasSuccessfulUploads = window.metadataLinksManager.shouldAddIntegrationInfo(
+                uploadResults.elabftw, 
+                uploadResults.omero
+            );
+            
+            if (!hasSuccessfulUploads) {
+                console.log('🔗 projectManager: No successful uploads - skipping link processing');
+                return;
+            }
+            
+            await this.handleEnhancedMetadataUpload(
+                projectData.metadata,
+                projectPath,
+                uploadResults
+            );
+
+            // 🔗 SIMPLE: Insert links into existing README.html
+        console.log('📄 projectManager: Inserting integration links into existing README...');
+        
+        if (window.electronAPI && window.electronAPI.insertLinksIntoReadme) {
+            try {
+                // Extract URLs from upload results
+                let elabftwUrl = null;
+                let omeroUrl = null;
+                
+                if (uploadResults.elabftw && uploadResults.elabftw.success && uploadResults.elabftw.url) {
+                    elabftwUrl = uploadResults.elabftw.url;
+                }
+                
+                if (uploadResults.omero && uploadResults.omero.success) {
+                    if (uploadResults.omero.dataset && uploadResults.omero.dataset.omeroWebUrl) {
+                        omeroUrl = uploadResults.omero.dataset.omeroWebUrl;
+                    } else if (uploadResults.omero.url) {
+                        omeroUrl = uploadResults.omero.url;
+                    } else if (uploadResults.omero.dataset && uploadResults.omero.dataset.id) {
+                        omeroUrl = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${uploadResults.omero.dataset.id}`;
+                    }
+                }
+                
+                // Insert links if we have any
+                if (elabftwUrl || omeroUrl) {
+                    const insertResult = await window.electronAPI.insertLinksIntoReadme(
+                        projectPath, 
+                        elabftwUrl, 
+                        omeroUrl
+                    );
+                    
+                    if (insertResult.success) {
+                        console.log('✅ projectManager: Integration links inserted into README successfully');
+                    } else {
+                        console.warn('⚠️ projectManager: Failed to insert links into README:', insertResult.message);
+                    }
+                } else {
+                    console.log('📄 projectManager: No integration links to insert');
+                }
+            } catch (linkError) {
+                console.error('❌ projectManager: Error inserting links into README:', linkError);
+            }
+        } else {
+            console.warn('⚠️ projectManager: Link insertion not available - running in browser mode');
+        }
+        
+            
+            console.log('✅ projectManager: Integration links processing completed');
+            
+        } catch (error) {
+            console.error('❌ projectManager: Error processing integration links:', error);
+        }
     }
 };
 

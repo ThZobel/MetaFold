@@ -62,135 +62,71 @@ const omeroUIIntegration = {
     
     // =================== CONNECTION MANAGEMENT ===================
     
-    // FIXED: Enhanced connection test mit async settings
+     /**
+     * Enhanced OMERO Connection Test mit automatischem Proxy-Start
+     * Diese Funktion startet automatisch den Node.js Proxy, falls nötig
+     */
     async testConnection() {
         try {
-            const settings = await this.getSettings(); // ASYNC Settings laden
+            console.log('🔬 Starting enhanced OMERO connection test...');
             
-            if (!settings.serverUrl) {
-                this.updateConnectionStatus('error', 'OMERO server URL not configured');
-                return { 
-                    success: false, 
-                    message: 'OMERO server URL not configured',
-                    details: { needsConfiguration: true }
-                };
-            }
+            // Update UI to show we're starting
+            this.updateConnectionStatus('testing', 'Preparing OMERO connection...');
             
-            console.log('🔬 === OMERO CONNECTION TEST (ASYNC SECURE SETTINGS FIXED) ===');
-            console.log('🔬 Settings loaded:', {
-                serverUrl: settings.serverUrl,
-                hasUsername: !!settings.username,
-                hasPassword: !!settings.password,
-                username: settings.username ? `${settings.username.substring(0, 4)}***` : 'none'
-            });
+            // Step 1: Ensure proxy is running
+            console.log('📋 Step 1: Ensuring OMERO proxy is running...');
+            const proxyResult = await this.ensureProxyIsRunning();
             
-            // Update UI immediately to show testing state
-            this.updateConnectionStatus('testing', 'Testing OMERO connection...');
-            
-            // Step 1: Check proxy server
-            console.log('🔬 Step 1: Checking proxy server...');
-            const proxyCheck = await this.checkProxyServer();
-            if (!proxyCheck.running) {
-                this.updateConnectionStatus('error', `Proxy server not running: ${proxyCheck.error}`);
+            if (!proxyResult.success) {
+                console.error('❌ Failed to start OMERO proxy:', proxyResult.message);
+                this.updateConnectionStatus('error', `Proxy startup failed: ${proxyResult.message}`);
                 return {
                     success: false,
-                    message: `Proxy server not running: ${proxyCheck.error}`,
+                    message: `Failed to start OMERO proxy: ${proxyResult.message}`,
                     details: { 
-                        proxyError: true, 
-                        recommendation: 'Please start omero_proxy.py on localhost:3000' 
+                        step: 'proxy_startup',
+                        error: proxyResult.message,
+                        guidance: 'Check if port 3000 is available or try restarting MetaFold'
                     }
                 };
             }
             
-            // Step 2: Initialize client
-            console.log('🔬 Step 2: Initializing client via proxy...');
+            console.log('✅ OMERO proxy is running:', proxyResult.proxyUrl);
+            this.updateConnectionStatus('testing', 'OMERO proxy started, testing connection...');
+            
+            // Step 2: Initialize client with proxy
+            console.log('📋 Step 2: Initializing OMERO client...');
             await this.initializeClient();
             
-            // Step 3: Test connection
-            console.log('🔬 Step 3: Testing OMERO connection via proxy...');
-            const connectionResult = await window.omeroAPI.testConnectionEnhanced();
+            // Step 3: Test authentication
+            console.log('📋 Step 3: Testing OMERO authentication...');
+            const authResult = await this.performAuthenticationTest();
             
-            if (!connectionResult.success) {
-                this.updateConnectionStatus('error', `Connection test failed: ${connectionResult.message}`);
-                return {
-                    success: false,
-                    message: `Proxy connection test failed: ${connectionResult.message}`,
-                    details: connectionResult
-                };
-            }
-            
-            // Step 4: Try to establish session mit korrekten credentials
-            let loginResult = null;
-            let authMethod = 'none';
-            
-            this.updateConnectionStatus('testing', 'Establishing OMERO session...');
-            
-            // Strategy 1: Username/Password mit KORREKT entschlüsselten Credentials
-            if (settings.username && settings.password) {
-                console.log('🔬 Step 4a: Trying username/password authentication...');
-                console.log('🔬 Decrypted username:', settings.username);
-                console.log('🔬 Has password:', !!settings.password);
-                
-                try {
-                    // FIXED: Übergebe entschlüsselte Strings, nicht Promises/Objects
-                    loginResult = await window.omeroAuth.loginWithCredentials(
-                        settings.username,  // Bereits entschlüsselter String
-                        settings.password   // Bereits entschlüsselter String  
-                    );
-                    authMethod = 'Username/Password';
-                    console.log('✅ Username/password authentication successful');
-                } catch (credError) {
-                    console.warn('⚠️ Username/password authentication failed:', credError.message);
-                }
-            }
-            
-            // Strategy 2: Public group fallback
-            if (!loginResult) {
-                console.log('🔬 Step 4b: Trying public group access...');
-                try {
-                    loginResult = await window.omeroAuth.loginPublicGroup();
-                    authMethod = 'Public Group';
-                    console.log('✅ Public group access successful');
-                } catch (publicError) {
-                    console.warn('⚠️ Public group access failed:', publicError.message);
-                }
-            }
-            
-            // Update visual status based on results
-            if (loginResult && loginResult.success) {
-                const statusMessage = `Connected via ${authMethod} (${loginResult.projectCount || 0} projects)`;
-                this.updateConnectionStatus('connected', statusMessage, {
-                    authMethod: authMethod,
-                    projectCount: loginResult.projectCount || 0,
-                    isAuthenticated: loginResult.session?.isAuthenticated || false,
-                    isPublicGroup: loginResult.isPublicGroup || false
-                });
+            if (authResult.success) {
+                console.log('✅ OMERO connection test successful!');
+                this.updateConnectionStatus('connected', 'OMERO connection successful!');
                 
                 return {
                     success: true,
-                    message: `Successfully connected via proxy to ${settings.serverUrl} using ${loginResult.loginMethod}`,
+                    message: 'OMERO connection established successfully',
                     details: {
-                        proxyUrl: this.getProxyUrl(),
-                        targetServer: settings.serverUrl,
-                        loginMethod: loginResult.loginMethod,
-                        authMethod: authMethod,
-                        projectCount: loginResult.projectCount || 0,
-                        isAuthenticated: loginResult.session?.isAuthenticated || false,
-                        isPublicGroup: loginResult.isPublicGroup || false,
-                        sessionValid: window.omeroAuth.isSessionValid()
+                        proxyUrl: proxyResult.proxyUrl,
+                        omeroServer: authResult.serverInfo?.server_url || 'Unknown',
+                        userId: authResult.userInfo?.id || 'Unknown',
+                        userName: authResult.userInfo?.omeName || 'Unknown'
                     }
                 };
             } else {
-                this.updateConnectionStatus('error', 'All authentication strategies failed');
+                console.error('❌ OMERO authentication failed:', authResult.message);
+                this.updateConnectionStatus('error', `Authentication failed: ${authResult.message}`);
+                
                 return {
                     success: false,
-                    message: 'All authentication strategies failed via proxy',
+                    message: `OMERO authentication failed: ${authResult.message}`,
                     details: {
-                        proxyUrl: this.getProxyUrl(),
-                        targetServer: settings.serverUrl,
-                        connectionTest: connectionResult,
-                        triedStrategies: ['username-password', 'public-group'],
-                        recommendation: 'Check credentials or verify public group access'
+                        step: 'authentication',
+                        error: authResult.message,
+                        guidance: authResult.guidance || 'Check your OMERO credentials in settings'
                     }
                 };
             }
@@ -198,13 +134,13 @@ const omeroUIIntegration = {
         } catch (error) {
             console.error('❌ OMERO connection test failed:', error);
             
-            let guidance = 'Check console for detailed error information.';
+            let guidance = 'Check console for detailed error information';
             if (error.message.includes('Proxy server not running')) {
-                guidance = 'Start the proxy server with: python omero_proxy.py';
+                guidance = 'OMERO proxy failed to start. Check if port 3000 is available.';
             } else if (error.message.includes('not initialized')) {
-                guidance = 'OMERO client initialization failed. Check if omeroAuth.js is loaded.';
+                guidance = 'OMERO client initialization failed. Try refreshing the page.';
             } else if (error.message.includes('fetch')) {
-                guidance = 'Network error. Ensure proxy server is running on localhost:3000';
+                guidance = 'Network error. Check your internet connection and OMERO server availability.';
             }
             
             this.updateConnectionStatus('error', `Connection error: ${error.message}`);
@@ -216,11 +152,292 @@ const omeroUIIntegration = {
             };
         }
     },
-    
-    // Get proxy URL for OMERO server access
-    getProxyUrl() {
-        return 'http://localhost:3000/omero-api';
+
+     /**
+     * Ensure OMERO Proxy is Running
+     * Smart proxy startup mit aktuellen Settings
+     */
+    async ensureProxyIsRunning() {
+        try {
+            console.log('🔍 Checking OMERO proxy status...');
+            
+            // Method 1: Try using Electron API if available
+            if (window.electronAPI && window.electronAPI.ensureOMEROProxyRunning) {
+                console.log('📱 Using Electron API for proxy management');
+                
+                // Get current OMERO settings for proxy
+                const settings = await this.getSettings();
+                const proxySettings = {
+                    serverUrl: settings.serverUrl || 'https://omero-imaging.uni-muenster.de',
+                    proxyPort: settings.proxyPort || 3000,
+                    autoStart: true
+                };
+                
+                console.log('⚙️ Starting proxy with settings:', proxySettings);
+                const result = await window.electronAPI.ensureOMEROProxyRunning(proxySettings);
+                
+                if (result.success) {
+                    console.log('✅ OMERO proxy is running via Electron API');
+                    return {
+                        success: true,
+                        proxyUrl: result.proxyUrl,
+                        port: result.port,
+                        method: 'electron_builtin',
+                        wasAlreadyRunning: result.wasAlreadyRunning
+                    };
+                } else {
+                    console.warn('⚠️ Electron proxy startup failed, trying fallback methods...');
+                }
+            }
+            
+            // Method 2: Check if external Python proxy is running
+            console.log('🔍 Checking for external Python proxy...');
+            const externalProxyResult = await this.checkExternalProxy();
+            
+            if (externalProxyResult.running) {
+                console.log('✅ External Python proxy detected and running');
+                return {
+                    success: true,
+                    proxyUrl: externalProxyResult.proxyUrl,
+                    port: externalProxyResult.port,
+                    method: 'external_python',
+                    wasAlreadyRunning: true
+                };
+            }
+            
+            // Method 3: No proxy available
+            console.error('❌ No OMERO proxy available');
+            return {
+                success: false,
+                message: 'No OMERO proxy server available. Neither built-in nor external proxy is running.',
+                suggestions: [
+                    'If using MetaFold desktop app: Restart the application',
+                    'If using browser: Start the Python proxy with: python omero_proxy.py',
+                    'Check if port 3000 is available and not blocked by firewall'
+                ]
+            };
+            
+        } catch (error) {
+            console.error('❌ Error ensuring OMERO proxy is running:', error);
+            return {
+                success: false,
+                message: `Failed to start OMERO proxy: ${error.message}`,
+                error: error.message
+            };
+        }
     },
+
+    /**
+     * Check External Python Proxy
+     * Erweiterte Prüfung für externe Python Proxys mit besserer Fehlerbehandlung
+     */
+    async checkExternalProxy() {
+        try {
+            console.log('🔍 Checking external Python proxy on localhost:3000...');
+            
+            // Try multiple endpoints to be thorough
+            const endpoints = [
+                'http://localhost:3000/proxy-status',
+                'http://localhost:3000/omero-api/',
+                'http://localhost:3000/'
+            ];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`🔗 Testing endpoint: ${endpoint}`);
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'GET',
+                        mode: 'cors',
+                        timeout: 3000 // 3 second timeout
+                    });
+                    
+                    if (response.ok) {
+                        console.log(`✅ External proxy responding on: ${endpoint}`);
+                        
+                        // Try to get detailed status if available
+                        let proxyInfo = { type: 'external_python' };
+                        if (endpoint.includes('proxy-status')) {
+                            try {
+                                proxyInfo = await response.json();
+                            } catch (e) {
+                                // Ignore JSON parse errors
+                            }
+                        }
+                        
+                        return {
+                            running: true,
+                            proxyUrl: 'http://localhost:3000/omero-api',
+                            port: 3000,
+                            endpoint: endpoint,
+                            proxyInfo: proxyInfo
+                        };
+                    }
+                } catch (fetchError) {
+                    console.log(`❌ Endpoint ${endpoint} failed:`, fetchError.message);
+                    continue; // Try next endpoint
+                }
+            }
+            
+            console.log('❌ No external proxy detected on any endpoint');
+            return {
+                running: false,
+                error: 'No external Python proxy detected on localhost:3000',
+                testedEndpoints: endpoints
+            };
+            
+        } catch (error) {
+            console.error('❌ Error checking external proxy:', error);
+            return {
+                running: false,
+                error: `Failed to check external proxy: ${error.message}`
+            };
+        }
+    },
+
+     /**
+     * Perform OMERO Authentication Test - FINAL CORRECTED VERSION
+     * Testet die OMERO-Authentifizierung nach erfolgreichem Proxy-Start
+     */
+    async performAuthenticationTest() {
+        try {
+            console.log('🔐 Starting OMERO authentication test...');
+            
+            // Initialize OMERO client if not already done
+            if (!window.omeroAPI || !window.omeroAPI.initialized) {
+                console.log('🔧 OMERO API not initialized, initializing now...');
+                await this.initializeClient();
+            }
+            
+            // Get settings (includes credentials) - CORRECTED METHOD
+            console.log('🔑 Getting OMERO settings with credentials...');
+            const settings = await this.getSettings();
+            
+            if (!settings.username || !settings.password) {
+                return {
+                    success: false,
+                    message: 'OMERO credentials not configured',
+                    guidance: 'Please configure your OMERO credentials in settings'
+                };
+            }
+            
+            console.log('🔑 Credentials loaded from settings:', {
+                username: settings.username.substring(0, 4) + '***',
+                hasPassword: !!settings.password,
+                serverUrl: settings.serverUrl
+            });
+            
+            // Test login using credentials from settings
+            console.log('🔐 Testing OMERO login...');
+            const loginResult = await window.omeroAuth.loginWithCredentials(
+                settings.username,
+                settings.password
+            );
+            
+            if (loginResult && loginResult.success) {
+                console.log('✅ OMERO authentication successful');
+                console.log('🎯 Login method used:', loginResult.loginMethod || 'credentials');
+                
+                // Get user and server info (if available)
+                let userInfo = null;
+                let serverInfo = null;
+                
+                try {
+                    if (window.omeroAPI && window.omeroAPI.getCurrentUser) {
+                        userInfo = await window.omeroAPI.getCurrentUser();
+                        console.log('👤 User info retrieved:', userInfo?.omeName || 'Unknown');
+                    }
+                    if (window.omeroAPI && window.omeroAPI.getServerInfo) {
+                        serverInfo = await window.omeroAPI.getServerInfo();
+                        console.log('🔬 Server info retrieved:', serverInfo?.server_url || 'Unknown');
+                    }
+                } catch (infoError) {
+                    console.warn('⚠️ Could not get user/server info:', infoError.message);
+                    // Not critical, continue without info
+                }
+                
+                return {
+                    success: true,
+                    message: 'OMERO authentication successful',
+                    userInfo: userInfo,
+                    serverInfo: serverInfo,
+                    loginMethod: loginResult.loginMethod || 'credentials',
+                    serverUrl: settings.serverUrl
+                };
+            } else {
+                console.error('❌ OMERO authentication failed:', loginResult?.message || 'Unknown error');
+                
+                let guidance = 'Check your OMERO credentials in settings';
+                const errorMessage = loginResult?.message || '';
+                
+                if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+                    guidance = 'Invalid username or password. Check your OMERO credentials in settings.';
+                } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+                    guidance = 'OMERO server error. Try again later or contact your OMERO administrator.';
+                } else if (errorMessage.includes('csrf') || errorMessage.includes('CSRF')) {
+                    guidance = 'CSRF token issue. Try refreshing the page and logging in again.';
+                } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+                    guidance = 'Network timeout. Check your internet connection and try again.';
+                } else if (errorMessage.includes('proxy')) {
+                    guidance = 'Proxy connection issue. The proxy is running but OMERO server may be unreachable.';
+                }
+                
+                return {
+                    success: false,
+                    message: loginResult?.message || 'OMERO authentication failed',
+                    guidance: guidance,
+                    serverUrl: settings.serverUrl
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Authentication test error:', error);
+            
+            let guidance = 'Check console for detailed error information';
+            if (error.message.includes('credentials not configured')) {
+                guidance = 'Configure your OMERO username and password in settings';
+            } else if (error.message.includes('proxy')) {
+                guidance = 'OMERO proxy connection issue. Try restarting MetaFold.';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                guidance = 'Network error. Check your internet connection.';
+            } else if (error.message.includes('settings')) {
+                guidance = 'Settings loading error. Try refreshing the page.';
+            }
+            
+            return {
+                success: false,
+                message: `Authentication test failed: ${error.message}`,
+                guidance: guidance
+            };
+        }
+    },
+
+    /**
+     * Get Proxy URL - Enhanced version with smart detection
+     * Erkennt automatisch ob Electron oder External Proxy verwendet wird
+     */
+    getProxyUrl() {
+        // Method 1: Try to get URL from Electron API if available
+        if (window.electronAPI && window.electronAPI.getOMEROProxyURL) {
+            return window.electronAPI.getOMEROProxyURL().then(url => {
+                if (url) {
+                    console.log('🔗 Using Electron built-in proxy URL:', url);
+                    return url;
+                } else {
+                    console.log('🔗 Electron proxy not running, falling back to external proxy');
+                    return 'http://localhost:3000/omero-api';
+                }
+            }).catch(() => {
+                console.log('🔗 Electron API failed, using fallback proxy URL');
+                return 'http://localhost:3000/omero-api';
+            });
+        }
+        
+        // Method 2: Fallback to standard external proxy URL
+        console.log('🔗 Using standard external proxy URL');
+        return Promise.resolve('http://localhost:3000/omero-api');
+    },
+
     
     // Check if proxy server is running
     async checkProxyServer() {
@@ -253,67 +470,219 @@ const omeroUIIntegration = {
     
     // Initialize client with proxy URL - ASYNC
     async initializeClient() {
-        const settings = await this.getSettings(); // ASYNC Settings laden
+        console.log('🔧 Initializing OMERO client (Enhanced Version)...');
         
-        if (!settings.serverUrl) {
-            throw new Error('OMERO server URL not configured in settings');
+        try {
+            // NEW: Get current proxy URL dynamically
+            let proxyUrl;
+            try {
+                proxyUrl = await this.getProxyUrl();
+                console.log('🔗 Using proxy URL for client initialization:', proxyUrl);
+            } catch (error) {
+                console.warn('⚠️ Failed to get proxy URL, using default:', error);
+                proxyUrl = 'http://localhost:3000/omero-api';
+            }
+            
+            // Get settings (original logic)
+            const settings = await this.getSettings();
+            
+            if (!settings.serverUrl) {
+                throw new Error('OMERO server URL not configured in settings');
+            }
+            
+            console.log('⚙️ OMERO Settings:', {
+                serverUrl: settings.serverUrl,
+                hasUsername: !!settings.username,
+                hasPassword: !!settings.password,
+                proxyUrl: proxyUrl
+            });
+            
+            // Enhanced proxy check with retry logic (NEW)
+            const maxRetries = 3;
+            let proxyRunning = false;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                console.log(`🔍 Checking proxy availability (attempt ${attempt}/${maxRetries})...`);
+                
+                try {
+                    const response = await fetch(`${proxyUrl.replace('/omero-api', '')}/proxy-status`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        timeout: 2000
+                    });
+                    
+                    if (response.ok) {
+                        proxyRunning = true;
+                        const proxyStatus = await response.json();
+                        console.log('✅ Proxy is running and responding:', proxyStatus.proxy_running ? 'Yes' : 'No');
+                        break;
+                    }
+                } catch (error) {
+                    console.log(`❌ Proxy check attempt ${attempt} failed:`, error.message);
+                    if (attempt < maxRetries) {
+                        console.log('⏳ Waiting 1 second before retry...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+            
+            if (!proxyRunning) {
+                throw new Error(`Proxy server not running after ${maxRetries} attempts. ` +
+                            'Please ensure the OMERO proxy is started.');
+            }
+            
+            // Initialize OMERO Auth (original logic - the correct way!)
+            console.log('🔧 Initializing OMERO authentication system with proxy:', proxyUrl);
+            console.log('🔬 Target OMERO server (via proxy):', settings.serverUrl);
+            
+            // This is the CORRECT initialization call (from original code)
+            window.omeroAuth.init(proxyUrl, {
+                verifySSL: settings.verifySSL || false
+            });
+            
+            // Ensure OMERO API is initialized (if it has an init method)
+            if (window.omeroAPI && window.omeroAPI.init && !window.omeroAPI.initialized) {
+                console.log('🔬 Initializing OMERO API module...');
+                window.omeroAPI.init();
+            }
+            
+            console.log('✅ OMERO client initialized successfully');
+            return window.omeroAuth;
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize OMERO client:', error);
+            throw new Error(`OMERO client initialization failed: ${error.message}`);
         }
-        
-        // Check proxy server first
-        const proxyCheck = await this.checkProxyServer();
-        if (!proxyCheck.running) {
-            throw new Error(`Proxy server not running: ${proxyCheck.error}. Please start omero_proxy.py`);
-        }
-        
-        // Initialize client with PROXY URL
-        const proxyUrl = this.getProxyUrl();
-        console.log('🔬 Initializing OMERO client via proxy:', proxyUrl);
-        console.log('🔬 Target OMERO server (via proxy):', settings.serverUrl);
-        
-        window.omeroAuth.init(proxyUrl, {
-            verifySSL: settings.verifySSL
-        });
-        
-        return window.omeroAuth;
     },
     
     // =================== VISUAL STATUS UPDATES ===================
     
     // Update connection status with visual feedback
     updateConnectionStatus(status, message, details = {}) {
-        // Update status icon and text
-        const statusIcon = document.getElementById('omeroStatusIcon');
-        const statusText = document.getElementById('omeroStatusText');
-        
-        if (statusIcon && statusText) {
-            switch (status) {
-                case 'testing':
-                    statusIcon.textContent = '🔄';
-                    statusText.textContent = message;
-                    statusText.style.color = '#0369a1';
-                    break;
-                case 'connected':
-                    statusIcon.textContent = details.isAuthenticated ? '🔐' : '🌐';
-                    statusText.textContent = message;
-                    statusText.style.color = '#059669';
-                    break;
-                case 'error':
-                    statusIcon.textContent = '❌';
-                    statusText.textContent = message;
-                    statusText.style.color = '#dc2626';
-                    break;
-                case 'disabled':
-                    statusIcon.textContent = '⚫';
-                    statusText.textContent = 'OMERO: Disabled';
-                    statusText.style.color = '#6b7280';
-                    break;
-                default:
-                    statusIcon.textContent = '❓';
-                    statusText.textContent = message || 'OMERO: Unknown status';
-                    statusText.style.color = '#6b7280';
+            // Update status icon and text (existing code)
+            const statusIcon = document.getElementById('omeroStatusIcon');
+            const statusText = document.getElementById('omeroStatusText');
+            
+            if (statusIcon && statusText) {
+                switch (status) {
+                    case 'testing':
+                        statusIcon.textContent = '🔄';
+                        statusText.textContent = message;
+                        statusText.style.color = '#0369a1';
+                        break;
+                    case 'connected':
+                        statusIcon.textContent = details.isAuthenticated ? '🔐' : '🌐';
+                        statusText.textContent = message;
+                        statusText.style.color = '#059669';
+                        
+                        // NEW: Show logout button when connected
+                        this.showLogoutButton();
+                        break;
+                    case 'error':
+                        statusIcon.textContent = '❌';
+                        statusText.textContent = message;
+                        statusText.style.color = '#dc2626';
+                        break;
+                    case 'disabled':
+                        statusIcon.textContent = '⚫';
+                        statusText.textContent = 'OMERO: Disabled';
+                        statusText.style.color = '#6b7280';
+                        break;
+                    case 'disconnected':
+                        statusIcon.textContent = '⚪';
+                        statusText.textContent = message || 'Disconnected from OMERO';
+                        statusText.style.color = '#6b7280';
+                        
+                        // NEW: Hide logout button when disconnected
+                        const logoutButton = document.getElementById('omeroLogoutButton');
+                        if (logoutButton) {
+                            logoutButton.style.display = 'none';
+                        }
+                        break;
+                    default:
+                        statusIcon.textContent = '❓';
+                        statusText.textContent = message || 'OMERO: Unknown status';
+                        statusText.style.color = '#6b7280';
+                }
             }
-        }
-    },
+            
+            // NEW: Also update the connect button state
+            this.updateConnectButtonState(status, details);
+        },
+
+         // Update connect button state and logout button visibility
+        updateConnectButtonState(status, details = {}) {
+            const connectButton = document.getElementById('omeroConnectButton');
+            const connectIcon = document.getElementById('omeroConnectIcon');
+            const connectText = document.getElementById('omeroConnectText');
+            const logoutButton = document.getElementById('omeroLogoutButton');
+            
+            if (!connectButton || !connectIcon || !connectText) return;
+            
+            switch (status) {
+                case 'connected':
+                    // Green connected state
+                    connectButton.style.background = 'linear-gradient(45deg, #059669, #047857)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(5, 150, 105, 0.3)';
+                    connectIcon.textContent = '✅';
+                    connectText.textContent = 'Connected';
+                    connectButton.disabled = false;
+                    
+                    // Show logout button
+                    if (logoutButton) {
+                        logoutButton.style.display = 'inline-block';
+                    }
+                    break;
+                    
+                case 'testing':
+                    // Testing state
+                    connectButton.style.background = 'linear-gradient(45deg, #6b7280, #4b5563)';
+                    connectIcon.textContent = '⏳';
+                    connectText.textContent = 'Connecting...';
+                    connectButton.disabled = true;
+                    
+                    // Hide logout button during testing
+                    if (logoutButton) {
+                        logoutButton.style.display = 'none';
+                    }
+                    break;
+                    
+                case 'error':
+                    // Error state (temporary)
+                    connectButton.style.background = 'linear-gradient(45deg, #dc2626, #b91c1c)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.3)';
+                    connectIcon.textContent = '❌';
+                    connectText.textContent = 'Connection Failed';
+                    connectButton.disabled = false;
+                    
+                    // Hide logout button on error
+                    if (logoutButton) {
+                        logoutButton.style.display = 'none';
+                    }
+                    
+                    // Auto-reset to default after 3 seconds
+                    setTimeout(() => {
+                        this.updateConnectButtonState('default');
+                    }, 3000);
+                    break;
+                    
+                case 'disconnected':
+                case 'default':
+                default:
+                    // Default orange state
+                    connectButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.3)';
+                    connectIcon.textContent = '🔗';
+                    connectText.textContent = 'Connect to OMERO';
+                    connectButton.disabled = false;
+                    
+                    // Hide logout button in default state
+                    if (logoutButton) {
+                        logoutButton.style.display = 'none';
+                    }
+                    break;
+            }
+        },
     
     // Get status for UI display - ASYNC
     async getStatus() {
@@ -384,6 +753,87 @@ const omeroUIIntegration = {
         }
     },
     
+    // ===OMERO Logout =====
+    /**
+     * Ultra simple OMERO logout - no server requests, just local cleanup
+     * Based on console tests: server logout fails with 404, local cleanup always works
+     */
+    async logout() {
+        console.log('🔬 OMERO logout...');
+        
+        // Check if session exists
+        if (!window.omeroAuth?.session) {
+            console.log('ℹ️ No active session');
+            this.resetUIAfterLogout();
+            return { success: true, message: 'No active session' };
+        }
+        
+        // Simple local cleanup (always works based on tests)
+        window.omeroAuth.session = null;
+        
+        // Clear caches (optional)
+        if (window.omeroGroups?.clearCache) window.omeroGroups.clearCache();
+        if (window.omeroProjects?.clearCache) window.omeroProjects.clearCache();
+        
+        // Reset UI
+        this.resetUIAfterLogout();
+        
+        console.log('✅ OMERO logout successful');
+        return { success: true, message: 'Logged out successfully' };
+    },
+    
+        /**
+         * Reset UI to logged out state
+         */
+        resetUIAfterLogout() {
+            // Update status
+            this.updateStatusDisplay('disconnected', 'Logged out from OMERO');
+            
+            // Reset connect button to original state
+            const connectButton = document.getElementById('omeroConnectButton');
+            const connectIcon = document.getElementById('omeroConnectIcon');
+            const connectText = document.getElementById('omeroConnectText');
+            
+            if (connectButton) {
+                connectButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
+                connectButton.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.3)';
+                connectButton.disabled = false;
+            }
+            
+            if (connectIcon) connectIcon.textContent = '🔗';
+            if (connectText) connectText.textContent = 'Connect to OMERO';
+            
+            // Hide the minimal logout button
+            const logoutButton = document.getElementById('omeroLogoutButton');
+            if (logoutButton) {
+                logoutButton.style.display = 'none';
+            }
+            
+            // Clear dropdowns
+            const groupSelect = document.getElementById('omeroGroupSelect');
+            const projectSelect = document.getElementById('omeroProjectSelect');
+            if (groupSelect) groupSelect.innerHTML = '<option value="">Select Group...</option>';
+            if (projectSelect) projectSelect.innerHTML = '<option value="">Select Project...</option>';
+            
+            // Update status text to original state
+            const statusText = document.getElementById('omeroStatusText');
+            if (statusText) {
+                statusText.textContent = 'Not connected';
+                statusText.style.color = '#6b7280';
+                statusText.style.fontStyle = 'italic';
+                statusText.style.fontWeight = 'normal';
+            }
+        },
+
+        // Show logout button when connected
+        showLogoutButton() {
+            const logoutButton = document.getElementById('omeroLogoutButton');
+            if (logoutButton) {
+                logoutButton.style.display = 'inline-block';
+                console.log('✅ Logout button shown');
+            }
+        },
+
     // Update status display (called from HTML) - ASYNC
     async updateStatusDisplay() {
         try {

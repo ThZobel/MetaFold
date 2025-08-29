@@ -3,6 +3,7 @@
 const templateTypeManager = {
     currentType: 'folders', // 'folders' or 'experiments'
 
+
     // Switch template type
     switchType(type) {
         if (type !== 'folders' && type !== 'experiments') {
@@ -10,26 +11,31 @@ const templateTypeManager = {
             return;
         }
 
+        console.log(`🔧 Switching template type: ${this.currentType} → ${type}`);
+        
         this.currentType = type;
         this.updateUI();
         
-        // Re-render template list
-        if (window.templateManager && window.templateManager.renderList) {
-            window.templateManager.renderList();
-        }
-
-        // Hide template details when switching
-        const templateDetails = document.getElementById('templateDetails');
-        if (templateDetails) {
-            templateDetails.style.display = 'none';
-        }
-
-        // Clear current template selection
+        // IMPORTANT: Prevent automatic template creation
         if (window.templateManager) {
+            // Clear current template selection SAFELY
             window.templateManager.currentTemplate = null;
+            window.templateManager.selectedIndex = -1;
+            
+            // Clear experiment form to prevent auto-rendering with undefined template
+            const experimentFields = document.getElementById('experimentFields');
+            if (experimentFields) {
+                experimentFields.innerHTML = '';
+            }
+            
+            // Clear template info display
+            const templateInfo = document.getElementById('templateInfo');
+            if (templateInfo) {
+                templateInfo.textContent = 'No template selected';
+                templateInfo.className = 'template-info';
+            }
             
             // CRITICAL FIX: Update search index when switching type
-            // This is what was missing!
             console.log('🔧 Fixing search index for type switch to:', type);
             
             // Clear all caches - exactly like the manual fix
@@ -46,6 +52,9 @@ const templateTypeManager = {
                 window.templateManager.clearSearch();
             }
             
+            // Re-render template list FIRST (before rebuilding index)
+            window.templateManager.renderList();
+            
             // Rebuild index after a delay - exactly like the manual fix
             setTimeout(() => {
                 console.log('🔧 Rebuilding search index for:', type);
@@ -58,13 +67,21 @@ const templateTypeManager = {
                 // Re-render with updated index
                 window.templateManager.renderList();
                 window.templateManager.updateSharedToggleVisibility();
+                window.templateManager.updateTemplateInfo();
             }, 100);
+        }
+
+        // Hide template details when switching
+        const templateDetails = document.getElementById('templateDetails');
+        if (templateDetails) {
+            templateDetails.style.display = 'none';
         }
 
         // Update integration options visibility - ASYNC VERSION
         this.updateIntegrationVisibility();
+        
+        console.log(`✅ Template type switched to: ${type}`);
     },
-
     // Update UI to reflect current type
     updateUI() {
         // Update button states

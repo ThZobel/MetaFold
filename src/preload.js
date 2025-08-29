@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Secure API for renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
-    // =================== EXISTING APIS ===================
+    // =================== EXISTING APIS - PRESERVED EXACTLY ===================
     
     // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
@@ -22,8 +22,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Load JSON file
     loadJsonFile: () => ipcRenderer.invoke('load-json-file'),
     
-    // Save JSON file
-    saveJsonFile: (data) => ipcRenderer.invoke('save-json-file', data),
+    // Save JSON file - DUAL SUPPORT: Original + New Direct API
+    saveJsonFile: (data, filePath = null) => {
+        if (filePath) {
+            // NEW: Direct save to specified path
+            return ipcRenderer.invoke('save-json-file-direct', filePath, data);
+        } else {
+            // ORIGINAL: Show save dialog
+            return ipcRenderer.invoke('save-json-file', data);
+        }
+    },
     
     // Open external URL in default browser
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
@@ -57,6 +65,252 @@ contextBridge.exposeInMainWorld('electronAPI', {
     retrieveSecureCredential: (encryptedData, method = 'safeStorage') => 
         ipcRenderer.invoke('retrieve-secure-credential', encryptedData, method),
     
+    // Template file deletion 
+    deleteTemplateFile: (filePath) => 
+        ipcRenderer.invoke('delete-template-file', filePath),
+
+    // NEW: Storage location information
+    getStorageLocationInfo: () => 
+        ipcRenderer.invoke('get-storage-location-info'),
+
+    
+    // =================== NEUE OMERO PROXY APIS ===================
+    // Fügen Sie diese APIs in die bestehende electronAPI-Objektdefinition ein:
+
+        // =================== OMERO PROXY CONTROL APIS ===================
+        
+        /**
+         * Start OMERO Proxy Server
+         * Startet den integrierten Node.js Proxy für OMERO-Verbindungen
+         * @param {Object} settings - OMERO settings (serverUrl, proxyPort, etc.)
+         * @returns {Promise<Object>} Start result with success status
+         */
+        startOMEROProxy: (settings = {}) => 
+            ipcRenderer.invoke('start-omero-proxy', settings),
+        
+        /**
+         * Stop OMERO Proxy Server
+         * Stoppt den laufenden OMERO Proxy Server
+         * @returns {Promise<Object>} Stop result with success status
+         */
+        stopOMEROProxy: () => 
+            ipcRenderer.invoke('stop-omero-proxy'),
+        
+        /**
+         * Get OMERO Proxy Status
+         * Ruft den aktuellen Status des OMERO Proxy Servers ab
+         * @returns {Promise<Object>} Current proxy status
+         */
+        getOMEROProxyStatus: () => 
+            ipcRenderer.invoke('get-omero-proxy-status'),
+        
+        /**
+         * Restart OMERO Proxy Server
+         * Startet den OMERO Proxy mit neuen Settings neu
+         * @param {Object} settings - Updated OMERO settings
+         * @returns {Promise<Object>} Restart result with success status
+         */
+        restartOMEROProxy: (settings = {}) => 
+            ipcRenderer.invoke('restart-omero-proxy', settings),
+        
+        /**
+         * Check OMERO Proxy Port Availability
+         * Prüft, ob ein Port für den OMERO Proxy verfügbar ist
+         * @param {number} port - Port number to check (default: 3000)
+         * @returns {Promise<Object>} Port availability status
+         */
+        checkOMEROProxyPort: (port = 3000) => 
+            ipcRenderer.invoke('check-omero-proxy-port', port),
+
+        // =================== CONVENIENCE APIS FOR OMERO INTEGRATION ===================
+        
+        /**
+         * Smart OMERO Proxy Startup
+         * Intelligenter Proxy-Start: Prüft Status und startet bei Bedarf
+         * @param {Object} settings - OMERO settings
+         * @returns {Promise<Object>} Startup result with proxy URL
+         */
+        ensureOMEROProxyRunning: async (settings = {}) => {
+            try {
+                // Check current status
+                const status = await ipcRenderer.invoke('get-omero-proxy-status');
+                
+                if (status.running) {
+                    return {
+                        success: true,
+                        message: 'OMERO proxy already running',
+                        proxyUrl: status.proxyUrl,
+                        port: status.port,
+                        wasAlreadyRunning: true
+                    };
+                }
+                
+                // Start proxy if not running
+                const startResult = await ipcRenderer.invoke('start-omero-proxy', settings);
+                
+                if (startResult.success) {
+                    return {
+                        ...startResult,
+                        proxyUrl: `http://localhost:${startResult.port}/omero-api`,
+                        wasAlreadyRunning: false
+                    };
+                }
+                
+                return startResult;
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    message: `Failed to ensure OMERO proxy is running: ${error.message}`,
+                    error: error.message
+                };
+            }
+        },
+        
+        /**
+         * Get OMERO Proxy URL
+         * Ruft die aktuelle Proxy-URL ab (falls der Proxy läuft)
+         * @returns {Promise<string|null>} Proxy URL or null if not running
+         */
+        getOMEROProxyURL: async () => {
+            try {
+                const status = await ipcRenderer.invoke('get-omero-proxy-status');
+                return status.running ? status.proxyUrl : null;
+            } catch (error) {
+                console.error('Failed to get OMERO proxy URL:', error);
+                return null;
+            }
+        },
+        
+        /**
+         * Test OMERO Proxy Connection
+         * Testet die Verbindung zum OMERO Proxy (nicht zum OMERO Server selbst)
+         * @returns {Promise<Object>} Connection test result
+         */
+        testOMEROProxyConnection: async () => {
+            try {
+                const status = await ipcRenderer.invoke('get-omero-proxy-status');
+                
+                if (!status.running) {
+                    return {
+                        success: false,
+                        message: 'OMERO proxy is not running',
+                        status: status.status
+                    };
+                }
+                
+                // Try to fetch proxy status endpoint
+                try {
+                    const response = await fetch(`http://localhost:${status.port}/proxy-status`, {
+                        method: 'GET',
+                        mode: 'cors'
+                    });
+                    
+                    if (response.ok) {
+                        const proxyStatus = await response.json();
+                        return {
+                            success: true,
+                            message: 'OMERO proxy connection successful',
+                            proxyStatus: proxyStatus,
+                            port: status.port
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            message: `OMERO proxy responded with status ${response.status}`,
+                            httpStatus: response.status
+                        };
+                    }
+                } catch (fetchError) {
+                    return {
+                        success: false,
+                        message: `Cannot connect to OMERO proxy: ${fetchError.message}`,
+                        error: fetchError.message
+                    };
+                }
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    message: `OMERO proxy connection test failed: ${error.message}`,
+                    error: error.message
+                };
+            }
+        },
+
+        // Template utilities (merged)
+        // This templateFileUtils object provides enhanced template file utilities for the Template APIs,
+        // including validation, cleaning, and export filename generation, and is distinct from the earlier
+        // templateFileUtils object which is used for legacy or general template file operations.
+        templateFileUtils: {
+        // Generate stable template filename
+        generateStableFilename: (template) => {
+            const safeName = (template.name || 'template')
+                .replace(/[^a-zA-Z0-9\s\-_]/g, '')  // Remove special chars
+                .replace(/\s+/g, '_')               // Replace spaces with underscores
+                .toLowerCase()                      // Lowercase
+                .substring(0, 50);                  // Limit length
+
+            const safeUser = (template.createdBy || 'unknown')
+                .replace(/[^a-zA-Z0-9\-_]/g, '')
+                .toLowerCase()
+                .substring(0, 20);
+
+            const templateType = template.type || 'template';
+            
+            return `${safeName}_${safeUser}_${templateType}.json`;
+        },
+        
+        // Check if filename is stable (no timestamps)
+        isStableFilename: (filename) => {
+            const timestampPattern = /_20\d{2}[01]\d[0-3]\d/; // YYYYMMDD pattern
+            const longNumberPattern = /\d{10,}/; // 10+ consecutive digits
+            
+            return !timestampPattern.test(filename) && !longNumberPattern.test(filename);
+        },
+        
+        // Validate template structure (merged logic: accepts both minimal and extended)
+        validateTemplate: (template) => {
+            if (!template || typeof template !== 'object') return false;
+            // Accept both minimal and extended validation
+            const required = ['id', 'name', 'type'];
+            const hasRequired = required.every(field => template.hasOwnProperty(field) && template[field]);
+            if (hasRequired) return true;
+            // Fallback to legacy validation
+            const legacyRequired = ['name', 'type'];
+            const hasLegacyRequired = legacyRequired.every(field => 
+                template.hasOwnProperty(field) && 
+                template[field] && 
+                template[field].toString().trim().length > 0
+            );
+            const hasValidName = template.name !== 'undefined';
+            return hasLegacyRequired && hasValidName;
+        },
+
+        // Clean template for export (remove UI-specific data)
+        cleanTemplateForExport: (template) => {
+            const clean = { ...template };
+            // Remove UI-specific properties
+            delete clean._uiState;
+            delete clean._dirty;
+            delete clean._selected;
+            delete clean._lastModified;
+            return clean;
+        },
+        
+        // Generate export filename
+        generateExportFilename: (templateName, isMultiple = false) => {
+            const timestamp = new Date().toISOString().slice(0, 10);
+            if (isMultiple) {
+                return `metafold_templates_${timestamp}.json`;
+            } else {
+                const safeName = templateName.replace(/[^a-zA-Z0-9]/g, '_');
+                return `${safeName}_template.json`;
+            }
+        }
+    },
+
+
     // =================== PROJECT SCANNER APIS ===================
     
     // Project Scanner APIs
@@ -99,7 +353,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     
     // Generic invoke for future extensions
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+    // =================== TEMPLATE APIS - ENHANCED WITH USER/GROUP SUPPORT ===================
+    
+    // Template Import/Export APIs
+    importTemplatesFromFile: () => 
+        ipcRenderer.invoke('import-templates-from-file'),
+
+    exportTemplatesToLocation: (templates, exportType = 'multiple') => 
+        ipcRenderer.invoke('export-templates-to-location', templates, exportType),
+
+    // ENHANCED: Template directory and file operations with user context
+    getTemplatesDirectory: (userInfo) => 
+        ipcRenderer.invoke('get-templates-directory', userInfo),
+
+    loadAllTemplates: (userInfo) => 
+        ipcRenderer.invoke('load-all-templates', userInfo),
+
+    saveTemplateToFile: (template, userInfo) => 
+        ipcRenderer.invoke('save-template-to-file', template, userInfo),
+
+    // NEW: Group template functions for sharing
+    loadGroupTemplates: (groupName, userInfo) => 
+        ipcRenderer.invoke('load-group-templates', groupName, userInfo),
+
+    watchTemplatesDirectory: (userInfo) => 
+        ipcRenderer.invoke('watch-templates-directory', userInfo),
+
+    insertLinksIntoReadme: async (projectPath, elabftwUrl, omeroUrl) => {
+            return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl);
+        },
+
+    // Template file utilities
+    // (Merged into the single templateFileUtils object above)
 });
 
 // Extended utilities
@@ -110,7 +397,39 @@ contextBridge.exposeInMainWorld('utils', {
     joinPath: (...paths) => {
         return paths.join(process.platform === 'win32' ? '\\' : '/');
     },
+      // Get home directory templates path
+    getHomeTemplatesPath: () => {
+        const os = require('os');
+        const path = require('path');
+        return path.join(os.homedir(), 'MetaFold', 'Templates');
+    },
     
+    // Check if running in home directory mode
+    isHomeDirectoryMode: () => {
+        return true; // Always true nach der Umstellung
+    },
+    
+    // Get user-friendly template path
+    getUserFriendlyTemplatePath: (userInfo = null) => {
+        let basePath = '~/MetaFold/Templates/';
+        
+        if (userInfo) {
+            const { username, groupname } = userInfo;
+            
+            if (groupname && groupname !== 'Unknown' && groupname !== 'Default') {
+                basePath += `${groupname}/`;
+                
+                if (username && username !== 'Unknown' && username !== 'User') {
+                    basePath += `${username}/`;
+                }
+            } else if (username && username !== 'Unknown' && username !== 'User') {
+                basePath += `${username}/`;
+            }
+        }
+        
+        return basePath;
+    },
+
     // Normalize path
     normalizePath: (inputPath) => {
         return inputPath.replace(/[/\\]+/g, process.platform === 'win32' ? '\\' : '/');
@@ -215,6 +534,51 @@ contextBridge.exposeInMainWorld('utils', {
             folders: templates.filter(t => t.type !== 'experiment').length,
             experiments: templates.filter(t => t.type === 'experiment').length
         };
+    },
+        
+    // Clean template for storage (remove UI-specific data but keep essential info)
+    cleanTemplateForStorage: (template) => {
+        if (!template) return template;
+        
+        const clean = { ...template };
+        
+        // Remove UI-specific properties that shouldn't be stored
+        delete clean._uiState;
+        delete clean._dirty;
+        delete clean._selected;
+        delete clean._lastModified;
+        delete clean._searchIndex;
+        delete clean._cachedHtml;
+        delete clean._renderCache;
+        
+        // Remove enhanced display properties (will be regenerated)
+        delete clean.userDisplayName;
+        delete clean.groupDisplayName;
+        delete clean.userColor;
+        delete clean.userInitials;
+        delete clean.isOwn;
+        delete clean.isShared;
+        delete clean.originalIndex;
+        
+        // Keep essential metadata for storage
+        return {
+            ...clean,
+            // Ensure required fields exist
+            id: clean.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: clean.name || 'Unnamed Template',
+            type: clean.type || 'experiment',
+            createdBy: clean.createdBy || 'Unknown',
+            createdByGroup: clean.createdByGroup || 'Unknown',
+            createdAt: clean.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+    },
+
+    // Alternative version that also handles arrays
+    cleanTemplatesForStorage: (templates) => {
+        if (!templates) return [];
+        if (!Array.isArray(templates)) return [window.utils.cleanTemplateForStorage(templates)];
+        return templates.map(template => window.utils.cleanTemplateForStorage(template));
     },
     
     // =================== SECURITY UTILITIES ===================
