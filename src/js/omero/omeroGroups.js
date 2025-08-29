@@ -11,6 +11,213 @@ const omeroGroups = {
         return this;
     },
 
+    // =================== CACHING SYSTEM FÜR PERFORMANCE ===================
+
+    cache: {
+        groups: null,
+        groupsTimestamp: 0,
+        projects: new Map(), // groupId -> {projects: [], timestamp: 0}
+        workingEndpoint: null,
+        cacheDuration: 5 * 60 * 1000 // 5 Minuten Cache
+    },
+
+    // Clear all caches
+    clearCache() {
+        console.log('🔬 Clearing OMERO groups cache...');
+        this.cache.groups = null;
+        this.cache.groupsTimestamp = 0;
+        this.cache.projects.clear();
+        this.cache.workingEndpoint = null;
+    },
+
+    // Check if cache is valid
+    isCacheValid(timestamp) {
+        return timestamp > 0 && (Date.now() - timestamp) < this.cache.cacheDuration;
+    },
+
+    // =================== OPTIMIERTE GROUPS LOADING ===================
+
+    // Get all groups the user has access to - OPTIMIERT mit Caching
+    async getGroups() {
+        try {
+            // ✅ CHECK CACHE FIRST
+            if (this.isCacheValid(this.cache.groupsTimestamp) && this.cache.groups) {
+                console.log('🔬 Using cached groups data');
+                this.groups = this.cache.groups;
+                return this.cache.groups;
+            }
+            
+            console.log('🔬 Fetching OMERO groups (v5.25.0 compatible, with caching)...');
+            
+            // ✅ USE CACHED WORKING ENDPOINT IF AVAILABLE
+            const possibleEndpoints = this.cache.workingEndpoint ? 
+                [this.cache.workingEndpoint] : // Try working endpoint first
+                [
+                    'api/v0/m/experimentergroups/',  // ✅ Funktioniert meist (zuerst versuchen)
+                    'webgateway/group_list/',
+                    'webclient/api/groups/',
+                    'api/v0/m/groups/'              // ❌ Als letztes versuchen
+                ];
+            
+            let groups = [];
+            let workingEndpoint = null;
+            
+            // ✅ OPTIMIERTE ENDPOINT-TESTS
+            for (const endpoint of possibleEndpoints) {
+                try {
+                    console.log(`🔬 Testing endpoint: ${endpoint}`);
+                    const response = await window.omeroAPI.apiRequest(endpoint);
+                    
+                    if (response.data && Array.isArray(response.data)) {
+                        groups = response.data;
+                        workingEndpoint = endpoint;
+                        console.log(`✅ Working endpoint confirmed: ${endpoint}`);
+                        break;
+                    } else if (response.groups && Array.isArray(response.groups)) {
+                        groups = response.groups;
+                        workingEndpoint = endpoint;
+                        console.log(`✅ Working endpoint confirmed: ${endpoint}`);
+                        break;
+                    } else if (Array.isArray(response)) {
+                        groups = response;
+                        workingEndpoint = endpoint;
+                        console.log(`✅ Working endpoint confirmed: ${endpoint}`);
+                        break;
+                    }
+                } catch (error) {
+                    console.log(`❌ Endpoint ${endpoint} failed:`, error.message);
+                    
+                    // If cached endpoint fails, clear it
+                    if (endpoint === this.cache.workingEndpoint) {
+                        this.cache.workingEndpoint = null;
+                    }
+                    continue;
+                }
+            }
+            
+            if (groups.length === 0) {
+                console.warn('⚠️ No groups endpoint worked, trying fallback...');
+                return await this.getGroupsFallback();
+            }
+            
+            console.log('🔬 Raw groups found:', groups.length);
+            
+            // ✅ NORMALIZE GROUP DATA
+            const userGroups = groups.filter(group => {
+                const groupName = group.Name || group.name || group.groupname || '';
+                // Filter out typical system groups
+                return !groupName.match(/^(system|guest|default|public|user-\d+)$/i);
+            }).map(group => ({
+                id: group['@id'] || group.id || group.group_id,
+                name: group.Name || group.name || group.groupname || `Group ${group.id}`,
+                description: group.Description || group.description || group.desc || '',
+                permissions: group.Details?.permissions || group.permissions || null,
+                isReadOnly: this.checkGroupPermissions(group)
+            }));
+            
+            console.log('🔬 Processed user groups:', userGroups.length);
+            console.log('🔬 Working endpoint:', workingEndpoint);
+            
+            // ✅ CACHE RESULTS
+            this.groups = userGroups;
+            this.cache.groups = userGroups;
+            this.cache.groupsTimestamp = Date.now();
+            this.cache.workingEndpoint = workingEndpoint;
+            
+            console.log('✅ Groups cached for 5 minutes');
+            return userGroups;
+            
+        } catch (error) {
+            console.error('❌ Error fetching groups:', error);
+            console.log('🔬 Trying fallback method...');
+            return await this.getGroupsFallback();
+        }
+    },
+
+    // =================== CACHED PROJECT LOADING ===================
+
+    // Get projects for specific group with caching
+    async getProjectsForGroupCached(groupId) {
+        try {
+            // ✅ CHECK CACHE FIRST
+            const cacheKey = groupId || 'all';
+            const cachedData = this.cache.projects.get(cacheKey);
+            
+            if (cachedData && this.isCacheValid(cachedData.timestamp)) {
+                console.log(`🔬 Using cached projects for group: ${groupId || 'all'}`);
+                return cachedData.projects;
+            }
+            
+            // ✅ FETCH FRESH DATA
+            console.log(`🔬 Fetching fresh projects for group: ${groupId || 'all'}`);
+            
+            let projects = [];
+            if (window.omeroProjects && window.omeroProjects.getProjectsForGroupEnhanced) {
+                projects = await window.omeroProjects.getProjectsForGroupEnhanced(groupId);
+            } else if (window.omeroProjects && window.omeroProjects.getProjectsForGroup) {
+                projects = await window.omeroProjects.getProjectsForGroup(groupId);
+            } else {
+                console.warn('⚠️ No project loading function available');
+                return [];
+            }
+            
+            // ✅ CACHE RESULTS
+            this.cache.projects.set(cacheKey, {
+                projects: projects,
+                timestamp: Date.now()
+            });
+            
+            console.log(`✅ Projects cached for group ${groupId || 'all'}: ${projects.length} projects`);
+            return projects;
+            
+        } catch (error) {
+            console.error(`❌ Error getting projects for group ${groupId}:`, error);
+            return [];
+        }
+    },
+
+    // =================== CACHE MANAGEMENT METHODS ===================
+
+    // Get cache status for debugging
+    getCacheStatus() {
+        const now = Date.now();
+        
+        return {
+            groups: {
+                cached: !!this.cache.groups,
+                count: this.cache.groups ? this.cache.groups.length : 0,
+                age: this.cache.groupsTimestamp > 0 ? now - this.cache.groupsTimestamp : 0,
+                valid: this.isCacheValid(this.cache.groupsTimestamp)
+            },
+            projects: {
+                cachedGroups: Array.from(this.cache.projects.keys()),
+                totalCachedProjects: Array.from(this.cache.projects.values()).reduce((sum, data) => sum + data.projects.length, 0),
+                cacheEntries: this.cache.projects.size
+            },
+            workingEndpoint: this.cache.workingEndpoint,
+            cacheDuration: this.cache.cacheDuration
+        };
+    },
+
+    // Force refresh of groups (clears cache first)
+    async forceRefreshGroups() {
+        console.log('🔬 Force refreshing groups (clearing cache)...');
+        this.cache.groups = null;
+        this.cache.groupsTimestamp = 0;
+        this.cache.workingEndpoint = null;
+        return await this.getGroups();
+    },
+
+    // Force refresh of projects for specific group
+    async forceRefreshProjectsForGroup(groupId) {
+        console.log(`🔬 Force refreshing projects for group: ${groupId || 'all'}`);
+        const cacheKey = groupId || 'all';
+        this.cache.projects.delete(cacheKey);
+        return await this.getProjectsForGroupCached(groupId);
+    },
+
+
+
     // =================== GROUPS MANAGEMENT (FIXED für 5.25.0) ===================
 
     // Get all groups the user has access to (FIXED für OMERO 5.25.0)

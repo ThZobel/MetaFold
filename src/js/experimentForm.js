@@ -1,6 +1,297 @@
-// Enhanced Experiment Form with Drag & Drop Support for Field Reordering
-
 const experimentForm = {
+    savedFieldValues: {},
+    
+    // NEW: Drag & Drop state for experiment form
+    dragState: {
+        isDragging: false,
+        draggedElement: null,
+        draggedFieldName: null,
+        dropIndicator: null,
+        originalOrder: [] // Store original field order
+    },
+
+    // NEW: Prevent auto template creation with validation (SANFTER)
+    preventAutoTemplateCreation() {
+        // Check if we have a valid user context
+        const currentUser = window.userManager?.currentUser;
+        const currentGroup = window.userManager?.currentGroup;
+        
+        if (!currentUser || currentUser === 'Unknown' || !currentGroup || currentGroup === 'Unknown') {
+            console.warn('⚠️ Auto template creation prevented: Invalid user context');
+            return false;
+        }
+        
+        // SANFTERE Prüfung: Nur wirklich problematische Templates verhindern
+        if (!window.templateManager?.currentTemplate) {
+            console.warn('⚠️ Auto template creation prevented: No current template');
+            return false;
+        }
+        
+        const template = window.templateManager.currentTemplate;
+        
+        // Nur Templates mit 'undefined' im Namen oder leeren Namen verhindern
+        if (!template.name || 
+            template.name === 'undefined' || 
+            template.name.startsWith('undefined') ||
+            template.name.trim() === '') {
+            console.warn('⚠️ Auto template creation prevented: Invalid template name:', template.name);
+            return false;
+        }
+        
+        return true; // ALLES ANDERE IST OK
+    },
+
+    // Initialize experiment form with drag & drop
+    init() {
+        this.createDropIndicator();
+        console.log('✅ Experiment Form initialized with Drag & Drop support');
+    },
+
+    // Create drop indicator for experiment form
+    createDropIndicator() {
+        if (!this.dragState.dropIndicator) {
+            this.dragState.dropIndicator = document.createElement('div');
+            this.dragState.dropIndicator.className = 'experiment-drag-drop-indicator';
+            this.dragState.dropIndicator.innerHTML = '<div class="experiment-drop-line"></div>';
+            this.dragState.dropIndicator.style.display = 'none';
+        }
+    },
+
+    // NEW: Generate template-specific cache key
+    getTemplateSpecificKey(fieldName) {
+        const templateId = window.templateManager?.currentTemplate?.id || 'unknown';
+        return `${templateId}_${fieldName}`;
+    },
+
+    // UPDATED: Template-specific saved field value getter
+    getSavedFieldValue(fieldName) {
+        const key = this.getTemplateSpecificKey(fieldName);
+        return this.savedFieldValues[key];
+    },
+
+    // UPDATED: Template-specific saved field value setter
+    saveFieldValue(fieldName, value) {
+        const key = this.getTemplateSpecificKey(fieldName);
+        this.savedFieldValues[key] = value;
+    },
+
+    clearSavedFieldValues() {
+        this.savedFieldValues = {};
+    },
+
+    // NEW: Reset form completely before loading new template
+    resetFormForNewTemplate() {
+        console.log('🔄 Resetting form for new template...');
+        
+        try {
+            // 1. Clear all form inputs using existing function
+            this.clearAllFormInputs();
+            
+            // 2. Clear the form container completely (force clean slate)
+            const container = document.getElementById('experimentFields');
+            if (container) {
+                container.innerHTML = '';
+            }
+            
+            // 3. Clear project paths
+            const targetPathEl = document.getElementById('targetPath');
+            const projectNameEl = document.getElementById('projectName');
+            if (targetPathEl) {
+                targetPathEl.value = '';
+                targetPathEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (projectNameEl) {
+                projectNameEl.value = '';
+                projectNameEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            
+            // 4. Update path preview
+            if (window.projectManager && window.projectManager.updatePathPreview) {
+                window.projectManager.updatePathPreview();
+            }
+            
+            // 5. Clear any temporary field order
+            this.tempFieldOrder = null;
+            
+            console.log('✅ Form completely reset for new template');
+            
+        } catch (error) {
+            console.error('❌ Error resetting form for new template:', error);
+        }
+    },
+
+    // NEW: Clear values for specific template only
+    clearSavedFieldValuesForCurrentTemplate() {
+        if (!window.templateManager?.currentTemplate?.id) return;
+        
+        const templateId = window.templateManager.currentTemplate.id;
+        const keysToDelete = Object.keys(this.savedFieldValues).filter(key => 
+            key.startsWith(templateId + '_')
+        );
+        
+        keysToDelete.forEach(key => {
+            delete this.savedFieldValues[key];
+        });
+        
+        console.log(`🧹 Cleared ${keysToDelete.length} cached values for template: ${templateId}`);
+    },
+
+    // REPARIERTE Enhanced render experiment form with validation
+    render(metadata) {
+        // SANFTE VALIDIERUNG: Nur bei wirklich problematischen Templates stoppen
+        if (!this.preventAutoTemplateCreation()) {
+            console.warn('⚠️ Render prevented: Invalid template or user context');
+            
+            const container = document.getElementById('experimentFields');
+            if (container) {
+                container.innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 40px; color: #6b7280;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">🧪</div>
+                        <div>Select an experiment template to begin</div>
+                        <div style="font-size: 14px; margin-top: 10px;">
+                            Choose a template from the list to create experiment metadata forms
+                        </div>
+                    </div>
+                `;
+            }
+            return;
+        }
+        
+        // ORIGINALE RENDER LOGIK (ab hier ist alles original)
+        const container = document.getElementById('experimentFields');
+        container.innerHTML = '';
+        
+        // Load saved paths if available in template
+        if (templateManager.currentTemplate && templateManager.currentTemplate.projectDefaults) {
+            const defaults = templateManager.currentTemplate.projectDefaults;
+            const targetPathEl = document.getElementById('targetPath');
+            const projectNameEl = document.getElementById('projectName');
+            
+            if (targetPathEl && defaults.basePath) {
+                targetPathEl.value = defaults.basePath;
+            }
+            if (projectNameEl && defaults.projectName) {
+                projectNameEl.value = defaults.projectName;
+            }
+            
+            // Update path preview
+            if (window.projectManager && window.projectManager.updatePathPreview) {
+                window.projectManager.updatePathPreview();
+            }
+        }
+        
+        // NEW: Enhanced metadata handling with field order support
+        let fieldsToRender, fieldOrder;
+        
+        // Check if metadata has enhanced format (fields + fieldOrder)
+        if (metadata.fields && metadata.fieldOrder) {
+            // Enhanced format from new metadata editor
+            fieldsToRender = metadata.fields;
+            fieldOrder = metadata.fieldOrder;
+            console.log('📋 Using enhanced metadata format with custom field order:', fieldOrder);
+        } else if (metadata.fieldOrder && !metadata.fields) {
+            // Transitional format - fieldOrder exists but fields are at root level
+            fieldsToRender = { ...metadata };
+            delete fieldsToRender.fieldOrder; // Remove fieldOrder from fields
+            fieldOrder = metadata.fieldOrder;
+            console.log('📋 Using transitional metadata format with field order:', fieldOrder);
+        } else {
+            // Legacy format - use alphabetical order but check for position hints
+            fieldsToRender = metadata;
+            
+            // Try to detect elabFTW-style positions
+            const fieldsWithPositions = Object.entries(metadata).filter(([key, field]) => 
+                field.position !== undefined
+            );
+            
+            if (fieldsWithPositions.length > 0) {
+                // Sort by position
+                fieldOrder = fieldsWithPositions
+                    .sort((a, b) => (a[1].position || 999) - (b[1].position || 999))
+                    .map(([key]) => key);
+                
+                // Add remaining fields without positions
+                const fieldsWithoutPositions = Object.keys(metadata).filter(key => 
+                    !fieldsWithPositions.find(([k]) => k === key)
+                );
+                fieldOrder = [...fieldOrder, ...fieldsWithoutPositions.sort()];
+                
+                console.log('📋 Using position-based field order:', fieldOrder);
+            } else {
+                // Fall back to alphabetical order
+                fieldOrder = Object.keys(metadata).sort();
+                console.log('📋 Using alphabetical field order (legacy fallback):', fieldOrder);
+            }
+        }
+        
+        // Render fields in the specified order
+        fieldOrder.forEach(fieldName => {
+            const fieldInfo = fieldsToRender[fieldName];
+            if (!fieldInfo) {
+                console.warn(`⚠️ Field "${fieldName}" in fieldOrder but not found in fields`);
+                return;
+            }
+            
+            if (fieldInfo.type === 'group') {
+                // Render group header
+                this.renderGroupHeader(container, fieldName, fieldInfo);
+            } else {
+                // Render normal field
+                this.renderField(container, fieldName, fieldInfo);
+            }
+        });
+        
+        console.log(`✅ Rendered ${fieldOrder.length} fields in specified order`);
+    },
+
+        // ENHANCED: Add validation to saveAsTemplateEnhanced
+        async saveAsTemplateEnhanced() {
+            console.log('💾 Starting enhanced save as template...');
+            
+            // ENHANCED VALIDATION: Prevent creation with invalid context
+            if (!this.preventAutoTemplateCreation()) {
+                alert('❌ Cannot create template:\n\n• Invalid user context\n• No valid template selected\n\nPlease:\n1. Go to Settings → User Management\n2. Select or create a user\n3. Select a valid experiment template\n4. Try creating the template again');
+                return;
+            }
+            
+            // Continue with original saveAsTemplateEnhanced logic...
+        },
+
+        // ENHANCED: Add validation to saveTemplate  
+        async saveTemplate() {
+            console.log('💾 Starting template-specific save with validation...');
+            
+            // VALIDATION: Prevent saving invalid template
+            if (!this.preventAutoTemplateCreation()) {
+                alert('❌ Cannot save template: Invalid template or user context');
+                return;
+            }
+            
+            // Continue with original saveTemplate logic...
+        },
+
+        // NEW: Safe template initialization check
+        checkTemplateInitialization() {
+            const template = window.templateManager?.currentTemplate;
+            
+            if (!template) {
+                console.warn('⚠️ No template selected for initialization');
+                return false;
+            }
+            
+            if (!template.name || template.name === 'undefined' || template.name.includes('undefined')) {
+                console.warn('⚠️ Invalid template name detected:', template.name);
+                return false;
+            }
+            
+            if (!template.createdBy || template.createdBy === 'Unknown') {
+                console.warn('⚠️ Invalid template creator detected:', template.createdBy);
+                return false;
+            }
+            
+            return true;
+        },
+    
     savedFieldValues: {},
     
     // NEW: Drag & Drop state for experiment form
@@ -28,17 +319,42 @@ const experimentForm = {
         }
     },
 
-    // Manage saved field values
-    getSavedFieldValue(fieldName) {
-        return this.savedFieldValues[fieldName];
+    // NEW: Generate template-specific cache key
+    getTemplateSpecificKey(fieldName) {
+        const templateId = window.templateManager?.currentTemplate?.id || 'unknown';
+        return `${templateId}_${fieldName}`;
     },
 
+    // UPDATED: Template-specific saved field value getter
+    getSavedFieldValue(fieldName) {
+        const key = this.getTemplateSpecificKey(fieldName);
+        return this.savedFieldValues[key];
+    },
+
+    // UPDATED: Template-specific saved field value setter
     saveFieldValue(fieldName, value) {
-        this.savedFieldValues[fieldName] = value;
+        const key = this.getTemplateSpecificKey(fieldName);
+        this.savedFieldValues[key] = value;
     },
 
     clearSavedFieldValues() {
         this.savedFieldValues = {};
+    },
+
+    // NEW: Clear values for specific template only
+    clearSavedFieldValuesForCurrentTemplate() {
+        if (!window.templateManager?.currentTemplate?.id) return;
+        
+        const templateId = window.templateManager.currentTemplate.id;
+        const keysToDelete = Object.keys(this.savedFieldValues).filter(key => 
+            key.startsWith(templateId + '_')
+        );
+        
+        keysToDelete.forEach(key => {
+            delete this.savedFieldValues[key];
+        });
+        
+        console.log(`🧹 Cleared ${keysToDelete.length} cached values for template: ${templateId}`);
     },
 
     // Enhanced render experiment form with field order support
@@ -583,9 +899,10 @@ const experimentForm = {
         return { valid: true };
     },
 
-    // Enhanced save template with field order support
+
+// UPDATED: Enhanced save template with immediate file storage
     saveTemplate() {
-        console.log('💾 Starting enhanced saveTemplate with field order support...');
+        console.log('💾 Starting template-specific save with file storage...');
         
         if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
             alert('No template selected or no metadata available to save.');
@@ -613,7 +930,7 @@ const experimentForm = {
         console.log('💾 Form data collected:', Object.keys(currentData).length, 'fields');
         console.log('💾 Project paths:', { basePath, projectName });
 
-        // Find the correct template index in the own templates array
+        // Find the correct template index
         const templateIndex = templateManager.templates.findIndex(t => 
             t.name === templateManager.currentTemplate.name && 
             t.createdBy === templateManager.currentTemplate.createdBy &&
@@ -621,30 +938,32 @@ const experimentForm = {
         );
 
         if (templateIndex < 0) {
-            console.error('❌ Template not found in own templates array');
-            alert('Error: Could not find template to update. This might be a shared template that you need to copy first.');
+            console.error('❌ Template not found in templates array');
+            alert('Error: Could not find template to update.');
             return;
         }
 
         console.log('💾 Found template at index:', templateIndex);
 
-        // Create updated template
-        const updatedTemplate = { ...templateManager.templates[templateIndex] };
+        // Create deep copy to avoid reference sharing
+        const originalTemplate = templateManager.templates[templateIndex];
+        const updatedTemplate = createDeepCopy(originalTemplate);
         
         // Handle both enhanced and legacy metadata formats
         let fieldsToUpdate;
         if (updatedTemplate.metadata.fields) {
-            // Enhanced format
             fieldsToUpdate = updatedTemplate.metadata.fields;
         } else {
-            // Legacy format
             fieldsToUpdate = updatedTemplate.metadata;
         }
         
-        // Merge current form values into template metadata
+        // SAFE: Merge current form values into template metadata
         Object.entries(currentData).forEach(([fieldName, value]) => {
             if (fieldsToUpdate[fieldName]) {
-                fieldsToUpdate[fieldName].value = value;
+                fieldsToUpdate[fieldName] = { 
+                    ...fieldsToUpdate[fieldName],
+                    value: value 
+                };
                 console.log(`💾 Updated field "${fieldName}":`, value);
             }
         });
@@ -657,16 +976,180 @@ const experimentForm = {
         updatedTemplate.projectDefaults.projectName = projectName;
         updatedTemplate.updatedAt = new Date().toISOString();
 
-        // Update template in templateManager
+        // Update template with immediate file storage
         templateManager.update(templateIndex, updatedTemplate);
-        
-        // Update current template reference
         templateManager.currentTemplate = updatedTemplate;
         
         // Show success message
-        this.showSaveMessage('✅ Template values and project paths saved successfully! (Field order preserved)');
+        this.showSaveMessage('✅ Template values and project paths saved successfully!');
         
-        console.log('✅ Enhanced template saved successfully with field order preservation');
+        console.log('✅ Template saved successfully with file storage');
+    },
+
+    // NEW: Clear current template values
+    clearTemplate() {
+        console.log('🧹 Starting template clear...');
+        
+        if (!templateManager.currentTemplate) {
+            alert('No template selected to clear.');
+            return;
+        }
+
+        if (!templateManager.currentTemplate.isOwn) {
+            alert('You can only clear your own templates. Please copy this template first.');
+            return;
+        }
+
+        // Confirmation already handled by menu - proceed directly
+
+        try {
+            // Clear all form inputs
+            this.clearAllFormInputs();
+            
+            // Clear saved field values
+            this.clearSavedFieldValuesForCurrentTemplate();
+            
+            // Clear project paths
+            const targetPathEl = document.getElementById('targetPath');
+            const projectNameEl = document.getElementById('projectName');
+            if (targetPathEl) targetPathEl.value = '';
+            if (projectNameEl) projectNameEl.value = '';
+            
+            // Update path preview
+            if (window.projectManager && window.projectManager.updatePathPreview) {
+                window.projectManager.updatePathPreview();
+            }
+
+            this.showSaveMessage('🧹 Template form cleared successfully!');
+            console.log('✅ Template form cleared');
+
+        } catch (error) {
+            console.error('❌ Error clearing template form:', error);
+            alert('Error clearing template form: ' + error.message);
+        }
+    },  
+
+    // NEW: Clear all form inputs
+    clearAllFormInputs() {
+        const container = document.getElementById('experimentFields');
+        if (!container) return;
+
+        const inputs = container.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+
+            // Trigger change event to update any listeners
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        console.log(`🧹 Cleared ${inputs.length} form inputs`);
+    },
+
+    // NEW: Clear template values permanently (save cleared state)
+    clearTemplateValues() {
+        console.log('🧹 Starting permanent template values clear...');
+        
+        if (!templateManager.currentTemplate) {
+            alert('No template selected to clear.');
+            return;
+        }
+
+        if (!templateManager.currentTemplate.isOwn) {
+            alert('You can only clear your own templates. Please copy this template first.');
+            return;
+        }
+
+        // Removed duplicate confirmation - already confirmed in menu
+
+        try {
+            // Use the templateManager's clear function
+            templateManager.clearCurrentTemplate();
+            
+            this.showSaveMessage('🧹 Template values cleared permanently and saved!');
+            console.log('✅ Template values cleared permanently');
+
+        } catch (error) {
+            console.error('❌ Error clearing template values:', error);
+            alert('Error clearing template values: ' + error.message);
+        }
+    },
+
+    // NEW: Show template actions menu
+    showTemplateActionsMenu() {
+        const menu = document.createElement('div');
+        menu.className = 'template-actions-menu';
+        menu.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 10000;
+            min-width: 300px;
+            padding: 20px;
+        `;
+
+        const templateName = templateManager.currentTemplate?.name || 'Unknown';
+        
+        menu.innerHTML = `
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin: 0 0 5px 0; color: #374151;">Template Actions</h3>
+                <p style="margin: 0; color: #6b7280; font-size: 14px;">Template: ${templateName}</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="window.experimentForm.clearTemplate(); document.body.removeChild(this.closest('.template-actions-menu'))" 
+                        style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: pointer;">
+                    🧹 Clear Form Values
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Clear current form inputs (temporary)</div>
+                </button>
+                
+                <button onclick="window.experimentForm.clearTemplateValuesNoConfirm(); try { document.body.removeChild(this.closest('.template-actions-menu')); } catch(e) {}" 
+                        style="padding: 10px; border: 1px solid #fca5a5; border-radius: 6px; background: #fef2f2; cursor: pointer; color: #dc2626;">
+                    🗑️ Clear Template Values
+                    <div style="font-size: 12px; color: #ef4444; margin-top: 4px;">Permanently clear all saved values from template</div>
+                </button>
+                
+                <button onclick="document.body.removeChild(this.closest('.template-actions-menu'))" 
+                        style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #f3f4f6; cursor: pointer;">
+                    Cancel
+                </button>
+            </div>
+        `;
+
+        // Add backdrop
+        const backdrop = document.createElement('div');
+        backdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+        `;
+        backdrop.onclick = () => {
+            try {
+                if (backdrop.parentNode) {
+                    document.body.removeChild(backdrop);
+                }
+                if (menu.parentNode) {
+                    document.body.removeChild(menu);
+                }
+            } catch (error) {
+                console.warn('Menu cleanup error (harmless):', error);
+            }
+        };
+
+        document.body.appendChild(backdrop);
+        document.body.appendChild(menu);
     },
 
     // Enhanced collect current form values with field order awareness
@@ -849,8 +1332,183 @@ const experimentForm = {
         const domFields = Array.from(document.querySelectorAll('.form-group[data-field-name]'))
             .map(el => el.getAttribute('data-field-name'));
         console.log('Current DOM order:', domFields);
-    }
+    },
+
+
+    // NEW: Clear template values without additional confirmation (already confirmed in menu)
+        clearTemplateValuesNoConfirm() {
+            console.log('🧹 Starting permanent template values clear (no additional confirm)...');
+            
+            if (!templateManager.currentTemplate) {
+                alert('No template selected to clear.');
+                return;
+            }
+
+            if (!templateManager.currentTemplate.isOwn) {
+                alert('You can only clear your own templates. Please copy this template first.');
+                return;
+            }
+
+            try {
+                // Use the templateManager's clear function
+                templateManager.clearCurrentTemplate();
+                
+                this.showSaveMessage('🧹 Template values cleared permanently and saved!');
+                console.log('✅ Template values cleared permanently');
+
+            } catch (error) {
+                console.error('❌ Error clearing template values:', error);
+                alert('Error clearing template values: ' + error.message);
+            }
+    },
+
+    // Add this enhanced saveAsTemplate function to experimentForm.js to prevent "Unknown" templates
+
+    // ENHANCED: Save as template with proper user validation
+    async saveAsTemplateEnhanced() {
+        console.log('💾 Starting enhanced save as template...');
+        
+        // Validate user context first
+        const currentUser = window.userManager?.currentUser;
+        const currentGroup = window.userManager?.currentGroup;
+        
+        if (!currentUser || currentUser === 'Unknown' || !currentGroup || currentGroup === 'Unknown') {
+            alert('❌ Cannot create template: User not properly logged in.\n\nPlease:\n1. Go to Settings → User Management\n2. Select or create a user\n3. Try creating the template again');
+            return;
+        }
+        
+        // Get template name
+        const templateName = prompt('Enter template name:');
+        if (!templateName || templateName.trim() === '') {
+            return;
+        }
+        
+        // Get template description (optional)
+        const templateDescription = prompt('Enter template description (optional):') || '';
+        
+        try {
+            // Collect form data
+            const formData = this.collectFormValues();
+            
+            if (!formData || Object.keys(formData).length === 0) {
+                alert('No form data available to create template.');
+                return;
+            }
+            
+            // Get current metadata schema from templateManager
+            let metadataSchema = {};
+            if (window.templateManager?.currentTemplate?.metadata) {
+                metadataSchema = JSON.parse(JSON.stringify(window.templateManager.currentTemplate.metadata));
+                
+                // Add current form values as default values
+                Object.keys(formData).forEach(fieldName => {
+                    if (metadataSchema[fieldName]) {
+                        metadataSchema[fieldName].defaultValue = formData[fieldName];
+                    } else if (metadataSchema.fields && metadataSchema.fields[fieldName]) {
+                        metadataSchema.fields[fieldName].defaultValue = formData[fieldName];
+                    }
+                });
+            } else {
+                // Create metadata schema from form data
+                Object.keys(formData).forEach(fieldName => {
+                    const value = formData[fieldName];
+                    const fieldType = typeof value === 'boolean' ? 'checkbox' : 
+                                    typeof value === 'number' ? 'number' : 'text';
+                    
+                    metadataSchema[fieldName] = {
+                        type: fieldType,
+                        label: fieldName,
+                        required: false,
+                        defaultValue: value
+                    };
+                });
+            }
+            
+            // Create new template object with proper user info
+            const newTemplate = {
+                id: this.generateTemplateId(templateName),
+                name: templateName.trim(),
+                description: templateDescription.trim(),
+                type: 'experiment',
+                metadata: metadataSchema,
+                createdBy: currentUser,
+                createdByGroup: currentGroup,
+                createdAt: new Date().toISOString(),
+                savedFormData: formData
+            };
+            
+            console.log('📝 Creating template:', {
+                name: newTemplate.name,
+                user: newTemplate.createdBy,
+                group: newTemplate.createdByGroup,
+                fieldsCount: Object.keys(metadataSchema).length
+            });
+            
+            // Add to templateManager
+            if (!window.templateManager) {
+                alert('Template manager not available');
+                return;
+            }
+            
+            window.templateManager.templates.push(newTemplate);
+            
+            // Save templates using storage
+            if (window.storage) {
+                const saved = await window.storage.saveTemplates(window.templateManager.templates);
+                if (!saved) {
+                    alert('Failed to save template to storage');
+                    return;
+                }
+            } else {
+                alert('Storage not available');
+                return;
+            }
+            
+            // Update UI
+            window.templateManager.invalidateCache();
+            window.templateManager.buildSearchIndex();
+            window.templateManager.renderList();
+            window.templateManager.updateTemplateInfo();
+            
+            // Show success message
+            this.showSaveMessage(`✅ Template "${templateName}" created successfully!`);
+            
+            console.log('✅ Template created and saved successfully');
+            
+        } catch (error) {
+            console.error('❌ Error creating template:', error);
+            alert('Error creating template: ' + error.message);
+        }
+    },
+
 };
+
+function createDeepCopy(obj) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    
+    if (obj instanceof Date) {
+        return new Date(obj.getTime());
+    }
+    
+    if (Array.isArray(obj)) {
+        return obj.map(item => createDeepCopy(item));
+    }
+    
+    if (typeof obj === 'object') {
+        const copy = {};
+        Object.keys(obj).forEach(key => {
+            copy[key] = createDeepCopy(obj[key]);
+        });
+        return copy;
+    }
+    
+    return obj;
+
+}
+
+
 
 // Make globally available
 window.experimentForm = experimentForm;

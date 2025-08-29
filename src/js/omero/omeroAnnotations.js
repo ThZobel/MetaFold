@@ -507,7 +507,813 @@ const omeroAnnotations = {
             console.log("❌ Verification failed:", error.message);
             return false;
         }
-    }
+    },
+
+    // =================== NEUE KEY-VALUE METHODEN (nach bestehenden Funktionen einfügen) ===================
+
+    // Test multiple key-value pairs at once - NEW SIMPLE METHOD
+    async testCreateMultipleKeyValues(datasetId, keyValuePairs) {
+        try {
+            console.log('🧪 === OMERO Console Test: Create Multiple Key-Value Pairs ===');
+            console.log(`🧪 Dataset ID: ${datasetId}`);
+            console.log(`🧪 Pairs count: ${keyValuePairs.length}`);
+            
+            if (!window.omeroAuth?.session || !window.omeroAuth.isSessionValid()) {
+                console.error('❌ Not authenticated to OMERO');
+                return { success: false, error: 'No valid OMERO session' };
+            }
+            
+            const csrfToken = window.omeroAuth.getBestCSRFToken();
+            if (!csrfToken) {
+                console.error('❌ No CSRF token available');
+                return { success: false, error: 'No CSRF token' };
+            }
+            
+            // Convert key-value pairs to the format OMERO expects
+            const mapAnnotation = JSON.stringify(keyValuePairs);
+            console.log('🧪 Map annotation data:', mapAnnotation);
+            
+            const formData = new URLSearchParams();
+            formData.append('parents', 'true');
+            formData.append('dataset', datasetId);
+            formData.append('mapAnnotation', mapAnnotation);
+            
+            const response = await fetch(`${window.omeroAuth.baseUrl}webclient/annotate_map/`, {
+                method: 'POST',
+                credentials: 'include',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Origin': window.location.origin,
+                    'Referer': window.location.href
+                },
+                body: formData.toString()
+            });
+            
+            console.log('🧪 Response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Request failed:', response.status, errorText);
+                return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+            }
+            
+            const result = await response.json();
+            console.log('🧪 Response data:', result);
+            
+            if (result.annId) {
+                console.log('✅ Success! Annotation ID:', result.annId);
+                return {
+                    success: true,
+                    annotationId: result.annId,
+                    keyValuePairs: keyValuePairs,
+                    datasetId: datasetId,
+                    message: `Successfully created ${keyValuePairs.length} key-value pairs`
+                };
+            } else {
+                return { success: false, error: 'Unexpected response format', details: result };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error creating multiple key-value pairs:', error);
+            return { success: false, error: error.message, details: error };
+        }
+    },
+
+    // Convert MetaFold metadata to simple key-value pairs (NEW SIMPLE METHOD)
+    convertMetadataToSimpleKeyValues(metadata) {
+        console.log('🔄 Converting metadata to simple key-value pairs...');
+        console.log('🔄 Input metadata:', metadata);
+        
+        if (!metadata || typeof metadata !== 'object') {
+            console.warn('🔄 Invalid metadata provided');
+            return [];
+        }
+        
+        const keyValuePairs = [];
+        let totalFields = 0;
+        let processedFields = 0;
+        
+        Object.entries(metadata).forEach(([key, fieldInfo]) => {
+            totalFields++;
+            
+            try {
+                if (!fieldInfo || typeof fieldInfo !== 'object') {
+                    console.warn(`🔄 Invalid field info for key: ${key}`);
+                    return;
+                }
+                
+                // Skip group fields for simple conversion
+                if (fieldInfo.type === 'group') {
+                    console.log(`🔄 Skipping group field: ${key}`);
+                    return;
+                }
+                
+                // Extract actual value
+                let value = fieldInfo.value;
+                if (value === undefined || value === null || value === '') {
+                    console.log(`🔄 Skipping empty field: ${key}`);
+                    return;
+                }
+                
+                // Use label if available, otherwise use key
+                const fieldName = fieldInfo.label || key;
+                
+                // Convert value to string for OMERO
+                let stringValue;
+                if (typeof value === 'boolean') {
+                    stringValue = value ? 'true' : 'false';
+                } else if (typeof value === 'number') {
+                    stringValue = value.toString();
+                } else {
+                    stringValue = String(value);
+                }
+                
+                console.log(`🔄 Processing: ${fieldName} = "${stringValue}"`);
+                keyValuePairs.push([fieldName, stringValue]);
+                processedFields++;
+                
+            } catch (error) {
+                console.warn(`🔄 Error processing field ${key}:`, error);
+            }
+        });
+        
+        console.log(`🔄 Conversion complete: ${processedFields}/${totalFields} fields processed`);
+        console.log('🔄 Generated key-value pairs:');
+        keyValuePairs.forEach(([key, value]) => {
+            console.log(`   ${key} = "${value}"`);
+        });
+        
+        return keyValuePairs;
+    },
+
+
+    // Convert metadata to simple key-value pairs WITH groups (NEW ENHANCED METHOD)
+    convertMetadataToSimpleKeyValuesWithGroups(metadata, templateMetadata = null) {
+        console.log('🔄 Converting metadata to simple key-value pairs WITH groups IN CORRECT ORDER...');
+        console.log('🔄 Input metadata:', metadata);
+        console.log('🔄 Template metadata provided:', !!templateMetadata);
+        
+        if (!metadata || typeof metadata !== 'object') {
+            console.warn('🔄 Invalid metadata provided');
+            return [];
+        }
+        
+        const keyValuePairs = [];
+        
+        // *** NEW: Use fieldOrder to maintain correct sequence ***
+        if (templateMetadata && templateMetadata.metadata && templateMetadata.metadata.fieldOrder && templateMetadata.metadata.fields) {
+            console.log('🔄 Using template fieldOrder for correct sequence...');
+            
+            const fieldOrder = templateMetadata.metadata.fieldOrder;
+            const fieldsObject = templateMetadata.metadata.fields;
+            
+            // Process fields IN fieldOrder sequence
+            fieldOrder.forEach(fieldKey => {
+                const fieldDefinition = fieldsObject[fieldKey];
+                
+                if (!fieldDefinition) {
+                    console.warn(`🔄 Field definition not found for: ${fieldKey}`);
+                    return;
+                }
+                
+                // Check if this is a GROUP field
+                if (fieldDefinition.type === 'group') {
+                    const groupName = fieldDefinition.label || fieldKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    keyValuePairs.push([groupName, '']);
+                    console.log(`🔄 Added GROUP in order: "${groupName}" = "" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
+                }
+                // Check if this is a DATA field with actual value
+                else if (metadata[fieldKey]) {
+                    const fieldInfo = metadata[fieldKey];
+                    
+                    // Skip if empty
+                    let value = fieldInfo.value;
+                    if (value === undefined || value === null || value === '') {
+                        console.log(`🔄 Skipping empty field: ${fieldKey}`);
+                        return;
+                    }
+                    
+                    // Use label if available, otherwise use key
+                    const fieldName = fieldInfo.label || fieldKey;
+                    
+                    // Convert value to string for OMERO
+                    let stringValue;
+                    if (typeof value === 'boolean') {
+                        stringValue = value ? 'true' : 'false';
+                    } else if (typeof value === 'number') {
+                        stringValue = value.toString();
+                    } else {
+                        stringValue = String(value);
+                    }
+                    
+                    keyValuePairs.push([fieldName, stringValue]);
+                    console.log(`🔄 Added DATA in order: "${fieldName}" = "${stringValue}" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
+                }
+            });
+            
+            console.log(`🔄 Ordered conversion complete: ${keyValuePairs.length} total pairs in correct fieldOrder`);
+            
+        } else {
+            console.log('🔄 No fieldOrder found, using fallback method...');
+            
+            // FALLBACK: Old method for templates without fieldOrder
+            let totalFields = 0;
+            let processedFields = 0;
+            
+            // STEP 1: Add group fields as key-only pairs FIRST
+            if (templateMetadata) {
+                const groupPairs = this.convertGroupFieldsToKeyOnlyPairs(templateMetadata);
+                keyValuePairs.push(...groupPairs);
+                console.log(`🔄 Added ${groupPairs.length} group key-only pairs`);
+            }
+            
+            // STEP 2: Add regular metadata fields
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                totalFields++;
+                
+                try {
+                    if (!fieldInfo || typeof fieldInfo !== 'object') {
+                        console.warn(`🔄 Invalid field info for key: ${key}`);
+                        return;
+                    }
+                    
+                    // Skip group fields (already added)
+                    if (fieldInfo.type === 'group') {
+                        console.log(`🔄 Skipping group field (already added as key-only): ${key}`);
+                        return;
+                    }
+                    
+                    // Extract actual value
+                    let value = fieldInfo.value;
+                    if (value === undefined || value === null || value === '') {
+                        console.log(`🔄 Skipping empty field: ${key}`);
+                        return;
+                    }
+                    
+                    // Use label if available, otherwise use key
+                    const fieldName = fieldInfo.label || key;
+                    
+                    // Convert value to string for OMERO
+                    let stringValue;
+                    if (typeof value === 'boolean') {
+                        stringValue = value ? 'true' : 'false';
+                    } else if (typeof value === 'number') {
+                        stringValue = value.toString();
+                    } else {
+                        stringValue = String(value);
+                    }
+                    
+                    keyValuePairs.push([fieldName, stringValue]);
+                    processedFields++;
+                    
+                    console.log(`🔄 Processing: ${fieldName} = "${stringValue}"`);
+                    
+                } catch (error) {
+                    console.warn(`🔄 Error processing field ${key}:`, error);
+                }
+            });
+            
+            console.log(`🔄 Fallback conversion complete: ${processedFields}/${totalFields} data fields processed`);
+        }
+        
+        console.log(`🔄 Final result: ${keyValuePairs.length} total pairs`);
+        console.log('🔄 Generated key-value pairs IN ORDER:');
+        keyValuePairs.forEach(([key, value], index) => {
+            if (value === '') {
+                console.log(`   ${index + 1}. 📁 GROUP: "${key}" = "" (key-only)`);
+            } else {
+                console.log(`   ${index + 1}. 📝 DATA:  "${key}" = "${value}"`);
+            }
+        });
+        
+        return keyValuePairs;
+    },
+
+    // =================== FEHLENDE FUNKTION: GROUP-FELDER ALS KEY-ONLY PAARE ===================
+    
+    // Extract group fields as key-only pairs from template metadata
+convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
+        console.log('📁 Converting group fields to key-only pairs...');
+        console.log('📁 Template metadata:', templateMetadata);
+        
+        if (!templateMetadata) {
+            console.warn('📁 No template metadata provided');
+            return [];
+        }
+        
+        // *** FIX: Look in the correct location ***
+        let fieldsObject = null;
+        
+        // Method 1: New format with metadata.fields  
+        if (templateMetadata.metadata && templateMetadata.metadata.fields) {
+            fieldsObject = templateMetadata.metadata.fields;
+        }
+        // Method 2: Old format with direct metadata
+        else if (templateMetadata.metadata) {
+            fieldsObject = templateMetadata.metadata;
+        }
+        else {
+            console.warn('📁 No fields object found in template metadata');
+            return [];
+        }
+        
+        const groupPairs = [];
+        
+        // Find all group-type fields
+        Object.entries(fieldsObject).forEach(([key, fieldInfo]) => {
+            if (fieldInfo && fieldInfo.type === 'group') {
+                // Use label if available, otherwise format key as title
+                const groupName = fieldInfo.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                
+                // Add as key-only pair (empty value)
+                groupPairs.push([groupName, '']);
+                
+                console.log(`📁 Added group key-only pair: "${groupName}" → ""`);
+            }
+        });
+        
+        console.log(`📁 Group conversion complete: ${groupPairs.length} group pairs created`);
+        return groupPairs;
+    },
+
+    // =================== HILFSFUNKTION: JSON TRIPLETS CHECKBOX ABFRAGE ===================
+    
+    // Check if JSON Triplets mode is enabled (from UI checkbox or settings)
+    async checkJsonTripletsMode() {
+        try {
+            // Method 1: Check UI checkbox first (immediate user preference)
+            const checkbox = document.getElementById('omeroUseJsonTriplets');
+            if (checkbox) {
+                console.log('📋 JSON Triplets checkbox found, checked:', checkbox.checked);
+                return checkbox.checked;
+            }
+            
+            // Method 2: Fallback to settings if checkbox not available
+            if (window.settingsManager && window.settingsManager.get) {
+                const setting = await window.settingsManager.get('omero.use_json_triplets');
+                console.log('📋 JSON Triplets from settings:', setting);
+                return setting || false;
+            }
+            
+            // Method 3: Default to false if neither available
+            console.log('📋 JSON Triplets: Using default (false)');
+            return false;
+            
+        } catch (error) {
+            console.warn('⚠️ Error checking JSON Triplets mode:', error);
+            return false;
+        }
+    },
+
+    // NEW MAIN METHOD: Add Map Annotations using simple key-value approach
+    async addMapAnnotationsSimple(objectId, objectType, metadata, namespace = null, templateMetadata = null) {
+        try {
+            console.log('🚀 === NEW SIMPLE MAP ANNOTATIONS METHOD - ENHANCED WITH GROUPS ===');
+            console.log('🚀 Target object:', objectType, objectId);
+            console.log('🚀 Namespace:', namespace || 'default (omero client)');
+            console.log('🚀 Metadata fields:', metadata ? Object.keys(metadata).length : 0);
+            console.log('🚀 Template metadata for groups:', !!templateMetadata);
+            
+            // *** ENHANCED: Use the new function that supports groups and fieldOrder ***
+            let keyValuePairs;
+            if (templateMetadata) {
+                console.log('🚀 Using ENHANCED conversion with groups and fieldOrder...');
+                keyValuePairs = this.convertMetadataToSimpleKeyValuesWithGroups(metadata, templateMetadata);
+            } else {
+                console.log('🚀 Using SIMPLE conversion (no groups)...');
+                keyValuePairs = this.convertMetadataToSimpleKeyValues(metadata);
+            }
+            
+            if (keyValuePairs.length === 0) {
+                return { 
+                    success: false, 
+                    message: 'No valid metadata for simple Map Annotation',
+                    details: { keyValuePairsGenerated: 0 }
+                };
+            }
+            
+            console.log('🚀 Generated key-value pairs:', keyValuePairs.length);
+            
+            // Use the tested working method
+            const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs);
+            
+            if (result.success) {
+                console.log('✅ Enhanced Simple Map Annotation created successfully!');
+                console.log('✅ Groups included in correct fieldOrder sequence');
+                
+                return {
+                    success: true,
+                    message: `Enhanced Simple Map Annotation created with ${keyValuePairs.length} key-value pairs (including groups)`,
+                    annotationId: result.annotationId,
+                    keyValuePairs: keyValuePairs.length,
+                    method: 'enhanced_simple_with_groups_and_fieldorder',
+                    groupsIncluded: templateMetadata ? true : false,
+                    details: {
+                        keyValuePairsGenerated: keyValuePairs.length,
+                        annotationCreated: true,
+                        groupsInCorrectOrder: templateMetadata ? true : false
+                    }
+                };
+                
+            } else {
+                return {
+                    success: false,
+                    message: 'Failed to create enhanced simple Map Annotation',
+                    error: result.error,
+                    details: result.details
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error in enhanced simple Map Annotations:', error);
+            return {
+                success: false,
+                message: `Failed to add enhanced simple Map Annotations: ${error.message}`,
+                error: error.message
+            };
+        }
+    },
+
+    // =================== PHASE 2: INTEGRATION LINKS CONVERSION ===================
+    
+    // Convert Integration Links to Key-Value pairs
+    convertIntegrationLinksToKeyValue(integrationData) {
+        console.log('🔗 Converting integration links to key-value pairs...');
+        console.log('🔗 Input integration data:', integrationData);
+        
+        if (!integrationData || typeof integrationData !== 'object') {
+            console.warn('🔗 Invalid integration data provided');
+            return [];
+        }
+        
+        const keyValuePairs = [];
+        
+        // Standard integration links mapping
+        const linkMapping = {
+            'metafold_export_timestamp': 'MetaFold Export Timestamp',
+            'project_local_path': 'Project Local Path', 
+            'omero_link': 'OMERO Link',
+            'elabftw_link': 'elabFTW Link',
+            'project_created_at': 'Project Created At',
+            'template_used': 'Template Used',
+            'created_by_user': 'Created By User',
+            'created_by_group': 'Created By Group'
+        };
+        
+        Object.entries(integrationData).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                const displayName = linkMapping[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                keyValuePairs.push([displayName, String(value)]);
+                console.log(`🔗 Added: ${displayName} = "${value}"`);
+            }
+        });
+        
+        console.log(`🔗 Integration links conversion complete: ${keyValuePairs.length} pairs generated`);
+        return keyValuePairs;
+    },
+    
+    // =================== PHASE 2: TEMPLATE GROUPS AS NAMESPACES ===================
+    
+    // Convert metadata to grouped key-value pairs (for template groups as namespaces)
+
+// FIXED: Enhanced metadata conversion that includes group fields as key-only pairs
+
+    convertMetadataToSimpleKeyValuesWithGroups(metadata, templateMetadata = null) {
+        console.log('🔄 Converting metadata to simple key-value pairs WITH groups IN CORRECT ORDER...');
+        console.log('🔄 Input metadata:', metadata);
+        console.log('🔄 Template metadata provided:', !!templateMetadata);
+        
+        if (!metadata || typeof metadata !== 'object') {
+            console.warn('🔄 Invalid metadata provided');
+            return [];
+        }
+        
+        const keyValuePairs = [];
+        
+        // *** NEW: Use fieldOrder to maintain correct sequence ***
+        if (templateMetadata && templateMetadata.metadata && templateMetadata.metadata.fieldOrder && templateMetadata.metadata.fields) {
+            console.log('🔄 Using template fieldOrder for correct sequence...');
+            
+            const fieldOrder = templateMetadata.metadata.fieldOrder;
+            const fieldsObject = templateMetadata.metadata.fields;
+            
+            // Process fields IN fieldOrder sequence
+            fieldOrder.forEach(fieldKey => {
+                const fieldDefinition = fieldsObject[fieldKey];
+                
+                if (!fieldDefinition) {
+                    console.warn(`🔄 Field definition not found for: ${fieldKey}`);
+                    return;
+                }
+                
+                // Check if this is a GROUP field
+                if (fieldDefinition.type === 'group') {
+                    const groupName = fieldDefinition.label || fieldKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    keyValuePairs.push([groupName, '']);
+                    console.log(`🔄 Added GROUP in order: "${groupName}" = "" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
+                }
+                // Check if this is a DATA field with actual value
+                else if (metadata[fieldKey]) {
+                    const fieldInfo = metadata[fieldKey];
+                    
+                    // Skip if empty
+                    let value = fieldInfo.value;
+                    if (value === undefined || value === null || value === '') {
+                        console.log(`🔄 Skipping empty field: ${fieldKey}`);
+                        return;
+                    }
+                    
+                    // Use label if available, otherwise use key
+                    const fieldName = fieldInfo.label || fieldKey;
+                    
+                    // Convert value to string for OMERO
+                    let stringValue;
+                    if (typeof value === 'boolean') {
+                        stringValue = value ? 'true' : 'false';
+                    } else if (typeof value === 'number') {
+                        stringValue = value.toString();
+                    } else {
+                        stringValue = String(value);
+                    }
+                    
+                    keyValuePairs.push([fieldName, stringValue]);
+                    console.log(`🔄 Added DATA in order: "${fieldName}" = "${stringValue}" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
+                }
+            });
+            
+            console.log(`🔄 Ordered conversion complete: ${keyValuePairs.length} total pairs in correct fieldOrder`);
+            
+        } else {
+            console.log('🔄 No fieldOrder found, using fallback method...');
+            
+            // FALLBACK: Old method for templates without fieldOrder
+            let totalFields = 0;
+            let processedFields = 0;
+            
+            // STEP 1: Add group fields as key-only pairs FIRST
+            if (templateMetadata) {
+                const groupPairs = this.convertGroupFieldsToKeyOnlyPairs(templateMetadata);
+                keyValuePairs.push(...groupPairs);
+                console.log(`🔄 Added ${groupPairs.length} group key-only pairs`);
+            }
+            
+            // STEP 2: Add regular metadata fields
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                totalFields++;
+                
+                try {
+                    if (!fieldInfo || typeof fieldInfo !== 'object') {
+                        console.warn(`🔄 Invalid field info for key: ${key}`);
+                        return;
+                    }
+                    
+                    // Skip group fields (already added)
+                    if (fieldInfo.type === 'group') {
+                        console.log(`🔄 Skipping group field (already added as key-only): ${key}`);
+                        return;
+                    }
+                    
+                    // Extract actual value
+                    let value = fieldInfo.value;
+                    if (value === undefined || value === null || value === '') {
+                        console.log(`🔄 Skipping empty field: ${key}`);
+                        return;
+                    }
+                    
+                    // Use label if available, otherwise use key
+                    const fieldName = fieldInfo.label || key;
+                    
+                    // Convert value to string for OMERO
+                    let stringValue;
+                    if (typeof value === 'boolean') {
+                        stringValue = value ? 'true' : 'false';
+                    } else if (typeof value === 'number') {
+                        stringValue = value.toString();
+                    } else {
+                        stringValue = String(value);
+                    }
+                    
+                    keyValuePairs.push([fieldName, stringValue]);
+                    processedFields++;
+                    
+                    console.log(`🔄 Processing: ${fieldName} = "${stringValue}"`);
+                    
+                } catch (error) {
+                    console.warn(`🔄 Error processing field ${key}:`, error);
+                }
+            });
+            
+            console.log(`🔄 Fallback conversion complete: ${processedFields}/${totalFields} data fields processed`);
+        }
+        
+        console.log(`🔄 Final result: ${keyValuePairs.length} total pairs`);
+        console.log('🔄 Generated key-value pairs IN ORDER:');
+        keyValuePairs.forEach(([key, value], index) => {
+            if (value === '') {
+                console.log(`   ${index + 1}. 📁 GROUP: "${key}" = "" (key-only)`);
+            } else {
+                console.log(`   ${index + 1}. 📝 DATA:  "${key}" = "${value}"`);
+            }
+        });
+        
+        return keyValuePairs;
+    },
+
+    // =================== PHASE 2: MULTI-NAMESPACE SUPPORT ===================
+
+    // Add Map Annotations with multiple namespaces support - UPDATED WITH GROUPS
+    async addMapAnnotationsWithGroups(objectId, objectType, metadata, options = {}) {
+        console.log('🚀 === MULTI-NAMESPACE MAP ANNOTATIONS (WITH GROUPS) ===');
+        console.log('🚀 Object:', objectType, objectId);
+        console.log('🚀 Options:', options);
+        console.log('🚀 Template metadata provided:', !!options.templateMetadata);
+        
+        try {
+            const results = [];
+            let totalPairs = 0;
+            
+            // Check if template groups should be used as namespaces
+            if (options.useTemplateGroupsAsNamespaces && options.templateMetadata) {
+                console.log('📁 Using template groups as namespaces...');
+                
+                const groupedData = this.convertMetadataToGroupedKeyValues(metadata, options.templateMetadata);
+                
+                // Create annotations for each group
+                for (const group of groupedData.groups) {
+                    if (group.keyValuePairs.length > 0) {
+                        console.log(`📁 Creating annotation for group: ${group.namespace}`);
+                        const result = await this.testCreateMultipleKeyValues(objectId, group.keyValuePairs);
+                        
+                        if (result.success) {
+                            results.push({
+                                success: true,
+                                namespace: group.namespace,
+                                annotationId: result.annotationId,
+                                keyValuePairs: group.keyValuePairs.length
+                            });
+                            totalPairs += group.keyValuePairs.length;
+                            console.log(`✅ Group ${group.namespace}: ${group.keyValuePairs.length} pairs created`);
+                        } else {
+                            results.push({
+                                success: false,
+                                namespace: group.namespace,
+                                error: result.error
+                            });
+                            console.error(`❌ Group ${group.namespace} failed:`, result.error);
+                        }
+                    }
+                }
+                
+                // Handle ungrouped fields
+                if (groupedData.ungrouped.length > 0) {
+                    console.log('📁 Creating annotation for ungrouped fields...');
+                    const result = await this.testCreateMultipleKeyValues(objectId, groupedData.ungrouped);
+                    
+                    if (result.success) {
+                        results.push({
+                            success: true,
+                            namespace: 'General Metadata',
+                            annotationId: result.annotationId,
+                            keyValuePairs: groupedData.ungrouped.length
+                        });
+                        totalPairs += groupedData.ungrouped.length;
+                        console.log(`✅ Ungrouped fields: ${groupedData.ungrouped.length} pairs created`);
+                    }
+                }
+                
+            } else {
+                // *** DECISION POINT: JSON Triplets vs Enhanced Key-Value ***
+                
+                if (options.useJsonTriplets) {
+                    console.log('📋 Using JSON TRIPLETS approach (original method)...');
+                    
+                    // Use original JSON triplet method - DO NOT include group key-only pairs
+                    // This maintains backward compatibility for users who prefer the old format
+                    const keyValuePairs = this.convertMetadataToSimpleKeyValues(metadata);
+                    
+                    if (keyValuePairs.length > 0) {
+                        // Convert to JSON triplet format and use original method
+                        console.log('📋 Converting to JSON triplet format for OMERO...');
+                        
+                        // Use the original JSON triplet method from metaFoldOMEROIntegration
+                        if (window.metaFoldOMEROIntegration && window.metaFoldOMEROIntegration.addMapAnnotations) {
+                            const tripletResult = await window.metaFoldOMEROIntegration.addMapAnnotations(objectId, metadata, options.namespace);
+                            
+                            if (tripletResult.success) {
+                                results.push({
+                                    success: true,
+                                    namespace: options.namespace || 'MetaFold Integration',
+                                    annotationId: tripletResult.annotationId,
+                                    keyValuePairs: tripletResult.keyValuePairs || keyValuePairs.length,
+                                    method: 'json_triplets'
+                                });
+                                totalPairs += tripletResult.keyValuePairs || keyValuePairs.length;
+                                console.log(`✅ JSON Triplets: ${tripletResult.keyValuePairs || keyValuePairs.length} pairs created`);
+                            } else {
+                                results.push({
+                                    success: false,
+                                    namespace: options.namespace || 'MetaFold Integration',
+                                    error: tripletResult.error,
+                                    method: 'json_triplets'
+                                });
+                            }
+                        }
+                    }
+                    
+                } else {
+                    console.log('🔄 Using enhanced key-value approach (includes groups as key-only)...');
+                    
+                    // Use new function that includes group fields as key-only pairs
+                    const keyValuePairs = options.templateMetadata ? 
+                        this.convertMetadataToSimpleKeyValuesWithGroups(metadata, options.templateMetadata) : 
+                        this.convertMetadataToSimpleKeyValues(metadata);
+                    
+                    if (keyValuePairs.length > 0) {
+                        const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs);
+                        
+                        if (result.success) {
+                            results.push({
+                                success: true,
+                                namespace: options.namespace || 'MetaFold Integration',
+                                annotationId: result.annotationId,
+                                keyValuePairs: keyValuePairs.length,
+                                method: 'enhanced_key_value'
+                            });
+                            totalPairs += keyValuePairs.length;
+                            console.log(`✅ Enhanced Key-Value: ${keyValuePairs.length} pairs created`);
+                        } else {
+                            results.push({
+                                success: false,
+                                namespace: options.namespace || 'MetaFold Integration', 
+                                error: result.error,
+                                method: 'enhanced_key_value'
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Handle integration links separately
+            if (options.integrationData && options.integrationLinksAsKeyValue) {
+                console.log('🔗 Creating annotation for integration links...');
+                const integrationPairs = this.convertIntegrationLinksToKeyValue(options.integrationData);
+                
+                if (integrationPairs.length > 0) {
+                    const result = await this.testCreateMultipleKeyValues(objectId, integrationPairs);
+                    
+                    if (result.success) {
+                        results.push({
+                            success: true,
+                            namespace: 'Integration Links',
+                            annotationId: result.annotationId,
+                            keyValuePairs: integrationPairs.length
+                        });
+                        totalPairs += integrationPairs.length;
+                        console.log(`✅ Integration links: ${integrationPairs.length} pairs created`);
+                    } else {
+                        results.push({
+                            success: false,
+                            namespace: 'Integration Links',
+                            error: result.error
+                        });
+                    }
+                }
+            }
+            
+            // Summary
+            const successful = results.filter(r => r.success);
+            const failed = results.filter(r => !r.success);
+            
+            console.log(`🎉 Multi-namespace annotations complete:`);
+            console.log(`   Successful: ${successful.length}/${results.length} namespaces`);
+            console.log(`   Total pairs: ${totalPairs}`);
+            if (failed.length > 0) {
+                console.log(`   Failed namespaces: ${failed.map(f => f.namespace).join(', ')}`);
+            }
+            
+            return {
+                success: failed.length === 0,
+                results: results,
+                totalPairs: totalPairs,
+                successCount: successful.length,
+                failureCount: failed.length
+            };
+            
+        } catch (error) {
+            console.error('❌ Error in multi-namespace annotations:', error);
+            return {
+                success: false,
+                error: error.message,
+                results: []
+            };
+        }
+    },
+
+
 };
 
 // Make globally available

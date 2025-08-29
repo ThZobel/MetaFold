@@ -14,12 +14,11 @@ const settingsManager = {
 
 	defaultSettings: {
 		// General Settings
-		'general.user_management_enabled': true,
+		'general.user_management_enabled': false,
 		'general.theme': 'dark',
 		'general.auto_save': true,
 		'general.show_tips': true,
-		'general.show_shared_templates': true,
-
+		
 		// Security Settings
 		'security.encryption_enabled': true,
 		'security.auto_migrate': true,
@@ -46,12 +45,7 @@ const settingsManager = {
 		'omero.default_project_id': '',
 		'omero.create_datasets': true,
 		'omero.verify_ssl': true,
-		'omero.session_timeout': 600000, // 10 minutes
-		
-		// Phase 2: OMERO Enhanced Settings
-		'omero.use_json_triplets': false,
-		'omero.use_template_groups_as_namespaces': true,
-		'omero.integration_links_as_keyvalue': true
+		'omero.session_timeout': 600000 // 10 minutes
 	},
 
     // Keys that should be stored securely
@@ -121,297 +115,6 @@ const settingsManager = {
         }
     },
 
-    // Enhanced loadSettings - now user-specific
-    loadSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-                console.log(`📂 User-specific settings loaded from: ${storageKey}`);
-            } else {
-                // Try to load global settings for migration
-                const globalStored = localStorage.getItem('metafold_settings');
-                if (globalStored) {
-                    this.settings = { ...this.defaultSettings, ...JSON.parse(globalStored) };
-                    console.log('📂 Global settings found - will migrate to user-specific on save');
-                } else {
-                    this.settings = { ...this.defaultSettings };
-                    console.log('📂 No existing settings found - using defaults');
-                }
-            }
-        } catch (error) {
-            console.warn('Error loading user-specific settings, using defaults:', error);
-            this.settings = { ...this.defaultSettings };
-        }
-    },
-
-    // Enhanced saveSettings - now user-specific
-    saveSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            localStorage.setItem(storageKey, JSON.stringify(this.settings));
-            console.log(`💾 User-specific settings saved to: ${storageKey}`);
-            return true;
-        } catch (error) {
-            console.error('Error saving user-specific settings:', error);
-            return false;
-        }
-    },
-
-    // New function: Switch settings when user changes
-    async switchToUser(username, groupname) {
-        console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
-        
-        // Save current settings before switching
-        this.saveSettingsUserSpecific();
-        
-        // Update user context (this should trigger storage prefix update)
-        if (window.storage && window.storage.setUserPrefix) {
-            const prefix = `${groupname}_${username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-            window.storage.setUserPrefix(prefix);
-        }
-        
-        // Load settings for new user
-        this.loadSettingsUserSpecific();
-        
-        // Apply theme and other initial settings
-        this.applyInitialSettings();
-        
-        // Reload secure credentials for new user
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        // FORCE UPDATE SETTINGS UI
-        setTimeout(async () => {
-            await this.forceUpdateSettingsUI();
-        }, 100);
-        console.log('✅ Settings switched successfully');
-    },
-
-        async forceUpdateSettingsUI() {
-            try {
-                console.log('🔄 FORCE updating settings UI...');
-                
-                // Clear secure credentials cache to force reload
-                this.secureCredentials = {};
-                await this.loadSecureCredentials();
-                
-                // Force update OMERO username field
-                const omeroField = document.getElementById('omeroUsername');
-                if (omeroField) {
-                    const omeroUsername = await this.get('omero.username');
-                    console.log(`Force OMERO update: "${omeroField.value}" → "${omeroUsername}"`);
-                    omeroField.value = omeroUsername || '';
-                }
-                
-                // Phase 2: JSON-Triplet Checkbox Handler 
-                const omeroUseJsonTriplets = document.getElementById('omeroUseJsonTriplets');
-                if (omeroUseJsonTriplets) {
-                    const useJsonTriplets = await this.get('omero.use_json_triplets');
-                    omeroUseJsonTriplets.checked = useJsonTriplets || false;
-                    
-                    omeroUseJsonTriplets.addEventListener('change', async () => {
-                        await this.set('omero.use_json_triplets', omeroUseJsonTriplets.checked);
-                        console.log('🔬 OMERO JSON-Triplet mode:', omeroUseJsonTriplets.checked ? 'enabled' : 'disabled');
-                    });
-                    
-                    console.log('✅ Phase 2 JSON-Triplet checkbox initialized:', useJsonTriplets);
-                } else {
-                    console.warn('⚠️ Phase 2 JSON-Triplet checkbox not found in DOM');
-                }
-                
-                console.log('✅ Settings UI force updated');
-                
-            } catch (error) {
-                console.error('❌ Error in force settings UI update:', error);
-            }
-        },
-
-    // New function: Migrate global settings to user-specific
-    migrateGlobalSettingsToUser() {
-        try {
-            const globalSettings = localStorage.getItem('metafold_settings');
-            if (globalSettings && window.storage) {
-                const userKey = window.storage.getStorageKey('settings');
-                const userSettings = localStorage.getItem(userKey);
-                
-                // Only migrate if user doesn't have settings yet
-                if (!userSettings) {
-                    localStorage.setItem(userKey, globalSettings);
-                    console.log('📦 Global settings migrated to user-specific');
-                    return true;
-                }
-            }
-            return false;
-        } catch (error) {
-            console.warn('Could not migrate global settings:', error);
-            return false;
-        }
-    },
-
-    // Enhanced init function to use user-specific storage
-    async initUserSpecific() {
-        console.log('🔧 Initializing settingsManager with user-specific support...');
-        
-        // Wait for dependencies
-        let attempts = 0;
-        while ((!window.storage || !window.userManager) && attempts < 20) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        
-        if (!window.storage) {
-            console.warn('⚠️ Storage system not available - falling back to global settings');
-            this.loadSettings(); // Use original function
-            this.applyInitialSettings();
-            return;
-        }
-        
-        // Load user-specific settings
-        this.loadSettingsUserSpecific();
-        
-        // Load secure credentials
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        // Apply initial settings
-        this.applyInitialSettings();
-        
-        console.log('✅ settingsManager initialized with user-specific support');
-    },
-
-    // =================== USER-SPECIFIC SETTINGS ENHANCEMENT ===================
-    // This enhancement makes settings user-specific by utilizing the existing storage system
-
-    // Enhanced loadSettings - now user-specific
-    loadSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-                console.log(`📂 User-specific settings loaded from: ${storageKey}`);
-            } else {
-                // Try to load global settings for migration
-                const globalStored = localStorage.getItem('metafold_settings');
-                if (globalStored) {
-                    this.settings = { ...this.defaultSettings, ...JSON.parse(globalStored) };
-                    console.log('📂 Global settings found - will migrate to user-specific on save');
-                } else {
-                    this.settings = { ...this.defaultSettings };
-                    console.log('📂 No existing settings found - using defaults');
-                }
-            }
-        } catch (error) {
-            console.warn('Error loading user-specific settings, using defaults:', error);
-            this.settings = { ...this.defaultSettings };
-        }
-    },
-
-    // Enhanced saveSettings - now user-specific
-    saveSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            localStorage.setItem(storageKey, JSON.stringify(this.settings));
-            console.log(`💾 User-specific settings saved to: ${storageKey}`);
-            return true;
-        } catch (error) {
-            console.error('Error saving user-specific settings:', error);
-            return false;
-        }
-    },
-
-    // New function: Switch settings when user changes
-    async switchToUser(username, groupname) {
-        console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
-        
-        // Save current settings before switching
-        this.saveSettingsUserSpecific();
-        
-        // Update user context (this should trigger storage prefix update)
-        if (window.storage && window.storage.setUserPrefix) {
-            const prefix = `${groupname}_${username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-            window.storage.setUserPrefix(prefix);
-        }
-        
-        // Load settings for new user
-        this.loadSettingsUserSpecific();
-        
-        // Apply theme and other initial settings
-        this.applyInitialSettings();
-        
-        // Reload secure credentials for new user
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        console.log('✅ Settings switched successfully');
-    },
-
-    // New function: Migrate global settings to user-specific
-    migrateGlobalSettingsToUser() {
-        try {
-            const globalSettings = localStorage.getItem('metafold_settings');
-            if (globalSettings && window.storage) {
-                const userKey = window.storage.getStorageKey('settings');
-                const userSettings = localStorage.getItem(userKey);
-                
-                // Only migrate if user doesn't have settings yet
-                if (!userSettings) {
-                    localStorage.setItem(userKey, globalSettings);
-                    console.log('📦 Global settings migrated to user-specific');
-                    return true;
-                }
-            }
-            return false;
-        } catch (error) {
-            console.warn('Could not migrate global settings:', error);
-            return false;
-        }
-    },
-
-    // Enhanced init function to use user-specific storage
-    async initUserSpecific() {
-        console.log('🔧 Initializing settingsManager with user-specific support...');
-        
-        // Wait for dependencies
-        let attempts = 0;
-        while ((!window.storage || !window.userManager) && attempts < 20) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        
-        if (!window.storage) {
-            console.warn('⚠️ Storage system not available - falling back to global settings');
-            this.loadSettings(); // Use original function
-            this.applyInitialSettings();
-            return;
-        }
-        
-        // Load user-specific settings
-        this.loadSettingsUserSpecific();
-        
-        // Load secure credentials
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        // Apply initial settings
-        this.applyInitialSettings();
-        
-        console.log('✅ settingsManager initialized with user-specific support');
-    },
-
     async get(key) {
         // Check if this is a sensitive key that should be retrieved securely
         if (this.sensitiveKeys.includes(key)) {
@@ -450,10 +153,7 @@ const settingsManager = {
 
     async loadSecureCredentials() {
         try {
-            const storageKey = window.storage ? 
-            window.storage.getStorageKey('secure_credentials') : 
-            'metafold_secure_credentials';
-        const storedCredentials = localStorage.getItem(storageKey);
+            const storedCredentials = localStorage.getItem('metafold_secure_credentials');
             if (storedCredentials) {
                 this.secureCredentials = JSON.parse(storedCredentials);
                 console.log('🔐 Loaded secure credentials store');
@@ -472,10 +172,7 @@ const settingsManager = {
 
     async saveSecureCredentials() {
         try {
-           const storageKey = window.storage ? 
-            window.storage.getStorageKey('secure_credentials') : 
-            'metafold_secure_credentials';
-        localStorage.setItem(storageKey, JSON.stringify(this.secureCredentials));
+            localStorage.setItem('metafold_secure_credentials', JSON.stringify(this.secureCredentials));
             localStorage.setItem('metafold_migration_status', JSON.stringify(this.migrationStatus));
             console.log('🔐 Saved secure credentials store');
         } catch (error) {
@@ -662,7 +359,7 @@ const settingsManager = {
         }
     },
 
-    // Create elabFTW experiment
+    // Create elabFTW experiment - FIXED
     async createElabFTWExperiment(projectName, metadata, structure = '') {
         const serverUrl = await this.getFormattedElabFTWUrl();
         const apiKey = await this.get('elabftw.api_key');
@@ -675,17 +372,12 @@ const settingsManager = {
         try {
             console.log('🧪 FIXED: Creating new elabFTW experiment');
             
-            const cleanTitle = String(projectName).trim();
-            if (!cleanTitle) {
-                throw new Error('Project name is empty or invalid');
-            }
-            
             const experimentData = {
-                title: cleanTitle,
-                body: this.generateExperimentBody(cleanTitle, metadata, structure)
+                title: projectName,
+                body: this.generateExperimentBody(projectName, metadata, structure)
             };
 
-            if (categoryId && categoryId !== '' && !isNaN(parseInt(categoryId))) {
+            if (categoryId && categoryId !== '') {
                 experimentData.category_id = parseInt(categoryId);
             }
 
@@ -703,32 +395,6 @@ const settingsManager = {
                 const experimentId = location ? location.split('/').pop() : null;
                 
                 console.log('🧪 FIXED: Experiment created with ID:', experimentId);
-                
-                // CRITICAL: Override title immediately after creation (in case template overwrote it)
-                if (experimentId) {
-                    try {
-                        console.log('🧪 FIXED: Ensuring correct title via PATCH override');
-                        const titleOverrideResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
-                            method: 'PATCH',
-                            headers: {
-                                'Authorization': apiKey,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                title: cleanTitle
-                            })
-                        });
-                        
-                        if (titleOverrideResponse.ok) {
-                            console.log('✅ FIXED: Title successfully set to:', cleanTitle);
-                        } else {
-                            console.warn('⚠️ FIXED: Title override response:', titleOverrideResponse.status);
-                        }
-                    } catch (titleError) {
-                        console.warn('⚠️ FIXED: Title override failed:', titleError.message);
-                        // Continue anyway - the experiment was created
-                    }
-                }
                 
                 // Add metadata using the FIXED merge logic
                 if (metadata && Object.keys(metadata).length > 0 && experimentId) {
@@ -1223,23 +889,13 @@ const settingsManager = {
         }
         
         try {
-            console.log('🔬 settingsManager: Creating OMERO dataset with Phase 2 support...');
-            
-            // Check if enhanced method is available
-            if (window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced) {
-                console.log('🔬 settingsManager: Using enhanced integration method');
-                return await this.createOMERODatasetEnhanced(projectName, metadata, options);
-            } else {
-                console.log('🔬 settingsManager: Using standard integration method');
-                return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, options);
-            }
-            
+            console.log('🔬 settingsManager: Delegating to metaFoldOMEROIntegration.createDatasetForMetaFoldProject');
+            return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, options);
         } catch (error) {
             console.error('❌ settingsManager: Error in createOMERODataset:', error);
             return {
                 success: false,
-                message: `Error creating OMERO dataset: ${error.message}`,
-                error: error.message
+                message: `Error creating OMERO dataset: ${error.message}`
             };
         }
     },
@@ -1447,66 +1103,6 @@ const settingsManager = {
 		if (!this.settings) return false;
 		return this.settings['general.user_management_enabled'] === true;
 	},
-
-    // Phase 2: Get OMERO Export Options
-    async getOMEROExportOptions() {
-        try {
-            const options = {
-                useJsonTriplets: await this.get('omero.use_json_triplets'),
-                useTemplateGroupsAsNamespaces: await this.get('omero.use_template_groups_as_namespaces'),
-                integrationLinksAsKeyValue: await this.get('omero.integration_links_as_keyvalue')
-            };
-            
-            console.log('🔬 Retrieved OMERO export options:', options);
-            return options;
-            
-        } catch (error) {
-            console.error('❌ Error getting OMERO export options:', error);
-            // Return safe defaults
-            return {
-                useJsonTriplets: false,
-                useTemplateGroupsAsNamespaces: true,
-                integrationLinksAsKeyValue: true
-            };
-        }
-    },
-    
-    // Enhanced OMERO dataset creation with Phase 2 support
-    async createOMERODatasetEnhanced(projectName, metadata, options = {}) {
-        if (!window.metaFoldOMEROIntegration) {
-            return { success: false, message: 'MetaFold OMERO integration module not available' };
-        }
-        
-        try {
-            console.log('🔬 settingsManager: Using enhanced OMERO integration...');
-            
-            // Get export options and merge with provided options
-            const exportOptions = await this.getOMEROExportOptions();
-            const enhancedOptions = {
-                ...options,
-                ...exportOptions
-            };
-            
-            console.log('🔬 settingsManager: Enhanced options:', enhancedOptions);
-            
-            // Use enhanced method if available
-            if (window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced) {
-                return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced(projectName, metadata, enhancedOptions);
-            } else {
-                // Fallback to standard method
-                console.warn('⚠️ Enhanced integration not available, using standard method');
-                return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, enhancedOptions);
-            }
-            
-        } catch (error) {
-            console.error('❌ settingsManager: Error in enhanced OMERO dataset creation:', error);
-            return {
-                success: false,
-                message: `Error creating enhanced OMERO dataset: ${error.message}`,
-                error: error.message
-            };
-        }
-    }
 };
 
 // Make globally available

@@ -1,233 +1,15 @@
-/**
- * MetaFold OMERO Integration - Saubere funktionierende Version
- * 
- * Basiert auf funktionierenden Logs:
- * - Neue Dataset IDs (15613, 15614) ✅
- * - Project Linking funktioniert ✅
- * - Map Annotations funktionieren ✅
- * - DELETE-Schritt entfernt (verursacht 501 Fehler)
- * - Nur funktionierende APIs beibehalten
- * 
- * @version 3.1 - Clean & Working
- * @author NFDI4BioImage MetaFold Team
- */
+// MetaFold OMERO Integration v3.0 - SCHNELLE VERSION
+// Basiert auf funktionierender Version, optimiert für Geschwindigkeit
 
 const metaFoldOMEROIntegration = {
-
-    // =================== TEMPLATE GROUPS AUTO-DETECTION ===================
-
-    // Helper function: Automatically detect if template has groups
-    detectTemplateGroups(templateMetadata) {
-        console.log('🔍 Auto-detecting template groups...');
-        console.log('🔍 Template metadata:', templateMetadata);
-        
-        if (!templateMetadata) {
-            console.log('🔍 No template metadata found');
-            return false;
-        }
-        
-        // *** FIX: Look in the correct location ***
-        let fieldsObject = null;
-        
-        // Method 1: New format with metadata.fields
-        if (templateMetadata.metadata && templateMetadata.metadata.fields) {
-            fieldsObject = templateMetadata.metadata.fields;
-            console.log('🔍 Using new format: metadata.fields');
-        }
-        // Method 2: Old format with direct metadata
-        else if (templateMetadata.metadata) {
-            fieldsObject = templateMetadata.metadata;
-            console.log('🔍 Using old format: metadata');
-        }
-        else {
-            console.log('🔍 No fields object found');
-            return false;
-        }
-        
-        // Look for group type fields
-        const groupFields = Object.entries(fieldsObject)
-            .filter(([key, field]) => field && field.type === 'group');
-        
-        if (groupFields.length > 0) {
-            console.log(`🔍 ✅ Template groups detected: ${groupFields.length} groups found`);
-            
-            // Log group details
-            groupFields.forEach(([key, field]) => {
-                const groupName = field.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                console.log(`🔍    - Group: "${groupName}" (key: ${key})`);
-            });
-            
-            return true;
-        } else {
-            console.log('🔍 ❌ No template groups found');
-            return false;
-        }
-    },
-
-    // =================== NEUE HAUPTMETHODE (vor den bestehenden Funktionen einfügen) ===================
-
-    // ENHANCED MAP ANNOTATIONS METHOD with AUTOMATIC Template Groups Detection
-
-    async addMapAnnotationsNew(datasetId, metadata, namespace = 'MetaFold Integration', options = {}) {
-            console.log('🚀 === ULTRA-SIMPLE MAP ANNOTATIONS (2 MODES ONLY) ===');
-            console.log('🚀 Dataset ID:', datasetId);
-            console.log('🚀 Namespace:', namespace);
-            console.log('🚀 Metadata fields:', metadata ? Object.keys(metadata).length : 0);
-            
-            try {
-                // *** STEP 1: Check JSON Triplets Checkbox - SIMPLE ***
-                const jsonTripletsCheckbox = document.getElementById('omeroUseJsonTriplets');
-                const useJsonTriplets = jsonTripletsCheckbox ? jsonTripletsCheckbox.checked : false;
-                
-                console.log(`📋 JSON Triplets checkbox: ${useJsonTriplets ? 'CHECKED' : 'UNCHECKED'}`);
-                
-                // *** STEP 2: ULTRA-SIMPLE IF/ELSE - NUR 2 WEGE ***
-                
-                if (useJsonTriplets) {
-                    
-            // =================== MODE 1: JSON TRIPLETS - FINAL FIX ===================
-                console.log('📋 MODE 1: Using JSON TRIPLETS (old working method)...');
-                
-                // *** FINAL FIX: Remove integration links from metadata BEFORE JSON triplet processing ***
-                let cleanedMetadata = { ...metadata }; // Clone to avoid modifying original
-                
-                // List of integration link fields that should NOT be in JSON triplets
-                const integrationFields = [
-                    'MetaFold Local Path', 'metafold_local_path', 'project_local_path',
-                    'MetaFold Created', 'metafold_created', 'metafold_export_timestamp', 
-                    'OMERO Link', 'omero_link',
-                    'elabFTW Link', 'elabftw_link',
-                    'metafold_integration'
-                ];
-                
-                // Remove integration fields from metadata before JSON triplet processing
-                let removedFieldsCount = 0;
-                integrationFields.forEach(fieldKey => {
-                    if (cleanedMetadata[fieldKey]) {
-                        console.log(`🔧 Removing integration field from JSON triplets: ${fieldKey}`);
-                        delete cleanedMetadata[fieldKey];
-                        removedFieldsCount++;
-                    }
-                });
-                
-                if (removedFieldsCount > 0) {
-                    console.log(`🔧 Removed ${removedFieldsCount} integration fields from JSON triplets to prevent duplication`);
-                    console.log(`🔧 Cleaned metadata fields: ${Object.keys(cleanedMetadata).length} (was ${Object.keys(metadata).length})`);
-                }
-                
-                // Get the main result with CLEANED metadata (no integration fields)
-                const result = await this.addMapAnnotations(datasetId, metadata, namespace, true); // true = no auto integration links                
-                if (result.success) {
-                    console.log('✅ JSON-triplet main annotation successful (integration links excluded):', result.keyValuePairs, 'pairs created');
-                    console.log('📋 Integration links will be handled separately by projectManager');
-                    
-                    return {
-                        ...result,
-                        method: 'json_triplets_mode_cleaned',
-                        mode: 'JSON Triplets (integration links separated)',
-                        integrationFieldsRemoved: removedFieldsCount,
-                        cleanedFieldsCount: Object.keys(cleanedMetadata).length,
-                        originalFieldsCount: Object.keys(metadata).length,
-                        note: 'Integration links excluded from JSON triplets to prevent duplication'
-                    };
-                } else {
-                    return {
-                        ...result,
-                        method: 'json_triplets_mode_error',
-                        mode: 'JSON Triplets (error occurred)'
-                    };
-                }
-            } else {
-
-                // =================== MODE 2: ENHANCED KEY-VALUE WITH GROUPS - FIXED VERSION ===================
-                console.log('🔄 MODE 2: Using ENHANCED KEY-VALUE (with groups)...');
-
-                // *** FIX: Get template metadata from options first, fallback to templateManager ***
-                let templateMetadata = null;
-                if (options && options.templateMetadata) {
-                    templateMetadata = options.templateMetadata;
-                    console.log('📋 Template from options:', templateMetadata.name || 'unnamed template');
-                } else if (window.templateManager && window.templateManager.currentTemplate) {
-                    templateMetadata = window.templateManager.currentTemplate;
-                    console.log('📋 Template from templateManager:', templateMetadata.name);
-                } else {
-                    console.log('📋 No template found - using simple key-value only');
-                }
-
-                // Test group detection and log template structure (ENHANCED DEBUGGING)
-                let hasGroups = false;
-                if (templateMetadata) {
-                    hasGroups = this.detectTemplateGroups(templateMetadata);
-                    console.log('📋 Template has groups:', hasGroups);
-                    
-                    // *** FIX: Log template metadata structure for debugging ***
-                    console.log('🔄 Template metadata structure:', {
-                        hasFields: !!(templateMetadata.metadata && templateMetadata.metadata.fields),
-                        hasFieldOrder: !!(templateMetadata.metadata && templateMetadata.metadata.fieldOrder),
-                        fieldOrderLength: templateMetadata.metadata && templateMetadata.metadata.fieldOrder ? templateMetadata.metadata.fieldOrder.length : 0,
-                        totalFields: templateMetadata.metadata ? Object.keys(templateMetadata.metadata.fields || templateMetadata.metadata || {}).length : 0
-                    });
-                }
-
-                // Convert with groups (ENHANCED WITH PROPER TEMPLATE METADATA)
-                let keyValuePairs;
-                if (templateMetadata && window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups) {
-                    console.log('🔄 Using ENHANCED conversion (with groups and correct fieldOrder)...');
-                    keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups(metadata, templateMetadata);
-                } else {
-                    console.log('🔄 Using STANDARD conversion (no groups - no template available)...');
-                    keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValues(metadata);
-                }
-                    
-                    if (keyValuePairs.length === 0) {
-                        return {
-                            success: false,
-                            message: 'No valid metadata for annotations',
-                            method: 'enhanced_key_value_mode'
-                        };
-                    }
-                    
-                    console.log(`🔄 Generated ${keyValuePairs.length} total key-value pairs`);
-                    
-                    // Create annotation
-                    const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
-                    
-                    if (result.success) {
-                        console.log('✅ Enhanced Key-Value method successful');
-                        return {
-                            ...result,
-                            method: 'enhanced_key_value_mode',
-                            mode: 'Enhanced Key-Value (with groups)',
-                            keyValuePairs: keyValuePairs.length
-                        };
-                    } else {
-                        console.error('❌ Enhanced method failed, trying JSON triplet fallback');
-                        const fallback = await this.addMapAnnotations(datasetId, metadata, namespace);
-                        return {
-                            ...fallback,
-                            method: 'json_triplet_fallback',
-                            mode: 'JSON Triplets (fallback)'
-                        };
-                    }
-                }
-                
-            } catch (error) {
-                console.error('❌ Ultra-simple annotations failed:', error);
-                return {
-                    success: false,
-                    message: `Annotations failed: ${error.message}`,
-                    error: error.message,
-                    method: 'error'
-                };
-            }
-        },
+    
     // =================== SCHLANKE HYBRID AUTHENTIFIZIERUNG ===================
     
     hybridAuth: {
         session: null,
         proxyUrl: 'http://localhost:3000/omero-api',
         
-        // Bewährte schnelle Authentifizierung
+        // Vereinfachte, schnelle Authentifizierung
         async loginViaJSONAPI(username, password, serverId = 1) {
             console.log('🔬 === SCHNELLE OMERO LOGIN ===');
             console.log('🔬 Username:', username);
@@ -248,7 +30,7 @@ const metaFoldOMEROIntegration = {
                 const csrfToken = tokenData.data;
                 console.log('✅ CSRF Token erhalten');
                 
-                // Schritt 2: Login
+                // Schritt 2: Login (nur JSON Format - das funktioniert)
                 const loginData = {
                     server: serverId,
                     username: username,
@@ -307,34 +89,29 @@ const metaFoldOMEROIntegration = {
             }
         },
         
-        // BEWÄHRTE Dataset-Erstellung (erstellt echte neue IDs)
+        // OPTIMIERTE Dataset-Erstellung mit Projekt-Support
         async createDatasetInGroup(name, description, groupId, projectId = null) {
             console.log('🔬 === OPTIMIERTE DATASET-ERSTELLUNG ===');
             console.log('🔬 Name:', name);
-            console.log('🔬 Gruppen-ID:', groupId || 'none');
+            console.log('🔬 Gruppen-ID:', groupId);
             console.log('🔬 Projekt-ID:', projectId || 'standalone');
             
             if (!this.session) {
                 throw new Error('Keine aktive Session - bitte zuerst einloggen');
             }
             
-            // Gruppenzugriff validieren (nur wenn groupId angegeben)
-            if (groupId) {
-                this.validateGroupAccess(groupId);
-            }
+            // Gruppenzugriff validieren
+            this.validateGroupAccess(groupId);
             
             try {
-                // Dataset standalone erstellen (bewährte Methode)
+                // SCHRITT 1: Dataset standalone erstellen (bewährte Methode)
                 const datasetData = {
                     "Name": name,
-                    "Description": description || 'Erstellt von MetaFold',
+                    "Description": description || 'Erstellt von MetaFold über schnelle Hybrid Auth',
                     "@type": "http://www.openmicroscopy.org/Schemas/OME/2016-06#Dataset"
                 };
                 
-                // URL mit oder ohne Gruppe
-                const saveUrl = groupId ? 
-                    `${this.proxyUrl}/api/v0/m/save/?group=${groupId}` :
-                    `${this.proxyUrl}/api/v0/save/`;
+                const saveUrl = `${this.proxyUrl}/api/v0/m/save/?group=${groupId}`;
                 
                 console.log('🔬 Erstelle Dataset...');
                 
@@ -364,7 +141,7 @@ const metaFoldOMEROIntegration = {
                 console.log('✅ Dataset erfolgreich erstellt');
                 console.log('📋 Dataset-ID:', datasetId);
                 
-                // Projekt-Verknüpfung falls gewünscht
+                // SCHRITT 2: Projekt-Verknüpfung falls gewünscht (bewährte Webclient-Methode)
                 let projectLinkResult = { success: false };
                 if (projectId && projectId !== 'none') {
                     console.log('🔗 Verknüpfe Dataset mit Projekt...');
@@ -377,20 +154,28 @@ const metaFoldOMEROIntegration = {
                     datasetName: result.data.Name,
                     groupId: groupId,
                     projectId: projectId,
-                    method: 'Bewährte Erstellung',
+                    method: 'Optimierte Erstellung',
                     linkedToProject: projectLinkResult.success,
-                    verified: projectLinkResult.verified || false,
-                    omeroWebUrl: this.generateOMEROURL(datasetId, groupId),
+                    omeroWebUrl: `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`,
                     response: result.data
                 };
                 
             } catch (error) {
-                console.error('❌ Dataset-Erstellung fehlgeschlagen:', error);
+                console.error('❌ Optimierte Dataset-Erstellung fehlgeschlagen:', error);
                 throw error;
             }
         },
         
-        // SAUBERE Projekt-Verknüpfung (ohne problematischen DELETE)
+        // SCHNELLE Projekt-Verknüpfung (bewährte Webclient-Methode)
+        
+        /**
+         * Link dataset to project using the exact API structure from successful browser logs
+         * This function replicates the exact API calls that work in the browser
+         * 
+         * @param {string|number} datasetId - The dataset ID to link
+         * @param {string|number} projectId - The project ID to link to
+         * @returns {Object} Result object with success status and details
+         */
         async linkDatasetToProjectWebclient(datasetId, projectId) {
             console.log('🔗 === DATASET-PROJEKT-VERKNÜPFUNG (WEBCLIENT API) ===');
             console.log('📋 Dataset ID:', datasetId);
@@ -398,14 +183,17 @@ const metaFoldOMEROIntegration = {
             console.log('🎯 Using exact API structure from successful browser logs');
             
             try {
+                // Ensure we have authentication
                 if (!this.session || !this.session.csrfToken) {
                     throw new Error('No valid OMERO session found');
                 }
                 
-                const linksUrl = `${this.proxyUrl}/webclient/api/links/`;
+                const proxyUrl = this.proxyUrl || 'http://localhost:3000/omero-api';
+                const linksUrl = `${proxyUrl}/webclient/api/links/`;
                 
-                // Link dataset to project (POST) - BEWÄHRTE METHODE
-                console.log('🔗 Linking dataset to project (POST)');
+                // STEP 1: Link dataset to project (POST)
+                // Body structure: {"project":{"PROJECT_ID":{"dataset":[DATASET_ID]}}}
+                console.log('🔗 STEP 1: Linking dataset to project (POST)');
                 
                 const linkBody = {
                     "project": {
@@ -421,7 +209,7 @@ const metaFoldOMEROIntegration = {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
-                        'User-Agent': 'MetaFold/3.1',
+                        'User-Agent': 'MetaFold/1.0',
                         'Accept': 'application/json, text/javascript, */*; q=0.01',
                         'Accept-Language': 'en-US,en;q=0.5',
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -442,11 +230,49 @@ const metaFoldOMEROIntegration = {
                 const linkResult = await linkResponse.json();
                 console.log('✅ POST link successful:', linkResult);
                 
-                // DELETE-Schritt ENTFERNT (verursacht 501 Fehler und ist nicht notwendig)
-                // Das Dataset ist bereits erfolgreich mit dem Project verknüpft
+                // STEP 2: Remove dataset from experimenter (DELETE)
+                // Body structure: {"experimenter":{"-1":{"dataset":[DATASET_ID]}}}
+                console.log('🔗 STEP 2: Removing dataset from experimenter (DELETE)');
                 
-                // Verification der Verknüpfung
-                console.log('🔍 Verifying dataset-project link');
+                const removeBody = {
+                    "experimenter": {
+                        "-1": {
+                            "dataset": [parseInt(datasetId)]
+                        }
+                    }
+                };
+                
+                console.log('📋 DELETE body:', JSON.stringify(removeBody));
+                
+                const removeResponse = await fetch(linksUrl, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'User-Agent': 'MetaFold/1.0',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-CSRFToken': this.session.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(removeBody)
+                });
+                
+                console.log('📋 DELETE response status:', removeResponse.status);
+                
+                if (!removeResponse.ok) {
+                    const errorText = await removeResponse.text();
+                    console.error('❌ DELETE remove failed:', removeResponse.status, errorText);
+                    // Don't throw error here - dataset is linked, just not moved from experimenter
+                    console.warn('⚠️ Dataset linked but not removed from experimenter');
+                } else {
+                    const removeResult = await removeResponse.json();
+                    console.log('✅ DELETE remove successful:', removeResult);
+                }
+                
+                // STEP 3: Verify the link was successful
+                console.log('🔍 STEP 3: Verifying dataset-project link');
+                
                 const verifyResult = await this.verifyDatasetProjectLink(datasetId, projectId);
                 console.log('📋 Verification result:', verifyResult);
                 
@@ -459,7 +285,7 @@ const metaFoldOMEROIntegration = {
                     verified: verifyResult.success,
                     verificationMethod: verifyResult.method || 'unknown',
                     message: `Dataset ${datasetId} successfully linked to project ${projectId}`,
-                    omeroWebUrl: this.generateOMEROURL(datasetId)
+                    omeroWebUrl: `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`
                 };
                 
             } catch (error) {
@@ -475,14 +301,24 @@ const metaFoldOMEROIntegration = {
             }
         },
 
-        // Verification der Projekt-Verknüpfung
+        /**
+         * Verify that a dataset is successfully linked to a project
+         * 
+         * @param {string|number} datasetId - The dataset ID to verify
+         * @param {string|number} projectId - The project ID to verify against
+         * @returns {Object} Verification result
+         */
         async verifyDatasetProjectLink(datasetId, projectId) {
             console.log('🔍 Verifying dataset-project link...');
             console.log('📋 Dataset ID:', datasetId);
             console.log('📋 Project ID:', projectId);
             
             try {
-                const projectDatasetsUrl = `${this.proxyUrl}/api/v0/m/projects/${projectId}/datasets/`;
+                const proxyUrl = this.proxyUrl || 'http://localhost:3000/omero-api';
+                
+                // Method 1: Check project's datasets
+                console.log('🔍 Method 1: Checking project datasets');
+                const projectDatasetsUrl = `${proxyUrl}/api/v0/m/projects/${projectId}/datasets/`;
                 
                 const response = await fetch(projectDatasetsUrl, {
                     method: 'GET',
@@ -543,34 +379,101 @@ const metaFoldOMEROIntegration = {
             }
         },
         
-        // Vereinfachte Projekt-Verknüpfung
         async linkDatasetToProject(datasetId, projectId) {
             console.log('🔗 === DATASET-PROJEKT-VERKNÜPFUNG (UPDATED) ===');
             console.log('📋 Dataset ID:', datasetId);
             console.log('📋 Project ID:', projectId);
-            console.log('🎯 Using working webclient API method');
+            console.log('🎯 Using new webclient API method');
             
-            const result = await this.linkDatasetToProjectWebclient(datasetId, projectId);
-            
-            if (result.success) {
-                console.log('✅ Dataset successfully linked to project using webclient API');
-                console.log('📋 Method:', result.method);
-                console.log('📋 Verified:', result.verified);
-                console.log('🌐 OMERO URL:', result.omeroWebUrl);
-            } else {
-                console.error('❌ Dataset linking failed:', result.message);
+            try {
+                // Use the new webclient API method that replicates successful browser behavior
+                const result = await this.linkDatasetToProjectWebclient(datasetId, projectId);
+                
+                if (result.success) {
+                    console.log('✅ Dataset successfully linked to project using webclient API');
+                    console.log('📋 Method:', result.method);
+                    console.log('📋 Verified:', result.verified);
+                    console.log('🌐 OMERO URL:', result.omeroWebUrl);
+                    
+                    return {
+                        success: true,
+                        method: result.method,
+                        verified: result.verified,
+                        verificationMethod: result.verificationMethod,
+                        omeroWebUrl: result.omeroWebUrl,
+                        message: result.message
+                    };
+                } else {
+                    console.error('❌ Dataset linking failed:', result.message);
+                    
+                    // Fallback: Try legacy method if available
+                    console.log('🔄 Trying legacy fallback method...');
+                    return await this.linkDatasetToProjectLegacy(datasetId, projectId);
+                }
+                
+            } catch (error) {
+                console.error('❌ Dataset linking exception:', error);
+                
+                // Fallback: Try legacy method
+                console.log('🔄 Trying legacy fallback method after exception...');
+                return await this.linkDatasetToProjectLegacy(datasetId, projectId);
             }
-            
-            return result;
         },
-        
-        // OMERO URL Generator
-        generateOMEROURL(datasetId, groupId = null) {
-            let url = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`;
-            if (groupId) {
-                url += `&group=${groupId}`;
+
+        /**
+         * Legacy fallback method for dataset linking
+         * This is the old method as a fallback
+         */
+        async linkDatasetToProjectLegacy(datasetId, projectId) {
+            console.log('🔗 Using legacy dataset linking method');
+            
+            try {
+                const linkUrl = `${this.proxyUrl}/webclient/action/addnewcontainer/`;
+                
+                const formData = new URLSearchParams();
+                formData.append('folder_type', 'dataset');
+                formData.append('parent', projectId);
+                formData.append('dataset', datasetId);
+                formData.append('csrfmiddlewaretoken', this.session.csrfToken);
+                
+                const response = await fetch(linkUrl, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': this.session.csrfToken
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Legacy dataset linking successful');
+                    return {
+                        success: true,
+                        method: 'legacy_addnewcontainer',
+                        verified: false, // Legacy method doesn't verify
+                        message: `Dataset ${datasetId} linked to project ${projectId} (legacy method)`
+                    };
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Legacy linking failed:', response.status, errorText);
+                    return {
+                        success: false,
+                        method: 'legacy_addnewcontainer',
+                        error: `HTTP ${response.status}: ${errorText}`,
+                        message: `Legacy linking failed: ${response.status}`
+                    };
+                }
+                
+            } catch (error) {
+                console.error('❌ Legacy linking exception:', error);
+                return {
+                    success: false,
+                    method: 'legacy_addnewcontainer',
+                    error: error.message,
+                    message: `Legacy linking failed: ${error.message}`
+                };
             }
-            return url;
         },
         
         // Gruppenzugriff validieren
@@ -598,6 +501,19 @@ const metaFoldOMEROIntegration = {
             const maxAge = 30 * 60 * 1000; // 30 Minuten
             
             return sessionAge < maxAge;
+        },
+        
+        // Gruppen-Informationen abrufen
+        getGroupInfo() {
+            if (!this.session) return null;
+            
+            return {
+                currentGroupId: this.session.groupId,
+                currentGroupName: this.session.groupName,
+                memberOfGroups: this.session.memberOfGroups,
+                leaderOfGroups: this.session.leaderOfGroups,
+                isAdmin: this.session.isAdmin
+            };
         }
     },
     
@@ -608,13 +524,13 @@ const metaFoldOMEROIntegration = {
         console.log(`📝 Project: ${projectName}`);
         console.log(`🔬 Metadata fields: ${metadata ? Object.keys(metadata).length : 0}`);
         console.log(`🎯 Target group: ${options.groupId || 'default'}`);
-        console.log(`📁 Target project: ${options.projectId || 'standalone'}`);
+        console.log(`📁 Target project: ${options.projectId || 'none'}`);
         
         try {
-            // Authentifizierung sicherstellen
+            // Schritt 1: Schnelle Authentifizierung
             await this.ensureAuthentication();
             
-            // Dataset erstellen
+            // Schritt 2: Dataset erstellen
             console.log("🏗️ Creating OMERO dataset...");
             
             const datasetName = projectName;
@@ -638,27 +554,25 @@ const metaFoldOMEROIntegration = {
                 console.log(`🔗 Dataset linked to project: ${options.projectId}`);
             }
             
-            // Map Annotations hinzufügen - NEW SIMPLE METHOD
+            // Schritt 3: Map Annotations hinzufügen
             let annotationResult = null;
             if (metadata && Object.keys(metadata).length > 0) {
-                console.log("� Adding experiment metadata as Map Annotations (NEW SIMPLE METHOD)...");
+                console.log("🔬 Adding experiment metadata as Map Annotations...");
                 
-                // Use new method with simple key-value pairs (falls back to old method if needed)
-                annotationResult = await this.addMapAnnotationsNew(
+                annotationResult = await this.addMapAnnotations(
                     datasetId,
                     metadata,
-                    options.namespace || 'MetaFold Integration',
-                    true  // useSimpleMethod = true
+                    options.namespace || 'NFDI4BioImage.MetaFold.ExperimentMetadata'
                 );
                 
                 if (annotationResult.success) {
-                    console.log(`✅ Map Annotations (${annotationResult.method || 'simple'}): ${annotationResult.keyValuePairs} pairs added`);
+                    console.log(`✅ Map Annotations: ${annotationResult.keyValuePairs} pairs added`);
                 } else {
                     console.log(`⚠️ Map Annotations failed: ${annotationResult.message}`);
                 }
             }
             
-            // Ergebnis zusammenstellen
+            // Schritt 4: Ergebnis zusammenstellen
             const result = {
                 success: true,
                 message: `MetaFold project "${projectName}" successfully exported to OMERO`,
@@ -669,16 +583,20 @@ const metaFoldOMEROIntegration = {
                     groupId: datasetResult.groupId,
                     projectId: datasetResult.projectId || null,
                     linkedToProject: datasetResult.linkedToProject,
-                    verified: datasetResult.verified
+                    creationMethod: 'Schnelle Integration'
                 },
                 annotations: annotationResult || { success: false, message: 'No metadata provided' },
                 integration: {
                     timestamp: new Date().toISOString(),
-                    metafoldVersion: 'v3.1',
-                    apiMethod: 'Schnelle Integration',
+                    metafoldVersion: 'v3.0',
+                    apiMethod: 'Schnelle Hybrid Auth',
                     groupContext: options.groupId,
                     actualGroup: datasetResult.groupId,
                     projectContext: options.projectId
+                },
+                metafold: {
+                    projectName: projectName,
+                    metadataFieldCount: metadata ? Object.keys(metadata).length : 0
                 }
             };
             
@@ -693,7 +611,8 @@ const metaFoldOMEROIntegration = {
                 success: false,
                 message: `Integration failed: ${error.message}`,
                 error: error.message,
-                stage: 'integration'
+                stage: 'schnelle_integration',
+                recommendations: this.generateErrorRecommendations(error)
             };
         }
     },
@@ -732,7 +651,7 @@ const metaFoldOMEROIntegration = {
             console.log('📋 Server URL:', omeroServerUrl);
             console.log('📋 Username:', omeroUsername);
             
-            // Authentifizierung durchführen
+            // Schnelle Authentifizierung durchführen
             const loginResult = await this.hybridAuth.loginViaJSONAPI(
                 omeroUsername,
                 omeroPassword
@@ -753,8 +672,8 @@ const metaFoldOMEROIntegration = {
     },
     
     // =================== MAP ANNOTATIONS ===================
-
-    async addMapAnnotations(datasetId, metadata, namespace, excludeIntegrationLinks = false) {
+    
+    async addMapAnnotations(datasetId, metadata, namespace) {
         console.log('🔬 Adding Map Annotations...');
         console.log('🔬 Dataset ID:', datasetId);
         console.log('🔬 Namespace:', namespace);
@@ -762,7 +681,7 @@ const metaFoldOMEROIntegration = {
         
         try {
             // Metadaten zu Map-Annotation-Format konvertieren
-            const mapPairs = this.convertMetadataToMapPairs(metadata, excludeIntegrationLinks);
+            const mapPairs = this.convertMetadataToMapPairs(metadata);
             console.log('🔬 Generated map pairs:', mapPairs.length);
             
             // Session für CSRF Token verwenden
@@ -816,7 +735,7 @@ const metaFoldOMEROIntegration = {
         }
     },
     
-    // Map Annotations Funktion für projectManager Kompatibilität
+    // Zusätzliche Map Annotations Funktion (für projectManager Kompatibilität)
     async addWorkingMapAnnotations(datasetId, metadata, namespace) {
         console.log('🔬 Adding working Map Annotations (projectManager compatibility)...');
         console.log('🔬 Dataset ID:', datasetId);
@@ -828,8 +747,8 @@ const metaFoldOMEROIntegration = {
     // =================== HILFSFUNKTIONEN ===================
     
     // Metadaten zu OMERO Map Annotation Paaren konvertieren
-        convertMetadataToMapPairs(metadata, excludeIntegrationLinks = false) {
-            const mapPairs = [];
+    convertMetadataToMapPairs(metadata) {
+        const mapPairs = [];
         
         for (const [key, fieldData] of Object.entries(metadata)) {
             if (fieldData && typeof fieldData === 'object') {
@@ -863,15 +782,10 @@ const metaFoldOMEROIntegration = {
             }
         }
         
-        if (!excludeIntegrationLinks) {
         // MetaFold Metadaten hinzufügen
         mapPairs.push(['metafold_export_timestamp', new Date().toISOString()]);
-        mapPairs.push(['metafold_version', 'v3.1']);
-        mapPairs.push(['metafold_export_method', 'CLEAN_INTEGRATION']);
-        console.log('🔧 Added automatic MetaFold integration fields');
-    } else {
-        console.log('🔧 Excluded automatic MetaFold integration fields (will be added separately)');
-    }
+        mapPairs.push(['metafold_version', 'v3.0']);
+        mapPairs.push(['metafold_export_method', 'SCHNELLE_INTEGRATION']);
         
         return mapPairs;
     },
@@ -881,7 +795,7 @@ const metaFoldOMEROIntegration = {
         const lines = [
             `Dataset created by MetaFold for project: ${projectName}`,
             `Creation date: ${new Date().toISOString()}`,
-            `Export method: Clean Integration v3.1`,
+            `Export method: Schnelle Integration`,
             ''
         ];
         
@@ -911,122 +825,125 @@ const metaFoldOMEROIntegration = {
         
         return lines.join('\n');
     },
-
-    // =================== PHASE 2: ENHANCED MAIN INTEGRATION ===================
     
-    // Enhanced createDatasetForMetaFoldProject with Phase 2 features
-    async createDatasetForMetaFoldProjectEnhanced(projectName, metadata = null, options = {}) {
-        console.log("🚀 === ENHANCED MetaFold OMERO Integration (Phase 2) ===");
-        console.log(`🚀 Project Name: "${projectName}"`);
-        console.log('🚀 Options:', options);
-        console.log('🚀 Metadata fields:', metadata ? Object.keys(metadata).length : 0);
+    // Fehler-Empfehlungen generieren
+    generateErrorRecommendations(error) {
+        const recommendations = [];
+        const errorMessage = error.message.toLowerCase();
+        
+        if (errorMessage.includes('authentication') || errorMessage.includes('login')) {
+            recommendations.push('Check OMERO credentials in settings');
+            recommendations.push('Verify OMERO server URL is correct');
+            recommendations.push('Start proxy server: python omero_proxy.py');
+        } else if (errorMessage.includes('group') || errorMessage.includes('permission')) {
+            recommendations.push('Verify user has access to the selected group');
+            recommendations.push('Check group permissions in OMERO.web');
+        } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+            recommendations.push('Check internet connection');
+            recommendations.push('Verify OMERO server is running');
+            recommendations.push('Start proxy server: python omero_proxy.py');
+        } else {
+            recommendations.push('Check browser console for detailed error information');
+            recommendations.push('Try refreshing the page and retrying');
+        }
+        
+        return recommendations;
+    },
+    
+    // =================== TESTING ===================
+    
+    // Schneller Test der Integration
+    async testQuickIntegration() {
+        console.log('🧪 === SCHNELLER INTEGRATIONS-TEST ===');
+        
+        const testResults = {
+            authentication: false,
+            groupAccess: false,
+            datasetCreation: false,
+            mapAnnotations: false,
+            overall: false
+        };
         
         try {
-            // Step 1: Create dataset (same as Phase 1)
-            console.log("📊 Step 1: Creating OMERO dataset...");
-            const datasetResult = await this.hybridAuth.createDatasetInGroup(
-                projectName,
-                this.generateDatasetDescription(projectName, metadata, options),
-                options.groupId,
-                options.projectId
-            );
-            
-            if (!datasetResult.success) {
-                throw new Error(`Dataset creation failed: ${datasetResult.error}`);
+            // Test 1: Authentifizierung
+            console.log('🧪 Test 1: Authentication...');
+            try {
+                await this.ensureAuthentication();
+                testResults.authentication = true;
+                console.log('✅ Authentication: Successful');
+            } catch (authError) {
+                console.log('❌ Authentication:', authError.message);
             }
             
-            const datasetId = datasetResult.datasetId;
-            console.log(`✅ Dataset created successfully: ID ${datasetId}`);
-            
-            // Step 2: Enhanced metadata annotations with Phase 2 features
-            let annotationResult = null;
-            if (metadata && Object.keys(metadata).length > 0) {
-                console.log("📋 Step 2: Adding enhanced metadata annotations...");
-                
-                // Prepare integration data
-                const integrationData = {
-                    metafold_export_timestamp: new Date().toISOString(),
-                    project_local_path: options.projectPath || 'Unknown',
-                    omero_link: this.generateOMEROURL(datasetId, options.groupId),
-                    template_used: options.templateName || 'Unknown Template',
-                    created_by_user: options.username || 'Unknown User',
-                    created_by_group: options.groupname || 'Unknown Group'
-                };
-                
-                // Add elabFTW link if available
-                if (options.elabftwLink) {
-                    integrationData.elabftw_link = options.elabftwLink;
-                }
-                
-                // Prepare enhanced options
-                const enhancedOptions = {
-                    ...options,
-                    integrationData: integrationData,
-                    templateMetadata: options.templateMetadata // Template structure for groups
-                };
-                
-                // Use enhanced annotation method
-                annotationResult = await this.addMapAnnotationsNew(
-                    datasetId,
-                    metadata,
-                    'MetaFold Integration',
-                    enhancedOptions
-                );
-                
-                if (annotationResult.success) {
-                    console.log(`✅ Enhanced annotations created: ${annotationResult.totalKeyValuePairs || annotationResult.keyValuePairs || 'Unknown'} total pairs`);
-                    if (annotationResult.totalNamespaces) {
-                        console.log(`📁 Namespaces created: ${annotationResult.totalNamespaces}`);
-                    }
+            if (testResults.authentication) {
+                // Test 2: Gruppenzugriff
+                console.log('🧪 Test 2: Group Access...');
+                const groupInfo = this.hybridAuth.getGroupInfo();
+                if (groupInfo && groupInfo.memberOfGroups.length > 0) {
+                    testResults.groupAccess = true;
+                    console.log('✅ Group Access: Available groups:', groupInfo.memberOfGroups);
                 } else {
-                    console.warn("⚠️ Enhanced annotations failed:", annotationResult.error);
+                    console.log('❌ Group Access: No groups accessible');
+                }
+                
+                // Test 3: Dataset-Erstellung
+                if (testResults.groupAccess) {
+                    console.log('🧪 Test 3: Dataset Creation...');
+                    const testMetadata = {
+                        test_field: {
+                            type: 'text',
+                            label: 'Test Field',
+                            value: 'Schneller Test v3.0',
+                            description: 'Test metadata for fast integration'
+                        }
+                    };
+                    
+                    const testGroupId = groupInfo.memberOfGroups[0];
+                    
+                    try {
+                        const integrationResult = await this.createDatasetForMetaFoldProject(
+                            `MetaFold_SchnellTest_${Date.now()}`,
+                            testMetadata,
+                            {
+                                groupId: testGroupId,
+                                namespace: 'NFDI4BioImage.MetaFold.SchnellTest'
+                            }
+                        );
+                        
+                        if (integrationResult.success) {
+                            testResults.datasetCreation = true;
+                            testResults.mapAnnotations = integrationResult.annotations.success;
+                            console.log('✅ Dataset Creation: Success, ID:', integrationResult.dataset.id);
+                            console.log('🌐 OMERO.web URL:', integrationResult.dataset.omeroWebUrl);
+                        } else {
+                            console.log('❌ Dataset Creation: Failed -', integrationResult.message);
+                        }
+                    } catch (integrationError) {
+                        console.log('❌ Integration Test:', integrationError.message);
+                    }
                 }
             }
             
-            // Step 3: Final result
-            const result = {
-                success: true,
-                message: `Enhanced MetaFold project "${projectName}" successfully exported to OMERO`,
-                dataset: {
-                    id: datasetId,
-                    name: projectName,
-                    omeroWebUrl: this.generateOMEROURL(datasetId, options.groupId),
-                    groupId: options.groupId,
-                    projectId: options.projectId || null,
-                    linkedToProject: datasetResult.linkedToProject,
-                    verified: datasetResult.verified
-                },
-                annotations: annotationResult || { success: false, message: 'No metadata provided' },
-                integration: {
-                    timestamp: new Date().toISOString(),
-                    metafoldVersion: 'v06 Phase 2',
-                    apiMethod: 'Enhanced Integration with Phase 2 Features',
-                    groupContext: options.groupId,
-                    actualGroup: options.groupId,
-                    projectContext: options.projectId,
-                    featuresUsed: {
-                        multiNamespace: annotationResult?.method?.includes('multi_namespace') || false,
-                        simpleKeyValue: annotationResult?.method?.includes('simple') || false,
-                        jsonTripletFallback: annotationResult?.method?.includes('triplet') || false,
-                        integrationLinks: annotationResult?.integrationLinksAdded || false
-                    }
-                }
-            };
+            // Gesamtergebnis
+            testResults.overall = testResults.authentication && testResults.groupAccess && 
+                                testResults.datasetCreation && testResults.mapAnnotations;
             
-            console.log("🎉 Enhanced MetaFold OMERO integration completed successfully!");
-            console.log(`🌐 View in OMERO.web: ${result.dataset.omeroWebUrl}`);
-            console.log(`📊 Integration method: ${annotationResult?.method || 'unknown'}`);
+            console.log('🧪 === SCHNELLE TEST RESULTS ===');
+            console.log('Authentication:', testResults.authentication ? '✅' : '❌');
+            console.log('Group Access:', testResults.groupAccess ? '✅' : '❌');
+            console.log('Dataset Creation:', testResults.datasetCreation ? '✅' : '❌');
+            console.log('Map Annotations:', testResults.mapAnnotations ? '✅' : '❌');
+            console.log('Overall:', testResults.overall ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED');
             
-            return result;
+            if (testResults.overall) {
+                console.log('🎉 SCHNELLE INTEGRATION IS READY FOR PRODUCTION!');
+            }
+            
+            return testResults;
             
         } catch (error) {
-            console.error("❌ Enhanced MetaFold OMERO integration failed:", error);
-            return {
-                success: false,
-                message: `Enhanced integration failed: ${error.message}`,
-                error: error.message,
-                stage: 'enhanced_integration'
-            };
+            console.error('❌ Schneller Test fehlgeschlagen:', error);
+            return { ...testResults, error: error.message };
         }
     }
 };
@@ -1034,17 +951,40 @@ const metaFoldOMEROIntegration = {
 // Global verfügbar machen
 window.metaFoldOMEROIntegration = metaFoldOMEROIntegration;
 
-console.log("✅ MetaFold OMERO Integration v3.1 - SAUBER & FUNKTIONIEREND geladen!");
+// Schneller Test-Befehl
+window.testSchnelleOMEROIntegration = async function() {
+    try {
+        console.log('🚀 Starte schnelle OMERO Integration Test...');
+        
+        const testResult = await metaFoldOMEROIntegration.testQuickIntegration();
+        
+        if (testResult.overall) {
+            console.log('✅ Schnelle Integration Test erfolgreich!');
+        } else {
+            console.log('❌ Schnelle Integration Test fehlgeschlagen:', testResult);
+        }
+        
+        return testResult;
+        
+    } catch (error) {
+        console.error('❌ Schnelle Integration Test fehlgeschlagen:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+console.log("✅ MetaFold OMERO Integration v3.0 - SCHNELLE VERSION geladen!");
 console.log("");
 console.log("🎯 MAIN FUNCTION:");
 console.log("  await metaFoldOMEROIntegration.createDatasetForMetaFoldProject(name, metadata, options)");
 console.log("");
-console.log("💡 VERSION v3.1 VERBESSERUNGEN:");
-console.log("  ✅ Nur funktionierende APIs beibehalten");
-console.log("  ✅ DELETE-Schritt entfernt (verursacht 501 Fehler)");
-console.log("  ✅ Standalone Dataset-Erstellung unterstützt");
-console.log("  ✅ Neue Dataset-IDs bei jedem Aufruf");
-console.log("  ✅ Project-Linking funktioniert zuverlässig");
-console.log("  ✅ Map Annotations funktionieren perfekt");
+console.log("🧪 TESTING:");
+console.log("  await testSchnelleOMEROIntegration()                          // Schnelltest");
 console.log("");
-console.log("🚀 SAUBER, FUNKTIONIEREND & ZUVERLÄSSIG!");
+console.log("💡 VERSION v3.0 OPTIMIERUNGEN:");
+console.log("  ✅ Nur eine Login-Methode (JSON - funktioniert zuverlässig)");
+console.log("  ✅ Keine komplexen Fallback-Szenarien");
+console.log("  ✅ Bewährte Dataset-Erstellung + Webclient-Verknüpfung");
+console.log("  ✅ Minimale Debug-Ausgaben für bessere Performance");
+console.log("  ✅ Fokus auf Geschwindigkeit und Zuverlässigkeit");
+console.log("");
+console.log("🚀 SCHNELLER & ZUVERLÄSSIGER!");

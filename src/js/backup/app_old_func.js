@@ -6,12 +6,12 @@ const app = {
     async init() {
         if (this.initialized) return;
         
-        console.log('🚀 Starting MetaFold with user-specific settings...');
+        console.log('🚀 Starting MetaFold (FIXED async User Management)...');
         
         try {
             // Check what modules are available
             console.log('=== AVAILABLE MODULES ===');
-            const modules = ['storage', 'userManager', 'templateManager', 'settingsManager'];
+            const modules = ['storage', 'userManager', 'templateManager', 'templateTypeManager', 'templateModal', 'projectManager', 'settingsManager'];
             
             modules.forEach(module => {
                 if (window[module]) {
@@ -21,36 +21,18 @@ const app = {
                 }
             });
             
-            // STEP 1: Initialize settingsManager with user-specific support
+            // STEP 1: Initialize settingsManager FIRST (required for user management check)
             if (window.settingsManager) {
-                console.log('🔧 Initializing settingsManager with user-specific support...');
-                
-                // Check if new user-specific function is available
-                if (typeof window.settingsManager.initUserSpecific === 'function') {
-                    await window.settingsManager.initUserSpecific();
-                    console.log('✅ settingsManager initialized with user-specific support');
-                } else {
-                    // Fallback to original init
-                    console.warn('⚠️ User-specific settings not available - using standard init');
-                    await window.settingsManager.init();
-                    console.log('✅ settingsManager initialized (fallback)');
-                }
+                console.log('🔧 Initializing settingsManager...');
+                await window.settingsManager.init(); // FIXED: await the async init
+                console.log('✅ settingsManager initialized');
             }
             
-            // STEP 2: Initialize userManager with settings support
+            // STEP 2: Initialize userManager AFTER settingsManager
             if (window.userManager) {
                 console.log('🔧 Initializing userManager...');
-                
-                // Check if new settings-aware function is available
-                if (typeof window.userManager.initWithSettingsSupport === 'function') {
-                    const userResult = await window.userManager.initWithSettingsSupport();
-                    console.log('✅ User initialized with settings support:', userResult);
-                } else {
-                    // Fallback to original init
-                    console.warn('⚠️ User-settings integration not available - using standard init');
-                    const userResult = await window.userManager.init();
-                    console.log('✅ User initialized (fallback):', userResult);
-                }
+                const userResult = await window.userManager.init(); // FIXED: await the async init
+                console.log('✅ User initialized:', userResult);
             }
             
             // STEP 3: Initialize other available modules
@@ -59,19 +41,24 @@ const app = {
             // STEP 4: Setup event listeners
             this.setupEventListeners();
             
+            // STEP 5: Platform-specific adjustments
+            if (typeof appUtils !== 'undefined' && appUtils && typeof appUtils.applyPlatformStyles === 'function') {
+                appUtils.applyPlatformStyles();
+            }
+            
             this.initialized = true;
-            console.log('✅ MetaFold started successfully with user-specific settings!');
+            console.log('✅ MetaFold started successfully!');
             
             // Show current user info
             if (window.userManager && window.userManager.isInitialized) {
                 this.showSuccess(`App started! User: ${window.userManager.currentUser} (${window.userManager.currentGroup})`);
             } else {
-                this.showSuccess('App started!');
+                this.showSuccess('App started! (Simple mode - no user management)');
             }
             
         } catch (error) {
-            console.error('❌ Error starting app:', error);
-            this.showError('Error starting the application: ' + error.message);
+            console.error('❌ Error during app initialization:', error);
+            this.showError('Error starting app: ' + error.message);
         }
     },
 
