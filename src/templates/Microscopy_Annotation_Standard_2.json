@@ -1,0 +1,183 @@
+{
+  "name": "Microscopy Annotation Standard 2",
+  "description": "Professional microscopy experiment template with comprehensive metadata fields",
+  "type": "experiment",
+  "createdBy": "Thomas",
+  "createdAt": "2025-06-12T12:38:25.751Z",
+  "metadata": {
+    "fields": {
+      "mode": {
+        "type": "dropdown",
+        "label": "Mode",
+        "value": "LSM Plus (DCV)",
+        "required": true,
+        "position": 1,
+        "description": "Microscopy acquisition mode",
+        "options": [
+          "Airyscan SR",
+          "Airyscan Fast",
+          "LSM Plus (DCV)",
+          "MPLX (Multiplex)",
+          "jDCV",
+          "Linear Unmixing (34Ch)"
+        ]
+      },
+      "laser_lines": {
+        "type": "text",
+        "label": "Laser Lines (nm)",
+        "value": "405",
+        "required": false,
+        "position": 2,
+        "description": "Used laser wavelengths (multiple values separated by comma)"
+      },
+      "fluorescent_proteins": {
+        "type": "text",
+        "label": "Fluorescent Proteins",
+        "value": "",
+        "required": false,
+        "position": 4,
+        "description": "Used fluorescent proteins (multiple values separated by comma)"
+      },
+      "dyes": {
+        "type": "text",
+        "label": "Dyes",
+        "value": "egfp",
+        "required": false,
+        "position": 3,
+        "description": "Used fluorescent dyes (multiple values separated by comma)"
+      },
+      "organism": {
+        "type": "dropdown",
+        "label": "Organism",
+        "value": "Mus musculus",
+        "required": false,
+        "position": 5,
+        "description": "Source organism",
+        "options": [
+          "Homo sapiens",
+          "Mus musculus",
+          "Rattus norvegicus",
+          "Danio rerio",
+          "Drosophila melanogaster",
+          "Arabidopsis thaliana",
+          "Other"
+        ]
+      },
+      "cell_type": {
+        "type": "text",
+        "label": "Cell Type",
+        "value": "",
+        "required": false,
+        "position": 6,
+        "description": "Type of cells being imaged"
+      },
+      "organism_part": {
+        "type": "text",
+        "label": "Organism Part",
+        "value": "",
+        "required": false,
+        "position": 7,
+        "description": "Specific part of organism"
+      },
+      "fixation": {
+        "type": "dropdown",
+        "label": "Fixation",
+        "value": "Fixed",
+        "required": true,
+        "position": 8,
+        "description": "Sample fixation status",
+        "options": [
+          "Fixed",
+          "Live"
+        ]
+      },
+      "sample_type": {
+        "type": "dropdown",
+        "label": "Sample Type",
+        "value": "Tissue Section",
+        "required": false,
+        "position": 9,
+        "description": "Type of sample preparation",
+        "options": [
+          "Cell Culture",
+          "Tissue Sample",
+          "Tissue Section",
+          "Embryo",
+          "Preparation",
+          "Primary Cells",
+          "Other"
+        ]
+      },
+      "sample_description": {
+        "type": "textarea",
+        "label": "Sample Description",
+        "value": "",
+        "required": false,
+        "position": 10,
+        "description": "Detailed description of the sample"
+      },
+      "imaging_purpose": {
+        "type": "textarea",
+        "label": "Imaging Purpose",
+        "value": "",
+        "required": false,
+        "position": 11,
+        "description": "Purpose and goals of the imaging experiment"
+      }
+    },
+    "fieldOrder": [
+      "mode",
+      "laser_lines",
+      "dyes",
+      "fluorescent_proteins",
+      "organism",
+      "cell_type",
+      "organism_part",
+      "fixation",
+      "sample_type",
+      "sample_description",
+      "imaging_purpose"
+    ]
+  },
+  "integrations": {
+    "elabftw": {
+      "enabled": false,
+      "defaultCategory": 0
+    },
+    "omero": {
+      "enabled": false
+    }
+  },
+  "folderStructure": [],
+  "id": "microscopy_standard_2_1749856943158",
+  "createdByGroup": "MIN",
+  "updatedAt": "2025-09-25T15:52:29.205Z",
+  "fileMetadata": {
+    "version": "1.1.0",
+    "savedAt": "2025-07-16T11:45:43.006Z",
+    "source": "MetaFold"
+  },
+  "projectDefaults": {
+    "basePath": "C:\\Projekte\\Klämbt2",
+    "projectName": "Key_Value_2"
+  },
+  "originalName": "Microscopy Annotation Standard 2",
+  "sourceFilename": "Microscopy_Annotation_Standard_2.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2025-09-25T15:51:22.883Z",
+  "_fileInfo": {
+    "filename": "Microscopy_Annotation_Standard_2.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\Microscopy_Annotation_Standard_2.json",
+    "savedAt": "2025-09-25T15:52:29.205Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

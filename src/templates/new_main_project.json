@@ -1,0 +1,30 @@
+{
+  "name": "New Main Project",
+  "description": "Standard folder structure for new main scientific projects",
+  "type": "folders",
+  "structure": "01_Experiments/\n  01_Microscopy/\n  02_DNA/\n  03_Proteinbiochemistry/\n  04_Image_Analysis/\n02_Seminars_and_talks/\n03_Retrospective/\n04_Publications/\n  00_Figures/\n  01_Presentations/\n  02_Papers/\n  03_Posters/\nREADME.md",
+  "createdBy": "Thomas",
+  "createdByGroup": "MIN",
+  "createdAt": "2025-09-04T12:00:00.000Z",
+  "id": "template_new_main_project_001",
+  "updatedAt": "2025-09-25T15:52:29.205Z",
+  "_fileInfo": {
+    "filename": "new_main_project.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\new_main_project.json",
+    "savedAt": "2025-09-25T15:52:29.205Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "New Main Project",
+  "sourceFilename": "new_main_project.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2025-09-25T15:51:22.886Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}
