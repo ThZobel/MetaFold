@@ -107,7 +107,7 @@ MetaFold provides example templates to help you get started quickly:
    - Click on the **Action Menu** button (usually in the top bar)
    - Select **More** → **Import Template**
 3. **Download example templates**:
-   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/src/templates) on GitHub
+   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/templates) on GitHub
    - Download the `.json` template files you need
 4. **Import the template**:
    - In the import dialog, select the downloaded `.json` file
@@ -118,7 +118,7 @@ MetaFold provides example templates to help you get started quickly:
 #### Method 2: Manual Installation
 
 1. **Download example templates**:
-   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/src/templates) on GitHub
+   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/templates) on GitHub
    - Download the `.json` template files you need
 2. **Locate your MetaFold configuration directory**:
    - **Windows**: `C:\Users\<YourUsername>\MetaFold\<group>\<user>\`
