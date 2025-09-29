@@ -33,86 +33,6 @@ const omeroAuth = {
         return formattedUrl;
     },
 
-    // =================== DYNAMISCHE PROXY URL UNTERSTÜTZUNG ===================
-    
-    // Get dynamic proxy URL from settings or default
-    async getDynamicProxyUrl() {
-        try {
-            // Method 1: Try to get from OMERO UI Integration (if available)
-            if (window.omeroUIIntegration && window.omeroUIIntegration.getProxyUrl) {
-                const proxyUrl = await window.omeroUIIntegration.getProxyUrl();
-                console.log('🔗 Using proxy URL from omeroUIIntegration:', proxyUrl);
-                return proxyUrl;
-            }
-            
-            // Method 2: Check if Electron proxy manager is available
-            if (window.electronAPI && window.electronAPI.getOMEROProxyStatus) {
-                try {
-                    const proxyStatus = await window.electronAPI.getOMEROProxyStatus();
-                    if (proxyStatus.success && proxyStatus.running) {
-                        const proxyUrl = `http://localhost:${proxyStatus.port}/omero-api`;
-                        console.log('🔗 Using proxy URL from Electron status:', proxyUrl);
-                        return proxyUrl;
-                    }
-                } catch (electronError) {
-                    console.warn('⚠️ Could not get proxy status from Electron:', electronError.message);
-                }
-            }
-            
-            // Method 3: Try to detect running proxy by testing common ports
-            const commonPorts = [3000, 3001, 3002];
-            for (const port of commonPorts) {
-                try {
-                    const testUrl = `http://localhost:${port}/proxy-status`;
-                    const response = await fetch(testUrl, {
-                        method: 'GET',
-                        mode: 'cors',
-                        timeout: 1000
-                    });
-                    
-                    if (response.ok) {
-                        const proxyUrl = `http://localhost:${port}/omero-api`;
-                        console.log('🔗 Detected running proxy on port', port, ':', proxyUrl);
-                        return proxyUrl;
-                    }
-                } catch (portError) {
-                    // Port not available, try next
-                    continue;
-                }
-            }
-            
-            // Method 4: Fallback to default
-            console.log('🔗 Using fallback proxy URL: http://localhost:3000/omero-api');
-            return 'http://localhost:3000/omero-api';
-            
-        } catch (error) {
-            console.warn('⚠️ Error getting dynamic proxy URL:', error);
-            return 'http://localhost:3000/omero-api'; // Safe fallback
-        }
-    },
-
-    // Build dynamic API URL for specific endpoint
-    async buildApiUrl(endpoint) {
-        const baseProxyUrl = await this.getDynamicProxyUrl();
-        
-        // Normalize endpoint
-        let cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-        
-        // Avoid double /api/ in the path
-        if (cleanEndpoint.startsWith('/api/api/')) {
-            cleanEndpoint = cleanEndpoint.replace('/api/api/', '/api/');
-        }
-        
-        // If endpoint doesn't have /api/ prefix, add it
-        if (!cleanEndpoint.startsWith('/api/')) {
-            cleanEndpoint = '/api' + cleanEndpoint;
-        }
-        
-        const fullUrl = baseProxyUrl + cleanEndpoint;
-        console.log('🔗 Built API URL:', endpoint, '→', fullUrl);
-        return fullUrl;
-    },
-
     // =================== SESSION DEBUGGING ===================
     
     debugSession() {
@@ -140,17 +60,15 @@ const omeroAuth = {
 
     // =================== CSRF TOKEN MANAGEMENT ===================
     
-    // Get CSRF Token - FIXED PROXY CONNECTION (correct URLs)
+    // Get CSRF Token with retry logic
     async getCSRFToken() {
-        if (!this.baseUrl) {
-            throw new Error('OMERO auth not initialized');
-        }
-
-        // PROXY CONNECTION: Use proxy but with CORRECT URLs (no double /api/)
-        const baseProxyUrl = await this.getDynamicProxyUrl();
-        const tokenUrl = baseProxyUrl + '/v0/token/';
+            if (!this.baseUrl) {
+                throw new Error('OMERO auth not initialized');
+            }
         
-        console.log('🔬 Getting CSRF token from corrected proxy URL:', tokenUrl);
+        // FIX: Verwende Proxy URL für CSRF Token statt direkte Server URL
+        const tokenUrl = 'http://localhost:3000/omero-api/api/v0/token/';
+        console.log('🔬 Getting CSRF token from:', tokenUrl);
         
         for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
             try {
@@ -168,35 +86,27 @@ const omeroAuth = {
                 
                 console.log('🔬 Token response status:', response.status);
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('🔬 CSRF Token received');
-                    
-                    // Store token in session
-                    if (!this.session) {
-                        this.session = {};
-                    }
-                    this.session.csrfToken = data.data;
-                    this.session.tokenTimestamp = Date.now();
-                    this.session.workingTokenUrl = tokenUrl;
-                    console.log('🔬 ✅ CSRF Token stored in session');
-                    
-                    return data.data;
-                } else if (response.status === 404 && attempt === 1) {
-                    // PROXY RESTART LOGIC: If first attempt gives 404, try to restart proxy
-                    console.warn('⚠️ 404 on first attempt - proxy may be misconfigured. Attempting proxy restart...');
-                    await this.forceProxyRestart();
-                    console.log('🔄 Proxy restart attempted, retrying token request...');
-                    await this.delay(2000); // Wait 2 seconds after restart
-                    continue;
-                } else {
+                if (!response.ok) {
                     if (attempt < this.options.maxRetries) {
                         console.warn(`⚠️ Token request failed (attempt ${attempt}), retrying...`);
                         await this.delay(this.options.retryDelay * attempt);
                         continue;
                     }
-                    throw new Error(`Token request failed: ${response.status}`);
+                    throw new Error(`Failed to get CSRF token: ${response.status} ${response.statusText}`);
                 }
+                
+                const data = await response.json();
+                console.log('🔬 CSRF Token received');
+                
+                // Store token in session
+                if (!this.session) {
+                    this.session = {};
+                }
+                this.session.csrfToken = data.data;
+                this.session.tokenTimestamp = Date.now();
+                console.log('🔬 ✅ CSRF Token stored in session');
+                
+                return data.data;
                 
             } catch (error) {
                 if (attempt < this.options.maxRetries) {
@@ -204,53 +114,9 @@ const omeroAuth = {
                     await this.delay(this.options.retryDelay * attempt);
                     continue;
                 }
-                throw new Error(`Failed to get CSRF token: ${error.message}`);
+                console.error('❌ Error getting CSRF token:', error);
+                throw error;
             }
-        }
-    },
-
-    // Force proxy restart when switching servers
-    async forceProxyRestart() {
-        try {
-            console.log('🔄 === FORCING PROXY RESTART ===');
-            
-            // Method 1: Try Electron API restart if available
-            if (window.electronAPI && window.electronAPI.restartOMEROProxy) {
-                console.log('🔄 Using Electron API to restart proxy...');
-                const result = await window.electronAPI.restartOMEROProxy();
-                if (result.success) {
-                    console.log('✅ Proxy restarted via Electron API');
-                    return;
-                }
-            }
-            
-            // Method 2: Try to restart via proxy restart endpoint
-            if (window.omeroUIIntegration && window.omeroUIIntegration.ensureProxyIsRunning) {
-                console.log('🔄 Using omeroUIIntegration to restart proxy...');
-                await window.omeroUIIntegration.ensureProxyIsRunning();
-                console.log('✅ Proxy restart attempted via UI integration');
-                return;
-            }
-            
-            // Method 3: Try direct proxy restart call
-            try {
-                console.log('🔄 Attempting direct proxy restart...');
-                const response = await fetch('http://localhost:3000/restart', {
-                    method: 'POST',
-                    mode: 'cors'
-                });
-                if (response.ok) {
-                    console.log('✅ Proxy restarted via direct call');
-                    return;
-                }
-            } catch (restartError) {
-                console.log('⚠️ Direct restart failed:', restartError.message);
-            }
-            
-            console.warn('⚠️ Could not restart proxy - please restart MetaFold manually');
-            
-        } catch (error) {
-            console.error('❌ Error during proxy restart:', error);
         }
     },
 
@@ -286,14 +152,14 @@ const omeroAuth = {
 
     // =================== AUTHENTICATION METHODS ===================
 
-    // Enhanced Login with multi-university support - SIMPLIFIED
+    // Enhanced Login with multi-university support
     async loginWithCredentials(username, password) {
         console.log('🔬 === OMERO MULTI-UNI LOGIN (CSRF FIXED) ===');
         console.log('🔬 Username:', username);
         console.log('🔬 Server:', this.baseUrl);
         
         try {
-            // Step 1: Get fresh CSRF token
+            // Step 1: Get fresh CSRF token with retries
             console.log('🔬 Step 1: Getting fresh CSRF token...');
             const csrfToken = await this.getCSRFToken();
             
@@ -369,7 +235,7 @@ const omeroAuth = {
         }
     },
 
-        // Form-based login (Django standard) - FIXED PROXY CONNECTION
+        // Form-based login (Django standard) - MINIMAL FIX für Proxy URLs
         async attemptFormLogin(username, password, serverId, csrfToken) {
             const loginData = new URLSearchParams({
                 username: username,
@@ -378,9 +244,8 @@ const omeroAuth = {
                 csrfmiddlewaretoken: csrfToken
             });
             
-            const baseProxyUrl = await this.getDynamicProxyUrl();
-            const loginUrl = baseProxyUrl + '/v0/login/';
-            console.log('🔬 Form login URL (corrected proxy):', loginUrl);
+            // FIX: Verwende Proxy URL statt direkte Server URL
+            const loginUrl = 'http://localhost:3000/omero-api/api/v0/login/';
             
             const response = await fetch(loginUrl, {
                 method: 'POST',
@@ -390,9 +255,9 @@ const omeroAuth = {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-CSRFToken': csrfToken,
                     'Accept': 'application/json',
-                    // FIXED: Use OMERO server domain for CSRF validation
-                    'Referer': `${this.baseUrl}webclient/login/`,
-                    'Origin': this.baseUrl.replace(/\/$/, '')
+                    'Referer': 'http://localhost:3000/omero-api/webclient/login/',
+                    'Origin': window.location.origin,
+                    'Referer': window.location.href
                 },
                 body: loginData
             });
@@ -400,7 +265,7 @@ const omeroAuth = {
             return await this.processLoginResponse(response, 'Form-based Login', csrfToken);
         },
 
-        // JSON API login (alternative) - FIXED PROXY CONNECTION
+        // JSON API login (alternative) - MINIMAL FIX für Proxy URLs
         async attemptJsonLogin(username, password, serverId, csrfToken) {
             const loginPayload = {
                 server: serverId,
@@ -408,9 +273,8 @@ const omeroAuth = {
                 password: password
             };
             
-            const baseProxyUrl = await this.getDynamicProxyUrl();
-            const loginUrl = baseProxyUrl + '/v0/login/';
-            console.log('🔬 JSON login URL (corrected proxy):', loginUrl);
+            // FIX: Verwende Proxy URL statt direkte Server URL  
+            const loginUrl = 'http://localhost:3000/omero-api/api/v0/login/';
             
             const response = await fetch(loginUrl, {
                 method: 'POST',
@@ -420,9 +284,9 @@ const omeroAuth = {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken,
                     'Accept': 'application/json',
-                    // FIXED: Use OMERO server domain for CSRF validation
-                    'Referer': `${this.baseUrl}webclient/login/`,
-                    'Origin': this.baseUrl.replace(/\/$/, '')
+                    'Referer': 'http://localhost:3000/omero-api/webclient/login/',
+                    'Origin': window.location.origin,
+                    'Referer': window.location.href
                 },
                 body: JSON.stringify(loginPayload)
             });
@@ -761,4 +625,4 @@ const omeroAuth = {
 
 // Make globally available
 window.omeroAuth = omeroAuth;
-console.log('✅ OMERO Auth Module loaded (Enhanced Multi-University + CSRF Fixed + Dynamic URLs)');
+console.log('✅ OMERO Auth Module loaded (Enhanced Multi-University + CSRF Fixed)');

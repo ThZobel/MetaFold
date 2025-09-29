@@ -1,7 +1,7 @@
 {
   "name": "metafold",
-  "version": "1.1.0",
-  "description": "MetaFold - A comprehensive template manager for folder structures and experiment metadata with interactive visualization",
+  "version": "0.0.1",
+  "description": "MetaFold - Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronical lab notebooks like elabFTW and also OMERO. Built for life sciences research workflows.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -27,7 +27,7 @@
     "jsoncrack",
     "data-analysis"
   ],
-  "author": "NFDI4BioImage Team",
+  "author": "Dr. Thomas Zobel",
   "license": "MIT",
   "dependencies": {
     "jsongraph-react": "^0.0.12",
@@ -46,7 +46,7 @@
     "webpack-cli": "^6.0.1"
   },
   "build": {
-    "appId": "com.nfdi4bioimage.metafold",
+    "appId": "com.thzobel.metafold",
     "productName": "MetaFold",
     "directories": {
       "output": "dist"

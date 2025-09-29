@@ -1,0 +1,442 @@
+/* MetaFold Project Navigator CSS */
+/* For the exported HTML project navigator that loads existing README.html files */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    color: #e0e0e0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.navigator-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* =================== NAVIGATION PANEL =================== */
+.nav-panel {
+    width: 350px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 0 20px 20px 0;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.nav-header {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    padding: 25px;
+    text-align: center;
+    border-radius: 0 20px 0 0;
+}
+
+.nav-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.nav-subtitle {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    font-weight: 300;
+}
+
+.project-count {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 5px 15px;
+    border-radius: 15px;
+    display: inline-block;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.nav-content {
+    padding: 20px;
+}
+
+.nav-section {
+    margin-bottom: 25px;
+}
+
+.nav-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #a855f7;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(168, 85, 247, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateX(4px);
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+    transform: translateX(6px);
+}
+
+.project-item {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(168, 85, 247, 0.05));
+    border-left: 4px solid #7c3aed;
+}
+
+.project-item.has-readme:hover {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.1));
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.2);
+}
+
+.project-item.no-readme {
+    opacity: 0.6;
+    border-left-color: #6b7280;
+    cursor: not-allowed;
+    background: rgba(107, 114, 128, 0.1);
+}
+
+.project-item.no-readme:hover {
+    background: rgba(107, 114, 128, 0.15);
+    transform: none;
+    box-shadow: none;
+}
+
+.nav-icon {
+    font-size: 1.2rem;
+    min-width: 24px;
+    text-align: center;
+}
+
+.project-info {
+    flex: 1;
+}
+
+.project-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.3;
+}
+
+.project-meta {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+.no-readme-badge {
+    font-size: 0.7rem;
+    background: #6b7280;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+/* =================== CONTENT PANEL =================== */
+.content-panel {
+    flex: 1;
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.welcome-screen {
+    padding: 60px 40px;
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.8), rgba(15, 52, 96, 0.4));
+}
+
+.welcome-screen h1 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    text-shadow: 0 2px 20px rgba(124, 58, 237, 0.3);
+}
+
+.welcome-screen p {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+    color: #9ca3af;
+    max-width: 600px;
+    line-height: 1.6;
+}
+
+.export-info {
+    margin-top: 30px;
+    padding: 20px 25px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    max-width: 500px;
+}
+
+.export-info div {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.export-info strong {
+    color: #a855f7;
+    margin-right: 10px;
+}
+
+.project-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    transition: opacity 0.3s ease;
+}
+
+/* =================== LOADING STATES =================== */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(26, 26, 46, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(168, 85, 247, 0.3);
+    border-top: 3px solid #a855f7;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: #a855f7;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* =================== RESPONSIVE DESIGN =================== */
+@media (max-width: 1200px) {
+    .nav-panel {
+        width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .navigator-container {
+        flex-direction: column;
+    }
+    
+    .nav-panel {
+        width: 100%;
+        height: 40vh;
+        border-radius: 0;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .nav-header {
+        border-radius: 0;
+        padding: 20px;
+    }
+    
+    .nav-title {
+        font-size: 1.3rem;
+    }
+    
+    .nav-content {
+        padding: 15px;
+    }
+    
+    .content-panel {
+        height: 60vh;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .welcome-screen {
+        padding: 30px 20px;
+    }
+    
+    .welcome-screen h1 {
+        font-size: 2rem;
+    }
+    
+    .welcome-screen p {
+        font-size: 1rem;
+    }
+    
+    .export-info {
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .nav-item {
+        padding: 8px 10px;
+    }
+    
+    .project-info {
+        min-width: 0; /* Allow text to wrap */
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-header {
+        padding: 15px;
+    }
+    
+    .nav-title {
+        font-size: 1.2rem;
+    }
+    
+    .project-count {
+        font-size: 0.8rem;
+        padding: 4px 12px;
+    }
+    
+    .welcome-screen h1 {
+        font-size: 1.8rem;
+    }
+    
+    .welcome-screen {
+        padding: 20px 15px;
+    }
+    
+    .nav-content {
+        padding: 10px;
+    }
+    
+    .nav-section-title {
+        font-size: 1rem;
+        padding: 6px 10px;
+    }
+    
+    .project-name {
+        font-size: 0.9rem;
+    }
+    
+    .project-meta {
+        font-size: 0.75rem;
+    }
+}
+
+/* =================== ACCESSIBILITY =================== */
+@media (prefers-reduced-motion: reduce) {
+    .nav-item,
+    .project-frame,
+    .loading-overlay {
+        transition: none;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+}
+
+/* =================== PRINT STYLES =================== */
+@media print {
+    .navigator-container {
+        flex-direction: column;
+    }
+    
+    .nav-panel {
+        width: 100%;
+        height: auto;
+        position: relative;
+        box-shadow: none;
+        border-radius: 0;
+    }
+    
+    .content-panel {
+        height: auto;
+        border: none;
+    }
+    
+    .project-frame {
+        height: auto;
+        min-height: 500px;
+    }
+}
+
+/* =================== DARK MODE ENHANCEMENTS =================== */
+@media (prefers-color-scheme: dark) {
+    /* Already optimized for dark mode */
+}
+
+/* =================== HIGH CONTRAST MODE =================== */
+@media (prefers-contrast: high) {
+    .nav-panel {
+        border: 2px solid #ffffff;
+    }
+    
+    .nav-item {
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .nav-item:hover,
+    .nav-item.active {
+        border: 2px solid #ffffff;
+    }
+    
+    .project-count {
+        border: 1px solid #ffffff;
+    }
+}

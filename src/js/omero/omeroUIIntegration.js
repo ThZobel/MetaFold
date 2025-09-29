@@ -300,117 +300,119 @@ const omeroUIIntegration = {
      * Testet die OMERO-Authentifizierung nach erfolgreichem Proxy-Start
      */
     async performAuthenticationTest() {
-        try {
-            console.log('🔐 Starting OMERO authentication test...');
-            
-            // Initialize OMERO client if not already done
-            if (!window.omeroAPI || !window.omeroAPI.initialized) {
-                console.log('🔧 OMERO API not initialized, initializing now...');
-                await this.initializeClient();
-            }
-            
-            // Get settings (includes credentials) - CORRECTED METHOD
-            console.log('🔑 Getting OMERO settings with credentials...');
-            const settings = await this.getSettings();
-            
-            if (!settings.username || !settings.password) {
-                return {
-                    success: false,
-                    message: 'OMERO credentials not configured',
-                    guidance: 'Please configure your OMERO credentials in settings'
-                };
-            }
-            
-            console.log('🔑 Credentials loaded from settings:', {
-                username: settings.username.substring(0, 4) + '***',
-                hasPassword: !!settings.password,
-                serverUrl: settings.serverUrl
-            });
-            
-            // Test login using credentials from settings
-            console.log('🔐 Testing OMERO login...');
-            const loginResult = await window.omeroAuth.loginWithCredentials(
-                settings.username,
-                settings.password
-            );
-            
-            if (loginResult && loginResult.success) {
-                console.log('✅ OMERO authentication successful');
-                console.log('🎯 Login method used:', loginResult.loginMethod || 'credentials');
+            try {
+                console.log('🔐 Starting OMERO authentication test...');
                 
-                // Get user and server info (if available)
-                let userInfo = null;
-                let serverInfo = null;
+                // Initialize OMERO client if not already done
+                if (!window.omeroAPI || !window.omeroAPI.initialized) {
+                    console.log('🔧 OMERO API not initialized, initializing now...');
+                    await this.initializeClient();
+                }
                 
-                try {
-                    if (window.omeroAPI && window.omeroAPI.getCurrentUser) {
-                        userInfo = await window.omeroAPI.getCurrentUser();
-                        console.log('👤 User info retrieved:', userInfo?.omeName || 'Unknown');
+                // Get settings (includes credentials) - SICHERHEITS-FIX
+                console.log('🔑 Getting OMERO settings with credentials...');
+                const settings = await this.getSettings();
+                
+                if (!settings.username || !settings.password) {
+                    return {
+                        success: false,
+                        message: 'OMERO credentials not configured',
+                        guidance: 'Please configure your OMERO credentials in settings'
+                    };
+                }
+                
+                // SICHERHEITS-FIX: Keine sensiblen Daten im Log
+                console.log('🔑 Credentials validation:', {
+                    hasUsername: !!settings.username,
+                    hasPassword: !!settings.password,  // FIX: Doppelte Negation für boolean
+                    serverUrl: settings.serverUrl
+                });
+                
+                // Test login using credentials from settings
+                console.log('🔐 Testing OMERO login...');
+                const loginResult = await window.omeroAuth.loginWithCredentials(
+                    settings.username,
+                    settings.password
+                );
+                
+                if (loginResult && loginResult.success) {
+                    console.log('✅ OMERO authentication successful');
+                    console.log('🎯 Login method used:', loginResult.loginMethod || 'credentials');
+                    
+                    // Get user and server info (if available)
+                    let userInfo = null;
+                    let serverInfo = null;
+                    
+                    try {
+                        if (window.omeroAPI && window.omeroAPI.getCurrentUser) {
+                            userInfo = await window.omeroAPI.getCurrentUser();
+                            // SICHERHEITS-FIX: Kein vollständiger Name im Log
+                            console.log('👤 User authenticated successfully');
+                        }
+                        if (window.omeroAPI && window.omeroAPI.getServerInfo) {
+                            serverInfo = await window.omeroAPI.getServerInfo();
+                            console.log('🔬 Server info retrieved:', serverInfo?.server_url || 'Unknown');
+                        }
+                    } catch (infoError) {
+                        console.warn('⚠️ Could not get user/server info:', infoError.message);
+                        // Not critical, continue without info
                     }
-                    if (window.omeroAPI && window.omeroAPI.getServerInfo) {
-                        serverInfo = await window.omeroAPI.getServerInfo();
-                        console.log('🔬 Server info retrieved:', serverInfo?.server_url || 'Unknown');
+                    
+                    return {
+                        success: true,
+                        message: 'OMERO authentication successful',
+                        userInfo: userInfo,
+                        serverInfo: serverInfo,
+                        loginMethod: loginResult.loginMethod || 'credentials',
+                        serverUrl: settings.serverUrl
+                    };
+                } else {
+                    console.error('❌ OMERO authentication failed:', loginResult?.message || 'Unknown error');
+                    
+                    let guidance = 'Check your OMERO credentials in settings';
+                    const errorMessage = loginResult?.message || '';
+                    
+                    if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+                        guidance = 'Invalid username or password. Check your OMERO credentials in settings.';
+                    } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+                        guidance = 'OMERO server error. Try again later or contact your OMERO administrator.';
+                    } else if (errorMessage.includes('csrf') || errorMessage.includes('CSRF')) {
+                        guidance = 'CSRF token issue. Try refreshing the page and logging in again.';
+                    } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+                        guidance = 'Network timeout. Check your internet connection and try again.';
+                    } else if (errorMessage.includes('proxy')) {
+                        guidance = 'Proxy connection issue. The proxy is running but OMERO server may be unreachable.';
                     }
-                } catch (infoError) {
-                    console.warn('⚠️ Could not get user/server info:', infoError.message);
-                    // Not critical, continue without info
+                    
+                    return {
+                        success: false,
+                        message: loginResult?.message || 'OMERO authentication failed',
+                        guidance: guidance,
+                        serverUrl: settings.serverUrl
+                    };
+                }
+                
+            } catch (error) {
+                console.error('❌ Authentication test error:', error);
+                
+                let guidance = 'Check console for detailed error information';
+                if (error.message.includes('credentials not configured')) {
+                    guidance = 'Configure your OMERO username and password in settings';
+                } else if (error.message.includes('proxy')) {
+                    guidance = 'OMERO proxy connection issue. Try restarting MetaFold.';
+                } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                    guidance = 'Network error. Check your internet connection.';
+                } else if (error.message.includes('settings')) {
+                    guidance = 'Settings loading error. Try refreshing the page.';
                 }
                 
                 return {
-                    success: true,
-                    message: 'OMERO authentication successful',
-                    userInfo: userInfo,
-                    serverInfo: serverInfo,
-                    loginMethod: loginResult.loginMethod || 'credentials',
-                    serverUrl: settings.serverUrl
-                };
-            } else {
-                console.error('❌ OMERO authentication failed:', loginResult?.message || 'Unknown error');
-                
-                let guidance = 'Check your OMERO credentials in settings';
-                const errorMessage = loginResult?.message || '';
-                
-                if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-                    guidance = 'Invalid username or password. Check your OMERO credentials in settings.';
-                } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
-                    guidance = 'OMERO server error. Try again later or contact your OMERO administrator.';
-                } else if (errorMessage.includes('csrf') || errorMessage.includes('CSRF')) {
-                    guidance = 'CSRF token issue. Try refreshing the page and logging in again.';
-                } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
-                    guidance = 'Network timeout. Check your internet connection and try again.';
-                } else if (errorMessage.includes('proxy')) {
-                    guidance = 'Proxy connection issue. The proxy is running but OMERO server may be unreachable.';
-                }
-                
-                return {
                     success: false,
-                    message: loginResult?.message || 'OMERO authentication failed',
-                    guidance: guidance,
-                    serverUrl: settings.serverUrl
+                    message: `Authentication test failed: ${error.message}`,
+                    guidance: guidance
                 };
             }
-            
-        } catch (error) {
-            console.error('❌ Authentication test error:', error);
-            
-            let guidance = 'Check console for detailed error information';
-            if (error.message.includes('credentials not configured')) {
-                guidance = 'Configure your OMERO username and password in settings';
-            } else if (error.message.includes('proxy')) {
-                guidance = 'OMERO proxy connection issue. Try restarting MetaFold.';
-            } else if (error.message.includes('network') || error.message.includes('fetch')) {
-                guidance = 'Network error. Check your internet connection.';
-            } else if (error.message.includes('settings')) {
-                guidance = 'Settings loading error. Try refreshing the page.';
-            }
-            
-            return {
-                success: false,
-                message: `Authentication test failed: ${error.message}`,
-                guidance: guidance
-            };
-        }
-    },
+        },
 
     /**
      * Get Proxy URL - Enhanced version with smart detection
@@ -468,7 +470,7 @@ const omeroUIIntegration = {
         }
     },
     
-    // Initialize client with proxy URL - ASYNC
+        // Initialize client with proxy URL - SERVER-URL FIX
     async initializeClient() {
         console.log('🔧 Initializing OMERO client (Enhanced Version)...');
         
@@ -531,22 +533,32 @@ const omeroUIIntegration = {
                             'Please ensure the OMERO proxy is started.');
             }
             
-            // Initialize OMERO Auth (original logic - the correct way!)
-            console.log('🔧 Initializing OMERO authentication system with proxy:', proxyUrl);
-            console.log('🔬 Target OMERO server (via proxy):', settings.serverUrl);
+            // FIX: Initialize OMERO Auth mit der echten Server-URL, nicht der Proxy-URL
+            console.log('🔧 Initializing OMERO authentication system...');
+            console.log('🔗 Using proxy URL:', proxyUrl);
+            console.log('🔬 Target OMERO server:', settings.serverUrl);
             
-            // This is the CORRECT initialization call (from original code)
-            window.omeroAuth.init(proxyUrl, {
-                verifySSL: settings.verifySSL || false
+            // KORRIGIERT: Auth mit der echten OMERO-Server URL initialisieren
+            window.omeroAuth.init(settings.serverUrl, {
+                verifySSL: settings.verifySSL || false,
+                proxyUrl: proxyUrl  // Proxy-URL als separate Option
             });
             
-            // Ensure OMERO API is initialized (if it has an init method)
-            if (window.omeroAPI && window.omeroAPI.init && !window.omeroAPI.initialized) {
-                console.log('🔬 Initializing OMERO API module...');
-                window.omeroAPI.init();
+            // Set proxy URL for API calls (new property)
+            if (window.omeroAPI) {
+                window.omeroAPI.proxyUrl = proxyUrl;
+                
+                // Ensure OMERO API is initialized
+                if (window.omeroAPI.init && !window.omeroAPI.initialized) {
+                    console.log('🔬 Initializing OMERO API module...');
+                    window.omeroAPI.init();
+                }
             }
             
             console.log('✅ OMERO client initialized successfully');
+            console.log('✅ Server URL correctly set to:', settings.serverUrl);
+            console.log('✅ Proxy URL set to:', proxyUrl);
+            
             return window.omeroAuth;
             
         } catch (error) {
@@ -975,6 +987,8 @@ const omeroUIIntegration = {
         }
     },
     
+
+    
     // Handle project selection
     handleProjectSelection() {
         const projectSelect = document.getElementById('omeroProjectSelect');
@@ -1207,5 +1221,33 @@ if (document.readyState === 'loading') {
 
 // Make globally available
 window.omeroUIIntegration = omeroUIIntegration;
+
+// MINIMAL: Global function called from HTML
+window.handleOMEROGroupSelection = function() {
+    // Check if "Send to OMERO" is checked and "All Groups" is selected
+    const sendToOMERO = document.getElementById('sendToOMERO');
+    const groupSelect = document.getElementById('omeroGroupSelect');
+    
+    if (sendToOMERO && sendToOMERO.checked && groupSelect && groupSelect.value === 'all') {
+        // Show warning immediately
+        if (window.projectManager && typeof window.projectManager.showOMEROGroupWarning === 'function') {
+            window.projectManager.showOMEROGroupWarning(
+                'Cannot create OMERO datasets in "All Groups"',
+                'Please select a specific group where you have dataset creation permissions.'
+            );
+        }
+    } else {
+        // Hide warning if valid selection
+        if (window.projectManager && typeof window.projectManager.hideOMEROGroupWarning === 'function') {
+            window.projectManager.hideOMEROGroupWarning();
+        }
+    }
+    
+    // Call the original handler
+    if (window.omeroUIIntegration && typeof window.omeroUIIntegration.handleGroupSelection === 'function') {
+        window.omeroUIIntegration.handleGroupSelection();
+    }
+};
+
 
 console.log('✅ OMERO UI Integration loaded (ASYNC SECURE SETTINGS FIXED)');

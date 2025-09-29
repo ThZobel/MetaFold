@@ -254,8 +254,8 @@ const templateModal = {
         this.showMessage(message, 'success', true);
     },
 
-    // FIXED: Save method without focus-breaking alerts
-    save() {
+    // FIXED: Save method without focus-breaking alerts (made async for proper template refresh)
+    async save() {
         console.log('🔧 Save method called');
         
         // Clear previous messages
@@ -318,8 +318,12 @@ const templateModal = {
             if (this.editingIndex >= 0) {
                 // Update existing template
                 if (window.templateManager && window.templateManager.update) {
-                    window.templateManager.update(this.editingIndex, template);
+                    await window.templateManager.update(this.editingIndex, template);
                     console.log('✅ Template updated successfully!');
+                    
+                    // FIXED: Reload templates to refresh UI after update
+                    console.log('🔄 Refreshing template list after update...');
+                    await window.templateManager.refresh();
                     
                     // FIXED: Show success message without alert
                     this.showSuccess(`Template "${name}" has been updated!`);
@@ -334,8 +338,12 @@ const templateModal = {
             } else {
                 // Add new template
                 if (window.templateManager && window.templateManager.add) {
-                    window.templateManager.add(template);
+                    await window.templateManager.add(template);
                     console.log('✅ Template added successfully!');
+                    
+                    // FIXED: Reload templates to refresh UI after adding
+                    console.log('🔄 Refreshing template list after adding...');
+                    await window.templateManager.refresh();
                     
                     // FIXED: Show success message without alert
                     this.showSuccess(`Template "${name}" has been created!`);

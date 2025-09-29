@@ -1506,7 +1506,409 @@ const settingsManager = {
                 error: error.message
             };
         }
+    },
+    // =================== PASSWORD SYSTEM DEFAULT SETTINGS ===================
+    
+    // Add these to the DEFAULT_SETTINGS object in settingsManager.js:
+    
+    'security.password_system_enabled': true,  // Enable password system by default
+    'security.require_admin_password': true,   // Require admin password for sensitive operations
+    'security.password_min_length': 3,         // Minimum password length
+    'security.auto_logout_minutes': 30,        // Auto-logout after inactivity (0 = disabled)
+    'security.show_password_strength': true,   // Show password strength indicator
+    'security.allow_password_reset': true,     // Allow admin to reset user passwords
+
+    // =================== PASSWORD SYSTEM SETTINGS MANAGEMENT ===================
+
+    /**
+     * Get password system configuration
+     * @returns {Object} - Password system config
+     */
+    getPasswordSystemConfig() {
+        return {
+            enabled: this.get('security.password_system_enabled'),
+            requireAdminPassword: this.get('security.require_admin_password'),
+            passwordMinLength: this.get('security.password_min_length'),
+            autoLogoutMinutes: this.get('security.auto_logout_minutes'),
+            showPasswordStrength: this.get('security.show_password_strength'),
+            allowPasswordReset: this.get('security.allow_password_reset')
+        };
+    },
+
+    /**
+     * Update password system configuration
+     * @param {Object} config - New configuration
+     * @returns {Promise<boolean>} - Success status
+     */
+    async updatePasswordSystemConfig(config) {
+        try {
+            const updates = {};
+            
+            if (config.enabled !== undefined) {
+                updates['security.password_system_enabled'] = config.enabled;
+            }
+            if (config.requireAdminPassword !== undefined) {
+                updates['security.require_admin_password'] = config.requireAdminPassword;
+            }
+            if (config.passwordMinLength !== undefined) {
+                updates['security.password_min_length'] = Math.max(1, Math.min(50, config.passwordMinLength));
+            }
+            if (config.autoLogoutMinutes !== undefined) {
+                updates['security.auto_logout_minutes'] = Math.max(0, Math.min(1440, config.autoLogoutMinutes));
+            }
+            if (config.showPasswordStrength !== undefined) {
+                updates['security.show_password_strength'] = config.showPasswordStrength;
+            }
+            if (config.allowPasswordReset !== undefined) {
+                updates['security.allow_password_reset'] = config.allowPasswordReset;
+            }
+            
+            // Apply updates
+            for (const [key, value] of Object.entries(updates)) {
+                await this.set(key, value);
+            }
+            
+            console.log('✅ Password system configuration updated');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Password system configuration update failed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Reset password system to defaults
+     * @returns {Promise<boolean>} - Success status
+     */
+    async resetPasswordSystemToDefaults() {
+        const defaultConfig = {
+            enabled: true,
+            requireAdminPassword: true,
+            passwordMinLength: 3,
+            autoLogoutMinutes: 30,
+            showPasswordStrength: true,
+            allowPasswordReset: true
+        };
+        
+        return await this.updatePasswordSystemConfig(defaultConfig);
+    },
+
+    /**
+     * Check if password system settings are valid
+     * @returns {Object} - Validation result
+     */
+    validatePasswordSystemSettings() {
+        const config = this.getPasswordSystemConfig();
+        const issues = [];
+        
+        if (config.passwordMinLength < 1 || config.passwordMinLength > 50) {
+            issues.push('Password minimum length must be between 1 and 50 characters');
+        }
+        
+        if (config.autoLogoutMinutes < 0 || config.autoLogoutMinutes > 1440) {
+            issues.push('Auto-logout must be between 0 and 1440 minutes (24 hours)');
+        }
+        
+        if (config.enabled && !window.secureStorage) {
+            issues.push('Password system enabled but secure storage is not available');
+        }
+        
+        return {
+            valid: issues.length === 0,
+            issues: issues,
+            config: config
+        };
+    },
+
+    // =================== INTEGRATION WITH EXISTING SETTINGS UI ===================
+
+    /**
+     * Get password system settings for UI rendering
+     * @returns {Object} - Settings structure for UI
+     */
+    getPasswordSystemSettingsForUI() {
+        const config = this.getPasswordSystemConfig();
+        
+        return {
+            title: '🔐 Password System',
+            description: 'Configure user password requirements and security settings',
+            expanded: true,
+            settings: [
+                {
+                    key: 'security.password_system_enabled',
+                    label: 'Enable Password System',
+                    type: 'toggle',
+                    value: config.enabled,
+                    description: 'Require passwords for user authentication',
+                    requiresRestart: true
+                },
+                {
+                    key: 'security.require_admin_password',
+                    label: 'Admin Password Required',
+                    type: 'toggle',
+                    value: config.requireAdminPassword,
+                    description: 'Require admin password for sensitive operations',
+                    dependsOn: 'security.password_system_enabled'
+                },
+                {
+                    key: 'security.password_min_length',
+                    label: 'Minimum Password Length',
+                    type: 'number',
+                    value: config.passwordMinLength,
+                    min: 1,
+                    max: 50,
+                    description: 'Minimum number of characters required for passwords',
+                    dependsOn: 'security.password_system_enabled'
+                },
+                {
+                    key: 'security.auto_logout_minutes',
+                    label: 'Auto-Logout (minutes)',
+                    type: 'number',
+                    value: config.autoLogoutMinutes,
+                    min: 0,
+                    max: 1440,
+                    description: 'Automatically logout users after inactivity (0 = disabled)',
+                    dependsOn: 'security.password_system_enabled'
+                },
+                {
+                    key: 'security.show_password_strength',
+                    label: 'Show Password Strength',
+                    type: 'toggle',
+                    value: config.showPasswordStrength,
+                    description: 'Display password strength indicator when setting passwords',
+                    dependsOn: 'security.password_system_enabled'
+                },
+                {
+                    key: 'security.allow_password_reset',
+                    label: 'Allow Password Reset',
+                    type: 'toggle',
+                    value: config.allowPasswordReset,
+                    description: 'Allow admin to reset user passwords',
+                    dependsOn: 'security.password_system_enabled'
+                }
+            ],
+            actions: [
+                {
+                    label: '👥 Manage Users',
+                    action: 'openUserManagement',
+                    type: 'secondary'
+                },
+                {
+                    label: '🔄 Reset to Defaults',
+                    action: 'resetPasswordSystemDefaults',
+                    type: 'danger',
+                    confirmMessage: 'Reset password system settings to defaults?'
+                }
+            ]
+        };
+    },
+
+    /**
+     * Handle password system setting actions
+     * @param {string} action - Action to perform
+     * @returns {Promise<boolean>} - Success status
+     */
+    async handlePasswordSystemAction(action) {
+        try {
+            switch (action) {
+                case 'openUserManagement':
+                    if (window.userManagementModal) {
+                        if (window.userManagementModal.showWithPasswordSupport) {
+                            window.userManagementModal.showWithPasswordSupport();
+                        } else {
+                            window.userManagementModal.show();
+                        }
+                        return true;
+                    }
+                    break;
+                    
+                case 'resetPasswordSystemDefaults':
+                    const success = await this.resetPasswordSystemToDefaults();
+                    if (success && window.app?.showSuccess) {
+                        window.app.showSuccess('Password system settings reset to defaults');
+                    }
+                    return success;
+                    
+                default:
+                    console.warn('Unknown password system action:', action);
+                    return false;
+            }
+        } catch (error) {
+            console.error('Password system action failed:', error);
+            return false;
+        }
+        
+        return false;
+    },
+
+    // =================== SETTINGS VALIDATION AND MIGRATION ===================
+
+    /**
+     * Migrate old settings to include password system defaults
+     * @returns {Promise<boolean>} - Migration success
+     */
+    async migrateToPasswordSystemSettings() {
+        try {
+            console.log('🔄 Migrating settings to include password system...');
+            
+            let migrationNeeded = false;
+            const passwordKeys = [
+                'security.password_system_enabled',
+                'security.require_admin_password', 
+                'security.password_min_length',
+                'security.auto_logout_minutes',
+                'security.show_password_strength',
+                'security.allow_password_reset'
+            ];
+            
+            // Check if any password system settings are missing
+            for (const key of passwordKeys) {
+                if (this.settings[key] === undefined) {
+                    migrationNeeded = true;
+                    break;
+                }
+            }
+            
+            if (migrationNeeded) {
+                // Add default password system settings
+                const defaults = {
+                    'security.password_system_enabled': true,
+                    'security.require_admin_password': true,
+                    'security.password_min_length': 3,
+                    'security.auto_logout_minutes': 30,
+                    'security.show_password_strength': true,
+                    'security.allow_password_reset': true
+                };
+                
+                for (const [key, defaultValue] of Object.entries(defaults)) {
+                    if (this.settings[key] === undefined) {
+                        this.settings[key] = defaultValue;
+                        console.log(`🔄 Added default setting: ${key} = ${defaultValue}`);
+                    }
+                }
+                
+                // Save migrated settings
+                await this.save();
+                console.log('✅ Settings migration completed');
+            } else {
+                console.log('ℹ️ No password system settings migration needed');
+            }
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Settings migration failed:', error);
+            return false;
+        }
+    },
+
+    // =================== ENHANCED INITIALIZATION ===================
+
+    /**
+     * Enhanced initialization with password system support
+     * @returns {Promise<void>}
+     */
+    async initWithPasswordSupport() {
+        try {
+            console.log('🔧 Initializing settings manager with password support...');
+            
+            // Call original initialization
+            if (this.init && typeof this.init === 'function') {
+                await this.init();
+            }
+            
+            // Perform password system migration if needed
+            await this.migrateToPasswordSystemSettings();
+            
+            // Validate password system settings
+            const validation = this.validatePasswordSystemSettings();
+            if (!validation.valid) {
+                console.warn('⚠️ Password system validation issues:', validation.issues);
+                
+                // Auto-fix common issues
+                if (validation.issues.some(issue => issue.includes('minimum length'))) {
+                    await this.set('security.password_min_length', 3);
+                }
+                if (validation.issues.some(issue => issue.includes('auto-logout'))) {
+                    await this.set('security.auto_logout_minutes', 30);
+                }
+            }
+            
+            console.log('✅ Settings manager initialized with password support');
+            
+        } catch (error) {
+            console.error('❌ Settings manager password support initialization failed:', error);
+        }
+    },
+
+    // =================== BACKWARD COMPATIBILITY ===================
+
+    /**
+     * Check if password system was previously disabled by user choice
+     * @returns {boolean} - True if user explicitly disabled it
+     */
+    wasPasswordSystemExplicitlyDisabled() {
+        // Check for explicit user preference (vs first-time setup)
+        const hasUserPreference = localStorage.getItem('metafold_password_system_user_choice');
+        const currentSetting = this.get('security.password_system_enabled');
+        
+        return hasUserPreference === 'false' || currentSetting === false;
+    },
+
+    /**
+     * Set user choice for password system
+     * @param {boolean} enabled - Whether user chose to enable password system
+     */
+    setPasswordSystemUserChoice(enabled) {
+        localStorage.setItem('metafold_password_system_user_choice', enabled.toString());
+    },
+
+    // =================== DEBUG AND MONITORING ===================
+
+    /**
+     * Get comprehensive password system status for debugging
+     * @returns {Object} - Complete status information
+     */
+    getPasswordSystemDebugInfo() {
+        const config = this.getPasswordSystemConfig();
+        const validation = this.validatePasswordSystemSettings();
+        
+        return {
+            timestamp: new Date().toISOString(),
+            configuration: config,
+            validation: validation,
+            userChoice: this.wasPasswordSystemExplicitlyDisabled(),
+            secureStorageAvailable: !!window.secureStorage,
+            secureStorageInitialized: window.secureStorage?.isInitialized || false,
+            userManagerAvailable: !!window.userManager,
+            adminExists: window.secureStorage?.hasUserPassword('Admin') || false,
+            totalUsers: window.userManager?.users?.length || 0
+        };
+    },
+
+    /**
+     * Log password system debug information to console
+     */
+    debugPasswordSystem() {
+        const debugInfo = this.getPasswordSystemDebugInfo();
+        
+        console.log('🔐 Password System Debug Information:');
+        console.log('=====================================');
+        console.table(debugInfo.configuration);
+        console.log('Validation:', debugInfo.validation);
+        console.log('System Status:', {
+            userChoice: debugInfo.userChoice,
+            secureStorageAvailable: debugInfo.secureStorageAvailable,
+            secureStorageInitialized: debugInfo.secureStorageInitialized,
+            userManagerAvailable: debugInfo.userManagerAvailable,
+            adminExists: debugInfo.adminExists,
+            totalUsers: debugInfo.totalUsers
+        });
+        
+        return debugInfo;
     }
+
 };
 
 // Make globally available

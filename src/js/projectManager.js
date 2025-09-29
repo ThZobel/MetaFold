@@ -1,5 +1,22 @@
 // Project Manager - FUNKTIONSFÄHIGE KORRIGIERTE VERSION
 
+/**
+ * Get OMERO Server URL from settings - NO FALLBACK!
+ */
+async function getConfiguredOMEROServerUrl() {
+    if (!window.settingsManager) {
+        throw new Error('Settings manager not available - cannot get OMERO server URL');
+    }
+    
+    const serverUrl = await window.settingsManager.get('omero.server_url');
+    
+    if (!serverUrl || serverUrl.trim() === '') {
+        throw new Error('No OMERO server URL configured in settings');
+    }
+    
+    return serverUrl.trim().endsWith('/') ? serverUrl.trim() : serverUrl.trim() + '/';
+}
+
 const projectManager = {
     // Initialize project manager
     init() {
@@ -57,14 +74,14 @@ const projectManager = {
         }
     },
 
-    // Create project - KORRIGIERTE VERSION
+    // Create project with directory conflict checking - ERWEITERTE VERSION
     async createProject() {
         if (!templateManager.currentTemplate) return;
         
         const basePath = document.getElementById('targetPath').value.trim();
-        const projectName = document.getElementById('projectName').value.trim();
+        const originalProjectName = document.getElementById('projectName').value.trim();
         
-        if (!basePath || !projectName) {
+        if (!basePath || !originalProjectName) {
             this.showError('Please choose a base directory and enter a project name!');
             return;
         }
@@ -83,6 +100,22 @@ const projectManager = {
         }
         
         try {
+            // *** NEUE KONFLIKT-PRÜFUNG ***
+            const conflictResolution = await this.checkDirectoryAndResolveConflicts(basePath, originalProjectName);
+            
+            if (!conflictResolution.proceed) {
+                // User cancelled or error occurred
+                return;
+            }
+            
+            // Verwende den eventuell geänderten Projektnamen
+            const finalProjectName = conflictResolution.projectName;
+            const finalProjectPath = conflictResolution.projectPath;
+            
+            console.log(`📁 Final project name: ${finalProjectName}`);
+            console.log(`📁 Final project path: ${finalProjectPath}`);
+            
+            // Ab hier: Normale createProject-Logik mit finalProjectName
             // Get template info
             const template = templateManager.currentTemplate;
             
@@ -106,20 +139,35 @@ const projectManager = {
             const experimentMetadata = window.experimentForm && window.experimentForm.collectData ? 
                 window.experimentForm.collectData() : null;
 
-                // VALIDATION: Check required fields before creating project
-                if (hasMetadata && window.experimentForm && window.experimentForm.validate) {
-                    console.log('🔍 Validating required fields...');
-                    
-                    const validationResult = window.experimentForm.validate();
-                    
-                    if (!validationResult.valid) {
-                        console.warn('❌ Validation failed:', validationResult.message);
-                        this.showError(validationResult.message);
-                        return; // Stop project creation
-                    }
-                    
-                    console.log('✅ Validation passed - all required fields filled');
+            // VALIDATION: Check required fields before creating project
+            if (hasMetadata && window.experimentForm && window.experimentForm.validate) {
+                console.log('🔍 Validating required fields...');
+                
+                const validationResult = window.experimentForm.validate();
+                
+                if (!validationResult.valid) {
+                    console.warn('❌ Validation failed:', validationResult.message);
+                    this.showError(validationResult.message);
+                    return; // Stop project creation
                 }
+                
+                console.log('✅ Validation passed - all required fields filled');
+            }
+
+            // 🚨 NEW: OMERO Group Validation - Check BEFORE creating project
+            if (template.type === 'experiment' && hasMetadata && await settingsManager.get('omero.enabled')) {
+                console.log('🔍 Performing OMERO group validation...');
+                
+                const omeroValidation = await this.shouldSyncToOMEROWithValidation();
+                
+                if (omeroValidation.sync === false && omeroValidation.validationError) {
+                    console.warn('❌ OMERO group validation failed:', omeroValidation.validationError.message);
+                    // Error is already displayed by showOMEROGroupWarning, just stop here
+                    return; // Stop project creation - do not create folders if OMERO sync is invalid
+                }
+                
+                console.log('✅ OMERO group validation passed or not applicable');
+            }
             
             console.log('🚀 Starting project creation...');
             console.log('📁 basePath:', basePath);
@@ -128,10 +176,10 @@ const projectManager = {
             console.log('📋 experimentMetadata:', experimentMetadata);
             console.log('📋 hasMetadata:', hasMetadata);
             
-            // Create project
+            // Create project with final (possibly changed) name
             const result = await window.electronAPI.createProject(
                 basePath,
-                projectName,
+                finalProjectName,
                 templateStructure,
                 experimentMetadata
             );
@@ -140,6 +188,13 @@ const projectManager = {
             
             if (result && result.success) {
                 let successMessage = result.message;
+                
+                // Add information about name change if applicable
+                if (conflictResolution.wasRenamed) {
+                    successMessage += ` (Renamed from "${originalProjectName}" to avoid conflicts)`;
+                } else if (conflictResolution.overwrite) {
+                    successMessage += ` (Overwrote existing directory)`;
+                }
                 let elabFTWResult = null;
                 let omeroResult = null;
                 
@@ -170,10 +225,10 @@ const projectManager = {
                                     experimentMetadata
                                 );
                             } else {
-                                // Create new experiment
+                                // Create new experiment with final project name
                                 console.log('🧪 Creating new elabFTW experiment');
                                 elabFTWResult = await settingsManager.createElabFTWExperiment(
-                                    projectName, 
+                                    finalProjectName, 
                                     experimentMetadata,
                                     templateStructure
                                 );
@@ -197,17 +252,24 @@ const projectManager = {
                     }
                 }
                 
-                // OMERO Integration
+                // OMERO Integration - NOW WITH VALIDATED GROUP
                 if (template.type === 'experiment' && hasMetadata && await settingsManager.get('omero.enabled')) {
-                    const shouldSyncToOMERO = await this.shouldSyncToOMERO();
+                    // Re-check validation result (should pass since we checked earlier)
+                    const omeroValidation = await this.shouldSyncToOMEROWithValidation();
                     
-                    if (shouldSyncToOMERO) {
-                        console.log('🔬 Starting OMERO upload...');
+                    if (omeroValidation.sync) {
+                        console.log('🔬 Starting OMERO upload with validated group...');
                         try {
                             const omeroOptions = this.getOMEROOptions();
                             
+                            // Override group ID with validated one
+                            if (omeroValidation.groupId) {
+                                omeroOptions.groupId = omeroValidation.groupId;
+                                console.log('🔬 Using validated OMERO group ID:', omeroValidation.groupId);
+                            }
+                            
                             omeroResult = await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(
-                                projectName,
+                                finalProjectName,
                                 experimentMetadata,
                                 omeroOptions
                             );
@@ -222,7 +284,7 @@ const projectManager = {
                             omeroResult = { success: false, message: error.message };
                         }
                     } else {
-                        console.log('🔬 OMERO sync not requested');
+                        console.log('🔬 OMERO sync skipped (validation failed or not requested)');
                     }
                 }
                 
@@ -235,7 +297,7 @@ const projectManager = {
 
                     const projectData = {
                         metadata: experimentMetadata || {},
-                        projectName: projectName,
+                        projectName: finalProjectName,
                         basePath: basePath,
                         template: template
                     };
@@ -246,7 +308,7 @@ const projectManager = {
                 }
 
                 // Build links and show success
-                const links = this.buildLinksFromResults({ elabftw: elabFTWResult, omero: omeroResult });
+                const links = await this.buildLinksFromResults({ elabftw: elabFTWResult, omero: omeroResult });
                 this.showEnhancedSuccess(successMessage, result.projectPath, links);
                 
             } else {
@@ -528,7 +590,7 @@ async syncToOMERO(projectName, targetPath, metadata) {
     },
 
     // Build links from integration results
-    buildLinksFromResults(uploadResults) {
+    async buildLinksFromResults(uploadResults) {
         const links = [];
         
         // elabFTW Link
@@ -563,9 +625,32 @@ async syncToOMERO(projectName, targetPath, metadata) {
             } else if (uploadResults.omero.url) {
                 omeroUrl = uploadResults.omero.url;
             } else if (uploadResults.omero.dataset && uploadResults.omero.dataset.id) {
-                // Fallback: URL aus Dataset-ID konstruieren
+                // Fallback: URL aus Dataset-ID konstruieren - FIXED to use dynamic server URL
                 const datasetId = uploadResults.omero.dataset.id;
-                omeroUrl = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`;
+                
+                try {
+                    // Try to get server URL from settings
+                    let serverUrl = null;
+                    if (window.settingsManager && typeof window.settingsManager.get === 'function') {
+                        serverUrl = await window.settingsManager.get('omero.server_url');
+                    }
+                    
+                    // Fallback: Try to get from current OMERO session
+                    if (!serverUrl && window.metaFoldOMEROIntegration?.hybridAuth?.session?.serverUrl) {
+                        serverUrl = window.metaFoldOMEROIntegration.hybridAuth.session.serverUrl;
+                    }
+                    
+                    if (!serverUrl) {
+                        throw new Error('No OMERO server URL configured - cannot generate link');
+                    }
+                    
+                    omeroUrl = `${serverUrl}webclient/?show=dataset-${datasetId}`;
+                    console.log(`🔗 projectManager: Generated dynamic fallback OMERO URL: ${omeroUrl}`);
+                    
+                } catch (error) {
+                    console.error('❌ projectManager: Error generating dynamic OMERO URL:', error);
+                    omeroUrl = null; // Don't create invalid links
+                }
             }
             
             if (omeroUrl) {
@@ -981,10 +1066,32 @@ async syncToOMERO(projectName, targetPath, metadata) {
                     } else if (uploadResults.omero.url) {
                         omeroUrl = uploadResults.omero.url;
                     } else if (uploadResults.omero.dataset && uploadResults.omero.dataset.id) {
-                        omeroUrl = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${uploadResults.omero.dataset.id}`;
+                        // Generate dynamic OMERO URL instead of hardcoded one
+                        try {
+                            // Try to get server URL from settings
+                            let serverUrl = null;
+                            if (window.settingsManager && typeof window.settingsManager.get === 'function') {
+                                serverUrl = await window.settingsManager.get('omero.server_url');
+                            }
+                            
+                            // Fallback: Try to get from current OMERO session
+                            if (!serverUrl && window.metaFoldOMEROIntegration?.hybridAuth?.session?.serverUrl) {
+                                serverUrl = window.metaFoldOMEROIntegration.hybridAuth.session.serverUrl;
+                            }
+                            
+                            if (!serverUrl) {
+                                throw new Error('No OMERO server URL configured - cannot generate integration link');
+                            }
+                            
+                            omeroUrl = `${serverUrl}webclient/?show=dataset-${uploadResults.omero.dataset.id}`;
+                            console.log(`🔗 projectManager: Generated dynamic OMERO integration URL: ${omeroUrl}`);
+                            
+                        } catch (error) {
+                            console.error('❌ projectManager: Error generating dynamic OMERO integration URL:', error);
+                            omeroUrl = null; // Don't create invalid links
+                        }
                     }
                 }
-                
                 // Insert links if we have any
                 if (elabftwUrl || omeroUrl) {
                     const insertResult = await window.electronAPI.insertLinksIntoReadme(
@@ -1013,6 +1120,364 @@ async syncToOMERO(projectName, targetPath, metadata) {
             
         } catch (error) {
             console.error('❌ projectManager: Error processing integration links:', error);
+        }
+    },
+
+    // =================== OMERO GROUP VALIDATION ===================
+    
+    /**
+     * Validate OMERO group selection before project creation
+     * Prevents creation when "All" is selected (which is not a valid group)
+     */
+    validateOMEROGroupSelection() {
+        const sendToOMERO = document.getElementById('sendToOMERO');
+        const groupSelect = document.getElementById('omeroGroupSelect');
+        
+        // Skip validation if OMERO sync is not requested
+        if (!sendToOMERO || !sendToOMERO.checked) {
+            return { valid: true, message: 'OMERO sync not requested' };
+        }
+        
+        // Skip validation if group dropdown not found
+        if (!groupSelect) {
+            return { valid: true, message: 'OMERO group dropdown not found' };
+        }
+        
+        const selectedGroupId = groupSelect.value;
+        
+        console.log('🔍 Validating OMERO group selection:', selectedGroupId);
+        
+        // Check if "All" or similar is selected
+        if (selectedGroupId === 'all' || selectedGroupId === 'All' || selectedGroupId === '') {
+            console.warn('❌ Invalid OMERO group selected:', selectedGroupId);
+            
+            return {
+                valid: false,
+                message: '⚠️ Cannot create OMERO dataset in "All Groups". Please select a specific group.',
+                details: {
+                    selectedValue: selectedGroupId,
+                    reason: 'ALL_GROUPS_NOT_SUPPORTED',
+                    guidance: 'Select a specific group from the dropdown where you have dataset creation permissions.'
+                }
+            };
+        }
+        
+        // Check if refresh option is selected
+        if (selectedGroupId === 'refresh') {
+            return {
+                valid: false,
+                message: '⚠️ Please select a valid OMERO group instead of "Refresh".',
+                details: {
+                    selectedValue: selectedGroupId,
+                    reason: 'REFRESH_OPTION_SELECTED',
+                    guidance: 'Choose a specific group from the dropdown.'
+                }
+            };
+        }
+        
+        console.log('✅ OMERO group validation passed:', selectedGroupId);
+        return { 
+            valid: true, 
+            message: `Valid group selected: ${selectedGroupId}`,
+            groupId: selectedGroupId
+        };
+    },
+
+    /**
+     * Show OMERO group validation warning in the UI
+     * Creates a red warning message similar to other error displays
+     */
+    showOMEROGroupWarning(message, guidance = null) {
+        // Find or create warning container
+        let warningContainer = document.getElementById('omeroGroupWarning');
+        
+        if (!warningContainer) {
+            // Create warning container if it doesn't exist
+            const omeroOption = document.getElementById('omeroOption');
+            if (omeroOption) {
+                warningContainer = document.createElement('div');
+                warningContainer.id = 'omeroGroupWarning';
+                warningContainer.style.cssText = `
+                    margin-top: 10px;
+                    padding: 12px;
+                    background: rgba(239, 68, 68, 0.1);
+                    border: 1px solid #ef4444;
+                    border-radius: 8px;
+                    color: #dc2626;
+                    font-weight: 500;
+                    display: none;
+                `;
+                omeroOption.appendChild(warningContainer);
+            }
+        }
+        
+        if (warningContainer) {
+            // Set warning content
+            let content = `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.2em;">⚠️</span>
+                <strong>${message}</strong>
+            </div>`;
+            
+            if (guidance) {
+                content += `<div style="font-size: 0.9em; color: #b91c1c; margin-left: 28px;">
+                    💡 ${guidance}
+                </div>`;
+            }
+            
+            warningContainer.innerHTML = content;
+            warningContainer.style.display = 'block';
+            
+            console.log('🚨 OMERO group warning displayed:', message);
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (warningContainer) {
+                    warningContainer.style.display = 'none';
+                }
+            }, 10000);
+        }
+    },
+
+    /**
+     * Hide OMERO group warning
+     */
+    hideOMEROGroupWarning() {
+        const warningContainer = document.getElementById('omeroGroupWarning');
+        if (warningContainer) {
+            warningContainer.style.display = 'none';
+        }
+    },
+
+    /**
+     * Enhanced shouldSyncToOMERO with group validation
+     * Now includes early validation to prevent invalid configurations
+     */
+    async shouldSyncToOMEROWithValidation() {
+        const baseResult = await this.shouldSyncToOMERO();
+        
+        if (!baseResult) {
+            // No OMERO sync requested, no validation needed
+            this.hideOMEROGroupWarning();
+            return { sync: false, reason: 'OMERO sync not requested' };
+        }
+        
+        // Perform group validation if OMERO sync is requested
+        const groupValidation = this.validateOMEROGroupSelection();
+        
+        if (!groupValidation.valid) {
+            // Show warning and prevent sync
+            this.showOMEROGroupWarning(groupValidation.message, groupValidation.details?.guidance);
+            return { 
+                sync: false, 
+                reason: 'Invalid group selection',
+                validationError: groupValidation
+            };
+        }
+        
+        // All validations passed
+        this.hideOMEROGroupWarning();
+        return { 
+            sync: true, 
+            reason: 'OMERO sync validated and approved',
+            groupId: groupValidation.groupId
+        };
+    },
+
+    // =================== OMERO GROUP WARNING (SIMPLE IMPLEMENTATION) ===================
+    
+    /**
+     * Show OMERO group warning in results area (where success/error messages appear)
+     * Simple implementation that shows warning at the bottom like other messages
+     */
+    showOMEROGroupWarning(message, guidance = null) {
+        console.log('🚨 Showing OMERO group warning:', message);
+        
+        // Use the same error message area where other messages appear
+        const errorDiv = document.getElementById('errorMessage');
+        if (errorDiv) {
+            let content = `⚠️ ${message}`;
+            
+            if (guidance) {
+                content += `<br><small style="margin-top: 5px; display: block;">${guidance}</small>`;
+            }
+            
+            errorDiv.innerHTML = content;
+            errorDiv.style.display = 'block';
+            
+            // Reset to original error message style (completely red)
+            errorDiv.style.background = '';
+            errorDiv.style.borderLeft = '';
+            
+            // Hide other messages
+            this.hideOtherMessages('errorMessage');
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                this.hideOMEROGroupWarning();
+            }, 10000);
+        }
+    },
+
+    /**
+     * Hide OMERO group warning
+     */
+    hideOMEROGroupWarning() {
+        const errorDiv = document.getElementById('errorMessage');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    },
+
+    // =================== NEUE ORDNER-EXISTENZ-PRÜFUNG ===================
+
+    /**
+     * Check if project directory exists and handle conflicts
+     * Returns: { proceed: boolean, projectName: string, projectPath: string }
+     */
+    async checkDirectoryAndResolveConflicts(basePath, originalProjectName) {
+        console.log('🔍 Checking for directory conflicts...');
+        
+        try {
+            const originalPath = window.utils && window.utils.buildFullPath ? 
+                window.utils.buildFullPath(basePath, originalProjectName) :
+                basePath + (basePath.endsWith('/') || basePath.endsWith('\\') ? '' : '/') + originalProjectName;
+            
+            console.log(`📁 Checking path: ${originalPath}`);
+            
+            // Check if directory exists
+            const dirCheck = await window.electronAPI.checkDirectoryExists(originalPath);
+            
+            if (!dirCheck.exists) {
+                // Directory doesn't exist - safe to proceed
+                console.log('✅ Directory does not exist, proceeding with creation');
+                return {
+                    proceed: true,
+                    projectName: originalProjectName,
+                    projectPath: originalPath
+                };
+            }
+            
+            console.log(`⚠️ Directory exists: ${dirCheck.itemCount} items, empty: ${dirCheck.isEmpty}`);
+            
+            // Directory exists - get alternatives and show dialog
+            const alternatives = await window.electronAPI.generateAlternativeNames(basePath, originalProjectName);
+            
+            if (!alternatives.success) {
+                this.showError('Error generating alternative names: ' + alternatives.error);
+                return { proceed: false };
+            }
+            
+            // Show confirmation dialog
+            const userChoice = await window.electronAPI.showDirectoryConfirmationDialog({
+                projectName: originalProjectName,
+                directoryPath: originalPath,
+                directoryInfo: dirCheck,
+                alternatives: alternatives.alternatives
+            });
+            
+            if (!userChoice.success) {
+                this.showError('Error showing confirmation dialog: ' + userChoice.error);
+                return { proceed: false };
+            }
+            
+            return await this.handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives.alternatives);
+            
+        } catch (error) {
+            console.error('❌ Error in directory conflict resolution:', error);
+            this.showError('Error checking directory: ' + error.message);
+            return { proceed: false };
+        }
+    },
+
+    /**
+     * Handle user's choice from directory conflict dialog
+     */
+    async handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives) {
+        const { choice, choiceName } = userChoice;
+        
+        console.log(`🤔 Processing user choice: ${choiceName} (${choice})`);
+        
+        switch (choice) {
+            case 0: // Cancel
+                console.log('❌ User cancelled project creation due to directory conflict');
+                this.showInfo('Project creation cancelled');
+                return { proceed: false };
+                
+            case 1: // Overwrite
+                console.log('⚠️ User chose to overwrite existing directory');
+                this.showWarning(`Overwriting existing directory: ${originalProjectName}`);
+                return {
+                    proceed: true,
+                    projectName: originalProjectName,
+                    projectPath: originalPath,
+                    overwrite: true
+                };
+                
+            case 2: // Use Different Name
+                console.log('🔄 User chose to use different name');
+                return await this.handleAlternativeNameSelection(basePath, alternatives);
+                
+            default:
+                console.warn('⚠️ Unknown user choice, defaulting to cancel');
+                return { proceed: false };
+        }
+    },
+
+    /**
+     * Handle alternative name selection
+     */
+    async handleAlternativeNameSelection(basePath, alternatives) {
+        if (!alternatives || alternatives.length === 0) {
+            this.showError('No alternative names available');
+            return { proceed: false };
+        }
+        
+        // For now, use the first alternative automatically
+        // TODO: In future, could show a selection dialog
+        const chosenAlternative = alternatives[0];
+        
+        console.log(`✅ Using alternative name: ${chosenAlternative.name}`);
+        
+        // Update UI to show the new name
+        const projectNameField = document.getElementById('projectName');
+        if (projectNameField) {
+            projectNameField.value = chosenAlternative.name;
+            this.updatePathPreview(); // Update the preview
+        }
+        
+        this.showSuccess(`Using alternative name: ${chosenAlternative.name}`, null);
+        
+        return {
+            proceed: true,
+            projectName: chosenAlternative.name,
+            projectPath: chosenAlternative.path,
+            wasRenamed: true,
+            originalName: projectNameField ? projectNameField.value : 'Unknown',
+            alternativeType: chosenAlternative.type
+        };
+    },
+
+    /**
+     * Show warning message (similar to showError but with different styling)
+     */
+    showWarning(message) {
+        const warningDiv = document.getElementById('errorMessage'); // Reuse error message div
+        if (warningDiv) {
+            warningDiv.innerHTML = `⚠️ ${message}`;
+            warningDiv.style.display = 'block';
+            warningDiv.style.background = 'rgba(239, 196, 68, 0.1)'; // Yellow warning color
+            warningDiv.style.color = '#d97706';
+            warningDiv.style.borderLeft = '4px solid #f59e0b';
+            
+            this.hideOtherMessages('errorMessage');
+            
+            setTimeout(() => {
+                warningDiv.style.display = 'none';
+                // Reset to original error styling
+                warningDiv.style.background = '';
+                warningDiv.style.color = '';
+                warningDiv.style.borderLeft = '';
+            }, 6000);
         }
     }
 };

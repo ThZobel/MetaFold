@@ -513,75 +513,117 @@ const omeroAnnotations = {
 
     // Test multiple key-value pairs at once - NEW SIMPLE METHOD
     async testCreateMultipleKeyValues(datasetId, keyValuePairs) {
-        try {
-            console.log('🧪 === OMERO Console Test: Create Multiple Key-Value Pairs ===');
-            console.log(`🧪 Dataset ID: ${datasetId}`);
-            console.log(`🧪 Pairs count: ${keyValuePairs.length}`);
-            
-            if (!window.omeroAuth?.session || !window.omeroAuth.isSessionValid()) {
-                console.error('❌ Not authenticated to OMERO');
-                return { success: false, error: 'No valid OMERO session' };
+            try {
+                console.log('🧪 === OMERO Console Test: Create Multiple Key-Value Pairs ===');
+                console.log(`🧪 Dataset ID: ${datasetId}`);
+                console.log(`🧪 Pairs count: ${keyValuePairs.length}`);
+                
+                // *** FIX: ROBUSTE SESSION VALIDATION ***
+                console.log('🔍 Checking OMERO authentication status...');
+                console.log('🔍 window.omeroAuth exists:', !!window.omeroAuth);
+                console.log('🔍 session exists:', !!window.omeroAuth?.session);
+                
+                // Try to get CSRF token (more reliable than session check)
+                let csrfToken = null;
+                if (window.omeroAuth && typeof window.omeroAuth.getBestCSRFToken === 'function') {
+                    try {
+                        csrfToken = window.omeroAuth.getBestCSRFToken();
+                        console.log('🔍 CSRF token available:', !!csrfToken);
+                    } catch (tokenError) {
+                        console.warn('⚠️ Error getting CSRF token:', tokenError);
+                    }
+                }
+                
+                // If no token, try to check if we can get one
+                if (!csrfToken) {
+                    console.log('🔄 No CSRF token available, checking authentication...');
+                    
+                    // Try to verify authentication by checking current session
+                    if (window.omeroUIIntegration && typeof window.omeroUIIntegration.checkAuthentication === 'function') {
+                        try {
+                            const authCheck = await window.omeroUIIntegration.checkAuthentication();
+                            if (authCheck && authCheck.authenticated) {
+                                console.log('✅ Authentication verified via omeroUIIntegration');
+                                // Try to get token again
+                                csrfToken = window.omeroAuth.getBestCSRFToken();
+                            }
+                        } catch (authError) {
+                            console.warn('⚠️ Authentication check failed:', authError);
+                        }
+                    }
+                }
+                
+                // Final token check
+                if (!csrfToken) {
+                    console.error('❌ No valid CSRF token - authentication required');
+                    return { 
+                        success: false, 
+                        error: 'No valid OMERO session - please log in again',
+                        needsLogin: true
+                    };
+                }
+                
+                console.log('✅ CSRF token confirmed, proceeding with annotation creation...');
+                
+                // Convert key-value pairs to the format OMERO expects
+                const mapAnnotation = JSON.stringify(keyValuePairs);
+                console.log('🧪 Map annotation data:', mapAnnotation);
+                
+                const formData = new URLSearchParams();
+                formData.append('parents', 'true');
+                formData.append('dataset', datasetId);
+                formData.append('mapAnnotation', mapAnnotation);
+                
+                // FIX: Verwende Proxy URL statt direkte Server URL
+                const proxyUrl = window.omeroAuth.proxyUrl || 'http://localhost:3000/omero-api/';
+                const url = `${proxyUrl}webclient/annotate_map/`;
+                
+                console.log('🧪 Using proxy URL:', url); // Debug log
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    credentials: 'include',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                        'Origin': window.location.origin,
+                        'Referer': window.location.href
+                    },
+                    body: formData.toString()
+                });
+                
+                console.log('🧪 Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Request failed:', response.status, errorText);
+                    return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+                }
+                
+                const result = await response.json();
+                console.log('🧪 Response data:', result);
+                
+                if (result.annId) {
+                    console.log('✅ Success! Annotation ID:', result.annId);
+                    return {
+                        success: true,
+                        annotationId: result.annId,
+                        keyValuePairs: keyValuePairs,
+                        datasetId: datasetId,
+                        message: `Successfully created ${keyValuePairs.length} key-value pairs`
+                    };
+                } else {
+                    return { success: false, error: 'Unexpected response format', details: result };
+                }
+                
+            } catch (error) {
+                console.error('❌ Error creating multiple key-value pairs:', error);
+                return { success: false, error: error.message, details: error };
             }
-            
-            const csrfToken = window.omeroAuth.getBestCSRFToken();
-            if (!csrfToken) {
-                console.error('❌ No CSRF token available');
-                return { success: false, error: 'No CSRF token' };
-            }
-            
-            // Convert key-value pairs to the format OMERO expects
-            const mapAnnotation = JSON.stringify(keyValuePairs);
-            console.log('🧪 Map annotation data:', mapAnnotation);
-            
-            const formData = new URLSearchParams();
-            formData.append('parents', 'true');
-            formData.append('dataset', datasetId);
-            formData.append('mapAnnotation', mapAnnotation);
-            
-            const response = await fetch(`${window.omeroAuth.baseUrl}webclient/annotate_map/`, {
-                method: 'POST',
-                credentials: 'include',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'X-CSRFToken': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json, text/javascript, */*; q=0.01',
-                    'Origin': window.location.origin,
-                    'Referer': window.location.href
-                },
-                body: formData.toString()
-            });
-            
-            console.log('🧪 Response status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Request failed:', response.status, errorText);
-                return { success: false, error: `HTTP ${response.status}: ${errorText}` };
-            }
-            
-            const result = await response.json();
-            console.log('🧪 Response data:', result);
-            
-            if (result.annId) {
-                console.log('✅ Success! Annotation ID:', result.annId);
-                return {
-                    success: true,
-                    annotationId: result.annId,
-                    keyValuePairs: keyValuePairs,
-                    datasetId: datasetId,
-                    message: `Successfully created ${keyValuePairs.length} key-value pairs`
-                };
-            } else {
-                return { success: false, error: 'Unexpected response format', details: result };
-            }
-            
-        } catch (error) {
-            console.error('❌ Error creating multiple key-value pairs:', error);
-            return { success: false, error: error.message, details: error };
-        }
-    },
+        },
 
     // Convert MetaFold metadata to simple key-value pairs (NEW SIMPLE METHOD)
     convertMetadataToSimpleKeyValues(metadata) {

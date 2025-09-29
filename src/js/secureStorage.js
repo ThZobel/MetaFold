@@ -223,32 +223,34 @@ const secureStorage = {
     },
 
     async decryptWithElectron(encryptedData, metadata) {
-        try {
-            // FIXED: Use 'safeStorage' to match main.js expectation
-            const result = await window.electronAPI.invoke('retrieve-secure-credential', encryptedData, 'safeStorage');
-            
-            if (result.success) {
-                console.log('🔐 Electron decryption result:', {
-                    hasValue: !!result.value,
-                    valueLength: result.value?.length || 0,
-                    valuePreview: result.value ? result.value.substring(0, 10) + '***' : 'EMPTY'
-                });
+            try {
+                // FIXED: Use 'safeStorage' to match main.js expectation
+                const result = await window.electronAPI.invoke('retrieve-secure-credential', encryptedData, 'safeStorage');
                 
-                return {
-                    success: true,
-                    decrypted: result.value,
-                    method: 'electronSafeStorage',
-                    timestamp: result.timestamp,
-                    metadata: result.metadata || metadata
-                };
-            } else {
-                throw new Error(result.error || 'Electron decryption failed');
+                if (result.success) {
+                    // SICHERHEITS-FIX: Keine sensiblen Daten im Log
+                    console.log('🔐 Electron decryption result:', {
+                        hasValue: !!result.value,
+                        valueLength: result.value?.length || 0,
+                        // ENTFERNT: valuePreview - keine Passwort-Fragmente im Log
+                        decryptionMethod: 'electronSafeStorage'
+                    });
+                    
+                    return {
+                        success: true,
+                        decrypted: result.value,
+                        method: 'electronSafeStorage',
+                        timestamp: result.timestamp,
+                        metadata: result.metadata || metadata
+                    };
+                } else {
+                    throw new Error(result.error || 'Electron decryption failed');
+                }
+            } catch (error) {
+                console.error('🔐 Electron decryption error:', error);
+                throw error;
             }
-        } catch (error) {
-            console.error('🔐 Electron decryption error:', error);
-            throw error;
-        }
-    },
+        },
 
     // =================== BROWSER CRYPTO METHODS ===================
 
@@ -433,6 +435,386 @@ const secureStorage = {
             method: 'plaintext',
             metadata: metadata
         };
+    },
+
+    // =================== PASSWORD MANAGEMENT ===================
+
+    /**
+     * Hash a password using browser-native crypto (PBKDF2)
+     * @param {string} password - Plain text password
+     * @param {string} salt - Optional salt (generates one if not provided)
+     * @returns {Promise<Object>} - { hash, salt, method }
+     */
+    async hashPassword(password, salt = null) {
+        if (!password || password.trim() === '') {
+            throw new Error('Password cannot be empty');
+        }
+
+        try {
+            // Generate salt if not provided
+            if (!salt) {
+                salt = this.generatePasswordSalt();
+            }
+
+            // Check if browser crypto is available
+            if (this.capabilities.browserCrypto && window.crypto && window.crypto.subtle) {
+                const hash = await this.hashPasswordWithCrypto(password, salt);
+                return {
+                    hash: hash,
+                    salt: salt,
+                    method: 'PBKDF2-SHA256',
+                    timestamp: new Date().toISOString()
+                };
+            } else {
+                // Fallback to simple hash
+                const hash = this.hashPasswordFallback(password, salt);
+                return {
+                    hash: hash,
+                    salt: salt,
+                    method: 'fallback-hash',
+                    timestamp: new Date().toISOString()
+                };
+            }
+        } catch (error) {
+            console.error('🔐 Password hashing failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Verify a password against a stored hash
+     * @param {string} password - Plain text password to verify
+     * @param {Object} storedHash - { hash, salt, method } from storage
+     * @returns {Promise<boolean>} - True if password matches
+     */
+    async verifyPassword(password, storedHash) {
+        if (!password || !storedHash || !storedHash.hash || !storedHash.salt) {
+            return false;
+        }
+
+        try {
+            // Re-hash the password with the stored salt
+            const newHash = await this.hashPassword(password, storedHash.salt);
+            
+            // Compare hashes
+            const isMatch = newHash.hash === storedHash.hash;
+            
+            console.log('🔐 Password verification result:', isMatch ? 'MATCH' : 'NO MATCH');
+            return isMatch;
+        } catch (error) {
+            console.error('🔐 Password verification failed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Generate a cryptographically secure salt for password hashing
+     * @returns {string} - Base64 encoded salt
+     */
+    generatePasswordSalt() {
+        try {
+            if (window.crypto && window.crypto.getRandomValues) {
+                const saltArray = new Uint8Array(32); // 256-bit salt
+                window.crypto.getRandomValues(saltArray);
+                return btoa(String.fromCharCode(...saltArray));
+            } else {
+                // Fallback: pseudo-random salt
+                return this.generateClientSalt() + Date.now().toString(36);
+            }
+        } catch (error) {
+            console.warn('🔐 Secure salt generation failed, using fallback:', error);
+            return this.generateClientSalt() + Date.now().toString(36);
+        }
+    },
+
+    /**
+     * Hash password using PBKDF2 with browser crypto
+     * @param {string} password - Plain text password
+     * @param {string} salt - Base64 encoded salt
+     * @returns {Promise<string>} - Base64 encoded hash
+     */
+    async hashPasswordWithCrypto(password, salt) {
+        try {
+            // Convert inputs to arrays
+            const encoder = new TextEncoder();
+            const passwordData = encoder.encode(password);
+            const saltData = new Uint8Array(atob(salt).split('').map(char => char.charCodeAt(0)));
+
+            // Import password as key material
+            const keyMaterial = await window.crypto.subtle.importKey(
+                'raw',
+                passwordData,
+                'PBKDF2',
+                false,
+                ['deriveBits']
+            );
+
+            // Derive key using PBKDF2
+            const derivedKey = await window.crypto.subtle.deriveBits(
+                {
+                    name: 'PBKDF2',
+                    salt: saltData,
+                    iterations: 100000, // 100k iterations for security
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                256 // 256-bit output
+            );
+
+            // Convert to base64
+            const hashArray = new Uint8Array(derivedKey);
+            return btoa(String.fromCharCode(...hashArray));
+        } catch (error) {
+            console.error('🔐 Crypto password hashing failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fallback password hashing for environments without crypto API
+     * @param {string} password - Plain text password
+     * @param {string} salt - Salt string
+     * @returns {string} - Hash string
+     */
+    hashPasswordFallback(password, salt) {
+        // Simple but better than plaintext - multiple rounds of XOR + transformation
+        let hash = password + salt;
+        
+        for (let round = 0; round < 1000; round++) {
+            let newHash = '';
+            for (let i = 0; i < hash.length; i++) {
+                const char = hash.charCodeAt(i);
+                const saltChar = salt.charCodeAt(i % salt.length);
+                const combined = (char + saltChar + round) % 256;
+                newHash += String.fromCharCode(combined);
+            }
+            hash = btoa(newHash);
+        }
+        
+        return hash;
+    },
+
+    // =================== USER PASSWORD STORAGE ===================
+
+    /**
+     * Store a user's password (hashed)
+     * @param {string} username - Username
+     * @param {string} password - Plain text password
+     * @returns {Promise<Object>} - Storage result
+     */
+    async storeUserPassword(username, password) {
+        if (!username || !password) {
+            throw new Error('Username and password are required');
+        }
+
+        try {
+            console.log(`🔐 Storing password for user: ${username}`);
+            
+            // Hash the password
+            const hashedPassword = await this.hashPassword(password);
+            
+            // Store the hash securely
+            const storageKey = `user_password_${username}`;
+            const encrypted = await this.encryptData(JSON.stringify(hashedPassword), {
+                type: 'user_password',
+                username: username,
+                createdAt: new Date().toISOString()
+            });
+
+            if (encrypted.success) {
+                // Store in localStorage with encryption metadata
+                localStorage.setItem(storageKey, JSON.stringify({
+                    encrypted: encrypted.encrypted,
+                    method: encrypted.method,
+                    metadata: encrypted.metadata
+                }));
+
+                console.log('✅ User password stored successfully');
+                return { success: true };
+            } else {
+                throw new Error('Failed to encrypt password');
+            }
+        } catch (error) {
+            console.error('🔐 Store user password failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Verify a user's password
+     * @param {string} username - Username
+     * @param {string} password - Plain text password to verify
+     * @returns {Promise<boolean>} - True if password is correct
+     */
+    async verifyUserPassword(username, password) {
+        if (!username || !password) {
+            return false;
+        }
+
+        try {
+            console.log(`🔐 Verifying password for user: ${username}`);
+            
+            // Retrieve stored password hash
+            const storageKey = `user_password_${username}`;
+            const storedData = localStorage.getItem(storageKey);
+            
+            if (!storedData) {
+                console.log('🔐 No password found for user');
+                return false;
+            }
+
+            const encryptedData = JSON.parse(storedData);
+            
+            // Decrypt the stored hash
+            const decrypted = await this.decryptData(
+                encryptedData.encrypted,
+                encryptedData.method,
+                encryptedData.metadata
+            );
+
+            if (!decrypted.success) {
+                console.error('🔐 Failed to decrypt stored password');
+                return false;
+            }
+
+            const storedHash = JSON.parse(decrypted.decrypted);
+            
+            // Verify the password
+            return await this.verifyPassword(password, storedHash);
+            
+        } catch (error) {
+            console.error('🔐 User password verification failed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Check if a user has a password set
+     * @param {string} username - Username
+     * @returns {boolean} - True if user has a password
+     */
+    hasUserPassword(username) {
+        if (!username) return false;
+        
+        const storageKey = `user_password_${username}`;
+        return localStorage.getItem(storageKey) !== null;
+    },
+
+    /**
+     * Remove a user's password
+     * @param {string} username - Username
+     * @returns {boolean} - True if removed
+     */
+    removeUserPassword(username) {
+        if (!username) return false;
+        
+        try {
+            const storageKey = `user_password_${username}`;
+            localStorage.removeItem(storageKey);
+            console.log(`🔐 Password removed for user: ${username}`);
+            return true;
+        } catch (error) {
+            console.error('🔐 Failed to remove user password:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Get password status for debugging
+     * @returns {Object} - Password system status
+     */
+    getPasswordSystemStatus() {
+        const users = window.userManager?.users || [];
+        const passwordStatus = {};
+        
+        users.forEach(username => {
+            passwordStatus[username] = this.hasUserPassword(username);
+        });
+        
+        return {
+            initialized: this.isInitialized,
+            capabilities: this.capabilities,
+            encryptionMethod: this.getBestEncryptionMethod(),
+            usersWithPasswords: passwordStatus,
+            totalUsers: users.length,
+            usersWithPasswordsCount: Object.values(passwordStatus).filter(Boolean).length
+        };
+    },
+
+    // =================== ADMIN ACCOUNT MANAGEMENT ===================
+
+    /**
+     * Initialize default admin account
+     * @returns {Promise<Object>} - Initialization result
+     */
+    async initializeAdminAccount() {
+        const adminUsername = 'Admin';
+        const defaultPassword = 'admin';
+        
+        try {
+            // Check if admin already exists
+            if (this.hasUserPassword(adminUsername)) {
+                console.log('🔐 Admin account already exists');
+                return { success: true, existed: true };
+            }
+
+            // Create admin password
+            await this.storeUserPassword(adminUsername, defaultPassword);
+            
+            // Add admin to user list if not exists
+            if (window.userManager && window.userManager.users) {
+                if (!window.userManager.users.includes(adminUsername)) {
+                    window.userManager.addUserToHistory(adminUsername, 'Admin');
+                }
+            }
+            
+            console.log('✅ Admin account created with default password');
+            return { 
+                success: true, 
+                created: true, 
+                username: adminUsername, 
+                defaultPassword: defaultPassword 
+            };
+            
+        } catch (error) {
+            console.error('🔐 Admin account initialization failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Reset a user's password (admin function)
+     * @param {string} adminUsername - Admin username for verification
+     * @param {string} adminPassword - Admin password for verification  
+     * @param {string} targetUsername - User whose password to reset
+     * @param {string} newPassword - New password
+     * @returns {Promise<Object>} - Reset result
+     */
+    async resetUserPassword(adminUsername, adminPassword, targetUsername, newPassword) {
+        try {
+            console.log(`🔐 Admin password reset requested for: ${targetUsername}`);
+            
+            // Verify admin credentials
+            const isAdminValid = await this.verifyUserPassword(adminUsername, adminPassword);
+            if (!isAdminValid) {
+                throw new Error('Invalid admin credentials');
+            }
+            
+            // Check if admin has admin privileges (is 'Admin' user)
+            if (adminUsername !== 'Admin') {
+                throw new Error('Only Admin user can reset passwords');
+            }
+            
+            // Set new password for target user
+            await this.storeUserPassword(targetUsername, newPassword);
+            
+            console.log(`✅ Password reset successful for user: ${targetUsername}`);
+            return { success: true };
+            
+        } catch (error) {
+            console.error('🔐 Password reset failed:', error);
+            throw error;
+        }
     },
 
     // =================== MIGRATION UTILITIES ===================

@@ -75,9 +75,20 @@ const app = {
         }
     },
 
-    initializeAvailableModules() {
+    async initializeAvailableModules() {
         console.log('🔧 Initializing available modules...');
         
+        // *** NEU: Initialize storage FIRST ***
+        if (window.storage && typeof window.storage.initFileStorage === 'function') {
+            try {
+                console.log('📂 Initializing file storage...');
+                await window.storage.initFileStorage();
+                console.log('✅ storage initialized');
+            } catch (error) {
+                console.error('❌ Error initializing storage:', error);
+            }
+        }
+
         // Initialize template type manager first (if available)
         if (window.templateTypeManager && typeof window.templateTypeManager.init === 'function') {
             try {
@@ -88,10 +99,11 @@ const app = {
             }
         }
 
-        // Initialize template manager
+        // Initialize template manager (now NACH storage initialization)
         if (window.templateManager && typeof window.templateManager.init === 'function') {
             try {
-                window.templateManager.init();
+                // Template manager kann jetzt file storage verwenden
+                await window.templateManager.init();
                 console.log('✅ templateManager initialized');
             } catch (error) {
                 console.error('❌ Error initializing templateManager:', error);
@@ -128,39 +140,15 @@ const app = {
             }
         }
 
-        // Initialize template modal if available
-        if (window.templateModal && typeof window.templateModal.init === 'function') {
+        // Initialize enhanced actions if available
+        if (window.enhancedActions && typeof window.enhancedActions.init === 'function') {
             try {
-                window.templateModal.init();
-                console.log('✅ templateModal initialized');
+                window.enhancedActions.init();
+                console.log('✅ enhancedActions initialized');
             } catch (error) {
-                console.error('❌ Error initializing templateModal:', error);
+                console.error('❌ Error initializing enhancedActions:', error);
             }
         }
-		
-		if (window.metadataEditor && typeof window.metadataEditor.init === 'function') {
-			try {
-				window.metadataEditor.init();
-				console.log('✅ metadataEditor initialized');
-			} catch (error) {
-				console.error('❌ Error initializing metadataEditor:', error);
-			}
-		}
-		
-		if (window.experimentForm && typeof window.experimentForm.init === 'function') {
-			window.experimentForm.init();
-			console.log('✅ experimentForm initialized');
-		}
-		
-		if (window.enhancedActions && typeof window.enhancedActions.init === 'function') {
-			try {
-				window.enhancedActions.init();
-				console.log('✅ enhancedActions initialized');
-			} catch (error) {
-				console.error('❌ Error initializing enhancedActions:', error);
-			}
-		}
-		
     },
     
     setupEventListeners() {

@@ -56,30 +56,35 @@ const omeroAPI = {
 
     // API request with authentication and CSRF handling
     async apiRequest(endpoint, options = {}) {
-        if (!window.omeroAuth || (!window.omeroAuth.session && !options.skipAuth)) {
-            throw new Error('No active OMERO session');
-        }
-        
-        const url = `${window.omeroAuth.baseUrl}${endpoint}`;
-        const csrfToken = window.omeroAuth.getBestCSRFToken();
-        
-        const requestOptions = {
-            headers: {
-                'Accept': 'application/json',
-                ...options.headers
-            },
-            ...options
-        };
-        
-        if (options.method && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(options.method.toUpperCase())) {
-            if (csrfToken) {
-                requestOptions.headers['X-CSRFToken'] = csrfToken;
+            if (!window.omeroAuth || (!window.omeroAuth.session && !options.skipAuth)) {
+                throw new Error('No active OMERO session');
             }
-            requestOptions.headers['Content-Type'] = 'application/json';
-        }
-        
-        return await this.makeRequest(url, requestOptions);
-    },
+            
+            // FIX: Verwende Proxy URL statt direkte Server URL
+            const baseUrl = window.omeroAuth.proxyUrl || 'http://localhost:3000/omero-api/';
+            const url = `${baseUrl}${endpoint}`;
+            
+            console.log('🔬 API Request URL:', url); // Debug log
+            
+            const csrfToken = window.omeroAuth.getBestCSRFToken();
+            
+            const requestOptions = {
+                headers: {
+                    'Accept': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            };
+            
+            if (options.method && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(options.method.toUpperCase())) {
+                if (csrfToken) {
+                    requestOptions.headers['X-CSRFToken'] = csrfToken;
+                }
+                requestOptions.headers['Content-Type'] = 'application/json';
+            }
+            
+            return await this.makeRequest(url, requestOptions);
+        },
 
     // =================== BASIC API ENDPOINTS ===================
 

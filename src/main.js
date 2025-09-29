@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
 const OMEROProxyServer = require('./js/proxyManager.js');
@@ -7,6 +7,202 @@ let mainWindow;
 
 // Global proxy manager instance
 let omeroProxyServer = null;
+
+function createMenuTemplate() {
+    const template = [];
+
+    // macOS App Menu (only on macOS)
+    if (process.platform === 'darwin') {
+        template.push({
+            label: app.getName(),
+            submenu: [
+                {
+                    label: 'About MetaFold',
+                    click: showAboutDialog
+                },
+                { type: 'separator' },
+                {
+                    label: 'Services',
+                    role: 'services',
+                    submenu: []
+                },
+                { type: 'separator' },
+                {
+                    label: `Hide ${app.getName()}`,
+                    accelerator: 'Command+H',
+                    role: 'hide'
+                },
+                {
+                    label: 'Hide Others',
+                    accelerator: 'Command+Alt+H',
+                    role: 'hideothers'
+                },
+                {
+                    label: 'Show All',
+                    role: 'unhide'
+                },
+                { type: 'separator' },
+                {
+                    label: 'Quit',
+                    accelerator: 'Command+Q',
+                    click: () => app.quit()
+                }
+            ]
+        });
+    }
+
+    // File Menu
+    template.push({
+        label: 'File',
+        submenu: [
+            {
+                label: 'New Template',
+                accelerator: 'CmdOrCtrl+N',
+                click: () => {
+                    mainWindow.webContents.send('menu-action', 'new-template');
+                }
+            },
+            { type: 'separator' },
+            {
+                label: process.platform === 'darwin' ? 'Close Window' : 'Exit',
+                accelerator: process.platform === 'darwin' ? 'Cmd+W' : 'Ctrl+Q',
+                click: () => {
+                    if (process.platform === 'darwin') {
+                        mainWindow.close();
+                    } else {
+                        app.quit();
+                    }
+                }
+            }
+        ]
+    });
+
+    // View Menu
+    template.push({
+        label: 'View',
+        submenu: [
+            {
+                label: 'Reload',
+                accelerator: 'CmdOrCtrl+R',
+                click: () => {
+                    mainWindow.reload();
+                }
+            },
+            {
+                label: 'Force Reload',
+                accelerator: 'CmdOrCtrl+Shift+R',
+                click: () => {
+                    mainWindow.webContents.reloadIgnoringCache();
+                }
+            },
+            {
+                label: 'Toggle Developer Tools',
+                accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+                click: () => {
+                    mainWindow.webContents.toggleDevTools();
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Actual Size',
+                accelerator: 'CmdOrCtrl+0',
+                role: 'resetZoom'
+            },
+            {
+                label: 'Zoom In',
+                accelerator: 'CmdOrCtrl+Plus',
+                role: 'zoomIn'
+            },
+            {
+                label: 'Zoom Out',
+                accelerator: 'CmdOrCtrl+-',
+                role: 'zoomOut'
+            },
+            { type: 'separator' },
+            {
+                label: 'Toggle Fullscreen',
+                accelerator: process.platform === 'darwin' ? 'Ctrl+Command+F' : 'F11',
+                role: 'togglefullscreen'
+            }
+        ]
+    });
+
+    // Window Menu (mainly for macOS)
+    if (process.platform === 'darwin') {
+        template.push({
+            label: 'Window',
+            submenu: [
+                {
+                    label: 'Minimize',
+                    accelerator: 'Command+M',
+                    role: 'minimize'
+                },
+                {
+                    label: 'Close',
+                    accelerator: 'Command+W',
+                    role: 'close'
+                },
+                { type: 'separator' },
+                {
+                    label: 'Bring All to Front',
+                    role: 'front'
+                }
+            ]
+        });
+    }
+
+    // Help Menu
+    template.push({
+        label: 'Help',
+        submenu: [
+            {
+                label: 'Documentation',
+                click: () => {
+                    shell.openExternal('https://metafold-docs.readthedocs.io/en/latest/');
+                }
+            },
+            {
+                label: 'GitHub Repository',
+                click: () => {
+                    shell.openExternal('https://github.com/ThZobel/MetaFold');
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'About MetaFold',
+                click: showAboutDialog
+            }
+        ]
+    });
+
+    return template;
+}
+
+
+function showAboutDialog() {
+    const aboutOptions = {
+        type: 'info',
+        title: 'About MetaFold',
+        message: 'MetaFold',
+        detail: `Laboratory Data Management & Experiment Organization
+
+Version: 0.0.1
+License: MIT
+
+Developed by: Dr. Thomas Zobel
+(with assistance from Claude AI)
+
+GitHub: https://github.com/ThZobel/MetaFold
+Documentation: https://metafold-docs.readthedocs.io/en/latest/
+
+Built for NFDI4BioImage and life sciences research.`,
+        buttons: ['OK'],
+        defaultId: 0,
+        noLink: false
+    };
+
+    dialog.showMessageBox(mainWindow, aboutOptions);
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -19,7 +215,7 @@ function createWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, 'assets', 'icon.png'),
+        icon: path.join(__dirname, 'assets','icon.png'),
         titleBarStyle: 'default',
         show: false
     });
@@ -38,6 +234,10 @@ function createWindow() {
         shell.openExternal(url);
         return { action: 'deny' };
     });
+
+     const menuTemplate = createMenuTemplate();
+    const menu = Menu.buildFromTemplate(menuTemplate);
+    Menu.setApplicationMenu(menu);
 }
 
 app.whenReady().then(() => {
@@ -74,23 +274,16 @@ app.on('window-all-closed', () => {
     }
 });
 
-// Generate stable filename without timestamps
+// Generate stable filename without timestamps (FIXED: Short names only)
 function generateStableTemplateFilename(template) {
     const safeName = (template.name || 'template')
         .replace(/[^a-zA-Z0-9\s\-_]/g, '')  // Remove special chars
         .replace(/\s+/g, '_')               // Replace spaces with underscores
         .toLowerCase()                      // Lowercase
-        .substring(0, 50);                  // Limit length
-
-    const safeUser = (template.createdBy || 'unknown')
-        .replace(/[^a-zA-Z0-9\-_]/g, '')
-        .toLowerCase()
-        .substring(0, 20);
-
-    const templateType = template.type || 'template';
+        .substring(0, 80);                  // Increased limit
     
-    // Simple, stable filename: templatename_user_type.json
-    return `${safeName}_${safeUser}_${templateType}.json`;
+    // FIXED: Just name + .json, no user/type suffix
+    return `${safeName}.json`;
 }
 
 // Check if filename is stable (doesn't contain timestamps)
@@ -506,6 +699,50 @@ ipcMain.handle('open-external', async (event, url) => {
     }
 });
 
+// File writing for export
+ipcMain.handle('writeFile', async (event, filePath, content) => {
+    try {
+        await fs.writeFile(filePath, content, 'utf8');
+        return { success: true };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Path joining utility
+ipcMain.handle('joinPath', async (event, ...pathParts) => {
+    return path.join(...pathParts);
+});
+
+// Copy file from source to destination
+ipcMain.handle('copyFile', async (event, srcPath, destPath) => {
+    try {
+        await fs.copyFile(srcPath, destPath);
+        return { success: true };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Ensure directory exists
+ipcMain.handle('ensureDir', async (event, dirPath) => {
+    try {
+        await fs.mkdir(dirPath, { recursive: true });
+        return { success: true };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Get application path
+ipcMain.handle('getAppPath', async (event) => {
+    try {
+        return { success: true, path: app.getAppPath() };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
 // Insert integration links into existing README.html
 ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl) => {
     try {
@@ -690,12 +927,15 @@ function sanitizeFilename(name) {
     return name.replace(/[<>:"/\\|?*]/g, '_').trim();
 }
 
-// Generate template filename
+// Generate template filename (FIXED: Clean, short names)
 function generateTemplateFilename(templateName, templateId = null) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safeName = sanitizeFilename(templateName);
-    const id = templateId || Date.now();
-    return `template_${safeName}_${id}_${timestamp}.json`;
+    const safeName = sanitizeFilename(templateName || 'template')
+        .replace(/\s+/g, '_')
+        .toLowerCase()
+        .substring(0, 80);  // Increased limit
+    
+    // FIXED: Just name + .json, no timestamp/ID suffix
+    return `${safeName}.json`;
 }
 
 // Save template to file
@@ -710,7 +950,7 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
         let filePath;
         let isUpdate = false;
         
-        // ===== DATEINAME-LOGIK =====
+        // ===== DATEINAME-LOGIK (FIXED: Clean names) =====
         // 1. Prüfe ob Template bereits eine Datei hat (_fileInfo)
         if (template._fileInfo && template._fileInfo.filename) {
             // BESTEHENDE DATEI - Namen beibehalten
@@ -719,8 +959,8 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
             isUpdate = true;
             console.log(`📝 Updating existing file: ${filename}`);
         } else {
-            // NEUE DATEI - Stabilen Namen generieren
-            filename = generateStableTemplateFilename(template);
+            // NEUE DATEI - Kurzen, sauberen Namen generieren  
+            filename = generateStableTemplateFilename(template);  // Now returns just name.json
             filePath = path.join(templatesDir, filename);
             isUpdate = false;
             console.log(`📄 Creating new file: ${filename}`);
@@ -1110,25 +1350,53 @@ ipcMain.handle('get-templates-directory', async (event, userInfo = null) => {
     }
 });
 
-// Export templates to location
-ipcMain.handle('export-templates-to-location', async (event, templates, exportType = 'single') => {
+// Export templates to location - ERWEITERT um defaultPath Support
+ipcMain.handle('export-templates-to-location', async (event, templates, exportType = 'single', defaultPath = null) => {
     try {
+        // Generate template-based filename if no defaultPath provided
+        let suggestedFileName = defaultPath;
+        
+        if (!suggestedFileName) {
+            if (exportType === 'bulk') {
+                suggestedFileName = 'metafold_templates_export.json';
+            } else {
+                // Single template export: use template name
+                const template = Array.isArray(templates) ? templates[0] : templates;
+                if (template && template.name) {
+                    // Sanitize template name for filename
+                    const safeName = template.name
+                        .replace(/[<>:"/\\|?*]/g, '_')     // Remove invalid filename characters
+                        .replace(/\s+/g, '_')              // Replace spaces with underscores
+                        .toLowerCase()                     // Convert to lowercase
+                        .substring(0, 100);                // Limit length
+                    
+                    suggestedFileName = `${safeName}_template.json`;
+                    console.log(`📝 Generated template-based filename: ${suggestedFileName}`);
+                } else {
+                    suggestedFileName = 'template_export.json';
+                }
+            }
+        }
+        
         const result = await dialog.showSaveDialog(mainWindow, {
             title: exportType === 'bulk' ? 'Export All Templates' : 'Export Template',
             filters: [
                 { name: 'JSON Files', extensions: ['json'] }
             ],
-            defaultPath: exportType === 'bulk' ? 'metafold_templates_export.json' : 'template_export.json'
+            defaultPath: suggestedFileName
         });
         
         if (!result.canceled && result.filePath) {
             const dataToExport = exportType === 'bulk' ? { templates, exportDate: new Date().toISOString() } : templates;
             await fs.writeFile(result.filePath, JSON.stringify(dataToExport, null, 2), 'utf8');
             
+            console.log(`✅ Template exported successfully to: ${result.filePath}`);
+            
             return {
                 success: true,
                 message: `Templates exported successfully to ${result.filePath}`,
-                filePath: result.filePath
+                filePath: result.filePath,
+                fileName: path.basename(result.filePath)
             };
         }
         
@@ -1140,7 +1408,8 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
         console.error('❌ Error exporting templates:', error);
         return {
             success: false,
-            error: error.message
+            error: error.message,
+            message: `Export failed: ${error.message}`
         };
     }
 });
@@ -1352,6 +1621,199 @@ ipcMain.handle('get-projects-statistics', async (event, projects) => {
     }
 });
 
+// =================== NEUE ORDNER-EXISTENZ-PRÜFUNG ===================
+
+// Check if directory exists and get info
+ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
+    try {
+        console.log(`🔍 Checking directory existence: ${directoryPath}`);
+        
+        try {
+            const stats = await fs.stat(directoryPath);
+            
+            if (stats.isDirectory()) {
+                // Directory exists - get contents
+                const contents = await fs.readdir(directoryPath);
+                
+                console.log(`📁 Directory exists with ${contents.length} items`);
+                
+                return {
+                    exists: true,
+                    isEmpty: contents.length === 0,
+                    itemCount: contents.length,
+                    isDirectory: true,
+                    created: stats.birthtime || stats.ctime,
+                    modified: stats.mtime
+                };
+            } else {
+                // Path exists but is not a directory
+                console.log(`⚠️ Path exists but is not a directory: ${directoryPath}`);
+                return {
+                    exists: true,
+                    isEmpty: false,
+                    isDirectory: false,
+                    error: 'Path exists but is not a directory'
+                };
+            }
+        } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+                // Directory doesn't exist - all good
+                console.log(`✅ Directory doesn't exist, safe to create: ${directoryPath}`);
+                return {
+                    exists: false,
+                    isEmpty: true,
+                    isDirectory: false
+                };
+            } else {
+                // Other error (permissions, etc.)
+                throw accessError;
+            }
+        }
+        
+    } catch (error) {
+        console.error(`❌ Error checking directory: ${directoryPath}`, error);
+        return {
+            success: false,
+            exists: false,
+            error: error.message
+        };
+    }
+});
+
+// Generate alternative project names
+ipcMain.handle('generate-alternative-names', async (event, basePath, originalName) => {
+    try {
+        console.log(`🔄 Generating alternative names for: ${originalName} in ${basePath}`);
+        
+        const alternatives = [];
+        
+        // Strategy 1: Add _02, _03, etc.
+        for (let i = 2; i <= 10; i++) {
+            const altName = `${originalName}_${i.toString().padStart(2, '0')}`;
+            const altPath = path.join(basePath, altName);
+            
+            try {
+                await fs.access(altPath);
+                // Path exists, try next number
+            } catch {
+                // Path doesn't exist - this is a good alternative
+                alternatives.push({
+                    name: altName,
+                    path: altPath,
+                    type: 'numbered'
+                });
+                if (alternatives.length >= 3) break; // Limit to first 3 options
+            }
+        }
+        
+        // Strategy 2: Add date suffix
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateAltName = `${originalName}_${dateStr}`;
+        const dateAltPath = path.join(basePath, dateAltName);
+        
+        try {
+            await fs.access(dateAltPath);
+            // Date version exists, try with time
+            const timeStr = today.toTimeString().substring(0, 5).replace(':', ''); // HHMM
+            const timeAltName = `${originalName}_${dateStr}_${timeStr}`;
+            const timeAltPath = path.join(basePath, timeAltName);
+            
+            try {
+                await fs.access(timeAltPath);
+                // Both date and time versions exist
+            } catch {
+                alternatives.push({
+                    name: timeAltName,
+                    path: timeAltPath,
+                    type: 'datetime'
+                });
+            }
+        } catch {
+            alternatives.push({
+                name: dateAltName,
+                path: dateAltPath,
+                type: 'date'
+            });
+        }
+        
+        // Strategy 3: Add timestamp suffix (as last resort)
+        if (alternatives.length === 0) {
+            const timestamp = Date.now();
+            const timestampAltName = `${originalName}_${timestamp}`;
+            alternatives.push({
+                name: timestampAltName,
+                path: path.join(basePath, timestampAltName),
+                type: 'timestamp'
+            });
+        }
+        
+        console.log(`✅ Generated ${alternatives.length} alternative names`);
+        
+        return {
+            success: true,
+            alternatives: alternatives,
+            originalName: originalName,
+            basePath: basePath
+        };
+        
+    } catch (error) {
+        console.error(`❌ Error generating alternative names:`, error);
+        return {
+            success: false,
+            error: error.message,
+            alternatives: []
+        };
+    }
+});
+
+// Show directory confirmation dialog  
+ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
+    try {
+        const { projectName, directoryPath, directoryInfo, alternatives } = options;
+        
+        let message = `The project directory already exists:\n\n"${projectName}"\n\n`;
+        
+        if (directoryInfo.isEmpty) {
+            message += 'The directory is empty.';
+        } else {
+            message += `The directory contains ${directoryInfo.itemCount} item(s).`;
+        }
+        
+        message += '\n\nWhat would you like to do?';
+        
+        const buttons = ['Cancel', 'Overwrite', 'Use Different Name'];
+        
+        const result = await dialog.showMessageBox(mainWindow, {
+            type: 'warning',
+            title: 'Directory Already Exists',
+            message: 'Project Directory Conflict',
+            detail: message,
+            buttons: buttons,
+            defaultId: 2, // "Use Different Name" as default
+            cancelId: 0,  // "Cancel" 
+            icon: path.join(__dirname, 'assets', 'icon.png')
+        });
+        
+        console.log(`🤔 User choice for directory conflict: ${buttons[result.response]}`);
+        
+        return {
+            success: true,
+            choice: result.response,
+            choiceName: buttons[result.response],
+            alternatives: alternatives
+        };
+        
+    } catch (error) {
+        console.error(`❌ Error showing directory confirmation dialog:`, error);
+        return {
+            success: false,
+            error: error.message,
+            choice: 0 // Default to Cancel on error
+        };
+    }
+});
+
 // =================== HELPER FUNCTIONS ===================
 
 // Improved folder structure creation
@@ -1447,9 +1909,12 @@ ipcMain.handle('start-omero-proxy', async (event, settings = {}) => {
         
         // Initialize proxy if not exists
         if (!omeroProxyServer) {
+            if (!settings.serverUrl) {
+                throw new Error('OMERO server URL not configured - cannot start proxy');
+            }
             omeroProxyServer = new OMEROProxyServer(
                 settings.proxyPort || 3000,
-                settings.serverUrl || 'https://omero-imaging.uni-muenster.de'
+                settings.serverUrl
             );
         }
         
@@ -1557,9 +2022,12 @@ ipcMain.handle('restart-omero-proxy', async (event, settings = {}) => {
         }
         
         // Reset proxy instance to apply new settings
+        if (!settings.serverUrl) {
+            throw new Error('OMERO server URL not configured - cannot restart proxy');
+        }
         omeroProxyServer = new OMEROProxyServer(
             settings.proxyPort || 3000,
-            settings.serverUrl || 'https://omero-imaging.uni-muenster.de'
+            settings.serverUrl
         );
         
         // Start with new settings
@@ -1643,7 +2111,7 @@ async function getCurrentOMEROSettings() {
     // Diese Funktion kann später erweitert werden, um Settings aus
     // der settings-Datei zu laden, falls nötig
     return {
-        serverUrl: 'https://omero-imaging.uni-muenster.de',
+        serverUrl: null, // Will be provided by settingsManager
         proxyPort: 3000,
         autoStart: true
     };
@@ -2390,20 +2858,36 @@ async function scanForMetaFoldProjects(basePath, maxDepth, currentDepth = 0) {
 // Parse a single MetaFold project directory
 async function parseMetaFoldProject(projectPath) {
     try {
-        const metadataPath = path.join(projectPath, 'elabftw-metadata.json');
-        const readmePath = path.join(projectPath, 'README.md');
-        
-        // Read metadata
-        const metadataContent = await fs.readFile(metadataPath, 'utf8');
-        const metadata = JSON.parse(metadataContent);
-        
-        // Read README if it exists
-        let readmeContent = null;
-        try {
-            readmeContent = await fs.readFile(readmePath, 'utf8');
-        } catch (readmeError) {
-            // README is optional
-        }
+    const metadataPath = path.join(projectPath, 'elabftw-metadata.json');
+            
+            // Read metadata
+            const metadataContent = await fs.readFile(metadataPath, 'utf8');
+            const metadata = JSON.parse(metadataContent);
+            
+            // VERBESSERTE README-ERKENNUNG: Prüfe README.html zuerst, dann README.md
+            let readmeContent = null;
+            let readmePath = null;
+            
+            // 1. Prüfe README.html (Priorität - wird von MetaFold erstellt)
+            const readmeHtmlPath = path.join(projectPath, 'README.html');
+            try {
+                await fs.access(readmeHtmlPath);
+                readmeContent = await fs.readFile(readmeHtmlPath, 'utf8');
+                readmePath = readmeHtmlPath;
+                console.log(`📖 Found README.html: ${readmeHtmlPath}`);
+            } catch (htmlError) {
+                // README.html doesn't exist, try README.md as fallback
+                const readmeMdPath = path.join(projectPath, 'README.md');
+                try {
+                    await fs.access(readmeMdPath);
+                    readmeContent = await fs.readFile(readmeMdPath, 'utf8');
+                    readmePath = readmeMdPath;
+                    console.log(`📖 Found README.md: ${readmeMdPath}`);
+                } catch (mdError) {
+                    // No README found - that's okay
+                    console.log(`📝 No README found in: ${projectPath}`);
+                }
+            }
         
         // Get directory stats
         const stats = await fs.stat(projectPath);
