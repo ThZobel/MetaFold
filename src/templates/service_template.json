@@ -1,0 +1,139 @@
+{
+  "name": "Service Template",
+  "description": "Template for documenting service reports with microscopy equipment",
+  "type": "experiment",
+  "structure": "",
+  "createdBy": "Thomas",
+  "createdByGroup": "MIN",
+  "createdAt": "2025-09-16T12:00:00.000Z",
+  "metadata": {
+    "fields": {
+      "General Information_group": {
+        "type": "group",
+        "label": "General Information",
+        "position": 1,
+        "description": "Basic information about the service report"
+      },
+      "report_date": {
+        "type": "date",
+        "label": "Report Date",
+        "value": "2025-09-16",
+        "required": true,
+        "position": 2,
+        "description": "Date when this report was created (automatically filled with current date)"
+      },
+      "contact_date": {
+        "type": "date",
+        "label": "Service Contact Date",
+        "value": "2025-09-11",
+        "required": true,
+        "position": 3,
+        "description": "Date when service was initially contacted"
+      },
+      "microscope": {
+        "type": "text",
+        "label": "Microscope",
+        "value": "LSM880_Klämbt",
+        "required": true,
+        "position": 4,
+        "description": "Name/model of the microscope requiring service"
+      },
+      "Service Details_group": {
+        "type": "group",
+        "label": "Service Details",
+        "position": 5,
+        "description": "Details about the service request and handling"
+      },
+      "name": {
+        "type": "text",
+        "label": "Name",
+        "value": "TZ",
+        "required": true,
+        "position": 6,
+        "description": "Name of the person who created this report"
+      },
+      "order_number": {
+        "type": "text",
+        "label": "Order Number",
+        "value": "",
+        "required": false,
+        "position": 7,
+        "description": "Order number (can contain numbers and letters)"
+      },
+      "invoice_number": {
+        "type": "text",
+        "label": "Invoice Number",
+        "value": "",
+        "required": false,
+        "position": 8,
+        "description": "Invoice number (can contain numbers and letters)"
+      },
+      "Technical Details_group": {
+        "type": "group",
+        "label": "Technical Details",
+        "position": 9,
+        "description": "Technical information about the problem and solution"
+      },
+      "problem_description": {
+        "type": "textarea",
+        "label": "Problem Description",
+        "value": "Svcanner shows Problems.\nBideriction shifted lines.\nScanfieldtest failed even after successful scannercalbration\n",
+        "required": true,
+        "position": 10,
+        "description": "Detailed description of the problem (multiple paragraphs possible)"
+      },
+      "additional_notes": {
+        "type": "textarea",
+        "label": "Additional Notes",
+        "value": "",
+        "required": false,
+        "position": 11,
+        "description": "Any additional information, notes, or comments"
+      }
+    },
+    "fieldOrder": [
+      "General Information_group",
+      "report_date",
+      "contact_date",
+      "microscope",
+      "Service Details_group",
+      "name",
+      "order_number",
+      "invoice_number",
+      "Technical Details_group",
+      "problem_description",
+      "additional_notes"
+    ],
+    "totalFields": 11
+  },
+  "id": "template_service_report_001",
+  "updatedAt": "2025-09-26T13:38:26.276Z",
+  "_fileInfo": {
+    "filename": "service_template.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\service_template.json",
+    "savedAt": "2025-09-26T13:38:26.276Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "projectDefaults": {
+    "basePath": "C:\\Projekte",
+    "projectName": "LSM880_Klämbt_Scanner_nov-2025"
+  },
+  "originalName": "Service Template",
+  "sourceFilename": "service_template.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2025-09-26T13:38:13.786Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁",
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0
+    }
+  }
+}

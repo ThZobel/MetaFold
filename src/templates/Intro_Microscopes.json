@@ -1,0 +1,94 @@
+{
+  "name": "Intro Microscopes",
+  "description": "elabFTW ID 469",
+  "type": "experiment",
+  "structure": "",
+  "createdBy": "Thomas",
+  "createdByGroup": "MIN",
+  "createdAt": "2025-06-12T12:38:25.751Z",
+  "metadata": {
+    "fields": {
+      "Date Training Session 1": {
+        "type": "date",
+        "label": "Date of Introduction",
+        "value": "",
+        "required": false,
+        "position": 1
+      },
+      "Date Training Session 2": {
+        "type": "date",
+        "label": "Date Training Session 2",
+        "value": "",
+        "required": false,
+        "position": 2
+      },
+      "User": {
+        "type": "text",
+        "label": "User",
+        "value": "",
+        "required": true,
+        "position": 3
+      },
+      "Email": {
+        "type": "text",
+        "label": "Email of the user",
+        "value": "",
+        "required": true,
+        "position": 4
+      },
+      "Project Details": {
+        "type": "textarea",
+        "label": "Project Details",
+        "value": "",
+        "required": false,
+        "position": 5
+      },
+      "Misc": {
+        "type": "text",
+        "label": "Misc",
+        "value": "",
+        "required": false,
+        "position": 6
+      }
+    },
+    "fieldOrder": [
+      "Date Training Session 1",
+      "Date Training Session 2",
+      "User",
+      "Email",
+      "Project Details",
+      "Misc"
+    ],
+    "totalFields": 6
+  },
+  "id": "template_1752607858111_3jgszxznc",
+  "updatedAt": "2025-09-25T15:52:29.202Z",
+  "_fileInfo": {
+    "filename": "Intro_Microscopes.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\Intro_Microscopes.json",
+    "savedAt": "2025-09-25T15:52:29.202Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Intro Microscopes",
+  "sourceFilename": "Intro_Microscopes.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2025-09-25T15:51:22.879Z",
+  "projectDefaults": {
+    "basePath": "C:\\Projekte",
+    "projectName": "test"
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 469
+    }
+  },
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

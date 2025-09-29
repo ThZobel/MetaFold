@@ -1,0 +1,30 @@
+{
+  "name": "Image Analysis Thomas Folders",
+  "description": "Folder Structure for Image Analysis Projects",
+  "type": "folders",
+  "structure": "0_RAW_Data/\n1_Processed_Data/\n  0_cellprofiler_processed_images/\n  1_fiji_processed_images/\n  2_ilastik_processed_images/\n2_Macros_Pipelines/\n  0_cellprofiler/\n  1_fiji/\n  2_ilastik/\n3_Results_csv/\n  0_cellprofiler_result_tables/\n  1_fiji_result_tables/\n  2_ilastik_result_tables/\n4_Organizational/\n  0_Project_meetings/\n5_Publications/\n  0_Presentations/\n  1_Figures/\n  2_Movies/\n  3_Paper/",
+  "createdBy": "Thomas",
+  "createdByGroup": "MIN",
+  "createdAt": "2025-07-28T07:54:44.617Z",
+  "id": "template_1753689284618_9vv2i8uc8",
+  "updatedAt": "2025-09-25T15:52:29.202Z",
+  "_fileInfo": {
+    "filename": "image_analysis_thomas_folders.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\image_analysis_thomas_folders.json",
+    "savedAt": "2025-09-25T15:52:29.202Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Image Analysis Thomas Folders",
+  "sourceFilename": "image_analysis_thomas_folders.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2025-09-25T15:51:22.874Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}
