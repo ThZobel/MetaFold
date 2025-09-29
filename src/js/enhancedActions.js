@@ -89,7 +89,7 @@ window.exportCurrentTemplate = function() {
     }
 };
 
-    // Import templates from file - ENHANCED VERSION
+    // Import templates from file - FIXED VERSION: Uses templateManager.add() for proper storage
     window.importTemplatesFromFile = async function() {
         const actionEl = document.getElementById('importAction');
         
@@ -97,7 +97,7 @@ window.exportCurrentTemplate = function() {
         enhancedActions.showProgress('Opening file dialog...', 10);
         
         try {
-            console.log('📥 Starting enhanced template import...');
+            console.log('📥 Starting template import (FIXED version)...');
             
             // Check if Electron API is available
             if (!window.electronAPI || !window.electronAPI.importTemplatesFromFile) {
@@ -114,35 +114,50 @@ window.exportCurrentTemplate = function() {
                 
                 let importedCount = 0;
                 let skippedCount = 0;
-                let updatedCount = 0;
+                let errorCount = 0;
                 
                 // Process each imported template
                 for (const template of result.templates) {
-                    // Check if template already exists (by name and creator)
-                    const exists = window.templateManager.templates.some(t => 
-                        t.name === template.name && 
-                        t.createdBy === template.createdBy
-                    );
-                    
-                    if (exists) {
-                        console.log(`⚠️ Template "${template.name}" already exists, skipping...`);
-                        skippedCount++;
-                        continue;
-                    }
-                    
                     try {
-                        // Add template to manager
+                        // Check if template already exists
+                        const exists = window.templateManager.templates.some(t => 
+                            t.name === template.name && 
+                            t.createdBy === template.createdBy
+                        );
+                        
+                        if (exists) {
+                            console.log(`⚠️ Template "${template.name}" already exists, skipping...`);
+                            skippedCount++;
+                            continue;
+                        }
+                        
+                        // Clean template data and set current user context
+                        const cleanTemplate = {
+                            ...template,
+                            id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            createdBy: template.createdBy || window.userManager?.currentUser || 'Unknown',
+                            createdByGroup: template.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+                            createdAt: template.createdAt || new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                            // Remove file info as this is a new import - will be set by add() method
+                            _fileInfo: undefined
+                        };
+                        
+                        // FIXED: Use templateManager.add() instead of direct push
+                        // This ensures proper file storage and UI updates
                         if (window.templateManager && window.templateManager.add) {
-                            window.templateManager.add(template);
+                            console.log(`📥 Adding template via templateManager.add(): ${cleanTemplate.name}`);
+                            await window.templateManager.add(cleanTemplate);
                             importedCount++;
-                            console.log(`✅ Imported template: ${template.name}`);
+                            console.log(`✅ Template imported and saved: ${cleanTemplate.name}`);
                         } else {
                             console.error('❌ templateManager.add not available');
-                            skippedCount++;
+                            errorCount++;
                         }
-                    } catch (error) {
-                        console.error(`❌ Error adding template "${template.name}":`, error);
-                        skippedCount++;
+                        
+                    } catch (templateError) {
+                        console.error(`❌ Error importing template "${template.name}":`, templateError);
+                        errorCount++;
                     }
                 }
                 
@@ -156,7 +171,11 @@ window.exportCurrentTemplate = function() {
                     message = `Successfully imported ${importedCount} template(s)!`;
                     
                     if (skippedCount > 0) {
-                        message += ` (${skippedCount} skipped - duplicates or errors)`;
+                        message += ` (${skippedCount} duplicates skipped)`;
+                    }
+                    
+                    if (errorCount > 0) {
+                        message += ` (${errorCount} errors)`;
                     }
                     
                     // Add fixes information if available
@@ -166,14 +185,14 @@ window.exportCurrentTemplate = function() {
                     
                     enhancedActions.showActionFeedback(actionEl, 'success', message);
                 } else {
-                    message = `No templates imported. ${skippedCount} templates were skipped (duplicates or errors).`;
+                    message = `No templates imported. ${skippedCount} duplicates skipped, ${errorCount} errors.`;
                     messageType = 'warning';
                     enhancedActions.showActionFeedback(actionEl, 'warning', message);
                 }
                 
                 // Show detailed success dialog with fixes info
                 if (window.app && window.app.showSuccess && importedCount > 0) {
-                    let detailedMessage = `Import Summary:\n• ${importedCount} templates imported\n• ${skippedCount} templates skipped`;
+                    let detailedMessage = `Import Summary:\n• ${importedCount} templates imported\n• ${skippedCount} duplicates skipped\n• ${errorCount} errors`;
                     
                     if (result.fixes && result.fixes.length > 0) {
                         detailedMessage += `\n• ${result.fixes.length} templates auto-fixed`;
@@ -182,18 +201,11 @@ window.exportCurrentTemplate = function() {
                     
                     window.app.showSuccess(detailedMessage);
                 } else if (window.app && window.app.showWarning && importedCount === 0) {
-                    window.app.showWarning(`No templates imported: ${skippedCount} templates were skipped (duplicates or errors).`);
+                    window.app.showWarning(`No templates imported: ${skippedCount} duplicates skipped, ${errorCount} errors.`);
                 }
                 
-                // Refresh template list if any were imported
-                if (importedCount > 0) {
-                    setTimeout(() => {
-                        if (window.templateManager && window.templateManager.renderList) {
-                            window.templateManager.renderList();
-                            console.log('🔄 Template list refreshed after import');
-                        }
-                    }, 500);
-                }
+                // NO NEED for manual UI refresh - templateManager.add() handles this
+                console.log('✅ UI refresh not needed - handled by templateManager.add()');
                 
             } else if (result.success && (!result.templates || result.templates.length === 0)) {
                 enhancedActions.showActionFeedback(actionEl, 'error', 'No valid templates found in file');
@@ -211,7 +223,7 @@ window.exportCurrentTemplate = function() {
                 enhancedActions.hideProgress();
             }, 2000);
             
-            console.log('✅ Enhanced template import completed');
+            console.log('✅ Template import completed (FIXED version)');
             
         } catch (error) {
             console.error('❌ Error importing templates:', error);
@@ -618,7 +630,7 @@ window.duplicateCurrentTemplate = async function() {
     }
 };
 
-// Export current template
+// Export current template - ERWEITERT um automatischen Template-Namen
 window.exportCurrentTemplate = async function() {
     const template = window.templateManager?.currentTemplate;
     const actionEl = document.getElementById('exportAction');
@@ -639,21 +651,37 @@ window.exportCurrentTemplate = async function() {
             throw new Error('Export functionality not available (requires Electron)');
         }
         
-        enhancedActions.showProgress('Saving template file...', 75);
+        enhancedActions.showProgress('Generating template filename...', 40);
         
         // Clean template for export
         const cleanTemplate = window.utils.cleanTemplateForStorage(template);
         
-        // Use Electron API to export
-        const result = await window.electronAPI.exportTemplatesToLocation([cleanTemplate], 'single');
+        // Generate template-based filename
+        const safeName = template.name
+            .replace(/[<>:"/\\|?*]/g, '_')     // Remove invalid filename characters
+            .replace(/\s+/g, '_')              // Replace spaces with underscores
+            .toLowerCase()                     // Convert to lowercase
+            .substring(0, 100);                // Limit length
+        
+        const suggestedFileName = `${safeName}_template.json`;
+        console.log(`📝 Suggested export filename: ${suggestedFileName}`);
+        
+        enhancedActions.showProgress('Opening save dialog...', 60);
+        
+        // Use Electron API to export with custom filename
+        const result = await window.electronAPI.exportTemplatesToLocation(
+            [cleanTemplate], 
+            'single',
+            suggestedFileName  // Pass the suggested filename
+        );
         
         if (result.success) {
             enhancedActions.showActionFeedback(actionEl, 'success', 'Template exported successfully!');
             enhancedActions.showProgress('Export completed!', 100);
             
-            // Show success message with file path
+            // Show success message with file path and name
             if (window.app && window.app.showSuccess) {
-                window.app.showSuccess(`Template exported to: ${result.filePath}`);
+                window.app.showSuccess(`Template "${template.name}" exported to: ${result.fileName || path.basename(result.filePath)}`);
             }
             
             setTimeout(() => {
@@ -926,7 +954,7 @@ Templates:
 };
 
 
-    // Enhanced refresh storage info function with user path display
+    // Enhanced refresh storage info function - SIMPLIFIED for file-only storage
     window.refreshStorageInfo = async function() {
         if (!window.storage) {
             console.warn('⚠️ Storage manager not available');
@@ -934,154 +962,78 @@ Templates:
         }
         
         try {
-            console.log('🔄 Refreshing storage info...');
+            console.log('🔄 Refreshing simplified storage info...');
             
-            // Get storage statistics
-            const stats = window.storage.getStorageStats();
-            const health = await window.storage.healthCheck();
-            
-            console.log('📊 Storage stats:', stats);
-            console.log('🏥 Storage health:', health);
-            
-            // Update UI elements safely with null checks
-            const updateElement = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.textContent = value;
-                    console.log(`✅ Updated ${id}:`, value);
-                } else {
-                    console.warn(`⚠️ Element not found: ${id}`);
-                }
-            };
-            
-            // Get user-specific storage path for display
-            const userPath = window.storage.getUserStoragePath ? 
-                window.storage.getUserStoragePath() : 'General folder';
+            // Get basic user and storage information
+            const userInfo = window.storage.getCurrentUserContext ? 
+                window.storage.getCurrentUserContext() : { username: 'Unknown', groupname: 'Unknown' };
             
             const isUserManagement = window.storage.isUserManagementActive ? 
                 window.storage.isUserManagementActive() : false;
+
+            const stats = window.storage.getStorageStats ? window.storage.getStorageStats() : {};
             
-                    // Get user-specific information
-                    const userInfo = window.storage.getCurrentUserContext ? 
-                        window.storage.getCurrentUserContext() : { username: 'Unknown', groupname: 'Unknown' };
-                    
-                                       
-                    // Update all storage info fields
-                    updateElement('storageModeValue', stats.mode || 'Unknown');
-                    updateElement('fileStorageValue', stats.fileStorageEnabled ? '✅ Available' : '❌ Not Available');
-                    updateElement('fileTemplatesValue', stats.templates?.files || '0');
-                    updateElement('localTemplatesValue', stats.templates?.localStorage || '0');
-                    
-                    // Show user management status and path
-                    if (isUserManagement) {
-                        // Create or update user management status display
-                        let userMgmtElement = document.getElementById('userManagementStatus');
-                        if (!userMgmtElement) {
-                            // Create the element if it doesn't exist
-                            const storageDetails = document.querySelector('.storage-details');
-                            if (storageDetails) {
-                                userMgmtElement = document.createElement('div');
-                                userMgmtElement.id = 'userManagementStatus';
-                                userMgmtElement.className = 'storage-stat user-path-indicator';
-                                storageDetails.appendChild(userMgmtElement);
-                            }
-                        }
-                        
-                        if (userMgmtElement) {
-                            userMgmtElement.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span>👥 User Management:</span>
-                                    <strong style="color: #10b981;">Active</strong>
-                                </div>
-                                <div style="font-size: 0.8em; margin-top: 4px; opacity: 0.8;">
-                                    User: <strong>${userInfo.username}</strong> | Group: <strong>${userInfo.groupname}</strong>
-                                </div>
-                                <div style="font-size: 0.75em; margin-top: 4px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 4px 6px; border-radius: 3px;">
-                                    📁 templates/${userInfo.groupname}/${userInfo.username}/
-                                </div>
-                            `;
-                            userMgmtElement.style.display = 'block';
-                            console.log(`👥 User management status displayed: ${userInfo.username} (${userInfo.groupname})`);
-                        }
-                        
-                        // Update migration text with user-specific path
-                        const migrationText = document.getElementById('migrationText');
-                        if (migrationText) {
-                            migrationText.innerHTML = `
-                                <p style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 10px;">
-                                    Migrate your templates to user-specific file storage:
-                                </p>
-                                <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; font-family: monospace; font-size: 0.8rem; margin-bottom: 10px;">
-                                    📁 templates/${userInfo.groupname}/${userInfo.username}/
-                                </div>
-                            `;
-                        }
-                        
-                    } else {
-                        // Hide user management status if not active
-                        const userMgmtElement = document.getElementById('userManagementStatus');
-                        if (userMgmtElement) {
-                            userMgmtElement.style.display = 'none';
-                        }
-                        
-                        console.log('👤 Simple mode: No user management active');
-                    }
-
-
-
-
-            // Add user path display if user management is active
-            const userPathElement = document.getElementById('userStoragePathValue');
-            if (userPathElement) {
-                if (isUserManagement) {
-                    userPathElement.textContent = userPath;
-                    userPathElement.style.display = 'inline';
-                    console.log(`👥 User path displayed: ${userPath}`);
-                } else {
-                    userPathElement.style.display = 'none';
-                }
-            }
-            
-            // Show migration options if needed
-            const migrationOptions = document.getElementById('migrationOptions');
-            if (migrationOptions) {
-            const shouldShowMigration = stats.fileStorageEnabled && 
-                            (stats.templates?.localStorage || 0) > 0 && 
-                            !stats.migrationCompleted;
-                migrationOptions.style.display = shouldShowMigration ? 'block' : 'none';
-                console.log(`📋 Migration options: ${shouldShowMigration ? 'shown' : 'hidden'}`);
+            // Update storage details with simplified information
+            const storageDetails = document.querySelector('.storage-details');
+            if (storageDetails) {
+                // Clear existing content
+                storageDetails.innerHTML = '';
                 
-                // Update migration text to include user path
-                const migrationText = document.getElementById('migrationText');
-                if (migrationText && shouldShowMigration && isUserManagement) {
-                    migrationText.innerHTML = `
-                        <p style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 10px;">
-                            Migrate your templates from browser storage to user-specific files:<br>
-                            <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.8rem;">
-                                templates/${userPath}
-                            </code>
-                        </p>
+                // Show file storage location
+                const locationStat = document.createElement('div');
+                locationStat.className = 'storage-stat';
+                
+                if (isUserManagement) {
+                    locationStat.innerHTML = `
+                        <div style="width: 100%;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span class="stat-label">📁 Storage Location:</span>
+                                <span class="stat-value" style="color: #10b981;">File Storage</span>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px;">
+                                <div style="font-family: monospace; font-size: 0.85em; color: #a855f7; word-break: break-all;">
+                                    templates/${userInfo.groupname}/${userInfo.username}/
+                                </div>
+                            </div>
+                            <div style="font-size: 0.8em; color: #6b7280;">
+                                User: <strong>${userInfo.username}</strong> | Group: <strong>${userInfo.groupname}</strong>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    locationStat.innerHTML = `
+                        <span class="stat-label">📁 Storage Location:</span>
+                        <span class="stat-value">templates/ <small style="color: #6b7280;">(General folder)</small></span>
                     `;
                 }
+                
+                storageDetails.appendChild(locationStat);
             }
             
-            // Update open directory button
+            // Hide migration options (not needed for file-only storage)
+            const migrationOptions = document.getElementById('migrationOptions');
+            if (migrationOptions) {
+                migrationOptions.style.display = 'none';
+                console.log('📋 Migration options: hidden (file-only storage)');
+            }
+            
+            // Update open directory button - always enable for file storage
             const openDirBtn = document.getElementById('openDirBtn');
             if (openDirBtn) {
-                openDirBtn.disabled = !stats.fileStorageEnabled;
-                openDirBtn.style.opacity = stats.fileStorageEnabled ? '1' : '0.5';
+                openDirBtn.disabled = false;
+                openDirBtn.style.opacity = '1';
                 
-                // Update button text to include user context
-                if (isUserManagement && stats.fileStorageEnabled) {
-                    openDirBtn.textContent = `📂 Open User Folder (${userPath.replace('/', ' → ')})`;
-                } else if (stats.fileStorageEnabled) {
-                    openDirBtn.textContent = '📂 Open Templates Folder';
+                // Update button text based on user context
+                if (isUserManagement) {
+                    openDirBtn.innerHTML = `📂 Open User Folder <small>(${userInfo.username})</small>`;
+                } else {
+                    openDirBtn.innerHTML = '📂 Open Templates Folder';
                 }
                 
-                console.log(`📂 Open directory button: ${stats.fileStorageEnabled ? 'enabled' : 'disabled'}`);
+                console.log('📂 Open directory button: enabled');
             }
             
-            console.log('✅ Storage info refreshed in panel UI with user context');
+            console.log('✅ Simplified storage info refreshed');
             
         } catch (error) {
             console.error('❌ Error refreshing storage info:', error);
@@ -1149,7 +1101,7 @@ Templates:
 
 
 
-// Open templates directory
+// Open templates directory - ENHANCED to support user-specific folders
 window.openTemplatesDirectory = async function() {
     if (!window.electronAPI || !window.electronAPI.getTemplatesDirectory) {
         console.warn('⚠️ Directory access not available in browser mode');
@@ -1160,9 +1112,34 @@ window.openTemplatesDirectory = async function() {
     try {
         console.log('📂 Opening templates directory...');
         const result = await window.electronAPI.getTemplatesDirectory();
+        
         if (result.success) {
-            await window.electronAPI.openFolder(result.directory);
-            console.log('✅ Templates directory opened:', result.directory);
+            let targetDirectory = result.directory;
+            
+            // Check if user management is active and get user-specific path
+            const isUserManagement = window.storage?.isUserManagementActive ? 
+                window.storage.isUserManagementActive() : false;
+                
+            if (isUserManagement) {
+                const userInfo = window.storage?.getCurrentUserContext ? 
+                    window.storage.getCurrentUserContext() : { username: 'Unknown', groupname: 'Unknown' };
+                    
+                if (userInfo.groupname && userInfo.username && 
+                    userInfo.groupname !== 'Unknown' && userInfo.username !== 'Unknown') {
+                    // Construct user-specific path: templates/GROUP/USERNAME/
+                    // Use path separator based on platform
+                    const separator = result.directory.includes('\\') ? '\\' : '/';
+                    targetDirectory = result.directory + separator + userInfo.groupname + separator + userInfo.username;
+                    console.log(`📁 Opening user-specific folder: ${targetDirectory}`);
+                } else {
+                    console.log('📁 Opening general templates folder (user info unavailable)');
+                }
+            } else {
+                console.log('📁 Opening general templates folder (user management disabled)');
+            }
+            
+            await window.electronAPI.openFolder(targetDirectory);
+            console.log('✅ Templates directory opened:', targetDirectory);
         } else {
             console.error('❌ Could not access templates directory:', result.message);
             alert('Could not access templates directory: ' + result.message);

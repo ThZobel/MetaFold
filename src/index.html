@@ -13,10 +13,15 @@
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="css/projectScanner.css">
     <link rel="stylesheet" href="css/dragDrop.css">
+    <link rel="stylesheet" href="css/projectScanner-export.css">
     <link rel="stylesheet" href="css/experimentFormDrag.css">
-    <link rel="stylesheet" href="css/enhanced-actions.css">	
+    <link rel="stylesheet" href="css/enhanced-actions.css">
+    <link rel="stylesheet" href="css/userManagement.css">
     <!-- CRITICAL: Layout override to force full width -->
     <link rel="stylesheet" href="css/layout-override.css">
+    
+    <!-- elabFTW Category Manager - NEU -->
+    <script src="js/elabftwCategoryManager.js" defer></script>
     
     <!-- JSONCrack Visualization CSS (ENHANCED) -->
     <style>
@@ -499,9 +504,19 @@
     <!-- LEFT SIDEBAR - Template Selection (PRESERVED EXACTLY) -->
     <div class="sidebar">
         <div class="header">
-    <!-- Header mit Settings Button -->
+    <!-- Header mit Logo und Settings Button -->
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-        <h1 style="margin: 0; font-size: 1.5rem;">📁 MetaFold</h1>
+        <!-- Logo + App Name -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="assets/icon.png" alt="MetaFold Logo" style="
+                height: 32px; 
+                width: auto; 
+                border-radius: 4px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            ">
+            <h1 style="margin: 0; font-size: 1.5rem;">MetaFold</h1>
+        </div>
+        
         <!-- Settings Button als Zahnradsymbol -->
         <button class="btn btn-secondary" onclick="showSettingsModal()" 
                 style="padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;" 
@@ -657,9 +672,11 @@
                 <button class="main-tab" onclick="switchMainTab('discover')" id="discoverTab">
                     📁 Discover Projects
                 </button>
+                <!-- Temporary inactivated
                 <button class="main-tab" onclick="switchMainTab('visualize')" id="visualizeTab">
                     📊 Visualize Data
                 </button>
+                -->
             </div>
 
             <!-- CREATE PROJECT TAB (PRESERVED EXACTLY FROM WORKING VERSION) -->
@@ -672,6 +689,46 @@
                             <h3>🎯 Project Configuration</h3>
                             <p>Configure your project location and details</p>
                         </div>
+
+                    <!-- JavaScript für elabFTW Category Auto-Save -->
+                    <script>
+                    /**
+                     * Save the current elabFTW category to the active template
+                     */
+                    async function saveElabFTWCategoryToTemplate() {
+                        if (!window.templateManager?.currentTemplate?.isOwn) {
+                            console.log('ℹ️ Cannot save category to shared template');
+                            return;
+                        }
+                        
+                        try {
+                            const success = await window.templateManager?.saveCurrentTemplateWithElabFTWCategory?.();
+                            if (success) {
+                                // Show subtle success indicator
+                                const categoryInput = document.getElementById('elabftwProjectCategory');
+                                if (categoryInput) {
+                                    const originalBorder = categoryInput.style.border;
+                                    categoryInput.style.border = '2px solid #10b981';
+                                    setTimeout(() => {
+                                        categoryInput.style.border = originalBorder;
+                                    }, 1000);
+                                }
+                                console.log('✅ elabFTW category saved to template');
+                            }
+                        } catch (error) {
+                            console.error('❌ Error saving category to template:', error);
+                        }
+                    }
+
+                    /**
+                     * Debounced save for real-time input
+                     */
+                    let elabftwCategorySaveTimeout;
+                    function debounceElabFTWCategorySave() {
+                        clearTimeout(elabftwCategorySaveTimeout);
+                        elabftwCategorySaveTimeout = setTimeout(saveElabFTWCategoryToTemplate, 1000);
+                    }
+                    </script>
                         
                         <!-- Enhanced Path and Name Section -->
                         <div class="project-config-grid">
@@ -750,6 +807,17 @@
                             </small>
                         </div>
                         
+                        <!-- Template-specific Category ID field - SINGLE FIELD -->
+                        <div id="elabftwCategoryField" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.6); border-radius: 6px;">
+                            <label for="elabftwProjectCategory" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
+                                📂 elabFTW Category ID (for this template):
+                            </label>
+                            <input type="number" id="elabftwProjectCategory" min="0" placeholder="e.g., 1" value="" onchange="saveElabFTWCategoryToTemplate()" oninput="debounceElabFTWCategorySave()" style="width: 100%; padding: 6px 10px; border: 1px solid #0ea5e9; border-radius: 4px;">
+                            <small style="color: #0369a1; display: block; margin-top: 4px;">
+                                Category ID for this specific template. Will be saved with the template.
+                            </small>
+                        </div>
+                        
                         <!-- Existing experiment ID field -->
                         <div id="elabftwExperimentId" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 6px;">
                             <label for="existingExperimentId" style="display: block; font-weight: 500; color: #0369a1; margin-bottom: 5px;">
@@ -774,7 +842,7 @@
                         <div id="omeroManualOption" style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; color: #92400e;">
-                                    <input type="checkbox" id="sendToOMERO" style="width: auto;">
+                                    <input type="checkbox" id="sendToOMERO" style="width: auto;" onchange="handleSendToOMEROChange()">
                                     🔬 Send to OMERO
                                 </label>
 
@@ -844,7 +912,7 @@
                                     👥 OMERO Group:
                                 </label>
                                 <select id="omeroGroupSelect" onchange="handleOMEROGroupSelection()" style="width: 100%; padding: 6px 8px; border: 1px solid #f59e0b; border-radius: 4px; background: white; color: #374151; font-size: 13px;">
-                                    <option value="">Loading groups...</option>
+                                    <option value="">Connect to OMERO first</option>
                                 </select>
                                 <div id="omeroGroupStatus" style="margin-top: 3px; font-size: 11px; font-style: italic; min-height: 14px; color: #6b7280;"></div>
                             </div>
@@ -855,8 +923,7 @@
                                     <span style="font-size: 14px;">📁</span> <span style="color: #92400e;">OMERO Project (optional):</span>
                                 </label>
                                 <select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()" style="width: 100%; padding: 6px 8px; border: 1px solid #f59e0b; border-radius: 4px; background: white; color: #374151; font-size: 13px;">
-                                    <option value="">-- Create standalone dataset --</option>
-                                    <option value="refresh">🔄 Refresh project list</option>
+                                    <option value="">Select group first</option>
                                 </select>
                                 <small style="color: #92400e; display: block; margin-top: 3px; font-size: 11px;">
                                     Select existing project or leave empty for standalone dataset
@@ -869,7 +936,7 @@
 
                     <!-- JavaScript Functions for the Optimized OMERO UI -->
                     <script>
-                    // Enhanced Connect to OMERO function with visual feedback
+                    // Enhanced Connect to OMERO function with auto-select current group
                     async function connectToOMERO() {
                         const connectButton = document.getElementById('omeroConnectButton');
                         const connectIcon = document.getElementById('omeroConnectIcon');
@@ -907,14 +974,18 @@
                                 statusText.style.fontStyle = 'normal';
                                 statusText.style.fontWeight = '500';
                                 
-                                // Refresh project list after successful connection
-                                if (window.loadOMEROProjects) {
-                                    setTimeout(() => {
-                                        window.loadOMEROProjects();
-                                    }, 500);
-                                }
-                                
-                                // Button stays green and "Connected" - NO RESET!
+                                // Load groups after successful connection and auto-select current group
+                                console.log('🔬 Loading OMERO groups and auto-selecting current group...');
+                                setTimeout(async () => {
+                                    if (window.omeroUIIntegration.loadGroupsForDropdown) {
+                                        await window.omeroUIIntegration.loadGroupsForDropdown();
+                                        
+                                        // 🆕 NEW: Auto-select current group after loading
+                                        setTimeout(() => {
+                                            selectCurrentOMEROGroup();
+                                        }, 1000);
+                                    }
+                                }, 500);
                                 
                             } else {
                                 // Error state
@@ -971,6 +1042,83 @@
                         }
                     }
 
+                    /**
+                     * Auto-select current OMERO group
+                     * Called after successful connection and group loading
+                     */
+                    function selectCurrentOMEROGroup() {
+                        console.log('🆕 Auto-selecting current OMERO group...');
+                        
+                        const groupSelect = document.getElementById('omeroGroupSelect');
+                        if (!groupSelect) {
+                            console.warn('⚠️ Group dropdown not found for auto-selection');
+                            return;
+                        }
+                        
+                        // Look for option marked as "(current)"
+                        const currentOption = Array.from(groupSelect.options).find(option => 
+                            option.text.includes('(current)')
+                        );
+                        
+                        if (currentOption) {
+                            console.log('✅ Found current group option:', currentOption.text);
+                            groupSelect.value = currentOption.value;
+                            
+                            // Trigger the change handler to load projects
+                            handleOMEROGroupSelection();
+                            
+                            console.log('✅ Auto-selected current OMERO group:', currentOption.value);
+                        } else {
+                            console.log('📝 No current group marked - user needs to select manually');
+                        }
+                    }
+
+                    /**
+                     * Logout from OMERO
+                     * Called when user clicks the logout button
+                     */
+                    async function logoutFromOMERO() {
+                        console.log('🚺 OMERO logout requested...');
+                        
+                        try {
+                            if (window.omeroUIIntegration && typeof window.omeroUIIntegration.logout === 'function') {
+                                const result = await window.omeroUIIntegration.logout();
+                                
+                                if (result.success) {
+                                    console.log('✅ OMERO logout successful');
+                                    
+                                    // Clear group and project dropdowns
+                                    const groupSelect = document.getElementById('omeroGroupSelect');
+                                    const projectSelect = document.getElementById('omeroProjectSelect');
+                                    
+                                    if (groupSelect) {
+                                        groupSelect.innerHTML = '<option value="">Connect to OMERO first</option>';
+                                    }
+                                    
+                                    if (projectSelect) {
+                                        projectSelect.innerHTML = '<option value="">Select group first</option>';
+                                    }
+                                    
+                                    // Clear group status
+                                    const statusElement = document.getElementById('omeroGroupStatus');
+                                    if (statusElement) {
+                                        statusElement.textContent = '';
+                                    }
+                                    
+                                    // Hide any warnings
+                                    if (window.projectManager && typeof window.projectManager.hideOMEROGroupWarning === 'function') {
+                                        window.projectManager.hideOMEROGroupWarning();
+                                    }
+                                    
+                                } else {
+                                    console.warn('⚠️ OMERO logout warning:', result.message);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('❌ OMERO logout error:', error);
+                        }
+                    }
+
                     // Enhanced status update function
                     async function updateOMEROConnectionStatus(status, message, username = null) {
                         const statusText = document.getElementById('omeroStatusText');
@@ -1015,6 +1163,134 @@
                                 statusText.style.fontWeight = 'normal';
                                 break;
                         }
+                    }
+
+                    // =================== OMERO GROUP SELECTION HANDLERS ===================
+
+                    /**
+                     * Handle OMERO Group Selection Change
+                     * Called when user changes the OMERO group dropdown
+                     * Provides immediate feedback and validation ONLY when OMERO sync is enabled
+                     */
+                    function handleOMEROGroupSelection() {
+                        const groupSelect = document.getElementById('omeroGroupSelect');
+                        if (!groupSelect) return;
+                        
+                        const selectedGroupId = groupSelect.value;
+                        
+                        console.log('🔬 OMERO group selection changed:', selectedGroupId);
+                        
+                        // Always hide existing warnings first
+                        if (window.projectManager && typeof window.projectManager.hideOMEROGroupWarning === 'function') {
+                            window.projectManager.hideOMEROGroupWarning();
+                        }
+                        
+                        // Handle special selections
+                        if (selectedGroupId === 'refresh') {
+                            // Refresh group list
+                            console.log('🔄 Refreshing OMERO group list...');
+                            if (window.omeroUIIntegration && typeof window.omeroUIIntegration.loadGroupsForDropdown === 'function') {
+                                window.omeroUIIntegration.loadGroupsForDropdown();
+                            }
+                            return;
+                        }
+                        
+                        // 🆕 NEW: Check if "Send to OMERO" is checked before showing warnings
+                        const sendToOMERO = document.getElementById('sendToOMERO');
+                        const omeroSyncRequested = sendToOMERO && sendToOMERO.checked;
+                        
+                        // ⚠️ IMMEDIATE WARNING: Only show warning if OMERO sync is requested AND "All" is selected
+                        if (omeroSyncRequested && (selectedGroupId === 'all' || selectedGroupId === 'All' || selectedGroupId === '')) {
+                            console.warn('⚠️ Invalid OMERO group selected with sync enabled:', selectedGroupId);
+                            
+                            // Show immediate warning (only when relevant)
+                            if (window.projectManager && typeof window.projectManager.showOMEROGroupWarning === 'function') {
+                                window.projectManager.showOMEROGroupWarning(
+                                    'Cannot create OMERO datasets in "All Groups"',
+                                    'Please select a specific group where you have dataset creation permissions.'
+                                );
+                            }
+                            
+                            // Update group status to show error
+                            const statusElement = document.getElementById('omeroGroupStatus');
+                            if (statusElement) {
+                                statusElement.textContent = '⚠️ Invalid selection: Please choose a specific group';
+                                statusElement.style.color = '#dc2626';
+                                statusElement.style.fontWeight = '500';
+                            }
+                            
+                            // Clear projects dropdown since we can't load projects for "all"
+                            const projectSelect = document.getElementById('omeroProjectSelect');
+                            if (projectSelect) {
+                                projectSelect.innerHTML = '<option value="">-- Select a specific group first --</option>';
+                            }
+                            
+                            return;
+                        }
+                        
+                        // Valid group selected OR OMERO sync not requested - proceed with normal handling
+                        if (selectedGroupId && selectedGroupId !== 'all' && selectedGroupId !== 'All') {
+                            console.log('✅ Valid OMERO group selected:', selectedGroupId);
+                            
+                            // Update group status to show success
+                            const statusElement = document.getElementById('omeroGroupStatus');
+                            if (statusElement) {
+                                const selectedOption = groupSelect.querySelector(`option[value="${selectedGroupId}"]`);
+                                const groupName = selectedOption?.textContent || 'Selected Group';
+                                
+                                // Show different status based on whether OMERO sync is requested
+                                if (omeroSyncRequested) {
+                                    statusElement.textContent = `✅ Group: ${groupName} (ready for OMERO)`;
+                                    statusElement.style.color = '#059669';
+                                } else {
+                                    statusElement.textContent = `📁 Group: ${groupName} (OMERO sync not enabled)`;
+                                    statusElement.style.color = '#6b7280';
+                                }
+                                statusElement.style.fontWeight = '500';
+                            }
+                            
+                            // Load projects for the selected group
+                            if (window.omeroUIIntegration && typeof window.omeroUIIntegration.loadProjectsForGroup === 'function') {
+                                console.log('📁 Loading projects for group:', selectedGroupId);
+                                window.omeroUIIntegration.loadProjectsForGroup(selectedGroupId);
+                            }
+                        } else {
+                            // No specific group selected
+                            const statusElement = document.getElementById('omeroGroupStatus');
+                            if (statusElement) {
+                                statusElement.textContent = omeroSyncRequested ? 
+                                    'Please select a group for OMERO sync' : 
+                                    'No group selected';
+                                statusElement.style.color = '#6b7280';
+                                statusElement.style.fontWeight = 'normal';
+                            }
+                        }
+                    }
+
+                    /**
+                     * Handle OMERO Project Selection Change
+                     * Called when user changes the OMERO project dropdown
+                     */
+                    function handleOMEROProjectSelection() {
+                        if (window.omeroUIIntegration && typeof window.omeroUIIntegration.handleProjectSelection === 'function') {
+                            window.omeroUIIntegration.handleProjectSelection();
+                        }
+                    }
+
+                    /**
+                     * Handle "Send to OMERO" checkbox change
+                     * Re-validates group selection when OMERO sync is enabled/disabled
+                     */
+                    function handleSendToOMEROChange() {
+                        console.log('🔬 Send to OMERO checkbox changed');
+                        
+                        // Re-trigger group selection validation with new checkbox state
+                        handleOMEROGroupSelection();
+                        
+                        const sendToOMERO = document.getElementById('sendToOMERO');
+                        const isChecked = sendToOMERO && sendToOMERO.checked;
+                        
+                        console.log('🔬 OMERO sync now:', isChecked ? 'ENABLED' : 'DISABLED');
                     }
                     </script>
 

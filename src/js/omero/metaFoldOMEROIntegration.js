@@ -64,163 +64,130 @@ const metaFoldOMEROIntegration = {
         }
     },
 
-    // =================== NEUE HAUPTMETHODE (vor den bestehenden Funktionen einfügen) ===================
+    // =================== NEW FIXED MAP ANNOTATIONS METHOD ===================
 
-    // ENHANCED MAP ANNOTATIONS METHOD with AUTOMATIC Template Groups Detection
-
-    async addMapAnnotationsNew(datasetId, metadata, namespace = 'MetaFold Integration', options = {}) {
+    async addMapAnnotationsNew(datasetId, metadata, namespace, options = {}) {
+        try {
             console.log('🚀 === ULTRA-SIMPLE MAP ANNOTATIONS (2 MODES ONLY) ===');
             console.log('🚀 Dataset ID:', datasetId);
             console.log('🚀 Namespace:', namespace);
-            console.log('🚀 Metadata fields:', metadata ? Object.keys(metadata).length : 0);
+            console.log('🚀 Metadata fields:', Object.keys(metadata || {}).length);
             
-            try {
-                // *** STEP 1: Check JSON Triplets Checkbox - SIMPLE ***
-                const jsonTripletsCheckbox = document.getElementById('omeroUseJsonTriplets');
-                const useJsonTriplets = jsonTripletsCheckbox ? jsonTripletsCheckbox.checked : false;
-                
-                console.log(`📋 JSON Triplets checkbox: ${useJsonTriplets ? 'CHECKED' : 'UNCHECKED'}`);
-                
-                // *** STEP 2: ULTRA-SIMPLE IF/ELSE - NUR 2 WEGE ***
-                
-                if (useJsonTriplets) {
-                    
-            // =================== MODE 1: JSON TRIPLETS - FINAL FIX ===================
-                console.log('📋 MODE 1: Using JSON TRIPLETS (old working method)...');
-                
-                // *** FINAL FIX: Remove integration links from metadata BEFORE JSON triplet processing ***
-                let cleanedMetadata = { ...metadata }; // Clone to avoid modifying original
-                
-                // List of integration link fields that should NOT be in JSON triplets
-                const integrationFields = [
-                    'MetaFold Local Path', 'metafold_local_path', 'project_local_path',
-                    'MetaFold Created', 'metafold_created', 'metafold_export_timestamp', 
-                    'OMERO Link', 'omero_link',
-                    'elabFTW Link', 'elabftw_link',
-                    'metafold_integration'
-                ];
-                
-                // Remove integration fields from metadata before JSON triplet processing
-                let removedFieldsCount = 0;
-                integrationFields.forEach(fieldKey => {
-                    if (cleanedMetadata[fieldKey]) {
-                        console.log(`🔧 Removing integration field from JSON triplets: ${fieldKey}`);
-                        delete cleanedMetadata[fieldKey];
-                        removedFieldsCount++;
-                    }
-                });
-                
-                if (removedFieldsCount > 0) {
-                    console.log(`🔧 Removed ${removedFieldsCount} integration fields from JSON triplets to prevent duplication`);
-                    console.log(`🔧 Cleaned metadata fields: ${Object.keys(cleanedMetadata).length} (was ${Object.keys(metadata).length})`);
-                }
-                
-                // Get the main result with CLEANED metadata (no integration fields)
-                const result = await this.addMapAnnotations(datasetId, metadata, namespace, true); // true = no auto integration links                
-                if (result.success) {
-                    console.log('✅ JSON-triplet main annotation successful (integration links excluded):', result.keyValuePairs, 'pairs created');
-                    console.log('📋 Integration links will be handled separately by projectManager');
-                    
-                    return {
-                        ...result,
-                        method: 'json_triplets_mode_cleaned',
-                        mode: 'JSON Triplets (integration links separated)',
-                        integrationFieldsRemoved: removedFieldsCount,
-                        cleanedFieldsCount: Object.keys(cleanedMetadata).length,
-                        originalFieldsCount: Object.keys(metadata).length,
-                        note: 'Integration links excluded from JSON triplets to prevent duplication'
-                    };
-                } else {
-                    return {
-                        ...result,
-                        method: 'json_triplets_mode_error',
-                        mode: 'JSON Triplets (error occurred)'
-                    };
-                }
+            // Check JSON Triplets checkbox from UI
+            const jsonTripletsCheckbox = document.getElementById('omeroUseJsonTriplets');
+            let useJsonTriplets = false;
+            
+            if (jsonTripletsCheckbox) {
+                useJsonTriplets = jsonTripletsCheckbox.checked;
+                console.log('📋 JSON Triplets checkbox:', useJsonTriplets ? 'CHECKED' : 'UNCHECKED');
             } else {
-
-                // =================== MODE 2: ENHANCED KEY-VALUE WITH GROUPS - FIXED VERSION ===================
+                console.log('📋 JSON Triplets checkbox not found in UI');
+                useJsonTriplets = options.useJsonTriplets || false;
+            }
+            
+            console.log('📋 Final mode decision: JSON Triplets =', useJsonTriplets);
+            
+            if (useJsonTriplets) {
+                console.log('🔄 MODE 1: Using JSON TRIPLETS (legacy compatibility)...');
+                return await this.addMapAnnotationsJsonTripletFallback(datasetId, metadata, namespace);
+            } else {
                 console.log('🔄 MODE 2: Using ENHANCED KEY-VALUE (with groups)...');
-
-                // *** FIX: Get template metadata from options first, fallback to templateManager ***
+                
+                // Get template metadata for groups support
                 let templateMetadata = null;
-                if (options && options.templateMetadata) {
-                    templateMetadata = options.templateMetadata;
-                    console.log('📋 Template from options:', templateMetadata.name || 'unnamed template');
-                } else if (window.templateManager && window.templateManager.currentTemplate) {
+                if (window.templateManager && window.templateManager.currentTemplate) {
                     templateMetadata = window.templateManager.currentTemplate;
                     console.log('📋 Template from templateManager:', templateMetadata.name);
+                } else if (options.templateMetadata) {
+                    templateMetadata = options.templateMetadata;
+                    console.log('📋 Template from options:', templateMetadata.name || 'unnamed');
                 } else {
-                    console.log('📋 No template found - using simple key-value only');
-                }
-
-                // Test group detection and log template structure (ENHANCED DEBUGGING)
-                let hasGroups = false;
-                if (templateMetadata) {
-                    hasGroups = this.detectTemplateGroups(templateMetadata);
-                    console.log('📋 Template has groups:', hasGroups);
-                    
-                    // *** FIX: Log template metadata structure for debugging ***
-                    console.log('🔄 Template metadata structure:', {
-                        hasFields: !!(templateMetadata.metadata && templateMetadata.metadata.fields),
-                        hasFieldOrder: !!(templateMetadata.metadata && templateMetadata.metadata.fieldOrder),
-                        fieldOrderLength: templateMetadata.metadata && templateMetadata.metadata.fieldOrder ? templateMetadata.metadata.fieldOrder.length : 0,
-                        totalFields: templateMetadata.metadata ? Object.keys(templateMetadata.metadata.fields || templateMetadata.metadata || {}).length : 0
-                    });
-                }
-
-                // Convert with groups (ENHANCED WITH PROPER TEMPLATE METADATA)
-                let keyValuePairs;
-                if (templateMetadata && window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups) {
-                    console.log('🔄 Using ENHANCED conversion (with groups and correct fieldOrder)...');
-                    keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups(metadata, templateMetadata);
-                } else {
-                    console.log('🔄 Using STANDARD conversion (no groups - no template available)...');
-                    keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValues(metadata);
-                }
-                    
-                    if (keyValuePairs.length === 0) {
-                        return {
-                            success: false,
-                            message: 'No valid metadata for annotations',
-                            method: 'enhanced_key_value_mode'
-                        };
-                    }
-                    
-                    console.log(`🔄 Generated ${keyValuePairs.length} total key-value pairs`);
-                    
-                    // Create annotation
-                    const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
-                    
-                    if (result.success) {
-                        console.log('✅ Enhanced Key-Value method successful');
-                        return {
-                            ...result,
-                            method: 'enhanced_key_value_mode',
-                            mode: 'Enhanced Key-Value (with groups)',
-                            keyValuePairs: keyValuePairs.length
-                        };
-                    } else {
-                        console.error('❌ Enhanced method failed, trying JSON triplet fallback');
-                        const fallback = await this.addMapAnnotations(datasetId, metadata, namespace);
-                        return {
-                            ...fallback,
-                            method: 'json_triplet_fallback',
-                            mode: 'JSON Triplets (fallback)'
-                        };
-                    }
+                    console.log('📋 No template metadata available');
                 }
                 
-            } catch (error) {
-                console.error('❌ Ultra-simple annotations failed:', error);
-                return {
-                    success: false,
-                    message: `Annotations failed: ${error.message}`,
-                    error: error.message,
-                    method: 'error'
-                };
+                // Check if template has groups
+                let hasGroups = false;
+                if (templateMetadata) {
+                    console.log('🔍 Template metadata structure:', {
+                        hasFields: !!templateMetadata.metadata?.fields,
+                        hasFieldOrder: !!templateMetadata.metadata?.fieldOrder,
+                        fieldOrderLength: templateMetadata.metadata?.fieldOrder?.length || 0,
+                        totalFields: templateMetadata.metadata?.fields ? Object.keys(templateMetadata.metadata.fields).length : 0
+                    });
+                    
+                    hasGroups = this.detectTemplateGroups(templateMetadata);
+                    console.log('📋 Template has groups:', hasGroups);
+                }
+                
+                if (hasGroups && templateMetadata) {
+                    console.log('🔄 Using ENHANCED conversion (with groups and correct fieldOrder)...');
+                    
+                    const keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups(
+                        metadata, 
+                        templateMetadata
+                    );
+                    
+                    if (keyValuePairs.length > 0) {
+                        console.log(`🔄 Generated ${keyValuePairs.length} total key-value pairs`);
+                        
+                        const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
+                        
+                        if (result.success) {
+                            console.log('✅ Enhanced method with groups successful!');
+                            return {
+                                success: true,
+                                method: 'enhanced_key_value_with_groups',
+                                annotationId: result.annotationId,
+                                keyValuePairs: keyValuePairs.length,
+                                templateGroupsUsed: true
+                            };
+                        } else {
+                            console.error('❌ Enhanced method failed:', result.error);
+                            throw new Error(result.error);
+                        }
+                    } else {
+                        throw new Error('No key-value pairs generated from metadata');
+                    }
+                } else {
+                    console.log('🔄 Using SIMPLE conversion (no groups)...');
+                    
+                    const keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValues(metadata);
+                    
+                    if (keyValuePairs.length > 0) {
+                        console.log(`🔄 Generated ${keyValuePairs.length} simple key-value pairs`);
+                        
+                        const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
+                        
+                        if (result.success) {
+                            console.log('✅ Simple method successful!');
+                            return {
+                                success: true,
+                                method: 'simple_key_value',
+                                annotationId: result.annotationId,
+                                keyValuePairs: keyValuePairs.length,
+                                templateGroupsUsed: false
+                            };
+                        } else {
+                            console.error('❌ Simple method failed:', result.error);
+                            throw new Error(result.error);
+                        }
+                    } else {
+                        throw new Error('No key-value pairs generated from metadata');
+                    }
+                }
             }
-        },
+        } catch (error) {
+            console.error('❌ Enhanced method failed, trying JSON triplet fallback');
+            console.error('❌ Error details:', error);
+            return await this.addMapAnnotationsJsonTripletFallback(datasetId, metadata, namespace);
+        }
+    },
+
+    // JSON Triplet fallback method
+    async addMapAnnotationsJsonTripletFallback(datasetId, metadata, namespace) {
+        console.log('🔧 Using JSON triplet fallback method...');
+        return await this.addMapAnnotations(datasetId, metadata, namespace);
+    },
     // =================== SCHLANKE HYBRID AUTHENTIFIZIERUNG ===================
     
     hybridAuth: {
@@ -564,14 +531,38 @@ const metaFoldOMEROIntegration = {
             return result;
         },
         
-        // OMERO URL Generator
-        generateOMEROURL(datasetId, groupId = null) {
-            let url = `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`;
-            if (groupId) {
-                url += `&group=${groupId}`;
-            }
-            return url;
-        },
+
+    // OMERO URL Generator - FIX für Server-URL aus Settings
+            generateOMEROURL(datasetId, groupId = null) {
+                // FIX: Server-URL aus Session oder Settings lesen statt hart-kodiert
+                let baseUrl = 'https://10.14.28.44/';  // Fallback
+                
+                // Method 1: Aus aktueller Session
+                if (this.hybridAuth?.session?.serverUrl) {
+                    baseUrl = this.hybridAuth.session.serverUrl;
+                }
+                // Method 2: Aus omeroAuth.baseUrl (aus Settings)  
+                else if (window.omeroAuth?.baseUrl) {
+                    baseUrl = window.omeroAuth.baseUrl;
+                }
+                // Method 3: Direkt aus Settings (async, aber als Fallback ok)
+                else if (window.settingsManager) {
+                    // Synchroner Fallback - Settings sollten bereits geladen sein
+                    const settings = window.settingsManager.settings;
+                    if (settings && settings['omero.server_url']) {
+                        baseUrl = settings['omero.server_url'];
+                    }
+                }
+                
+                // URL generieren
+                let url = `${baseUrl}webclient/?show=dataset-${datasetId}`;
+                if (groupId) {
+                    url += `&group=${groupId}`;
+                }
+                
+                console.log('🔗 Generated OMERO URL:', url); // Debug log
+                return url;
+            },
         
         // Gruppenzugriff validieren
         validateGroupAccess(groupId) {

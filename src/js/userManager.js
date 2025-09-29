@@ -12,7 +12,7 @@ const userManager = {
     users: [],
     isInitialized: false,
 
-    // Initialize user manager
+    // Initialize user manager with password support
     async init() {
         console.log('🔧 Initializing userManager...');
         
@@ -52,13 +52,17 @@ const userManager = {
         // Load user history for autocomplete suggestions
         this.loadUserHistory();
         
-        console.log('👥 User management enabled - ALWAYS showing login dialog...');
+        // ✅ KRITISCHER FIX: Immer nach Passwort-System prüfen
+        console.log('👥 User management enabled - checking password system...');
         
-        // CRITICAL: ALWAYS show login dialog when user management is enabled
-        // REMOVE auto-restore logic - user must actively select
         try {
-            console.log('🔑 User management active - showing user selection dialog...');
-            const userInfo = await this.showLoginModal();
+            // Prüfe ob Password-System aktiviert ist
+            const passwordSystemEnabled = await this.isPasswordSystemEnabled();
+            console.log('🔐 Password system enabled:', passwordSystemEnabled);
+            
+            // ✅ FIX: Zeige Login-Modal mit korrektem Password-Parameter
+            console.log('🔑 Showing user selection dialog with password support...');
+            const userInfo = await this.showLoginModalWithPasswordCheck(passwordSystemEnabled);
             
             if (userInfo && userInfo.username) {
                 await this.setCurrentUser(userInfo.username, userInfo.groupname);
@@ -93,12 +97,30 @@ const userManager = {
         console.log('✅ Simple mode initialized');
     },
 
-    // Show login modal
+    // Show login modal with password support
     async showLoginModal() {
+        // ✅ FIX: Prüfe Password-System bevor Login-Modal angezeigt wird
+        try {
+            const passwordSystemEnabled = await this.isPasswordSystemEnabled();
+            console.log('🔐 Password system check for login modal:', passwordSystemEnabled);
+            
+            return await this.showLoginModalWithPasswordCheck(passwordSystemEnabled);
+        } catch (error) {
+            console.warn('⚠️ Could not check password system, showing login without password:', error);
+            return await this.showLoginModalWithPasswordCheck(false);
+        }
+    },
+
+    // NEW: Password-aware login modal
+    async showLoginModalWithPasswordCheck(requirePassword = false) {
         if (!window.loginModal) {
             throw new Error('loginModal not available');
         }
-        return await window.loginModal.show();
+        
+        console.log('🔐 Showing login modal with password requirement:', requirePassword);
+        
+        // ✅ FIX: Korrekte Parameterübergabe
+        return await window.loginModal.show(requirePassword);
     },
 
     async setCurrentUser(username, groupname) {
@@ -737,6 +759,454 @@ const userManager = {
         
         return null;
     },
+
+    // =================== PASSWORD SYSTEM MANAGEMENT ===================
+
+    /**
+     * Check if password system is enabled
+     * @returns {Promise<boolean>} - True if password system is enabled
+     */
+    async isPasswordSystemEnabled() {
+        if (!window.settingsManager) {
+            return false;
+        }
+        
+        try {
+            const enabled = await window.settingsManager.get('security.password_system_enabled');
+            return enabled === true;
+        } catch (error) {
+            console.warn('⚠️ Error checking password system setting:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Initialize password system
+     * @returns {Promise<Object>} - Initialization result
+     */
+    async initializePasswordSystem() {
+        try {
+            console.log('🔐 Initializing password system...');
+            
+            // Ensure secure storage is initialized
+            if (window.secureStorage && !window.secureStorage.isInitialized) {
+                await window.secureStorage.init();
+            }
+            
+            // Initialize admin account
+            const adminResult = await window.secureStorage.initializeAdminAccount();
+            
+            if (adminResult.created) {
+                console.log('🔐 Default admin account created');
+                return {
+                    success: true,
+                    adminCreated: true,
+                    message: `Default admin account created.\nUsername: ${adminResult.username}\nPassword: ${adminResult.defaultPassword}\n\n⚠️ Please change the admin password immediately!`
+                };
+            } else {
+                console.log('🔐 Admin account already exists');
+                return {
+                    success: true,
+                    adminCreated: false,
+                    message: 'Password system initialized. Admin account already exists.'
+                };
+            }
+            
+        } catch (error) {
+            console.error('🔐 Password system initialization failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
+    /**
+     * Enable password system
+     * @returns {Promise<Object>} - Enable result
+     */
+    async enablePasswordSystem() {
+        try {
+            if (!window.settingsManager) {
+                throw new Error('Settings manager not available');
+            }
+            
+            // Initialize the password system first
+            const initResult = await this.initializePasswordSystem();
+            
+            if (!initResult.success) {
+                throw new Error('Password system initialization failed: ' + initResult.error);
+            }
+            
+            // Enable in settings
+            await window.settingsManager.set('security.password_system_enabled', true);
+            console.log('✅ Password system enabled');
+            
+            return {
+                success: true,
+                message: initResult.message
+            };
+            
+        } catch (error) {
+            console.error('🔐 Enable password system failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
+    /**
+     * Disable password system
+     * @returns {Promise<Object>} - Disable result
+     */
+    async disablePasswordSystem() {
+        try {
+            if (!window.settingsManager) {
+                throw new Error('Settings manager not available');
+            }
+            
+            await window.settingsManager.set('security.password_system_enabled', false);
+            console.log('✅ Password system disabled');
+            
+            return {
+                success: true,
+                message: 'Password system disabled. Users can now login without passwords.'
+            };
+            
+        } catch (error) {
+            console.error('🔐 Disable password system failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
+    // =================== USER PASSWORD MANAGEMENT ===================
+
+    /**
+     * Set password for a user
+     * @param {string} username - Username
+     * @param {string} password - Plain text password
+     * @returns {Promise<Object>} - Set result
+     */
+    async setUserPassword(username, password) {
+        try {
+            if (!window.secureStorage) {
+                throw new Error('Secure storage not available');
+            }
+            
+            await window.secureStorage.storeUserPassword(username, password);
+            console.log(`🔐 Password set for user: ${username}`);
+            
+            return {
+                success: true,
+                message: `Password set for user "${username}"`
+            };
+            
+        } catch (error) {
+            console.error('🔐 Set user password failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
+    /**
+     * Verify user password
+     * @param {string} username - Username
+     * @param {string} password - Plain text password
+     * @returns {Promise<boolean>} - True if password is correct
+     */
+    async verifyUserPassword(username, password) {
+        try {
+            if (!window.secureStorage) {
+                console.warn('🔐 Secure storage not available for password verification');
+                return false;
+            }
+            
+            return await window.secureStorage.verifyUserPassword(username, password);
+        } catch (error) {
+            console.error('🔐 User password verification failed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Check if user has password set
+     * @param {string} username - Username
+     * @returns {boolean} - True if user has password
+     */
+    hasUserPassword(username) {
+        if (!window.secureStorage) {
+            return false;
+        }
+        
+        return window.secureStorage.hasUserPassword(username);
+    },
+
+    /**
+     * Remove password for a user
+     * @param {string} username - Username
+     * @returns {Promise<Object>} - Remove result
+     */
+    async removeUserPassword(username) {
+        try {
+            if (!window.secureStorage) {
+                throw new Error('Secure storage not available');
+            }
+            
+            const removed = window.secureStorage.removeUserPassword(username);
+            
+            if (removed) {
+                console.log(`🔐 Password removed for user: ${username}`);
+                return {
+                    success: true,
+                    message: `Password removed for user "${username}"`
+                };
+            } else {
+                throw new Error('Failed to remove password');
+            }
+            
+        } catch (error) {
+            console.error('🔐 Remove user password failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
+    // =================== ENHANCED LOGIN WITH PASSWORD ===================
+
+    /**
+     * Enhanced initialization with password support
+     * @returns {Promise<Object>} - User info after login
+     */
+    async initWithPasswordSupport() {
+        console.log('🔐 Initializing userManager with password support...');
+        
+        // Wait for dependencies
+        await this.waitForDependencies();
+        
+        // Check if user management is enabled
+        const userManagementEnabled = await this.isUserManagementEnabled();
+        if (!userManagementEnabled) {
+            console.log('📝 User management disabled - using simple mode');
+            this.initSimpleMode();
+            return { username: this.currentUser, groupname: this.currentGroup };
+        }
+
+        // Check if password system is enabled
+        const passwordSystemEnabled = await this.isPasswordSystemEnabled();
+        
+        console.log('🔐 Password system enabled:', passwordSystemEnabled);
+        
+        // Load user history for autocomplete
+        this.loadUserHistory();
+        
+        // Show login dialog (with or without password requirement)
+        try {
+            console.log('🔑 Showing login dialog...');
+            const userInfo = await this.showLoginModal(passwordSystemEnabled);
+            
+            if (userInfo && userInfo.username) {
+                await this.setCurrentUser(userInfo.username, userInfo.groupname);
+                
+                // Initialize user-specific settings
+                if (window.settingsManager?.initUserSpecific) {
+                    await window.settingsManager.initUserSpecific();
+                }
+                
+                console.log('✅ User login completed with password support');
+                return userInfo;
+            } else {
+                console.log('❌ Login cancelled - switching to simple mode');
+                await window.settingsManager?.set('general.user_management_enabled', false);
+                this.initSimpleMode();
+                return { username: this.currentUser, groupname: this.currentGroup };
+            }
+        } catch (error) {
+            console.warn('❌ Login failed, using simple mode:', error);
+            this.initSimpleMode();
+            return { username: this.currentUser, groupname: this.currentGroup };
+        }
+    },
+
+    /**
+     * Wait for dependencies to be available
+     * @returns {Promise<void>}
+     */
+    async waitForDependencies() {
+        const dependencies = ['settingsManager', 'secureStorage'];
+        const maxAttempts = 20;
+        
+        for (const dep of dependencies) {
+            let attempts = 0;
+            while (!window[dep] && attempts < maxAttempts) {
+                console.log(`🔧 Waiting for ${dep}... (attempt ${attempts + 1}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (!window[dep]) {
+                console.warn(`⚠️ ${dep} not available after ${maxAttempts} attempts`);
+            } else {
+                console.log(`✅ ${dep} is available`);
+            }
+        }
+    },
+
+    /**
+     * Show login modal with optional password requirement
+     * @param {boolean} requirePassword - Whether password is required
+     * @returns {Promise<Object>} - User info
+     */
+    async showLoginModal(requirePassword = false) {
+        if (!window.loginModal) {
+            throw new Error('loginModal not available');
+        }
+        
+        // Pass password requirement to login modal
+        return await window.loginModal.show(requirePassword);
+    },
+
+    /**
+     * Enhanced user switch with password verification
+     * @param {string} username - Username
+     * @param {string} groupname - Group name  
+     * @param {string} password - Optional password for verification
+     * @returns {Promise<Object>} - Switch result
+     */
+    async switchUserWithPassword(username, groupname, password = null) {
+        try {
+            console.log(`🔄 Switching to user with password check: ${username} (${groupname})`);
+            
+            // Check if password system is enabled
+            const passwordEnabled = await this.isPasswordSystemEnabled();
+            
+            if (passwordEnabled) {
+                // Check if user has a password set
+                const hasPassword = this.hasUserPassword(username);
+                
+                if (hasPassword) {
+                    // Verify password if provided
+                    if (!password) {
+                        throw new Error('Password required for this user');
+                    }
+                    
+                    const isValidPassword = await this.verifyUserPassword(username, password);
+                    if (!isValidPassword) {
+                        throw new Error('Invalid password');
+                    }
+                    
+                    console.log('✅ Password verified successfully');
+                } else {
+                    console.log('ℹ️ User has no password set, skipping verification');
+                }
+            }
+            
+            // Proceed with normal user switch
+            return await this.switchUser(username, groupname);
+            
+        } catch (error) {
+            console.error('🔐 User switch with password failed:', error);
+            throw error;
+        }
+    },
+
+    // =================== PASSWORD SYSTEM STATUS ===================
+
+    /**
+     * Get comprehensive password system status
+     * @returns {Promise<Object>} - Complete status
+     */
+    async getPasswordSystemStatus() {
+        const passwordEnabled = await this.isPasswordSystemEnabled();
+        const userManagementEnabled = await this.isUserManagementEnabled();
+        
+        let secureStorageStatus = null;
+        if (window.secureStorage) {
+            secureStorageStatus = window.secureStorage.getPasswordSystemStatus();
+        }
+        
+        const users = this.users || [];
+        const currentUser = this.getCurrentUser();
+        
+        return {
+            userManagement: {
+                enabled: userManagementEnabled,
+                currentUser: currentUser,
+                totalUsers: users.length,
+                users: users
+            },
+            passwordSystem: {
+                enabled: passwordEnabled,
+                initialized: !!window.secureStorage?.isInitialized,
+                adminExists: window.secureStorage?.hasUserPassword('Admin') || false
+            },
+            secureStorage: secureStorageStatus,
+            recommendations: this.getPasswordSystemRecommendations(passwordEnabled, users)
+        };
+    },
+
+    /**
+     * Get recommendations for password system setup
+     * @param {boolean} passwordEnabled - Whether password system is enabled
+     * @param {Array} users - List of users
+     * @returns {Array} - List of recommendations
+     */
+    getPasswordSystemRecommendations(passwordEnabled, users) {
+        const recommendations = [];
+        
+        if (!passwordEnabled) {
+            recommendations.push({
+                type: 'info',
+                message: 'Password system is disabled. Users can login without passwords.'
+            });
+        } else {
+            if (!window.secureStorage?.hasUserPassword('Admin')) {
+                recommendations.push({
+                    type: 'warning',
+                    message: 'Admin account needs to be initialized.'
+                });
+            }
+            
+            const usersWithoutPassword = users.filter(user => 
+                user !== 'Admin' && !window.secureStorage?.hasUserPassword(user)
+            );
+            
+            if (usersWithoutPassword.length > 0) {
+                recommendations.push({
+                    type: 'info',
+                    message: `${usersWithoutPassword.length} user(s) have no password set: ${usersWithoutPassword.join(', ')}`
+                });
+            }
+        }
+        
+        return recommendations;
+    },
+
+    // =================== DEBUG HELPERS ===================
+
+    /**
+     * Debug password system status (console output)
+     */
+    async debugPasswordSystem() {
+        const status = await this.getPasswordSystemStatus();
+        
+        console.log('🔐 Password System Debug Status:');
+        console.log('================================');
+        console.log('User Management:', status.userManagement);
+        console.log('Password System:', status.passwordSystem);
+        console.log('Secure Storage:', status.secureStorage);
+        console.log('Recommendations:', status.recommendations);
+        
+        return status;
+    },
+
 
     // Debug status
     async debugStatus() {

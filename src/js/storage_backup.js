@@ -114,82 +114,52 @@ const storage = {
             
             let templates = [];
             
-            // **PRIORITÄT: Immer Files zuerst versuchen**
+            // Try file storage first
             if (this.fileStorageEnabled && (this.storageMode === 'files' || this.storageMode === 'hybrid')) {
                 try {
                     templates = await this.loadTemplatesFromFilesOnly();  
                     console.log(`📂 Loaded ${templates.length} templates from files`);
-                    
-                    // **FILES-ONLY MODUS: Wenn File Storage funktioniert, KEINE localStorage Fallback**
-                    if (this.storageMode === 'files' && templates.length >= 0) {
-                        console.log('✅ File-only mode: Using templates from files exclusively');
-                        // Ensure we have at least default templates
-                        if (templates.length === 0) {
-                            const defaultTemplates = this.getDefaultTemplates() || [];
-                            console.log(`📦 Added ${defaultTemplates.length} default templates`);
-                            templates = [...templates, ...defaultTemplates];
-                        }
-                        
-                        // Filter out problematic templates
-                        const validTemplates = templates.filter(template => {
-                            if (!template.name || template.name === 'undefined') {
-                                console.log(`🗑️ Filtered out invalid template: ${template.name}`);
-                                return false;
-                            }
-                            return true;
-                        });
-                        
-                        console.log(`📂 Files-only loading completed: ${validTemplates.length} valid templates`);
-                        return validTemplates;
-                    }
-                    
                 } catch (error) {
-                    console.warn('Could not load templates from files:', error);
-                    // Falls Files fehlschlagen, auf localStorage fallback ONLY in hybrid mode
-                    if (this.storageMode === 'files') {
-                        console.warn('File-only mode failed, returning empty array');
-                        return this.getDefaultTemplates() || [];
-                    }
+                    console.warn('Could not load from files:', error);
                 }
             }
             
-            // **FALLBACK: localStorage nur wenn File Storage nicht verfügbar**
-            if (!this.fileStorageEnabled || this.storageMode === 'localStorage') {
-                console.log('📦 Loading from localStorage (file storage not available)');
+            // Fallback to localStorage if no file templates or localStorage mode
+            if (templates.length === 0 || this.storageMode === 'localStorage' || this.storageMode === 'hybrid') {
                 try {
-                    const localTemplates = this.loadTemplatesFromLocalStorage();
-                    console.log(`📦 Added ${localTemplates.length} templates from localStorage`);
-                    templates = [...templates, ...localTemplates];
+                    const localStorageTemplates = this.loadTemplatesFromLocalStorage();
+                    if (localStorageTemplates.length > 0) {
+                        templates = [...templates, ...localStorageTemplates];
+                        console.log(`📦 Added ${localStorageTemplates.length} templates from localStorage`);
+                    }
                 } catch (error) {
-                    console.warn('Could not load templates from localStorage:', error);
+                    console.warn('Could not load from localStorage:', error);
                 }
             }
             
-            // Default templates as final fallback
+            // Add default templates only if no templates found
             if (templates.length === 0) {
-                const defaultTemplates = this.getDefaultTemplates() || [];
-                console.log(`📦 Added ${defaultTemplates.length} default templates as final fallback`);
-                templates = defaultTemplates;
+                templates = this.getDefaultTemplates();
+                console.log('📋 Using default templates');
             }
             
-            // Filter out problematic templates
-            const validTemplates = templates.filter(template => {
-                if (!template.name || template.name === 'undefined') {
-                    console.log(`🗑️ Filtered out invalid template: ${template.name}`);
-                    return false;
-                }
-                return true;
-            });
+            // WICHTIG: Filter und enhance Templates
+            templates = templates.filter(t => t && t.name && t.name !== 'undefined');
+            console.log(`📂 Filtered to ${templates.length} valid templates (removed invalid)`);
             
-            console.log(`📂 Template loading completed: ${validTemplates.length} valid templates (from ${templates.length} total)`);
-            return validTemplates;
+            // Add metadata
+            templates = this.addTemplateMetadataStrict(templates);
+            console.log(`📂 Enhanced ${templates.length} templates with UI metadata`);
+            
+            // WICHTIG: Return array, never undefined
+            return Array.isArray(templates) ? templates : [];
             
         } catch (error) {
             console.warn('❌ Error loading templates:', error);
             return this.getDefaultTemplates() || [];
         }
-    },    
-
+    },
+    
     // Save templates (FILES-FIRST with AUTO GROUP-SHARING)
     async saveTemplates(templates) {
         if (!this.isAvailable) return false;
@@ -237,7 +207,7 @@ const storage = {
         }
     },
 
-    // Save single template to file immediately (FIXED: Template rename support)
+    // Save single template to file immediately
     async saveTemplateToFileImmediately(template, userInfo) {
         try {
             if (!this.fileStorageEnabled) {
@@ -247,31 +217,16 @@ const storage = {
 
             const templateUserInfo = userInfo || this.getCurrentUserContext();
             
-            // ===== TEMPLATE RENAME DETECTION =====
+            // ===== FILENAME PRESERVATION LOGIC =====
             let targetFilename;
             let isUpdate = false;
-            let isRename = false;
-            let oldFilePath = null;
             
             // 1. Check if template already has a filename
             if (template._fileInfo && template._fileInfo.filename) {
-                // BESTEHENDE DATEI - prüfe ob umbenannt wurde
-                const oldFilename = template._fileInfo.filename;
-                const expectedFilename = this.generateStableTemplateFilename(template);
-                
-                if (oldFilename !== expectedFilename) {
-                    // TEMPLATE WURDE UMBENANNT!
-                    console.log(`🏷️ Template rename detected: "${oldFilename}" -> "${expectedFilename}"`);
-                    isRename = true;
-                    oldFilePath = template._fileInfo.filePath;
-                    targetFilename = expectedFilename;
-                    isUpdate = false; // Behandle als neue Datei
-                } else {
-                    // NORMALES UPDATE - Namen beibehalten
-                    targetFilename = oldFilename;
-                    isUpdate = true;
-                    console.log(`💾 Updating existing template "${template.name}" in file: ${targetFilename}`);
-                }
+                // BESTEHENDE DATEI - Namen beibehalten
+                targetFilename = template._fileInfo.filename;
+                isUpdate = true;
+                console.log(`💾 Updating existing template "${template.name}" in file: ${targetFilename}`);
             } else {
                 // NEUE DATEI - Stabilen Namen generieren
                 targetFilename = this.generateStableTemplateFilename(template);
@@ -285,40 +240,20 @@ const storage = {
                 window.utils.cleanTemplateForStorage(template) : 
                 this.cleanTemplateBasic(template);
 
-            // ===== HANDLE RENAME: Create new file =====
-            if (isRename) {
-                // Remove old file info to force creation of new file
-                delete cleanTemplate._fileInfo;
-                console.log(`🔄 Creating new file for renamed template: ${targetFilename}`);
-            } else if (isUpdate && originalFileInfo) {
-                // ===== NORMAL UPDATE: Restore filename info for main.js =====
+            // ===== RESTORE FILENAME INFO FOR MAIN.JS =====
+            // Wichtig: main.js braucht die _fileInfo um zu erkennen ob es ein Update ist
+            if (isUpdate && originalFileInfo) {
                 cleanTemplate._fileInfo = {
                     ...originalFileInfo,
-                    filename: targetFilename
+                    filename: targetFilename  // Ensure filename is preserved
                 };
             }
 
-            // Call main.js with appropriate file info
+            // Call main.js with preserved file info
             const result = await window.electronAPI.saveTemplateToFile(cleanTemplate, templateUserInfo);
             
             if (result.success) {
-                // ===== DELETE OLD FILE IF RENAMED =====
-                if (isRename && oldFilePath && window.electronAPI.deleteTemplateFile) {
-                    try {
-                        const deleteResult = await window.electronAPI.deleteTemplateFile(oldFilePath);
-                        if (deleteResult.success) {
-                            console.log(`🗑️ Deleted old template file: ${oldFilePath}`);
-                        } else {
-                            console.warn(`⚠️ Could not delete old file: ${deleteResult.message}`);
-                            // Continue - new file was created successfully
-                        }
-                    } catch (deleteError) {
-                        console.warn('⚠️ Error deleting old template file:', deleteError);
-                        // Continue - new file was created successfully
-                    }
-                }
-                
-                // Update original template with new file info
+                // Update original template with file info
                 template._fileInfo = {
                     filename: result.filename,
                     filePath: result.filePath,
@@ -326,13 +261,10 @@ const storage = {
                     source: 'file',
                     directory: result.directory,
                     stable: true,
-                    isUpdate: !isRename, // False for renames (treated as new)
-                    wasRenamed: isRename
+                    isUpdate: isUpdate
                 };
                 
-                if (isRename) {
-                    console.log(`✅ Template "${template.name}" renamed and saved to new file: ${result.filePath}`);
-                } else if (isUpdate) {
+                if (isUpdate) {
                     console.log(`✅ Template "${template.name}" updated in existing file: ${result.filePath}`);
                 } else {
                     console.log(`✅ Template "${template.name}" saved to new file: ${result.filePath}`);
@@ -342,8 +274,7 @@ const storage = {
                     success: true, 
                     filePath: result.filePath, 
                     filename: result.filename,
-                    isUpdate: !isRename,
-                    wasRenamed: isRename
+                    isUpdate: isUpdate
                 };
             } else {
                 console.error(`❌ Failed to save template: ${result.message}`);
@@ -661,15 +592,22 @@ async loadTemplatesFromFilesOnly() {
 
     // =================== TEMPLATE UTILITIES ===================
 
-    // Generate stable filename (FIXED: Shorter, cleaner names)
+    // Generate stable filename
     generateStableTemplateFilename(template) {
         const safeName = (template.name || 'template')
             .replace(/[^a-zA-Z0-9\s\-_]/g, '')
             .replace(/\s+/g, '_')
             .toLowerCase()
-            .substring(0, 80);  // Increased length limit
+            .substring(0, 50);
+
+        const safeUser = (template.createdBy || 'unknown')
+            .replace(/[^a-zA-Z0-9\-_]/g, '')
+            .toLowerCase()
+            .substring(0, 20);
+
+        const templateType = template.type || 'template';
         
-        return `${safeName}.json`;  // Just the name + .json, no user/type suffix
+        return `${safeName}_${safeUser}_${templateType}.json`;
     },
 
     // Deduplicate templates
@@ -847,24 +785,7 @@ experiment_log.md`,
             };
         }
         
-        // TIMING-FIX: Check if user management is disabled
-        // Falls userManager noch nicht initialisiert, aber Settings zeigen "disabled"
-        if (window.settingsManager) {
-            try {
-                const userMgmtEnabled = window.settingsManager.get('general.user_management_enabled');
-                if (userMgmtEnabled === false) {
-                    console.log('🔧 User management disabled - using Default user structure');
-                    return {
-                        username: 'User',
-                        groupname: 'Default'
-                    };
-                }
-            } catch (error) {
-                // settingsManager noch nicht bereit, weiter mit Fallback
-            }
-        }
-        
-        // Fallback: Try to get from storage prefix  
+        // Fallback: Try to get from storage prefix
         if (this.userPrefix && this.userPrefix !== 'default') {
             const parts = this.userPrefix.split('_');
             if (parts.length >= 2) {
@@ -875,13 +796,10 @@ experiment_log.md`,
             }
         }
         
-        // VERBESSERTER Final fallback: 
-        // Wenn wir hier landen, ist wahrscheinlich User Management disabled
-        // aber userManager/settingsManager sind noch nicht bereit
-        console.log('⚠️ Uncertain user context - defaulting to Default user (likely disabled user management)');
+        // Final fallback
         return {
-            username: 'User',        // Statt 'Unknown' 
-            groupname: 'Default'     // Statt 'Unknown'
+            username: 'Unknown',
+            groupname: 'Unknown'
         };
     },
 

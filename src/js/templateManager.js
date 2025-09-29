@@ -1019,9 +1019,100 @@ const templateManager = {
             }
         }
         
+        // NEW: Load elabFTW category from template
+        if (this.currentTemplate.integrations?.elabftw?.defaultCategory !== undefined) {
+            console.log(`📂 Loading elabFTW category from template: ${this.currentTemplate.integrations.elabftw.defaultCategory}`);
+            this.setElabFTWCategoryInUI(this.currentTemplate.integrations.elabftw.defaultCategory);
+        } else if (this.currentTemplate.elabftwCategory !== undefined) {
+            // Legacy support for direct property
+            console.log(`📂 Loading legacy elabFTW category from template: ${this.currentTemplate.elabftwCategory}`);
+            this.setElabFTWCategoryInUI(this.currentTemplate.elabftwCategory);
+        } else {
+            // Clear category field if template has no specific category
+            this.setElabFTWCategoryInUI('');
+        }
+        
         this.updateActionButtons();
         
         console.log('✅ Template selected:', template.name);
+    },
+
+    // NEW: Get elabFTW Category from UI input
+    getElabFTWCategoryFromUI() {
+        const categoryInput = document.getElementById('elabftwProjectCategory');
+        const categoryValue = categoryInput?.value?.trim();
+        
+        if (categoryValue && categoryValue !== '' && !isNaN(parseInt(categoryValue))) {
+            return parseInt(categoryValue);
+        }
+        
+        return null; // No specific category set
+    },
+
+    // NEW: Set elabFTW Category in UI when template is loaded
+    setElabFTWCategoryInUI(category) {
+        const categoryInput = document.getElementById('elabftwProjectCategory');
+        if (categoryInput) {
+            categoryInput.value = category !== null && category !== undefined ? category : '';
+            console.log(`📂 elabFTW category field set to: ${category}`);
+        }
+    },
+
+    // NEW: Save current template with elabFTW category
+    async saveCurrentTemplateWithElabFTWCategory() {
+        if (!this.currentTemplate) {
+            console.warn('⚠️ No current template to save category to');
+            return false;
+        }
+
+        if (!this.currentTemplate.isOwn) {
+            console.log('ℹ️ Cannot save category to shared template');
+            return false;
+        }
+        
+        const elabftwCategory = this.getElabFTWCategoryFromUI();
+        
+        try {
+            // Find the template index
+            const templateIndex = this.templates.findIndex(t => 
+                t.name === this.currentTemplate.name && 
+                t.createdBy === this.currentTemplate.createdBy &&
+                t.createdAt === this.currentTemplate.createdAt
+            );
+
+            if (templateIndex < 0) {
+                throw new Error('Template not found for elabFTW category save');
+            }
+
+            // Create updated template
+            const updatedTemplate = {
+                ...this.currentTemplate,
+                updatedAt: new Date().toISOString()
+            };
+            
+            // Initialize integrations structure if needed
+            if (!updatedTemplate.integrations) {
+                updatedTemplate.integrations = {};
+            }
+            
+            if (!updatedTemplate.integrations.elabftw) {
+                updatedTemplate.integrations.elabftw = {};
+            }
+            
+            // Store category in template
+            updatedTemplate.integrations.elabftw.defaultCategory = elabftwCategory;
+            
+            // Update the template
+            await this.update(templateIndex, updatedTemplate);
+            this.currentTemplate = updatedTemplate;
+            
+            console.log(`✅ elabFTW category ${elabftwCategory || 'cleared'} saved to template "${this.currentTemplate.name}"`);
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Error saving elabFTW category to template:', error);
+            return false;
+        }
     },
 
     // Update action buttons
@@ -1116,9 +1207,9 @@ const templateManager = {
         }
     },
 
-    // UPDATED: Update template with immediate file storage
+    // UPDATED: Update template with immediate file storage (FIXED: Rename support)
     async update(index, updatedTemplate) {
-        console.log('📝 Updating template (fixed version):', updatedTemplate.name);
+        console.log('📝 Updating template (rename-aware version):', updatedTemplate.name);
         
         try {
             if (index < 0 || index >= this.templates.length) {
@@ -1126,6 +1217,14 @@ const templateManager = {
             }
             
             const existingTemplate = this.templates[index];
+            const oldTemplateName = existingTemplate.name;
+            const newTemplateName = updatedTemplate.name;
+            
+            // ===== DETECT TEMPLATE RENAME =====
+            const isRename = oldTemplateName !== newTemplateName;
+            if (isRename) {
+                console.log(`🏷️ Template rename detected: "${oldTemplateName}" -> "${newTemplateName}"`);
+            }
             
             // Preserve original metadata but update content
             const finalTemplate = {
@@ -1135,26 +1234,34 @@ const templateManager = {
                 createdByGroup: existingTemplate.createdByGroup, // Keep original group
                 createdAt: existingTemplate.createdAt,      // Keep original creation time
                 updatedAt: new Date().toISOString(),        // Update modification time
-                _fileInfo: existingTemplate._fileInfo       // Preserve file info
+                _fileInfo: existingTemplate._fileInfo       // Preserve file info (will be updated by storage)
             };
             
-            // Update in memory
+            // Update in memory first
             this.templates[index] = finalTemplate;
             
-            // Save to file using stable method (will overwrite existing file)
+            // Save to file using stable method (will handle rename automatically)
             if (window.storage && window.storage.saveTemplateToFileImmediately) {
                 const saveResult = await window.storage.saveTemplateToFileImmediately(finalTemplate);
                 
                 if (saveResult.success) {
-                    // Update file info if needed
+                    // Update file info with new information from storage
                     finalTemplate._fileInfo = {
                         ...(finalTemplate._fileInfo || {}),
+                        filename: saveResult.filename,
+                        filePath: saveResult.filePath,
                         savedAt: new Date().toISOString(),
-                        stable: true
+                        stable: true,
+                        wasRenamed: saveResult.wasRenamed || false
                     };
-                    console.log(`✅ Template "${finalTemplate.name}" updated in file`);
+                    
+                    if (saveResult.wasRenamed) {
+                        console.log(`✅ Template renamed and saved: "${oldTemplateName}" -> "${newTemplateName}"`);
+                    } else {
+                        console.log(`✅ Template "${finalTemplate.name}" updated in file`);
+                    }
                 } else {
-                    console.error(`❌ Failed to update template file: ${saveResult.message}`);
+                    console.error(`❌ Failed to save updated template: ${saveResult.message}`);
                     // Revert memory change if file save failed
                     this.templates[index] = existingTemplate;
                     throw new Error(`Failed to update template: ${saveResult.message}`);
@@ -1163,13 +1270,32 @@ const templateManager = {
                 console.warn('⚠️ File storage not available, template updated in memory only');
             }
             
+            // ===== UPDATE CURRENT TEMPLATE IF IT'S THE ONE BEING EDITED =====
+            if (this.currentTemplate && 
+                this.currentTemplate.name === oldTemplateName && 
+                this.currentTemplate.createdBy === finalTemplate.createdBy) {
+                // Update the current template reference with the new name
+                this.currentTemplate = finalTemplate;
+                console.log(`🔄 Updated current template reference for: "${newTemplateName}"`);
+            }
+            
+            // FORCE: Update selected index to point to the renamed template
+            if (isRename && this.selectedIndex >= 0 && this.selectedIndex < this.templates.length) {
+                const selectedTemplate = this.templates[this.selectedIndex];
+                if (selectedTemplate && selectedTemplate.name === finalTemplate.name && 
+                    selectedTemplate.createdBy === finalTemplate.createdBy) {
+                    // Keep the same selectedIndex - it's still the same template
+                    console.log(`🎯 Maintaining selection on renamed template at index: ${this.selectedIndex}`);
+                }
+            }
+            
             // Update UI
             this.invalidateCache();
             this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
             
-            console.log(`✅ Template "${finalTemplate.name}" updated successfully`);
+            console.log(`✅ Template update completed: "${finalTemplate.name}"`);
             return finalTemplate;
             
         } catch (error) {
@@ -1374,73 +1500,181 @@ const templateManager = {
         }
     },
 
-    // Delete current template
-        async deleteCurrent() {
-            if (!this.currentTemplate || !this.currentTemplate.isOwn) {
-                if (window.app && window.app.showError) {
-                    window.app.showError('You can only delete your own templates.');
-                }
+    // Delete current template (ROBUST VERSION - works even without _fileInfo)
+    async deleteCurrent() {
+        if (!this.currentTemplate || !this.currentTemplate.isOwn) {
+            if (window.app && window.app.showError) {
+                window.app.showError('You can only delete your own templates.');
+            }
+            return;
+        }
+
+        try {
+            // Find template index
+            const templateIndex = this.templates.findIndex(t => 
+                t.name === this.currentTemplate.name && 
+                t.createdBy === this.currentTemplate.createdBy &&
+                t.createdAt === this.currentTemplate.createdAt
+            );
+
+            if (templateIndex < 0) {
+                throw new Error('Template not found in list');
+            }
+
+            const templateToDelete = this.templates[templateIndex];
+            
+            // ===== ENHANCED CONFIRMATION DIALOG =====
+            const confirmMessage = `⚠️ Delete Template: "${templateToDelete.name}"?\n\n` +
+                `Type: ${templateToDelete.type === 'experiment' ? 'Experiment' : 'Folder'}\n` +
+                `Created: ${templateToDelete.createdAt ? new Date(templateToDelete.createdAt).toLocaleDateString() : 'Unknown'}\n` +
+                `Creator: ${templateToDelete.createdBy} (${templateToDelete.createdByGroup})\n` +
+                `Storage: ${templateToDelete._fileInfo ? 'File' : 'Auto-detect'}\n\n` +
+                `⚠️ This action cannot be undone!\n\n` +
+                `Continue with deletion?`;
+            
+            if (!confirm(confirmMessage)) {
+                console.log('🚫 Template deletion cancelled by user');
                 return;
             }
 
-            try {
-                // Find template index
-                const templateIndex = this.templates.findIndex(t => 
-                    t.name === this.currentTemplate.name && 
-                    t.createdBy === this.currentTemplate.createdBy &&
-                    t.createdAt === this.currentTemplate.createdAt
-                );
+            console.log(`🗑️ Deleting template: ${templateToDelete.name} by ${templateToDelete.createdBy}`);
 
-                if (templateIndex < 0) {
-                    throw new Error('Template not found in list');
-                }
-
-                const templateToDelete = this.templates[templateIndex];
-                console.log(`🗑️ Deleting template: ${templateToDelete.name} by ${templateToDelete.createdBy}`);
-
-                // Remove from memory first
-                this.templates.splice(templateIndex, 1);
-
-                // Delete file if it exists
-                if (templateToDelete._fileInfo && templateToDelete._fileInfo.filePath && window.electronAPI.deleteTemplateFile) {
-                    try {
-                        const deleteResult = await window.electronAPI.deleteTemplateFile(templateToDelete._fileInfo.filePath);
-                        if (deleteResult.success) {
-                            console.log(`✅ Template file deleted: ${templateToDelete._fileInfo.filePath}`);
-                        } else {
-                            console.warn(`⚠️ Failed to delete template file: ${deleteResult.message}`);
-                        }
-                    } catch (fileError) {
-                        console.warn('⚠️ Template file deletion failed:', fileError);
-                        // Continue - template still removed from memory
+            // ===== ROBUST FILE DELETION APPROACH =====
+            let fileDeleteAttempted = false;
+            let fileDeleteSuccessful = false;
+            let deleteError = null;
+            
+            // METHOD 1: Use existing _fileInfo if available
+            if (templateToDelete._fileInfo && templateToDelete._fileInfo.filePath && window.electronAPI.deleteTemplateFile) {
+                try {
+                    console.log(`🗂️ Method 1: Using existing _fileInfo: ${templateToDelete._fileInfo.filePath}`);
+                    const deleteResult = await window.electronAPI.deleteTemplateFile(templateToDelete._fileInfo.filePath);
+                    fileDeleteAttempted = true;
+                    
+                    if (deleteResult.success) {
+                        console.log(`✅ File deleted successfully via _fileInfo`);
+                        fileDeleteSuccessful = true;
+                    } else {
+                        console.warn(`⚠️ Method 1 failed: ${deleteResult.message}`);
+                        deleteError = deleteResult.message;
                     }
-                }
-
-                // Clear current selection
-                this.currentTemplate = null;
-                this.selectedIndex = -1;
-
-                // Update UI
-                this.invalidateCache();
-                this.buildSearchIndex();
-                this.renderList();
-                this.updateTemplateInfo();
-
-                // Hide template details
-                const templateDetails = document.getElementById('templateDetails');
-                if (templateDetails) {
-                    templateDetails.style.display = 'none';
-                }
-
-                console.log(`✅ Template "${templateToDelete.name}" deleted successfully`);
-
-            } catch (error) {
-                console.error('❌ Error deleting template:', error);
-                if (window.app && window.app.showError) {
-                    window.app.showError(`Failed to delete template: ${error.message}`);
+                } catch (error) {
+                    console.warn('⚠️ Method 1 error:', error);
+                    deleteError = error.message;
                 }
             }
-        },
+            
+            // METHOD 2: Calculate expected file path and try to delete
+            if (!fileDeleteSuccessful && window.storage && window.storage.generateStableTemplateFilename && window.electronAPI) {
+                try {
+                    console.log('🗂️ Method 2: Calculating expected file path...');
+                    const expectedFilename = window.storage.generateStableTemplateFilename(templateToDelete);
+                    console.log(`📁 Expected filename: ${expectedFilename}`);
+                    
+                    // Get templates directory and calculate full path
+                    const userInfo = {
+                        username: templateToDelete.createdBy,
+                        groupname: templateToDelete.createdByGroup
+                    };
+                    
+                    const dirResult = await window.electronAPI.getTemplatesDirectory(userInfo);
+                    if (dirResult.success) {
+                        const separator = dirResult.directory.includes('\\') ? '\\' : '/';
+                        const calculatedPath = dirResult.directory + separator + expectedFilename;
+                        
+                        console.log(`🗂️ Attempting to delete calculated path: ${calculatedPath}`);
+                        
+                        const deleteResult = await window.electronAPI.deleteTemplateFile(calculatedPath);
+                        fileDeleteAttempted = true;
+                        
+                        if (deleteResult.success) {
+                            console.log(`✅ File deleted successfully via calculated path`);
+                            fileDeleteSuccessful = true;
+                        } else {
+                            console.warn(`⚠️ Method 2 failed: ${deleteResult.message}`);
+                            if (!deleteError) deleteError = deleteResult.message;
+                        }
+                    } else {
+                        console.warn(`⚠️ Could not get templates directory: ${dirResult.message}`);
+                        if (!deleteError) deleteError = dirResult.message;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Method 2 error:', error);
+                    if (!deleteError) deleteError = error.message;
+                }
+            }
+            
+            // ===== HANDLE FILE DELETION RESULTS =====
+            if (fileDeleteAttempted && !fileDeleteSuccessful && deleteError) {
+                // File deletion was attempted but failed
+                const continueMessage = `⚠️ File deletion failed: ${deleteError}\n\n` +
+                    `The template file could not be deleted from the filesystem.\n` +
+                    `This may happen if the file was already deleted manually\n` +
+                    `or if there are permission issues.\n\n` +
+                    `Do you want to remove the template from the list anyway?\n\n` +
+                    `(You may need to delete the file manually later)`;
+                
+                if (!confirm(continueMessage)) {
+                    console.log('🚫 Template deletion aborted due to file deletion failure');
+                    return; // Cancel deletion if user doesn't want to continue
+                }
+                
+                console.log('⚠️ Continuing with template deletion despite file deletion failure');
+            } else if (!fileDeleteAttempted) {
+                console.log('ℹ️ No file deletion attempted (template might be memory-only)');
+            } else if (fileDeleteSuccessful) {
+                console.log('✅ Template file deleted successfully');
+            }
+
+            // ===== REMOVE FROM MEMORY =====
+            this.templates.splice(templateIndex, 1);
+            console.log(`✅ Template removed from memory: ${templateToDelete.name}`);
+
+            // ===== UI CLEANUP =====
+            // Clear current selection
+            this.currentTemplate = null;
+            this.selectedIndex = -1;
+
+            // Update UI
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+            this.updateTemplateInfo();
+
+            // Hide template details
+            const templateDetails = document.getElementById('templateDetails');
+            if (templateDetails) {
+                templateDetails.style.display = 'none';
+            }
+
+            // Success message
+            const successMessage = fileDeleteSuccessful ? 
+                `Template "${templateToDelete.name}" and its file deleted successfully!` :
+                `Template "${templateToDelete.name}" removed from list!`;
+                
+            if (window.app && window.app.showSuccess) {
+                window.app.showSuccess(successMessage);
+            }
+
+            console.log(`✅ Template "${templateToDelete.name}" deletion completed`);
+
+        } catch (error) {
+            console.error('❌ Error deleting template:', error);
+            
+            // Enhanced error message for user
+            let errorMessage = `Failed to delete template: ${error.message}`;
+            
+            if (error.message.includes('file') || error.message.includes('path')) {
+                errorMessage += `\n\nThe template file may still exist on the filesystem.`;
+            }
+            
+            if (window.app && window.app.showError) {
+                window.app.showError(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+        }
+    },
 
     // NEW: Validate template before operations to prevent "undefined" templates
     validateTemplateForOperation(template, operation = 'operation') {
@@ -1677,9 +1911,13 @@ const templateManager = {
         }
     },
 
-    // ENHANCED: Refresh function with error handling and UI updates
+    // ENHANCED: Refresh function with error handling and UI updates (FIXED: Keep selection)
     async refresh() {
         console.log('🔄 Manually refreshing template manager...');
+        
+        // Remember current template for re-selection
+        const currentTemplateName = this.currentTemplate?.name;
+        const currentTemplateCreator = this.currentTemplate?.createdBy;
         
         try {
             // 1. Clear all caches
@@ -1698,8 +1936,48 @@ const templateManager = {
             // 5. Re-render the list (will include group templates via getAllTemplates)
             this.renderList();
             
-            // 6. Update template info
-            this.updateTemplateInfo();
+            // 6. Try to re-select the previously selected template (FIXED: Better matching)
+            if (currentTemplateName && currentTemplateCreator) {
+                const allTemplates = this.getAllTemplates();
+                
+                // Try multiple strategies to find the template
+                let templateIndex = -1;
+                
+                // Strategy 1: Exact name and creator match
+                templateIndex = allTemplates.findIndex(t => 
+                    t.name === currentTemplateName && t.createdBy === currentTemplateCreator
+                );
+                
+                // Strategy 2: If renamed, try with original name from memory
+                if (templateIndex < 0 && this.currentTemplate && this.currentTemplate.id) {
+                    templateIndex = allTemplates.findIndex(t => t.id === this.currentTemplate.id);
+                }
+                
+                // Strategy 3: Fuzzy match by similar name (for renames)
+                if (templateIndex < 0) {
+                    const nameLower = currentTemplateName.toLowerCase();
+                    templateIndex = allTemplates.findIndex(t => 
+                        t.createdBy === currentTemplateCreator &&
+                        (t.name.toLowerCase().includes(nameLower.substring(0, 10)) ||
+                         nameLower.includes(t.name.toLowerCase().substring(0, 10)))
+                    );
+                }
+                
+                if (templateIndex >= 0) {
+                    const foundTemplate = allTemplates[templateIndex];
+                    console.log(`🎯 Re-selecting template: ${foundTemplate.name} (was: ${currentTemplateName})`);
+                    this.select(templateIndex);
+                } else {
+                    console.log(`⚠️ Could not re-select template "${currentTemplateName}" - not found`);
+                    // Clear selection if template no longer exists
+                    this.currentTemplate = null;
+                    this.selectedIndex = -1;
+                    this.updateTemplateInfo();
+                }
+            } else {
+                // 7. Update template info if no template was selected
+                this.updateTemplateInfo();
+            }
             
             console.log('✅ Template manager refresh completed');
             

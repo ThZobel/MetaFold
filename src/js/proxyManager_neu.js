@@ -10,7 +10,10 @@ const url = require('url');
 const querystring = require('querystring');
 
 class OMEROProxyServer {
-    constructor(port = 3000, omeroServerUrl = 'https://omero-imaging.uni-muenster.de') {
+    constructor(port = 3000, omeroServerUrl = null) {
+        if (!omeroServerUrl) {
+            throw new Error('OMERO server URL is required for proxy initialization');
+        }
         this.port = port;
         this.omeroServerUrl = omeroServerUrl;
         this.server = null;
@@ -19,11 +22,10 @@ class OMEROProxyServer {
         // Session storage für Client-zu-OMERO Mapping (wie im Python Proxy)
         this.clientSessions = new Map();
         
-        // Connection pooling with SSL fixes for development servers
+        // Connection pooling
         this.httpsAgent = new https.Agent({
             keepAlive: true,
-            rejectUnauthorized: false, // Accept self-signed certificates
-            secureProtocol: 'TLS_method' // Use modern TLS
+            rejectUnauthorized: false // Wie im Python Proxy für Development
         });
         
         console.log('🔬 OMERO Proxy Manager initialized');
@@ -167,11 +169,8 @@ class OMEROProxyServer {
             return;
         }
 
-        // Route requests with enhanced debugging
-        console.log(`🔍 Incoming request: ${req.method} ${path}`);
-        
+        // Route requests
         if (path.startsWith('/omero-api/')) {
-            console.log(`🔗 Routing to OMERO proxy: ${path}`);
             this.proxyToOMERO(req, res);
         } else if (path === '/proxy-status') {
             this.serveProxyStatus(req, res);
@@ -211,26 +210,16 @@ class OMEROProxyServer {
                 omeroPath = '/api' + omeroPath;
             }
 
-            // FIXED: Avoid double slashes in URL construction
-            const cleanServerUrl = this.omeroServerUrl.replace(/\/$/, '');
-            const cleanPath = omeroPath.startsWith('/') ? omeroPath : '/' + omeroPath;
-            const omeroUrl = cleanServerUrl + cleanPath;
+            const omeroUrl = this.omeroServerUrl + omeroPath;
             
             console.log(`🔬 [${req.method}] ${req.url} -> ${omeroUrl}`);
-            console.log(`🔍 URL Transformation Details:`);
-            console.log(`   Original request: ${req.url}`);
-            console.log(`   Stripped path: ${omeroPath}`);
-            console.log(`   OMERO server: ${this.omeroServerUrl}`);
-            console.log(`   Final URL: ${omeroUrl}`);
             console.log(`🔬 Client: ${clientId}`);
 
-            // Prepare request options with enhanced SSL handling
+            // Prepare request options
             const requestOptions = {
                 method: req.method,
                 headers: this.processRequestHeaders(req, clientId),
-                agent: this.httpsAgent,
-                rejectUnauthorized: false, // Accept self-signed certificates
-                timeout: 30000 // 30 second timeout
+                agent: this.httpsAgent
             };
 
             // Create the proxied request
@@ -238,18 +227,14 @@ class OMEROProxyServer {
                 this.handleProxyResponse(req, res, proxyRes, clientId);
             });
 
-            // Handle request errors with detailed logging
+            // Handle request errors
             proxyReq.on('error', (error) => {
                 console.error('❌ Proxy request error:', error);
-                console.error('❌ Failed URL:', omeroUrl);
-                console.error('❌ OMERO Server:', this.omeroServerUrl);
                 res.writeHead(502, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify({
                     error: 'Bad Gateway',
                     message: `Failed to connect to OMERO server: ${error.message}`,
-                    omeroServer: this.omeroServerUrl,
-                    requestedUrl: omeroUrl,
-                    originalPath: req.url
+                    omeroServer: this.omeroServerUrl
                 }));
             });
 

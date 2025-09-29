@@ -1,6 +1,23 @@
 // MetaFold Metadata Links Manager
 // Manages automatic addition of integration links to project metadata
 
+/**
+ * Get OMERO Server URL from settings - NO FALLBACK!
+ */
+async function getConfiguredOMEROServerUrl() {
+    if (!window.settingsManager) {
+        throw new Error('Settings manager not available - cannot get OMERO server URL');
+    }
+    
+    const serverUrl = await window.settingsManager.get('omero.server_url');
+    
+    if (!serverUrl || serverUrl.trim() === '') {
+        throw new Error('No OMERO server URL configured in settings');
+    }
+    
+    return serverUrl.trim().endsWith('/') ? serverUrl.trim() : serverUrl.trim() + '/';
+}
+
 const metadataLinksManager = {
     
     // =================== MAIN FUNCTIONS ===================
@@ -44,16 +61,46 @@ const metadataLinksManager = {
                 };
             }
             
-            // Add OMERO link info
-            if (omeroResult && omeroResult.success) {
-                console.log('🔬 Adding OMERO integration info');
-                enhancedMetadata.metafold_integration.external_links.omero = {
-                    url: omeroResult.url || this.generateOMEROUrl(omeroResult.dataset?.id),
-                    dataset_id: omeroResult.dataset?.id?.toString(),
-                    uploaded_at: new Date().toISOString(),
-                    status: 'uploaded'
-                };
-            }
+            
+    // Add OMERO link info (ENHANCED VERSION with username)
+    if (omeroResult && omeroResult.success) {
+        console.log('🔬 Adding OMERO integration info');
+        
+        // Get OMERO username from the correct locations (based on debug results)
+        let omeroUsername = null;
+        
+        // Option 1: hybridAuth session (most reliable)
+        if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.userName) {
+            omeroUsername = window.metaFoldOMEROIntegration.hybridAuth.session.userName;
+        }
+        // Option 2: omeroAuth eventContext (backup)
+        else if (window.omeroAuth?.session?.eventContext?.userName) {
+            omeroUsername = window.omeroAuth.session.eventContext.userName;
+        }
+        
+        console.log('🔬 OMERO username resolved:', omeroUsername);
+        
+        // Get OMERO URL - handle both direct URL and generated URL
+        let omeroUrl = omeroResult.url;
+        if (!omeroUrl && omeroResult.dataset?.id) {
+            // Use await since generateOMEROUrl is now async
+            omeroUrl = await this.generateOMEROUrl(omeroResult.dataset.id);
+        }
+        
+        enhancedMetadata.metafold_integration.external_links.omero = {
+            url: omeroUrl,
+            dataset_id: omeroResult.dataset?.id?.toString(),
+            user_name: omeroUsername || 'Unknown',
+            uploaded_at: new Date().toISOString(),
+            status: 'uploaded'
+        };
+        
+        console.log('🔬 OMERO integration info added:', {
+            dataset_id: omeroResult.dataset?.id,
+            user_name: omeroUsername,
+            url: omeroUrl
+        });
+    }
             
             // Update local metadata file
             await this.updateLocalMetadataFile(localPath, enhancedMetadata);
@@ -174,13 +221,19 @@ const metadataLinksManager = {
     },
     
     /**
-     * Generate OMERO URL based on dataset ID
+     * Generate OMERO URL based on dataset ID - NO HARDCODED FALLBACK!
      * @param {string|number} datasetId - OMERO dataset ID
-     * @returns {string} Full URL to OMERO dataset
+     * @param {string|number} groupId - Optional group ID
+     * @returns {Promise<string>} Full URL to OMERO dataset
      */
-    generateOMEROUrl(datasetId) {
-        // This matches the format used in metaFoldOMEROIntegration.js
-        return `https://omero-imaging.uni-muenster.de/webclient/?show=dataset-${datasetId}`;
+    async generateOMEROUrl(datasetId, groupId = null) {
+        const serverUrl = await getConfiguredOMEROServerUrl();
+        let url = `${serverUrl}webclient/?show=dataset-${datasetId}`;
+        if (groupId) {
+            url += `&group=${groupId}`;
+        }
+        console.log(`🔗 metadataLinksManager: Generated OMERO URL: ${url}`);
+        return url;
     },
     
     // =================== HELPER FUNCTIONS ===================
