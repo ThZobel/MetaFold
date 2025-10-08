@@ -1,9 +1,11 @@
+![MetaFold_Logo](/assets/MetafoldLogoPurple.png)
+
 # MetaFold 🔬
 
 **A powerful desktop application for laboratory data management and experiment organization**
 
 MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks and image management systems.
-
+![MetaFold Grafic](/assets/MetafoldGrafikPurple.png)
 ---
 ## ⚠️ Development Status: PROTOTYPE
 
