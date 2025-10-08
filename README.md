@@ -4,10 +4,19 @@
 
 MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks and image management systems.
 
+---
+## ⚠️ Development Status: PROTOTYPE
+
+> **Disclaimer:**  
+> This project was completely developed with the assistance of [claude.ai](https://claude.ai).  
+> It is currently in a **prototype** stage — use at your own risk.  
+> Contributions, reviews, and testing are highly appreciated.
+
+---
+
 ![MetaFold Interface](/assets/screenshots/metafold-main-interface.png)
 *Screenshot placeholder - Main MetaFold interface*
 
----
 
 ## ✨ Key Features
 
