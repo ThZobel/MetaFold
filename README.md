@@ -1,6 +1,4 @@
-![MetaFold_Logo](/assets/MetafoldLogoPurple.png)
-
-# MetaFold 🔬
+<img src="/assets/MetafoldLogoPurple.png" alt="MetaFold Logo" width="256">
 
 **A powerful desktop application for laboratory data management and experiment organization**
 
