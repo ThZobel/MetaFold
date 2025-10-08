@@ -15,7 +15,6 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 ---
 
 ![MetaFold Interface](/assets/screenshots/metafold-main-interface.png)
-*Screenshot placeholder - Main MetaFold interface*
 
 
 ## ✨ Key Features
