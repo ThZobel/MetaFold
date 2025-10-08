@@ -207,7 +207,7 @@ MetaFold is inspired by the excellent **RDM-Desktop Tool** by T. Haraszti:
 We thank T. Haraszti for the inspiration and foundation.
 
 ### Development
-This project was developed with the assistance of [claude.ai](https://claude.ai/) as part of the **NFDI4BioImage** initiative.
+This project was developed with the assistance of [claude.ai](https://claude.ai/)
 
 ---
 
