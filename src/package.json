@@ -27,7 +27,11 @@
     "jsoncrack",
     "data-analysis"
   ],
-  "author": "Dr. Thomas Zobel",
+  "author": {
+    "name": "Dr. Thomas Zobel",
+    "email": "thomas.zobel@uni-muenster.de"
+  },
+  "homepage": "https://github.com/ThZobel/MetaFold",
   "license": "MIT",
   "dependencies": {
     "jsongraph-react": "^0.0.12",
@@ -86,7 +90,8 @@
         }
       ],
       "icon": "assets/icon.png",
-      "category": "Science"
+      "category": "Science",
+      "maintainer": "Dr. Thomas Zobel <thomas.zobel@uni-muenster.de>"
     }
   }
 }
