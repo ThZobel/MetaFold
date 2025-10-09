@@ -78,7 +78,8 @@ For developers who want to run from source:
 1. **Clone the repository**
    ```bash
    git clone https://github.com/ThZobel/MetaFold.git
-   cd MetaFold
+   cd MetaFold/src
+
    ```
 
 2. **Install dependencies**
