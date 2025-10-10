@@ -149,18 +149,10 @@ MetaFold provides example templates to help you get started quickly:
 
 ---
 
-## 📖 Documentation
+## Admin User and User Management 
 
-For comprehensive documentation, tutorials, and API references, visit:
-
-**📚 [MetaFold Documentation](https://metafold-docs.readthedocs.io/en/latest/)**
-
-The documentation includes:
-- Detailed setup guides
-- Template creation tutorials
-- Integration configuration
-- Advanced features and workflows
-- Troubleshooting guides
+Admin User Password: `admin`
+To manage users and their passwords, switch to the Admin user (the default password is admin). After switching, you can manage all users — for example, change their groups or reset their passwords.
 
 ---
 
