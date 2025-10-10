@@ -21,8 +21,8 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 
 🗂️ **Template-Based Project Creation**
 - Create standardized folder structures from configurable templates
-- Dynamic metadata forms with validation
-- Support for both folder and experiment templates
+- Create .json and .html metadata files based on templates.
+- Sent your metadata to different systems like electronical lan notebooks (elabFTW) and special Databases (OMERO)
 
 👥 **Multi-User Support**
 - Secure user management with credential storage
@@ -30,19 +30,15 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 - Group-based access control
 
 🔗 **Laboratory Integrations**
-- **elabFTW**: Direct experiment creation with metadata sync
-- **OMERO**: Dataset creation with map annotations
-- **Secure Authentication**: Multi-layer encryption for credentials
+- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata sync
+- **[OMERO](https://www.openmicroscopy.org/index.html)**: Dataset creation with map annotations
 
 📊 **Project Discovery & Visualization**
 - Recursive scanning of existing projects
 - Interactive data visualization with JSONCrack
-- Project statistics and relationship analysis
 
 🎨 **Modern Interface**
 - Responsive design for different screen sizes
-- Drag & drop functionality
-- Real-time validation and feedback
 
 ---
 
@@ -191,14 +187,11 @@ MetaFold is designed for:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please check our documentation for:
-- Development setup guides
-- Code contribution guidelines
-- Feature request procedures
+We welcome contributions! - Development setup guides
 
 ---
 
-## 📄 License & Acknowledgements
+## 📄 Acknowledgements
 
 ### Inspiration
 MetaFold is inspired by the excellent **RDM-Desktop Tool** by T. Haraszti:
@@ -213,14 +206,7 @@ This project was developed with the assistance of [claude.ai](https://claude.ai/
 ---
 
 ## 🔗 Links
-
-- 📚 [Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)
 - 📦 [Download Latest Release](https://github.com/ThZobel/MetaFold/releases)
 - 📝 [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
 - 🐛 [Report Issues](https://github.com/ThZobel/MetaFold/issues)
-- 💬 [Discussions](https://github.com/ThZobel/MetaFold/discussions)
 - 🌐 [NFDI4BioImage](https://nfdi4bioimage.de/)
-
----
-
-*Simplifying laboratory data management, one experiment at a time* ✨
