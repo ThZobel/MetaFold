@@ -8,6 +8,29 @@ MetaFold simplifies laboratory data management through easy-to-use templates tha
 It reduces manual steps by automatically generating folder structures and metadata files at multiple locations simultaneously.  
 Thanks to its **integration with OMERO and ELNs**, microscopy data can be automatically imported based on the existing metadata — saving researchers significant time and effort.
 
+- [⚠️ Development Status: PROTOTYPE](#️-development-status-prototype)
+- [✨ Key Features](#-key-features)
+- [Live demo](#live-demo)
+- [🚀 Installation](#-installation)
+  - [Option 1: Pre-built Binaries (Recommended for Most Users)](#option-1-pre-built-binaries-recommended-for-most-users)
+  - [Option 2: Development Setup](#option-2-development-setup)
+    - [Prerequisites](#prerequisites)
+    - [Installation Steps](#installation-steps)
+    - [Building for Production](#building-for-production)
+- [📝 Getting Started with Templates](#-getting-started-with-templates)
+  - [Using Example Templates](#using-example-templates)
+    - [Method 1: Import via User Interface (Recommended)](#method-1-import-via-user-interface-recommended)
+    - [Method 2: Manual Installation](#method-2-manual-installation)
+- [🛡️ Admin User and User Management](#️-admin-user-and-user-management)
+- [🔧 Core Concepts](#-core-concepts)
+  - [Templates](#templates)
+  - [Projects](#projects)
+  - [Discovery](#discovery)
+- [🎯 Target Audience](#-target-audience)
+- [🤝 Contributing](#-contributing)
+- [📄 Acknowledgements](#-acknowledgements)
+- [🔗 Links](#-links)
+
 ---
 
 ## ⚠️ Development Status: PROTOTYPE
