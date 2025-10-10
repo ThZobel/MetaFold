@@ -149,7 +149,7 @@ MetaFold provides example templates to help you get started quickly:
 
 ---
 
-## Admin User and User Management 
+## 🛡️ Admin User and User Management 
 
 Admin User Password: `admin`
 To manage users and their passwords, switch to the Admin user (the default password is admin). After switching, you can manage all users — for example, change their groups or reset their passwords.
