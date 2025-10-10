@@ -2,7 +2,11 @@
 
 **A powerful desktop application for laboratory data management and experiment organization**
 
-MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks and image management systems.
+## Which problem is solved by this tool
+
+MetaFold simplifies laboratory data management through easy-to-use templates that create **reproducible metadata**.  
+It reduces manual steps by automatically generating folder structures and metadata files at multiple locations simultaneously.  
+Thanks to its **integration with OMERO and ELNs**, microscopy data can be automatically imported based on the existing metadata — saving researchers significant time and effort.
 
 ---
 
@@ -20,18 +24,19 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 <img src="/assets/MetafoldGrafikPurple.png" alt="MetaFold Grafic" width="512">
 
 🗂️ **Template-Based Project Creation**
-- Create standardized folder structures from configurable templates
-- Create .json and .html metadata files based on templates.
-- Sent your metadata to different systems like electronical lan notebooks (elabFTW) and special Databases (OMERO)
+- Create standardized folder structures and metadata forms from configurable templates
+- Create .json and .html metadata files.
+- Sent your metadata to different systems like electronical lan notebooks (elabFTW) and special Databases (OMERO).
 
 👥 **Multi-User Support**
-- Secure user management with credential storage
+- Secure user and group management with credential storage
 - User-specific templates and settings
 - Group-based access control
 
 🔗 **Laboratory Integrations**
-- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata sync
-- **[OMERO](https://www.openmicroscopy.org/index.html)**: Dataset creation with map annotations
+- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata sync 
+- **[OMERO](https://www.openmicroscopy.org/index.html)**: Dataset creation with map annotations / metadata annotation
+- Directly linking off all intergrations 
 
 📊 **Project Discovery & Visualization**
 - Recursive scanning of existing projects
@@ -39,7 +44,10 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 
 🎨 **Modern Interface**
 - Responsive design for different screen sizes
+---
+## Live demo
 
+<https://youtu.be/OV1vB6SOis8> *(early state & and first try(I will remove / exchange it soon)*
 ---
 
 ## 🚀 Installation
