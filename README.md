@@ -47,7 +47,10 @@ Thanks to its **integration with OMERO and ELNs**, microscopy data can be automa
 ---
 ## Live demo
 
+<img src="/assets/MetaFold_Teaser_konv3.gif" alt="MetaFold Gif" width="512">
+
 <https://youtu.be/OV1vB6SOis8> *(early state & and first try(I will remove / exchange it soon)*
+
 ---
 
 ## 🚀 Installation
