@@ -1,6 +1,10 @@
 # .github/workflows/release.yml
 name: Build and Release MetaFold
 
+# Wichtig: Permissions für GITHUB_TOKEN
+permissions:
+  contents: write
+  
 on:
   # Händischer Trigger über GitHub UI  
   workflow_dispatch:
