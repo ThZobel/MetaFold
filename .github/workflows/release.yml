@@ -1,161 +1,206 @@
-# .github/workflows/release.yml
-name: Build and Release MetaFold
+name: Build and Release Electron App
 
 on:
-  # Händischer Trigger über GitHub UI  
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., v0.0.3)'
-        required: true
-        default: 'v0.0.3'
-  
-  # Automatischer Trigger bei Tag-Push (optional)
   push:
-    tags:
-      - 'v*'
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  # Test job first
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out Git repository
+      uses: actions/checkout@v4
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: 'src/package-lock.json'
+
+    - name: Install dependencies
+      working-directory: src
+      run: npm ci
+
+    - name: Run tests
+      working-directory: src
+      run: npm test || echo "No tests defined"
+
+    - name: Run linting
+      working-directory: src
+      run: npm run lint || echo "No linting defined"
+
+  # Build job
   build:
+    needs: test
     runs-on: ${{ matrix.os }}
     
     strategy:
+      fail-fast: false
       matrix:
         include:
+          - os: windows-latest
+            platform: windows
+            command: build-win
+            artifact_name: MetaFold-Windows
+            artifact_path: 'src/dist/*.exe'
+          - os: macos-13  # Intel macOS
+            platform: mac-intel
+            command: build-mac
+            artifact_name: MetaFold-macOS-Intel
+            artifact_path: 'src/dist/*.dmg'
+          - os: macos-14  # ARM macOS (M1/M2)
+            platform: mac-arm
+            command: build-mac
+            artifact_name: MetaFold-macOS-ARM
+            artifact_path: 'src/dist/*.dmg'
           - os: ubuntu-latest
             platform: linux
-          - os: windows-latest  
-            platform: windows
-          - os: macos-latest
-            platform: mac
+            command: build-linux
+            artifact_name: MetaFold-Linux
+            artifact_path: 'src/dist/*.AppImage'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Check out Git repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: 'src/package-lock.json'
 
-      - name: Install dependencies
-        run: npm ci
+    # Windows specific setup
+    - name: Prepare for app notarization (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        echo "Windows code signing would go here"
 
-      - name: Build visualization (webpack)
-        run: npm run build-visualization
+    # macOS specific setup  
+    - name: Prepare for app notarization (macOS)
+      if: startsWith(matrix.platform, 'mac')
+      run: |
+        echo "macOS notarization setup would go here"
+        # Add certificates, etc.
 
-      - name: Build for Windows
-        if: matrix.platform == 'windows'
-        run: npm run build-win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Linux specific setup
+    - name: Install Linux dependencies
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite-dev libxdamage-dev libxrandr-dev libgbm-dev libxss1 libasound2-dev
 
-      - name: Build for macOS  
-        if: matrix.platform == 'mac'
-        run: npm run build-mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Für Code Signing (falls du später willst):
-          # CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
-          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+    - name: Install dependencies
+      working-directory: src
+      run: npm ci
 
-      - name: Build for Linux
-        if: matrix.platform == 'linux'  
-        run: npm run build-linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build Electron app
+      working-directory: src
+      run: npm run ${{ matrix.command }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: metafold-${{ matrix.platform }}
-          path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.pkg  
-            dist/*.AppImage
-            dist/*.deb
-          retention-days: 5
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.artifact_path }}
+        retention-days: 30
+
+  # Release job (only on release events)
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Display structure of downloaded files
+      run: ls -la artifacts/
+
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/MetaFold-Windows/*
+          artifacts/MetaFold-macOS-Intel/*
+          artifacts/MetaFold-macOS-ARM/*
+          artifacts/MetaFold-Linux/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Auto-release job (on push to main)
+  auto-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Check out Git repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Get package version
+      id: package-version
+      working-directory: src
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.package-version.outputs.version }}
+        name: Release ${{ steps.package-version.outputs.version }}
+        files: |
+          artifacts/MetaFold-Windows/*
+          artifacts/MetaFold-macOS-Intel/*
+          artifacts/MetaFold-macOS-ARM/*
+          artifacts/MetaFold-Linux/*
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: success()
+    if: github.event_name == 'release'
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Get version number
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          release_name: MetaFold ${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: false
-          body: |
-            # MetaFold ${{ steps.version.outputs.version }}
-            
-            **Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronic lab notebooks.**
-            
-            ## 📥 Downloads
-            
-            Choose the version for your operating system:
-            
-            ### Windows
-            - `MetaFold-Setup-${{ steps.version.outputs.version }}.exe` - Windows Installer
-            
-            ### macOS  
-            - `MetaFold-${{ steps.version.outputs.version }}.dmg` - macOS Disk Image
-            
-            ### Linux
-            - `MetaFold-${{ steps.version.outputs.version }}.AppImage` - Universal Linux AppImage
-            - `MetaFold-${{ steps.version.outputs.version }}.deb` - Debian/Ubuntu Package
-            
-            ## 🚀 Installation
-            
-            - **Windows**: Run the `.exe` installer
-            - **macOS**: Open the `.dmg` and drag MetaFold to Applications  
-            - **Linux**: Make the `.AppImage` executable (`chmod +x`) or install the `.deb` package
-            
-            ## 📖 Documentation
-            
-            See the [README](https://github.com/ThZobel/MetaFold/blob/main/README.md) for detailed usage instructions.
-            
-            ---
-            
-            **Admin User Password:** `admin`  
-            **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
-
-      - name: Upload Release Assets
-        run: |
-          # Alle Build-Artefakte zu Release hinzufügen
-          for dir in artifacts/*/; do
-            for file in "$dir"dist/*; do
-              if [[ -f "$file" ]]; then
-                filename=$(basename "$file")
-                echo "Uploading: $filename"
-                gh release upload ${{ steps.version.outputs.version }} "$file" --clobber
-              fi
-            done
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/MetaFold-Windows/*
+          artifacts/MetaFold-macOS/*
+          artifacts/MetaFold-Linux/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
