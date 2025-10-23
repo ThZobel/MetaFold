@@ -34,8 +34,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Debug: Check file structure
-      - name: Debug - Check repository structure
+      # Debug: Check file structure (Windows)
+      - name: Debug - Check repository structure (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          echo "=== Repository root ==="
+          dir
+          echo "=== src directory ==="
+          dir src\ 2>nul || echo "src directory not found"
+          echo "=== Find package files ==="
+          Get-ChildItem -Recurse -Name "package*.json" 2>nul || echo "No package files found"
+
+      # Debug: Check file structure (Unix-like)
+      - name: Debug - Check repository structure (Unix)
+        if: matrix.platform != 'windows'
         run: |
           echo "=== Repository root ==="
           ls -la
@@ -69,35 +81,76 @@ jobs:
             libatspi2.0-0 \
             libgtk-3-0
 
+      # Debug: Check npm setup
+      - name: Debug - Check npm and build commands
+        working-directory: src
+        run: |
+          echo "=== Node and NPM versions ==="
+          node --version
+          npm --version
+          echo "=== Package.json scripts ==="
+          npm run 2>&1 || echo "No scripts or error showing scripts"
+          echo "=== Checking build commands exist ==="
+          npm run build-visualization --dry-run 2>&1 || echo "build-visualization command not found"
+          npm run build-${{ matrix.platform }} --dry-run 2>&1 || echo "build-${{ matrix.platform }} command not found"
+
       - name: Install dependencies
         run: |
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
         working-directory: src
+        continue-on-error: false
+
+      - name: Debug - Post-install check (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: src
+        run: |
+          echo "=== Checking node_modules ==="
+          dir node_modules\ 2>nul | Select-Object -First 10 || echo "No node_modules"
+          echo "=== Checking webpack ==="
+          npx webpack --version || echo "webpack not found"
+          echo "=== Checking electron-builder ==="
+          npx electron-builder --version || echo "electron-builder not found"
+
+      - name: Debug - Post-install check (Unix)
+        if: matrix.platform != 'windows'
+        working-directory: src
+        run: |
+          echo "=== Checking node_modules ==="
+          ls -la node_modules/ | head -10 || echo "No node_modules"
+          echo "=== Checking webpack ==="
+          npx webpack --version || echo "webpack not found"
+          echo "=== Checking electron-builder ==="
+          npx electron-builder --version || echo "electron-builder not found"
 
       - name: Build visualization (webpack)
         run: |
           echo "=== Building visualization ==="
-          npm run build-visualization
+          npm run build-visualization 2>&1
         working-directory: src
+        continue-on-error: false
 
       - name: Build for Windows
         if: matrix.platform == 'windows'
         run: |
           echo "=== Building for Windows ==="
-          npm run build-win
+          echo "Command: npm run build-win"
+          npm run build-win 2>&1
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
 
       - name: Build for macOS  
         if: matrix.platform == 'mac'
         run: |
           echo "=== Building for macOS ==="
-          npm run build-mac
+          echo "Command: npm run build-mac"
+          npm run build-mac 2>&1
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
           # Für Code Signing (falls du später willst):
           # CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
           # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -106,13 +159,24 @@ jobs:
         if: matrix.platform == 'linux'  
         run: |
           echo "=== Building for Linux ==="
-          npm run build-linux
+          echo "Command: npm run build-linux"
+          npm run build-linux 2>&1
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
 
-      # Debug: Check what was built
-      - name: Debug - Check build output
+      # Debug: Check what was built (Windows)
+      - name: Debug - Check build output (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          echo "=== Build output ==="
+          dir src\dist\ 2>nul || echo "No dist directory found"
+          Get-ChildItem -Path src\dist -Recurse -File 2>nul || echo "No files in dist"
+
+      # Debug: Check what was built (Unix)
+      - name: Debug - Check build output (Unix)
+        if: matrix.platform != 'windows'
         run: |
           echo "=== Build output ==="
           ls -la src/dist/ || echo "No dist directory found"
@@ -148,7 +212,7 @@ jobs:
       - name: Debug - Check downloaded artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          find ./artifacts -type f -ls || echo "No artifacts found"
+          find ./artifacts -type f -ls 2>/dev/null || echo "No artifacts found"
 
       - name: Get version number
         id: version
