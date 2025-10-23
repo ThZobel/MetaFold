@@ -705,3 +705,265 @@
         flex-direction: column;
     }
 }
+
+/* =================== METADATA VIEWER & SENDER =================== */
+
+.metadata-viewer-container {
+    flex: 1;
+    background: linear-gradient(135deg, #2a2a40, #1e1e2e);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.metadata-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.viewer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(168, 85, 247, 0.05));
+}
+
+.viewer-header .header-content h2 {
+    margin: 0 0 10px 0;
+    color: #a855f7;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.viewer-header .file-path {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+.viewer-header .file-path code {
+    background: rgba(124, 58, 237, 0.2);
+    color: #a855f7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+.viewer-header .header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Metadata Table */
+.metadata-table-container {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metadata-table-container h3 {
+    color: #e0e0e0;
+    margin: 0 0 15px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.metadata-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.metadata-table thead {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(168, 85, 247, 0.2));
+}
+
+.metadata-table th {
+    padding: 12px 15px;
+    text-align: left;
+    color: #e0e0e0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(124, 58, 237, 0.5);
+}
+
+.metadata-table td {
+    padding: 12px 15px;
+    color: #9ca3af;
+    font-size: 0.95rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metadata-table tr:hover {
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.metadata-table tr:last-child td {
+    border-bottom: none;
+}
+
+.field-type-badge {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.no-metadata {
+    text-align: center;
+    padding: 60px 40px;
+    color: #9ca3af;
+}
+
+.no-metadata p {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* Integration Section */
+.integration-section {
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.integration-section h3 {
+    color: #e0e0e0;
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.integration-section > p {
+    color: #9ca3af;
+    margin: 0 0 20px 0;
+    font-size: 0.9rem;
+}
+
+.integration-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.integration-option {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s ease;
+}
+
+.integration-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(124, 58, 237, 0.3);
+}
+
+.integration-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+
+.integration-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.integration-icon {
+    font-size: 1.3rem;
+}
+
+.integration-description {
+    margin: 8px 0 0 28px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+}
+
+.omero-selection {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.omero-selection label {
+    display: block;
+    color: #9ca3af;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.omero-selection select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.omero-selection select:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.action-buttons .btn {
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 8px;
+}
+
+/* Responsive Design for Metadata Viewer */
+@media (max-width: 768px) {
+    .viewer-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .metadata-table {
+        font-size: 0.85rem;
+    }
+    
+    .metadata-table th,
+    .metadata-table td {
+        padding: 8px 10px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+    }
+}

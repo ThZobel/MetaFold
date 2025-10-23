@@ -867,19 +867,15 @@ const metaFoldOMEROIntegration = {
         return mapPairs;
     },
     
-    // Dataset-Beschreibung generieren
+    // Dataset-Beschreibung generieren (VEREINFACHT - ohne technische Details)
     generateDatasetDescription(projectName, metadata, options) {
         const lines = [
             `Dataset created by MetaFold for project: ${projectName}`,
             `Creation date: ${new Date().toISOString()}`,
-            `Export method: Clean Integration v3.1`,
             ''
         ];
         
         if (metadata && Object.keys(metadata).length > 0) {
-            lines.push(`Metadata fields: ${Object.keys(metadata).length}`);
-            lines.push('');
-            
             // Wichtige Metadaten-Highlights hinzufügen
             const highlights = [];
             for (const [key, fieldData] of Object.entries(metadata)) {
@@ -893,11 +889,6 @@ const metaFoldOMEROIntegration = {
                 lines.push('Key metadata:');
                 highlights.forEach(highlight => lines.push(`- ${highlight}`));
             }
-        }
-        
-        if (options.namespace) {
-            lines.push('');
-            lines.push(`Namespace: ${options.namespace}`);
         }
         
         return lines.join('\n');

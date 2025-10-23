@@ -159,7 +159,7 @@
     line-height: 1.2;
 }
 
-/* Template Badges (RESTORED) */
+/* Template Badges - ENHANCED for 4 Categories */
 .template-badge {
     display: inline-block;
     background: #059669;
@@ -171,6 +171,28 @@
     margin-left: 4px;
 }
 
+/* Category-specific template badges in template list */
+.template-badge.category1 {
+    background: #8b5cf6;
+    color: white;
+}
+
+.template-badge.category2 {
+    background: #06b6d4;
+    color: white;
+}
+
+.template-badge.category3 {
+    background: #10b981;
+    color: white;
+}
+
+.template-badge.category4 {
+    background: #f59e0b;
+    color: white;
+}
+
+/* Legacy badges for backward compatibility */
 .template-badge.experiment {
     background: #dc2626;
 }
@@ -290,7 +312,127 @@
     font-style: normal;
 }
 
+/* =================== TEMPLATE TYPE SELECTOR - 4 Categories (2x2 Grid) =================== */
+
+/* Template Type Selector - 2x2 Grid Layout */
+.template-type-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 columns */
+    grid-template-rows: auto auto;   /* 2 rows */
+    gap: 8px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+/* Template Type Button Base Style */
+.template-type-btn {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 42px;
+}
+
+/* Template Type Button Hover State */
+.template-type-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Template Type Button Active State (Dynamic Colors) */
+.template-type-btn.active {
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    /* Individual colors will be set via JavaScript */
+}
+
+/* Category-Specific Colors (Fallback if JavaScript fails) */
+#category1TypeBtn.active {
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+#category2TypeBtn.active {
+    background: linear-gradient(135deg, #06b6d4, #22d3ee);
+    border-color: rgba(6, 182, 212, 0.5);
+}
+
+#category3TypeBtn.active {
+    background: linear-gradient(135deg, #10b981, #34d399);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+#category4TypeBtn.active {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* =================== ACCESSIBILITY =================== */
+
+.template-type-btn:focus {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+.template-type-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
 /* RESPONSIVE ADJUSTMENTS FOR TEMPLATE COMPONENTS */
+
+/* Responsive Grid Anpassungen für Template Type Selector */
+@media (max-width: 1024px) {
+    .template-type-selector {
+        gap: 6px;
+    }
+    
+    .template-type-btn {
+        font-size: 0.8rem;
+        padding: 8px 10px;
+        min-height: 38px;
+    }
+}
+
+@media (max-width: 768px) {
+    .template-type-selector {
+        gap: 5px;
+    }
+    
+    .template-type-btn {
+        font-size: 0.75rem;
+        padding: 7px 8px;
+        min-height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .template-type-selector {
+        gap: 4px;
+    }
+    
+    .template-type-btn {
+        font-size: 0.7rem;
+        padding: 6px;
+        min-height: 32px;
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+
 @media (max-width: 768px) {
     .template-header {
         flex-wrap: wrap;
@@ -415,4 +557,89 @@
 .success-message .btn-secondary:hover,
 .success-message button.btn-secondary:hover {
     box-shadow: 0 8px 25px rgba(75, 85, 99, 0.4) !important;
+}
+
+/* ===== DROPDOWN STYLE FIX - Passend zu anderen Form-Elementen ===== */
+
+/* Dropdown/Select Styling - passend zu anderen Form-Elementen */
+#experimentFields select,
+.form-group select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05); /* Gleicher Hintergrund wie andere Felder */
+    color: #e0e0e0; /* Weiße Schrift wie andere Felder */
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Hover State */
+#experimentFields select:hover,
+.form-group select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Focus State - gleicher Style wie andere Felder */
+#experimentFields select:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Dropdown Options - Dunklerer Hintergrund für bessere Lesbarkeit */
+#experimentFields select option,
+.form-group select option {
+    background: #1a1a2e; /* Dunkler Hintergrund beim Ausklappen */
+    color: #e0e0e0; /* Weiße Schrift */
+    padding: 8px;
+}
+
+/* Ausgewählte Option im ausgeklappten Dropdown */
+#experimentFields select option:checked,
+.form-group select option:checked {
+    background: #7c3aed; /* Lila Highlight für ausgewählte Option */
+    color: white;
+}
+
+/* Hover auf Options (funktioniert in manchen Browsers) */
+#experimentFields select option:hover,
+.form-group select option:hover {
+    background: rgba(124, 58, 237, 0.3);
+}
+
+/* Placeholder/Unausgewählter Zustand */
+#experimentFields select option[value=""],
+.form-group select option[value=""] {
+    color: #9ca3af; /* Grau für "-- Select --" */
+    font-style: italic;
+}
+
+/* Disabled State */
+#experimentFields select:disabled,
+.form-group select:disabled {
+    background: rgba(255, 255, 255, 0.02);
+    color: #6b7280;
+    border-color: rgba(255, 255, 255, 0.1);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Firefox-spezifische Anpassungen */
+@-moz-document url-prefix() {
+    #experimentFields select,
+    .form-group select {
+        color: #e0e0e0;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    #experimentFields select option,
+    .form-group select option {
+        background-color: #1a1a2e;
+        color: #e0e0e0;
+    }
 }

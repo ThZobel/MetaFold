@@ -1,4 +1,4 @@
-/* Layout Override - Force Full Width (Add this after other CSS files) */
+/* Layout Override - Force Full Width (Fixed for Sidebar Resize) */
 
 /* CRITICAL: Override any max-width constraints */
 .container {
@@ -8,7 +8,7 @@
     padding: 0 !important;
 }
 
-/* CRITICAL: Override any responsive constraints from responsive.css */
+/* CRITICAL: Override responsive constraints - WITHOUT fixed sidebar widths */
 @media (min-width: 1200px) {
     .container {
         max-width: none !important;
@@ -18,7 +18,8 @@
     
     .main-content {
         max-width: none !important;
-        width: calc(100vw - 380px) !important;
+        /* ✅ REMOVED: width: calc(100vw - 380px) !important; */
+        /* Width is now controlled by JavaScript dynamically */
         margin: 0 !important;
     }
 }
@@ -32,15 +33,13 @@
     
     .main-content {
         max-width: none !important;
-        width: calc(100vw - 380px) !important;
+        /* ✅ REMOVED: width: calc(100vw - 380px) !important; */
+        /* Width is now controlled by JavaScript dynamically */
         margin: 0 !important;
     }
     
-    /* Ensure sidebar doesn't get wider on large screens */
-    .sidebar {
-        width: 380px !important;
-        max-width: 380px !important;
-    }
+    /* ✅ REMOVED ALL SIDEBAR WIDTH CONSTRAINTS */
+    /* Sidebar width is now fully controlled by JavaScript */
 }
 
 /* Override any centering from responsive.css */

@@ -383,3 +383,100 @@
     transform: none;
     background: rgba(255, 255, 255, 0.05);
 }
+
+/* ========================================
+   SIDEBAR MORE BUTTON - Compact Style
+   ======================================== */
+
+.sidebar-more-btn {
+    padding: 12px 16px !important;
+    font-size: 13px !important;
+    white-space: nowrap;
+    min-width: 130px;
+    justify-content: center;
+}
+
+.sidebar-more-btn span:first-child {
+    font-size: 16px;
+}
+
+.sidebar-more-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(75, 85, 99, 0.4);
+}
+
+/* Responsive adjustments for sidebar buttons */
+@media (max-width: 768px) {
+    .sidebar-more-btn {
+        min-width: 100px;
+        padding: 10px 12px !important;
+        font-size: 11px !important;
+    }
+    
+    .sidebar-more-btn span:last-child {
+        font-size: 0.75rem !important;
+    }
+}
+
+/* Ensure sidebar button container wraps properly on small screens */
+@media (max-width: 400px) {
+    .sidebar .btn,
+    .sidebar-more-btn {
+        font-size: 12px !important;
+        padding: 10px 12px !important;
+    }
+}
+
+/* ========================================
+   NEEDS TEMPLATE STATE - Grayed out but clickable
+   ======================================== */
+
+.panel-action.needs-template {
+    opacity: 0.5;
+    cursor: pointer;
+    position: relative;
+}
+
+.panel-action.needs-template:hover {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Visual indicator for needs-template state */
+.panel-action.needs-template .panel-action-button::after {
+    content: '⚠️';
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    font-size: 18px;
+    opacity: 0.6;
+}
+
+/* Warning feedback styling */
+.action-feedback {
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: none;
+    animation: slideIn 0.3s ease;
+}
+
+.panel-action.warning .action-feedback {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    display: block;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

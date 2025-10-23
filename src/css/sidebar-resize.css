@@ -1,0 +1,173 @@
+/* ===== CONTINUOUS SIDEBAR RESIZE WITH AUTO-COLUMN SWITCHING (1/2/3 columns) ===== */
+
+/* Sidebar is resizable via JavaScript handle only */
+.sidebar {
+    position: relative;
+    width: 380px; /* Default width */
+    min-width: 320px;
+    max-width: 900px;
+    /* NO resize: horizontal - we handle this via JavaScript */
+    overflow: hidden; /* Prevent horizontal scrolling */
+}
+
+/* Resize Handle - always visible on right edge */
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    background: transparent;
+    cursor: ew-resize;
+    z-index: 200;
+    transition: background-color 0.3s ease;
+}
+
+.sidebar-resize-handle:hover {
+    background: rgba(124, 58, 237, 0.3);
+}
+
+.sidebar-resize-handle.resizing {
+    background: rgba(124, 58, 237, 0.6);
+}
+
+/* Visual indicator on hover */
+.sidebar-resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 40px;
+    background: rgba(124, 58, 237, 0.4);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-resize-handle:hover::before {
+    opacity: 1;
+}
+
+/* ===== AUTO COLUMN LAYOUT BASED ON WIDTH ===== */
+
+/* DEFAULT: 1 column, compact templates (< 550px) */
+.sidebar #templateList {
+    display: block;
+}
+
+/* 2 COLUMNS when sidebar is wide (>= 550px) - FLEXBOX SOLUTION */
+.sidebar.sidebar-wide #templateList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-content: flex-start; /* Prevent vertical stretching */
+}
+
+/* Template items for 2-column layout - FIXED WIDTH */
+.sidebar.sidebar-wide .template-item {
+    /* Calculate width: (container - gap) / 2 */
+    width: calc(50% - 5px);
+    padding: 10px 12px;
+    margin-bottom: 0; /* Remove bottom margin in flex layout */
+    /* Items keep their natural height */
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.sidebar.sidebar-wide .template-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: 0.7rem;
+}
+
+.sidebar.sidebar-wide .template-info h3 {
+    font-size: 0.9rem;
+}
+
+.sidebar.sidebar-wide .template-meta {
+    font-size: 0.7rem;
+}
+
+/* ✨ NEW: 3 COLUMNS when sidebar is extra wide (>= 750px) - FLEXBOX SOLUTION */
+.sidebar.sidebar-extra-wide #templateList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-content: flex-start; /* Prevent vertical stretching */
+}
+
+/* Template items for 3-column layout - FIXED WIDTH */
+.sidebar.sidebar-extra-wide .template-item {
+    /* Calculate width: (container - 2*gap) / 3 */
+    width: calc(33.333% - 7px);
+    padding: 8px 10px;
+    margin-bottom: 0; /* Remove bottom margin in flex layout */
+    /* Items keep their natural height */
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.sidebar.sidebar-extra-wide .template-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 0.65rem;
+}
+
+.sidebar.sidebar-extra-wide .template-info h3 {
+    font-size: 0.85rem;
+}
+
+.sidebar.sidebar-extra-wide .template-meta {
+    font-size: 0.65rem;
+}
+
+.sidebar.sidebar-extra-wide .template-description {
+    font-size: 0.65rem;
+    -webkit-line-clamp: 1; /* Show only 1 line in 3-column mode */
+}
+
+/* Main Content adjusts automatically */
+.main-content {
+    flex: 1;
+    min-width: 0;
+    transition: none; /* Remove transition for smoother resize */
+}
+
+/* Resizing State */
+.sidebar-resizing {
+    user-select: none;
+}
+
+.sidebar-resizing * {
+    cursor: ew-resize !important;
+}
+
+/* Empty State spans all columns */
+.empty-state {
+    width: 100%;
+    flex: 1 1 100%; /* Take full width in flex layout */
+}
+
+/* Responsive: Disable resize on small screens */
+@media (max-width: 1024px) {
+    .sidebar {
+        resize: none;
+        min-width: 380px;
+        max-width: 380px;
+    }
+    
+    .sidebar-resize-handle {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100% !important;
+        min-width: 100%;
+        max-width: 100%;
+        resize: none;
+    }
+}

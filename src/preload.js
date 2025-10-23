@@ -98,9 +98,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // =================== PROJECT ENHANCEMENT ===================
     
     // Insert links into README files
-    insertLinksIntoReadme: async (projectPath, elabftwUrl, omeroUrl) => {
-        return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl);
+    insertLinksIntoReadme: async (projectPath, elabftwUrl, omeroUrl, projectName = null) => {
+        return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl, projectName);
     },
+
+    // Regenerate README.html with metadata and integration links
+    regenerateReadmeHtml: async (projectPath, metadata, projectName, elabftwUrl = null, omeroUrl = null) => {
+        return await ipcRenderer.invoke('regenerate-readme-html', projectPath, metadata, projectName, elabftwUrl, omeroUrl);
+    },
+
+    // Generate README HTML content without saving (for metadataLoader)
+    generateReadmeHtmlContent: (metadata, projectName, elabftwUrl, omeroUrl) => 
+        ipcRenderer.invoke('generate-readme-html-content', metadata, projectName, elabftwUrl, omeroUrl),
+
+    // Save HTML file with save dialog
+    saveHtmlFile: (htmlContent, suggestedFilename) => 
+        ipcRenderer.invoke('save-html-file', htmlContent, suggestedFilename),
 
     // =================== SECURITY & STORAGE APIS ===================
     

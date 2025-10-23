@@ -221,7 +221,14 @@ const userManagementModal = {
         const userSelect = document.getElementById('passwordUser');
         if (!userSelect) return;
 
-        const users = window.userManager?.users || [];
+        let users = window.userManager?.users || [];
+        
+        // ✅ FIX: Add Admin to dropdown if Admin account exists
+        const adminExists = window.secureStorage?.hasUserPassword?.('Admin');
+        if (adminExists && !users.includes('Admin')) {
+            users = ['Admin', ...users];
+        }
+        
         userSelect.innerHTML = '<option value="">Select user...</option>';
 
         users.forEach(user => {
@@ -476,7 +483,10 @@ const userManagementModal = {
                 return;
             }
 
-            console.log(`🔄 Switching to user: ${username}`);
+            // ✅ FIX: Admin gets "System" as group
+            const actualGroup = username === 'Admin' ? 'System' : group;
+            
+            console.log(`🔄 Switching to user: ${username} (${actualGroup})`);
 
             // Check if user has password
             const hasPassword = this.isPasswordSystemEnabled() && 
@@ -500,7 +510,7 @@ const userManagementModal = {
 
             // Perform switch
             if (window.userManager?.switchUser) {
-                await window.userManager.switchUser(username, group);
+                await window.userManager.switchUser(username, actualGroup);
                 this.close();
                 this.showSuccess(`Switched to user: ${username}`);
             } else {
@@ -731,7 +741,15 @@ const userManagementModal = {
         const listContainer = document.getElementById('userList');
         if (!listContainer) return;
 
-        const users = window.userManager?.users || [];
+        let users = window.userManager?.users || [];
+        
+        // ✅ FIX: Add Admin to user list if Admin account exists
+        const adminExists = window.secureStorage?.hasUserPassword?.('Admin');
+        if (adminExists && !users.includes('Admin')) {
+            users = ['Admin', ...users]; // Add Admin at the beginning
+            console.log('✅ Admin account detected and added to user list');
+        }
+        
         const currentUser = window.userManager?.currentUser;
 
         if (users.length === 0) {
@@ -755,6 +773,9 @@ const userManagementModal = {
             const hasPassword = this.isPasswordSystemEnabled() && 
                               window.secureStorage?.hasUserPassword?.(user);
 
+            // ✅ FIX: Admin gets "System" as group
+            const displayGroup = user === 'Admin' ? 'System' : group;
+            
             return `
                 <div style="
                     display: flex; align-items: center; padding: 1rem;
@@ -793,7 +814,7 @@ const userManagementModal = {
                             ${isCurrent ? '<span style="color: #7c3aed; font-size: 0.8rem; font-weight: 600;">CURRENT</span>' : ''}
                         </div>
                         <div style="color: #9ca3af; font-size: 0.9rem; margin-top: 2px;">
-                            Group: ${group}
+                            Group: ${displayGroup}
                             ${isEditing ? ' <span style="color: #f59e0b; font-weight: 600;">(editing)</span>' : ''}
                         </div>
                     </div>

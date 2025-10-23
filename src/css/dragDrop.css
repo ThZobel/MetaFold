@@ -345,6 +345,29 @@
     }
 }
 
+/* =================== INPUT FIELDS - NO DRAG =================== */
+
+/* Ensure all inputs, selects, and textareas in metadata fields are NOT draggable */
+.metadata-field input,
+.metadata-field select,
+.metadata-field textarea {
+    cursor: text !important;
+    user-select: text !important;
+}
+
+.metadata-field input[type="checkbox"] {
+    cursor: pointer !important;
+}
+
+/* Visual feedback when trying to select text in inputs */
+.metadata-field input:focus,
+.metadata-field select:focus,
+.metadata-field textarea:focus {
+    border-color: #7c3aed;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
 /* =================== ACCESSIBILITY ENHANCEMENTS =================== */
 
 .drag-handle:focus {
@@ -531,4 +554,36 @@ body.dragging-field * {
 @keyframes spin {
     0% { transform: translate(-50%, -50%) rotate(0deg); }
     100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* =================== INPUT FIELDS - NO DRAG =================== */
+
+/* Ensure all inputs, selects, and textareas in metadata fields are NOT draggable */
+.metadata-field input,
+.metadata-field select,
+.metadata-field textarea {
+    cursor: text !important;
+    user-select: text !important;
+}
+
+.metadata-field input[type="checkbox"] {
+    cursor: pointer !important;
+}
+
+/* ✅ CRITICAL: Disable pointer events on inputs during drag to allow drop events through */
+.metadata-field.dragging input,
+.metadata-field.dragging select,
+.metadata-field.dragging textarea,
+.metadata-field.dragging button,
+.metadata-field.dragging label {
+    pointer-events: none !important;
+}
+
+/* Visual feedback when trying to select text in inputs */
+.metadata-field input:focus,
+.metadata-field select:focus,
+.metadata-field textarea:focus {
+    border-color: #7c3aed;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
 }

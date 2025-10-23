@@ -38,23 +38,28 @@ window.toggleMoreMenu = function() {
         // Fallback: Manuelles Toggle ohne enhancedActions
         const overlay = document.getElementById('slideOutOverlay');
         const panel = document.getElementById('slideOutPanel');
-        const trigger = document.getElementById('moreMenuTrigger');
+        // Support both button IDs (sidebar and actions)
+        const trigger = document.getElementById('sidebarMoreMenuTrigger') || document.getElementById('moreMenuTrigger');
         
-        if (overlay && panel && trigger) {
+        if (overlay && panel) {
             const isActive = panel.classList.contains('active');
             
             if (isActive) {
                 // Schließen
                 overlay.classList.remove('active');
                 panel.classList.remove('active');
-                trigger.classList.remove('active');
+                if (trigger) {
+                    trigger.classList.remove('active');
+                }
                 document.body.style.overflow = '';
                 console.log('✅ More Menu closed (fallback)');
             } else {
                 // Öffnen
                 overlay.classList.add('active');
                 panel.classList.add('active');
-                trigger.classList.add('active');
+                if (trigger) {
+                    trigger.classList.add('active');
+                }
                 document.body.style.overflow = 'hidden';
                 console.log('✅ More Menu opened (fallback)');
             }
@@ -333,12 +338,15 @@ const enhancedActions = {
         // Show overlay and panel
         const overlay = document.getElementById('slideOutOverlay');
         const panel = document.getElementById('slideOutPanel');
-        const trigger = document.getElementById('moreMenuTrigger');
+        // Support both button IDs (sidebar and actions)
+        const trigger = document.getElementById('sidebarMoreMenuTrigger') || document.getElementById('moreMenuTrigger');
         
-        if (overlay && panel && trigger) {
+        if (overlay && panel) {
             overlay.classList.add('active');
             panel.classList.add('active');
-            trigger.classList.add('active');
+            if (trigger) {
+                trigger.classList.add('active');
+            }
             
             this.isOpen = true;
             
@@ -346,6 +354,12 @@ const enhancedActions = {
             document.body.style.overflow = 'hidden';
             
             console.log('✅ More Menu opened');
+        } else {
+            console.error('❌ Required DOM elements not found:', {
+                overlay: !!overlay,
+                panel: !!panel,
+                trigger: !!trigger
+            });
         }
     },
     
@@ -355,12 +369,15 @@ const enhancedActions = {
         
         const overlay = document.getElementById('slideOutOverlay');
         const panel = document.getElementById('slideOutPanel');
-        const trigger = document.getElementById('moreMenuTrigger');
+        // Support both button IDs (sidebar and actions)
+        const trigger = document.getElementById('sidebarMoreMenuTrigger') || document.getElementById('moreMenuTrigger');
         
-        if (overlay && panel && trigger) {
+        if (overlay && panel) {
             overlay.classList.remove('active');
             panel.classList.remove('active');
-            trigger.classList.remove('active');
+            if (trigger) {
+                trigger.classList.remove('active');
+            }
             
             this.isOpen = false;
             
@@ -441,49 +458,64 @@ const enhancedActions = {
         statsEl.innerHTML = stats.join('');
     },
     
-    // Update action button states
+    // Update action button states - IMPROVED: Gray out but keep clickable
     updateActionStates(template) {
         const duplicateAction = document.getElementById('duplicateAction');
         const exportAction = document.getElementById('exportAction');
         const deleteAction = document.getElementById('deleteActionPanel');
         const importAction = document.getElementById('importAction');
+        const storageAction = document.getElementById('storageAction');
         
         if (!duplicateAction || !exportAction || !deleteAction) return;
         
         const hasTemplate = !!template;
         const canEdit = hasTemplate && template.isOwn !== false; // Can edit own templates
         
-        // Duplicate action - available for all templates
+        // Duplicate action - needs template
         if (hasTemplate) {
-            duplicateAction.classList.remove('disabled');
+            duplicateAction.classList.remove('needs-template');
             duplicateAction.style.opacity = '1';
+            duplicateAction.style.pointerEvents = 'auto';
         } else {
-            duplicateAction.classList.add('disabled');
-            duplicateAction.style.opacity = '0.4';
+            duplicateAction.classList.add('needs-template');
+            duplicateAction.style.opacity = '0.5';
+            duplicateAction.style.pointerEvents = 'auto'; // Keep clickable for warning
         }
         
-        // Export action - available for all templates
+        // Export action - needs template
         if (hasTemplate) {
-            exportAction.classList.remove('disabled');
+            exportAction.classList.remove('needs-template');
             exportAction.style.opacity = '1';
+            exportAction.style.pointerEvents = 'auto';
         } else {
-            exportAction.classList.add('disabled');
-            exportAction.style.opacity = '0.4';
+            exportAction.classList.add('needs-template');
+            exportAction.style.opacity = '0.5';
+            exportAction.style.pointerEvents = 'auto'; // Keep clickable for warning
         }
         
-        // Delete action - only for own templates
+        // Delete action - needs own template
         if (canEdit) {
-            deleteAction.classList.remove('disabled');
+            deleteAction.classList.remove('needs-template');
             deleteAction.style.opacity = '1';
+            deleteAction.style.pointerEvents = 'auto';
         } else {
-            deleteAction.classList.add('disabled');
-            deleteAction.style.opacity = '0.4';
+            deleteAction.classList.add('needs-template');
+            deleteAction.style.opacity = '0.5';
+            deleteAction.style.pointerEvents = 'auto'; // Keep clickable for warning
         }
         
-        // Import action - always available
+        // Import action - always available (no template needed)
         if (importAction) {
-            importAction.classList.remove('disabled');
+            importAction.classList.remove('needs-template');
             importAction.style.opacity = '1';
+            importAction.style.pointerEvents = 'auto';
+        }
+        
+        // Storage action - always available (no template needed)
+        if (storageAction) {
+            storageAction.classList.remove('needs-template');
+            storageAction.style.opacity = '1';
+            storageAction.style.pointerEvents = 'auto';
         }
     },
     
@@ -569,7 +601,7 @@ window.duplicateCurrentTemplate = async function() {
     const actionEl = document.getElementById('duplicateAction');
     
     if (!template) {
-        enhancedActions.showActionFeedback(actionEl, 'error', 'No template selected');
+        enhancedActions.showActionFeedback(actionEl, 'warning', '⚠️ You have to select a template first');
         return;
     }
     
@@ -636,7 +668,7 @@ window.exportCurrentTemplate = async function() {
     const actionEl = document.getElementById('exportAction');
     
     if (!template) {
-        enhancedActions.showActionFeedback(actionEl, 'error', 'No template selected');
+        enhancedActions.showActionFeedback(actionEl, 'warning', '⚠️ You have to select a template first');
         return;
     }
     
@@ -827,12 +859,12 @@ window.deleteCurrentTemplate = async function() {
     const actionEl = document.getElementById('deleteActionPanel');
     
     if (!template) {
-        enhancedActions.showActionFeedback(actionEl, 'error', 'No template selected');
+        enhancedActions.showActionFeedback(actionEl, 'warning', '⚠️ You have to select a template first');
         return;
     }
     
     if (!template.isOwn) {
-        enhancedActions.showActionFeedback(actionEl, 'error', 'Can only delete your own templates');
+        enhancedActions.showActionFeedback(actionEl, 'warning', '⚠️ Can only delete your own templates');
         return;
     }
     

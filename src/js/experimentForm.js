@@ -1,3 +1,8 @@
+// Enhanced Experiment Form Manager for MetaFold
+// ❌ NOTE: Drag & Drop is DISABLED in the experiment form (Create Project tab)
+// Drag & Drop is only active in the Template Edit Modal (metadataEditor.js)
+// This prevents accidental drag when selecting text in input fields
+
 const experimentForm = {
     savedFieldValues: {},
     
@@ -8,6 +13,13 @@ const experimentForm = {
         draggedFieldName: null,
         dropIndicator: null,
         originalOrder: [] // Store original field order
+    },
+
+    // NEW: Filename suggestion state
+    filenameState: {
+        selectedFields: [],  // Array of field names in selection order
+        prefix: '',
+        isSwitchingTemplate: false  // NEW: Flag to prevent auto-save during template switch
     },
 
     // NEW: Prevent auto template creation with validation (SANFTER)
@@ -82,6 +94,9 @@ const experimentForm = {
     // NEW: Reset form completely before loading new template
     resetFormForNewTemplate() {
         console.log('🔄 Resetting form for new template...');
+        
+        // NEW: Set flag to prevent auto-save during reset
+        this.filenameState.isSwitchingTemplate = true;
         
         try {
             // 1. Clear all form inputs using existing function
@@ -242,6 +257,18 @@ const experimentForm = {
         });
         
         console.log(`✅ Rendered ${fieldOrder.length} fields in specified order`);
+        
+        // NEW: Initialize filename state from template
+        this.initializeFilenameStateFromTemplate();
+        
+        // NEW: Update filename preview after rendering
+        setTimeout(() => {
+            this.updateFilenamePreview();
+            
+            // NEW: Reset template switching flag AFTER everything is loaded
+            this.filenameState.isSwitchingTemplate = false;
+            console.log('✅ Template switch complete, auto-save re-enabled');
+        }, 150);
     },
 
         // ENHANCED: Add validation to saveAsTemplateEnhanced
@@ -443,6 +470,19 @@ const experimentForm = {
         });
         
         console.log(`✅ Rendered ${fieldOrder.length} fields in specified order`);
+        
+        // NEW: Initialize filename state from template
+        this.initializeFilenameStateFromTemplate();
+        
+        // NEW: Update filename preview after field values are loaded
+        setTimeout(() => {
+            this.updateFilenamePreview();
+            console.log('📝 Filename preview updated after template load');
+            
+            // NEW: Reset template switching flag AFTER everything is loaded
+            this.filenameState.isSwitchingTemplate = false;
+            console.log('✅ Template switch complete, auto-save re-enabled');
+        }, 200);
     },
 
     // Render group header
@@ -459,11 +499,11 @@ const experimentForm = {
         container.appendChild(groupDiv);
     },
 
-    // Enhanced render single field with drag & drop support
+    // Enhanced render single field WITHOUT drag & drop support (disabled for experiment form)
     renderField(container, fieldName, fieldInfo) {
         const fieldDiv = document.createElement('div');
-        fieldDiv.className = 'form-group draggable-field';
-        fieldDiv.draggable = true;
+        fieldDiv.className = 'form-group';
+        // ❌ REMOVED: fieldDiv.draggable = true; - Drag & Drop disabled in experiment form
         fieldDiv.setAttribute('data-field-name', fieldName);
         
         // Check if field belongs to a group (nested)
@@ -485,15 +525,7 @@ const experimentForm = {
         let inputHtml = '';
         const savedValue = this.getSavedFieldValue(fieldName) || fieldInfo.value || '';
         
-        // NEW: Add drag handle and position indicator for experiment form
-        const dragHandle = `
-            <div class="experiment-drag-handle" title="Drag to reorder field">
-                <span class="experiment-drag-icon">⋮⋮</span>
-            </div>
-        `;
-        
-        const positionIndicator = fieldInfo.position ? 
-            `<span class="experiment-field-position" style="font-size: 10px; color: #9ca3af; margin-left: 8px;">[${fieldInfo.position}]</span>` : '';
+        // ❌ REMOVED: Drag handle and position indicator - not needed in experiment form
         
         switch (fieldInfo.type) {
             case 'text':
@@ -526,25 +558,40 @@ const experimentForm = {
                 break;
         }
         
-        // Enhanced label with drag handle and position indicator
+        // Enhanced label WITHOUT drag handle
         const labelHtml = fieldInfo.description ? 
             `<div class="field-label-container">
-                ${dragHandle}
-                <span>${fieldInfo.label}${requiredMark} ${positionIndicator}</span>
+                <span>${fieldInfo.label}${requiredMark}</span>
                 <small style="color: #9ca3af; font-weight: normal; display: block; margin-top: 2px;">(${fieldInfo.description})</small>
             </div>` :
             `<div class="field-label-container">
-                ${dragHandle}
-                <span>${fieldInfo.label}${requiredMark} ${positionIndicator}</span>
+                <span>${fieldInfo.label}${requiredMark}</span>
             </div>`;
+        
+        // NEW: Use for Filename Checkbox
+        // WICHTIG: Während Template-Switch nicht checked setzen, wird später programmtisch gesetzt
+        const isCheckedAttr = (this.filenameState.isSwitchingTemplate) ? '' : (fieldInfo.useForFilename ? 'checked' : '');
+        const useForFilenameCheckbox = `
+            <div style="margin-top: 8px; padding: 6px; background: rgba(16, 185, 129, 0.1); border-radius: 4px;">
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" 
+                           id="useForFilename_${safeFieldId}"
+                           data-field-name="${fieldName}"
+                           ${isCheckedAttr}
+                           onchange="experimentForm.handleFilenameCheckboxChange('${fieldName}', this.checked)"
+                           style="width: auto; margin: 0;">
+                    <span style="color: #10b981; font-weight: 500;">📝 Use for filename</span>
+                </label>
+            </div>
+        `;
         
         fieldDiv.innerHTML = `
             <label for="${safeFieldId}">${labelHtml}:</label>
             ${inputHtml}
+            ${useForFilenameCheckbox}
         `;
         
-        // NEW: Add drag event listeners to the field
-        this.addFieldDragEventListeners(fieldDiv, fieldName);
+        // ❌ REMOVED: addFieldDragEventListeners - Drag & Drop disabled in experiment form
         
         container.appendChild(fieldDiv);
         
@@ -554,6 +601,11 @@ const experimentForm = {
             input.addEventListener('change', () => {
                 const realFieldName = input.getAttribute('data-field-name');
                 this.saveFieldValue(realFieldName, input.type === 'checkbox' ? input.checked : input.value);
+                
+                // NEW: Update filename preview if this field is used for filename
+                if (this.filenameState.selectedFields.includes(realFieldName)) {
+                    this.updateFilenamePreview();
+                }
             });
         }
     },
@@ -944,6 +996,9 @@ const experimentForm = {
         }
 
         console.log('💾 Found template at index:', templateIndex);
+
+        // NEW: Save all filename checkbox states to template before updating
+        this.saveAllFilenameCheckboxesToTemplate();
 
         // Create deep copy to avoid reference sharing
         const originalTemplate = templateManager.templates[templateIndex];
@@ -1480,6 +1535,277 @@ const experimentForm = {
             alert('Error creating template: ' + error.message);
         }
     },
+
+    // ========== FILENAME SUGGESTION SYSTEM ==========
+
+    /**
+     * Handle checkbox change for "Use for filename"
+     */
+    handleFilenameCheckboxChange(fieldName, isChecked) {
+        console.log(`📝 Filename checkbox changed: ${fieldName} = ${isChecked}`);
+        
+        if (isChecked) {
+            // Add to selectedFields if not already there
+            if (!this.filenameState.selectedFields.includes(fieldName)) {
+                this.filenameState.selectedFields.push(fieldName);
+            }
+        } else {
+            // Remove from selectedFields
+            this.filenameState.selectedFields = this.filenameState.selectedFields.filter(f => f !== fieldName);
+        }
+        
+        // Update the preview
+        this.updateFilenamePreview();
+        
+        // NEW: Only save if NOT switching templates
+        if (!this.filenameState.isSwitchingTemplate) {
+            // Save checkbox state to current template
+            this.saveFilenameCheckboxToTemplate(fieldName, isChecked);
+        } else {
+            console.log(`⏸️ Skipped auto-save during template switch: ${fieldName}`);
+        }
+    },
+
+    /**
+     * Save filename checkbox state to template
+     */
+    async saveFilenameCheckboxToTemplate(fieldName, isChecked) {
+        if (!window.templateManager?.currentTemplate) return;
+        
+        const template = window.templateManager.currentTemplate;
+        const metadata = template.metadata;
+        
+        // Find the field and update useForFilename
+        if (metadata[fieldName]) {
+            metadata[fieldName].useForFilename = isChecked;
+        } else if (metadata.fields && metadata.fields[fieldName]) {
+            metadata.fields[fieldName].useForFilename = isChecked;
+        }
+        
+        // Save template (silent save)
+        const templateIndex = window.templateManager.templates.findIndex(t => 
+            t.name === template.name && 
+            t.createdBy === template.createdBy
+        );
+        
+        if (templateIndex >= 0) {
+            await window.templateManager.update(templateIndex, template);
+            console.log(`💾 Saved useForFilename for ${fieldName}: ${isChecked}`);
+        }
+    },
+
+    /**
+     * Update filename preview based on selected fields
+     */
+    updateFilenamePreview() {
+        const prefixInput = document.getElementById('filenamePrefix');
+        const previewDiv = document.getElementById('filenamePreview');
+        const warningDiv = document.getElementById('filenameLengthWarning');
+        
+        if (!previewDiv) return;
+        
+        // Get manual prefix
+        const prefix = prefixInput?.value?.trim() || '';
+        this.filenameState.prefix = prefix;
+        
+        // Collect values from selected fields (in order)
+        const parts = [];
+        
+        if (prefix) {
+            parts.push(prefix);
+        }
+        
+        this.filenameState.selectedFields.forEach(fieldName => {
+            const safeFieldId = 'field_' + this.createSafeId(fieldName);
+            const input = document.getElementById(safeFieldId);
+            
+            if (input && input.value) {
+                let value = input.type === 'checkbox' ? (input.checked ? 'Yes' : 'No') : input.value;
+                
+                // Sanitize the value
+                value = this.sanitizeFilename(value);
+                
+                if (value) {
+                    parts.push(value);
+                }
+            }
+        });
+        
+        // Generate filename
+        let filename = parts.length > 0 ? parts.join('_') : 'Select fields with "Use for filename"';
+        
+        // Update preview
+        previewDiv.textContent = filename;
+        
+        // Check length and show warning
+        if (parts.length > 0 && filename.length > 30) {
+            warningDiv.style.display = 'block';
+            warningDiv.textContent = `⚠️ Filename exceeds 30 characters (${filename.length})`;
+        } else {
+            warningDiv.style.display = 'none';
+        }
+        
+        console.log(`📝 Filename updated: ${filename} (${filename.length} chars)`);
+    },
+
+    /**
+     * Sanitize filename - only allow A-Z, a-z, 0-9, _, -
+     */
+    sanitizeFilename(value) {
+        if (!value) return '';
+        
+        return value
+            .replace(/[^a-zA-Z0-9_-]/g, '_')  // Replace invalid chars with _
+            .replace(/_+/g, '_')               // Replace multiple _ with single _
+            .replace(/^_|_$/g, '');            // Remove leading/trailing _
+    },
+
+    /**
+     * Copy filename to clipboard
+     */
+    async copyFilenameToClipboard() {
+        const previewDiv = document.getElementById('filenamePreview');
+        if (!previewDiv) return;
+        
+        const filename = previewDiv.textContent;
+        
+        if (filename === 'Select fields with "Use for filename"' || !filename) {
+            this.showSaveMessage('⚠️ No filename generated yet');
+            return;
+        }
+        
+        try {
+            await navigator.clipboard.writeText(filename);
+            this.showSaveMessage('📋 Filename copied to clipboard!');
+            console.log('📋 Filename copied:', filename);
+        } catch (error) {
+            console.error('Error copying filename:', error);
+            this.showSaveMessage('❌ Failed to copy filename');
+        }
+    },
+
+    /**
+     * Initialize filename state from template
+     */
+    initializeFilenameStateFromTemplate() {
+        if (!window.templateManager?.currentTemplate) return;
+        
+        const template = window.templateManager.currentTemplate;
+        const metadata = template.metadata;
+        this.filenameState.selectedFields = [];
+        
+        console.log('📝 Initializing filename state from template...');
+        
+        // NEW: Restore saved filename prefix FIRST
+        const prefixInput = document.getElementById('filenamePrefix');
+        if (prefixInput && template.filenamePrefix !== undefined) {
+            prefixInput.value = template.filenamePrefix;
+            this.filenameState.prefix = template.filenamePrefix;
+            console.log(`📝 Restored filename prefix: "${template.filenamePrefix}"`);
+        }
+        
+        // Handle both metadata formats
+        const fieldsToCheck = metadata.fields || metadata;
+        
+        // NEW: Collect fields with useForFilename and sort by filenameOrder
+        const fieldsWithFilename = [];
+        Object.entries(fieldsToCheck).forEach(([fieldName, fieldInfo]) => {
+            if (fieldInfo.useForFilename && fieldInfo.filenameOrder !== undefined) {
+                fieldsWithFilename.push({
+                    name: fieldName,
+                    order: fieldInfo.filenameOrder
+                });
+            }
+        });
+        
+        // Sort by filenameOrder
+        fieldsWithFilename.sort((a, b) => a.order - b.order);
+        
+        if (fieldsWithFilename.length > 0) {
+            console.log(`📝 Restoring ${fieldsWithFilename.length} checkboxes in order...`);
+            
+            // Set checkboxes one by one in order
+            fieldsWithFilename.forEach((field, index) => {
+                const safeFieldId = 'field_' + this.createSafeId(field.name);
+                const checkbox = document.getElementById(`useForFilename_${safeFieldId}`);
+                
+                if (checkbox && !checkbox.checked) {
+                    console.log(`  [✅ ${field.order}] Setting checkbox for: ${field.name}`);
+                    checkbox.checked = true;
+                    
+                    // Add to selectedFields in correct order
+                    this.filenameState.selectedFields.push(field.name);
+                }
+            });
+            
+            // DON'T update filename preview yet - wait for field values to load
+            console.log('📝 Filename state restored from filenameOrder (waiting for values)');
+            
+        } else {
+            console.log('📝 No filename configuration found in template');
+        }
+    },
+
+    /**
+     * NEW: Save all "Use for filename" checkbox states to template
+     * This function collects ALL checkbox states and updates the template metadata
+     */
+    saveAllFilenameCheckboxesToTemplate() {
+        console.log('💾 Saving all filename checkbox states to template...');
+        
+        if (!window.templateManager?.currentTemplate) {
+            console.warn('⚠️ No current template to save checkbox states');
+            return;
+        }
+        
+        const template = window.templateManager.currentTemplate;
+        const metadata = template.metadata;
+        
+        // Determine which fields object to use (enhanced or legacy format)
+        const fieldsToUpdate = metadata.fields || metadata;
+        
+        // Find all "Use for filename" checkboxes in the DOM
+        const checkboxes = document.querySelectorAll('input[id^="useForFilename_"]');
+        
+        let updatedCount = 0;
+        
+        // First pass: Set all useForFilename and clear filenameOrder
+        checkboxes.forEach(checkbox => {
+            const fieldName = checkbox.getAttribute('data-field-name');
+            const isChecked = checkbox.checked;
+            
+            if (fieldName && fieldsToUpdate[fieldName]) {
+                fieldsToUpdate[fieldName].useForFilename = isChecked;
+                
+                // Clear filenameOrder if not checked
+                if (!isChecked) {
+                    delete fieldsToUpdate[fieldName].filenameOrder;
+                }
+                
+                updatedCount++;
+                console.log(`  📝 ${fieldName}: useForFilename = ${isChecked}`);
+            }
+        });
+        
+        // Second pass: Set filenameOrder for checked fields in current order
+        this.filenameState.selectedFields.forEach((fieldName, index) => {
+            if (fieldsToUpdate[fieldName]) {
+                fieldsToUpdate[fieldName].filenameOrder = index + 1;
+                console.log(`  🔢 ${fieldName}: filenameOrder = ${index + 1}`);
+            }
+        });
+        
+        // Save the manual prefix in template
+        const prefixInput = document.getElementById('filenamePrefix');
+        if (prefixInput) {
+            template.filenamePrefix = prefixInput.value || '';
+            console.log(`  📝 Saved filename prefix: "${template.filenamePrefix}"`);
+        }
+        
+        console.log(`✅ Updated ${updatedCount} checkbox states with filenameOrder in template`);
+        
+        return updatedCount;
+    }
 
 };
 

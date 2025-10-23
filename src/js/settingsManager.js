@@ -25,6 +25,14 @@ const settingsManager = {
 		'security.auto_migrate': true,
 		'security.require_encryption': false,
 		
+		// Password System Settings (DEFAULT: ENABLED)
+		'security.password_system_enabled': true,  // Enable password system by default
+		'security.require_admin_password': true,   // Require admin password for sensitive operations
+		'security.password_min_length': 3,         // Minimum password length
+		'security.auto_logout_minutes': 30,        // Auto-logout after inactivity (0 = disabled)
+		'security.show_password_strength': true,   // Show password strength indicator
+		'security.allow_password_reset': true,     // Allow admin to reset user passwords
+		
 		// elabFTW Integration Settings
 		'elabftw.enabled': false,
 		'elabftw.server_url': '',
@@ -51,7 +59,26 @@ const settingsManager = {
 		// Phase 2: OMERO Enhanced Settings
 		'omero.use_json_triplets': false,
 		'omero.use_template_groups_as_namespaces': true,
-		'omero.integration_links_as_keyvalue': true
+		'omero.integration_links_as_keyvalue': true,
+		
+		// Template Category Configuration
+		'templates.category1_name': 'Main-Project',
+		'templates.category1_icon': '🎯',
+		'templates.category1_color': '#8b5cf6',
+		
+		'templates.category2_name': 'Sub-Project',
+		'templates.category2_icon': '📊',
+		'templates.category2_color': '#06b6d4',
+		
+		'templates.category3_name': 'Action',
+		'templates.category3_icon': '⚡',
+		'templates.category3_color': '#10b981',
+		
+		'templates.category4_name': 'Misc',
+		'templates.category4_icon': '📋',
+		'templates.category4_color': '#f59e0b',
+		
+		'templates.active_category': 'category1'
 	},
 
     // Keys that should be stored securely
@@ -78,8 +105,22 @@ const settingsManager = {
             }
         }
         
-        // Load settings
-        this.loadSettings();
+        // ===== CRITICAL FIX: Load settings user-specific if userManager is active =====
+        // Problem: loadSettings() lädt IMMER global aus 'metafold_settings'
+        // Lösung: Prüfe ob userManager aktiv ist und lade dann user-spezifisch
+        
+        const isUserManagerActive = window.userManager && 
+                                    window.userManager.isInitialized && 
+                                    window.storage && 
+                                    typeof window.storage.getStorageKey === 'function';
+        
+        if (isUserManagerActive) {
+            console.log('📂 Loading user-specific settings...');
+            this.loadSettingsUserSpecific();
+        } else {
+            console.log('📂 Loading global settings (userManager not active)...');
+            this.loadSettings();
+        }
         
         // Load secure credentials
         await this.loadSecureCredentials();
@@ -163,7 +204,7 @@ const settingsManager = {
         }
     },
 
-    // New function: Switch settings when user changes
+    // New function: Switch settings when user changes (ENHANCED with Group Categories)
     async switchToUser(username, groupname) {
         console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
         
@@ -176,8 +217,51 @@ const settingsManager = {
             window.storage.setUserPrefix(prefix);
         }
         
+        // ===== CRITICAL FIX 2: Clear settings BEFORE loading new user =====
+        // Problem: this.settings contains old user's values after prefix change
+        // Solution: Clear settings object to prevent old values being saved to new user's file
+        console.log('🔄 Clearing settings before loading new user...');
+        this.settings = {};
+        console.log('✅ Settings cleared - ready for user switch');
+        // ====================================================================
+        
+        // Check if this is a new user (no existing settings)
+        const storageKey = window.storage ? 
+            window.storage.getStorageKey('settings') : 
+            `metafold_${groupname}_${username}_settings`;
+        
+        const existingSettings = localStorage.getItem(storageKey);
+        const isNewUser = !existingSettings;
+        
         // Load settings for new user
         this.loadSettingsUserSpecific();
+        
+        // ===== NEW: Apply group category settings for new users =====
+        if (isNewUser && groupname && groupname !== 'Unknown' && groupname !== 'Default') {
+            console.log(`👤 New user detected: ${username} - checking for group category settings...`);
+            
+            const groupSettings = this.loadGroupCategorySettings(groupname);
+            
+            if (groupSettings) {
+                console.log(`👥 Applying group category settings from: ${groupname}`);
+                
+                // Apply group category settings without triggering save
+                for (const [key, value] of Object.entries(groupSettings)) {
+                    this.settings[key] = value;
+                }
+                
+                // Save the inherited settings
+                this.saveSettingsUserSpecific();
+                
+                console.log(`✅ New user ${username} inherited group category settings`);
+            } else {
+                console.log(`📋 No group category settings found - using defaults`);
+            }
+        } else if (isNewUser) {
+            console.log(`📋 New user ${username} using default category settings (no group)`);
+        } else {
+            console.log(`👤 Existing user ${username} - using personal category settings`);
+        }
         
         // Apply theme and other initial settings
         this.applyInitialSettings();
@@ -186,11 +270,21 @@ const settingsManager = {
         if (this.loadSecureCredentials) {
             await this.loadSecureCredentials();
         }
+        
+        // ===== UPDATE CATEGORY UI =====
+        if (window.templateTypeManager && window.templateTypeManager.updateUI) {
+            console.log('🎨 Updating category UI after user switch...');
+            setTimeout(() => {
+                window.templateTypeManager.updateUI();
+            }, 100);
+        }
+        
         // FORCE UPDATE SETTINGS UI
         setTimeout(async () => {
             await this.forceUpdateSettingsUI();
         }, 100);
-        console.log('✅ Settings switched successfully');
+        
+        console.log('✅ Settings switched successfully with category support');
     },
 
         async forceUpdateSettingsUI() {
@@ -232,6 +326,146 @@ const settingsManager = {
             }
         },
 
+    // =================== GROUP TEMPLATE CATEGORIES SUPPORT ===================
+
+    /**
+     * Load group-level category settings (shared by all group members)
+     * @param {string} groupname - Group name
+     * @returns {Object} - Group category settings
+     */
+    loadGroupCategorySettings(groupname) {
+        if (!groupname || groupname === 'Unknown' || groupname === 'Default') {
+            return null;
+        }
+        
+        try {
+            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
+            const stored = localStorage.getItem(groupSettingsKey);
+            
+            if (stored) {
+                const groupSettings = JSON.parse(stored);
+                console.log(`👥 Loaded group category settings for: ${groupname}`);
+                return groupSettings;
+            }
+        } catch (error) {
+            console.warn('Could not load group category settings:', error);
+        }
+        
+        return null;
+    },
+
+    /**
+     * Save current user's category settings as group standard
+     * @param {string} groupname - Group name
+     * @returns {boolean} - Success status
+     */
+    async saveAsGroupStandard(groupname) {
+        if (!groupname || groupname === 'Unknown' || groupname === 'Default') {
+            console.warn('Cannot save group standard for invalid group');
+            return false;
+        }
+        
+        try {
+            // Extract current category settings
+            const categorySettings = {};
+            
+            const categoryKeys = [
+                'templates.category1_name', 'templates.category1_icon', 'templates.category1_color',
+                'templates.category2_name', 'templates.category2_icon', 'templates.category2_color',
+                'templates.category3_name', 'templates.category3_icon', 'templates.category3_color',
+                'templates.category4_name', 'templates.category4_icon', 'templates.category4_color',
+                'templates.active_category'
+            ];
+            
+            for (const key of categoryKeys) {
+                categorySettings[key] = await this.get(key);
+            }
+            
+            // Save to group storage
+            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
+            localStorage.setItem(groupSettingsKey, JSON.stringify(categorySettings));
+            
+            console.log(`✅ Category settings saved as group standard for: ${groupname}`);
+            
+            if (window.app && window.app.showSuccess) {
+                window.app.showSuccess('Category settings saved as group standard!');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving group standard:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Apply group category settings to current user
+     * @param {string} groupname - Group name
+     * @returns {Promise<boolean>} - Success status
+     */
+    async applyGroupCategorySettings(groupname) {
+        const groupSettings = this.loadGroupCategorySettings(groupname);
+        
+        if (!groupSettings) {
+            console.log('No group category settings to apply');
+            return false;
+        }
+        
+        try {
+            console.log(`🔄 Applying group category settings for: ${groupname}`);
+            
+            // Apply each category setting
+            for (const [key, value] of Object.entries(groupSettings)) {
+                await this.set(key, value);
+            }
+            
+            console.log('✅ Group category settings applied successfully');
+            
+            // Update UI
+            if (window.templateTypeManager && window.templateTypeManager.updateUI) {
+                window.templateTypeManager.updateUI();
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error applying group category settings:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Check if user has custom category settings (different from group)
+     * @param {string} groupname - Group name
+     * @returns {boolean} - True if user has custom settings
+     */
+    hasCustomCategorySettings(groupname) {
+        const groupSettings = this.loadGroupCategorySettings(groupname);
+        
+        if (!groupSettings) {
+            return true; // No group settings = user settings are custom
+        }
+        
+        try {
+            const categoryKeys = [
+                'templates.category1_name', 'templates.category1_icon', 'templates.category1_color',
+                'templates.category2_name', 'templates.category2_icon', 'templates.category2_color',
+                'templates.category3_name', 'templates.category3_icon', 'templates.category3_color',
+                'templates.category4_name', 'templates.category4_icon', 'templates.category4_color'
+            ];
+            
+            for (const key of categoryKeys) {
+                if (this.settings[key] !== groupSettings[key]) {
+                    return true; // Found a difference
+                }
+            }
+            
+            return false; // All settings match group
+        } catch (error) {
+            console.warn('Error checking custom category settings:', error);
+            return true;
+        }
+    },
+
     // New function: Migrate global settings to user-specific
     migrateGlobalSettingsToUser() {
         try {
@@ -272,7 +506,13 @@ const settingsManager = {
             return;
         }
         
-        // Load user-specific settings
+        // ===== CRITICAL FIX: Clear existing settings before loading =====
+        // Problem: Settings könnten bereits global geladen sein von init()
+        // Lösung: Settings-Object leeren und neu laden
+        console.log('🔄 Clearing existing settings before user-specific load...');
+        this.settings = {};
+        
+        // Load user-specific settings (now from clean slate)
         this.loadSettingsUserSpecific();
         
         // Load secure credentials
@@ -331,33 +571,6 @@ const settingsManager = {
         }
     },
 
-    // New function: Switch settings when user changes
-    async switchToUser(username, groupname) {
-        console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
-        
-        // Save current settings before switching
-        this.saveSettingsUserSpecific();
-        
-        // Update user context (this should trigger storage prefix update)
-        if (window.storage && window.storage.setUserPrefix) {
-            const prefix = `${groupname}_${username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-            window.storage.setUserPrefix(prefix);
-        }
-        
-        // Load settings for new user
-        this.loadSettingsUserSpecific();
-        
-        // Apply theme and other initial settings
-        this.applyInitialSettings();
-        
-        // Reload secure credentials for new user
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        console.log('✅ Settings switched successfully');
-    },
-
     // New function: Migrate global settings to user-specific
     migrateGlobalSettingsToUser() {
         try {
@@ -392,14 +605,22 @@ const settingsManager = {
         }
         
         if (!window.storage) {
-            console.warn('⚠️ Storage system not available - falling back to global settings');
-            this.loadSettings(); // Use original function
-            this.applyInitialSettings();
-            return;
+        console.warn('⚠️ Storage system not available - falling back to global settings');
+        this.loadSettings(); // Use original function
+        this.applyInitialSettings();
+        return;
         }
         
-        // Load user-specific settings
-        this.loadSettingsUserSpecific();
+        // ===== CRITICAL FIX: Clear existing settings before user-specific load =====
+        // Problem: init() lädt Settings global, die dann im this.settings Object bleiben
+    // Lösung: Object leeren, damit nur user-spezifische Settings geladen werden
+    console.log('🔄 Clearing existing settings before user-specific load...');
+    this.settings = {};
+    console.log('✅ Settings object cleared - ready for user-specific load');
+    // ============================================================================
+    
+    // Load user-specific settings
+    this.loadSettingsUserSpecific();
         
         // Load secure credentials
         if (this.loadSecureCredentials) {
@@ -420,6 +641,13 @@ const settingsManager = {
         
         // Regular setting retrieval
         const value = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
+        
+        // Debug log für wichtige Keys
+        if (key.startsWith('templates.category')) {
+            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
+            console.log(`🔍 Get ${key}: "${value}" (from ${storageKey})`);
+        }
+        
         return value;
     },
 
@@ -437,7 +665,23 @@ const settingsManager = {
         
         // Regular setting storage
         this.settings[key] = value;
-        const saved = this.saveSettings();
+        
+        // ===== CRITICAL FIX: Check if userManager is ACTIVE, not just enabled =====
+        // Problem: isUserManagementEnabled() liest aus settings, die noch global sein könnten
+        // Lösung: Prüfe ob userManager existiert UND initialisiert ist
+        
+        const isUserManagerActive = window.userManager && 
+                                    window.userManager.isInitialized && 
+                                    window.storage && 
+                                    typeof window.storage.getStorageKey === 'function';
+        
+        const saved = isUserManagerActive ? 
+            this.saveSettingsUserSpecific() :  // User-spezifisch wenn userManager aktiv
+            this.saveSettings();               // Global als Fallback
+        
+        console.log(`💾 Saved using ${isUserManagerActive ? 'user-specific' : 'global'} method`);
+        console.log(`   UserManager active: ${!!isUserManagerActive}`);
+        console.log(`   Storage key: ${isUserManagerActive && window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings'}`);
         
         if (saved) {
             this.handleSettingChange(key, value);
@@ -1448,6 +1692,14 @@ const settingsManager = {
 		return this.settings['general.user_management_enabled'] === true;
 	},
 
+    // NEUE FUNKTION: Prüfe ob userManager AKTIV ist (unabhängig vom Setting)
+    isUserManagerActive() {
+        return !!(window.userManager && 
+                  window.userManager.isInitialized && 
+                  window.storage && 
+                  typeof window.storage.getStorageKey === 'function');
+    },
+
     // Phase 2: Get OMERO Export Options
     async getOMEROExportOptions() {
         try {
@@ -1507,17 +1759,6 @@ const settingsManager = {
             };
         }
     },
-    // =================== PASSWORD SYSTEM DEFAULT SETTINGS ===================
-    
-    // Add these to the DEFAULT_SETTINGS object in settingsManager.js:
-    
-    'security.password_system_enabled': true,  // Enable password system by default
-    'security.require_admin_password': true,   // Require admin password for sensitive operations
-    'security.password_min_length': 3,         // Minimum password length
-    'security.auto_logout_minutes': 30,        // Auto-logout after inactivity (0 = disabled)
-    'security.show_password_strength': true,   // Show password strength indicator
-    'security.allow_password_reset': true,     // Allow admin to reset user passwords
-
     // =================== PASSWORD SYSTEM SETTINGS MANAGEMENT ===================
 
     /**
@@ -1907,6 +2148,102 @@ const settingsManager = {
         });
         
         return debugInfo;
+    },
+
+    // =================== TEMPLATE CATEGORIES MANAGEMENT ===================
+
+    /**
+     * Get configuration for a template category
+     * @param {string} categoryId - Category ID (category1, category2, category3, category4)
+     * @returns {Promise<Object>} - Category configuration
+     */
+    async getCategoryConfig(categoryId) {
+        return {
+            name: await this.get(`templates.${categoryId}_name`),
+            icon: await this.get(`templates.${categoryId}_icon`),
+            color: await this.get(`templates.${categoryId}_color`),
+            id: categoryId
+        };
+    },
+
+    /**
+     * Get all template categories
+     * @returns {Promise<Array>} - Array of category configurations
+     */
+    async getAllCategories() {
+        return await Promise.all([
+            this.getCategoryConfig('category1'),
+            this.getCategoryConfig('category2'),
+            this.getCategoryConfig('category3'),
+            this.getCategoryConfig('category4')
+        ]);
+    },
+
+    /**
+     * Update category configuration
+     * @param {string} categoryId - Category ID
+     * @param {Object} config - Configuration updates
+     * @returns {Promise<boolean>} - Success status
+     */
+    async updateCategory(categoryId, config) {
+        try {
+            if (config.name !== undefined) {
+                await this.set(`templates.${categoryId}_name`, config.name);
+            }
+            if (config.icon !== undefined) {
+                await this.set(`templates.${categoryId}_icon`, config.icon);
+            }
+            if (config.color !== undefined) {
+                await this.set(`templates.${categoryId}_color`, config.color);
+            }
+            
+            console.log(`✅ Category ${categoryId} updated:`, config);
+            return true;
+        } catch (error) {
+            console.error(`❌ Failed to update category ${categoryId}:`, error);
+            return false;
+        }
+    },
+
+    /**
+     * Reset category to defaults
+     * @param {string} categoryId - Category ID
+     * @returns {Promise<boolean>} - Success status
+     */
+    async resetCategory(categoryId) {
+        const defaults = {
+            category1: { name: 'Main-Project', icon: '🎯', color: '#8b5cf6' },
+            category2: { name: 'Sub-Project', icon: '📊', color: '#06b6d4' },
+            category3: { name: 'Action', icon: '⚡', color: '#10b981' },
+            category4: { name: 'Misc', icon: '📋', color: '#f59e0b' }
+        };
+        
+        const defaultConfig = defaults[categoryId];
+        if (!defaultConfig) return false;
+        
+        return await this.updateCategory(categoryId, defaultConfig);
+    },
+
+    /**
+     * Get active category
+     * @returns {string} - Active category ID
+     */
+    getActiveCategory() {
+        return this.get('templates.active_category') || 'category1';
+    },
+
+    /**
+     * Set active category
+     * @param {string} categoryId - Category ID to activate
+     * @returns {Promise<boolean>} - Success status
+     */
+    async setActiveCategory(categoryId) {
+        if (!['category1', 'category2', 'category3', 'category4'].includes(categoryId)) {
+            console.error('Invalid category ID:', categoryId);
+            return false;
+        }
+        
+        return await this.set('templates.active_category', categoryId);
     }
 
 };

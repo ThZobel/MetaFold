@@ -19,9 +19,25 @@
     <link rel="stylesheet" href="css/userManagement.css">
     <!-- CRITICAL: Layout override to force full width -->
     <link rel="stylesheet" href="css/layout-override.css">
+    <!-- Sidebar Resize Styles -->
+    <link rel="stylesheet" href="css/sidebar-resize.css">
+    <!-- Sticky Actions Styles -->
+    <link rel="stylesheet" href="css/sticky-actions.css">
+    <link rel="stylesheet" href="css/main-content-footer.css">
+
     
     <!-- elabFTW Category Manager - NEU -->
     <script src="js/elabftwCategoryManager.js" defer></script>
+    <!-- Metadata Loader - Load and send metadata retroactively -->
+    <script src="js/metadataLoader.js" defer></script>
+    <!-- Sidebar Resize Manager -->
+    <script src="js/sidebarResizeManager.js" defer></script>
+    <script src="js/mainContentFooterManager.js" defer></script>
+    <!-- ✨ Footer Messages Manager - Handles message visibility -->
+    <script src="js/footerMessagesManager.js" defer></script>
+    <!-- 🔧 Tab Footer Control - Manages footer visibility per tab -->
+    <script src="js/tabFooterControl.js" defer></script>
+
     
     <!-- JSONCrack Visualization CSS (ENHANCED) -->
     <style>
@@ -152,37 +168,68 @@
     letter-spacing: -0.5px;
 }
 
-    /* Template Type Selector - neue Position */
+    /* Template Type Selector - ENHANCED 4-Category 2x2 Grid */
     .template-type-selector {
-        display: flex;
-        gap: 5px;
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 2 columns */
+        grid-template-rows: auto auto;   /* 2 rows */
+        gap: 8px;
         margin-top: 15px;
+        margin-bottom: 15px;
     }
 
     .template-type-btn {
-        flex: 1;
-        padding: 8px 12px;
+        padding: 10px 12px;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 6px;
+        border-radius: 8px;
         color: #9ca3af;
         cursor: pointer;
         transition: all 0.3s ease;
         font-size: 0.85rem;
         font-weight: 500;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        white-space: nowrap;
+        min-height: 42px;
     }
 
     .template-type-btn.active {
-        background: linear-gradient(135deg, #7c3aed, #a855f7);
         color: white;
-        border-color: rgba(124, 58, 237, 0.5);
+        font-weight: 600;
         box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        /* Individual colors will be set via JavaScript */
     }
 
     .template-type-btn:hover:not(.active) {
         background: rgba(255, 255, 255, 0.1);
         color: #e0e0e0;
         border-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+    }
+
+    /* Category-Specific Colors (Fallback if JavaScript fails) */
+    #category1TypeBtn.active {
+        background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+        border-color: rgba(139, 92, 246, 0.5);
+    }
+
+    #category2TypeBtn.active {
+        background: linear-gradient(135deg, #06b6d4, #22d3ee);
+        border-color: rgba(6, 182, 212, 0.5);
+    }
+
+    #category3TypeBtn.active {
+        background: linear-gradient(135deg, #10b981, #34d399);
+        border-color: rgba(16, 185, 129, 0.5);
+    }
+
+    #category4TypeBtn.active {
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        border-color: rgba(245, 158, 11, 0.5);
     }
 
     /* Settings Button Hover-Effekt */
@@ -632,16 +679,43 @@
         "></div>
     </div>
     
-    <!-- New Template Button -->
-    <button class="btn" onclick="showTemplateModal()">New Template</button>
-    
-    <!-- Template Type Selector - VERSCHOBEN HIERHER (vorher oben) -->
-    <div class="template-type-selector" style="margin-top: 15px;">
-        <button class="template-type-btn active" onclick="switchTemplateType('folders')" id="foldersTypeBtn">
-            📂 Folders
+    <!-- Template Management Buttons - NEUE VERSION -->
+    <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <button class="btn" onclick="showTemplateModal()" style="flex: 1;">New Template</button>
+        <button class="more-menu-trigger sidebar-more-btn" onclick="toggleMoreMenu()" id="sidebarMoreMenuTrigger">
+            <span>⚙️</span>
+            <span style="font-size: 0.85rem;">Templ. Options</span>
         </button>
-        <button class="template-type-btn" onclick="switchTemplateType('experiments')" id="experimentsTypeBtn">
-            🧪 Experiments
+    </div>
+    
+    <!-- Template Type Selector - ENHANCED 4-Category Grid -->
+    <div class="template-type-selector" style="margin-top: 15px;">
+        <!-- Row 1: Category 1 & 2 -->
+        <button class="template-type-btn active" 
+                onclick="switchTemplateType('category1')" 
+                id="category1TypeBtn"
+                title="Templates for main projects">
+            🎯 Main-Project
+        </button>
+        <button class="template-type-btn" 
+                onclick="switchTemplateType('category2')" 
+                id="category2TypeBtn"
+                title="Templates for sub-projects">
+            📊 Sub-Project
+        </button>
+        
+        <!-- Row 2: Category 3 & 4 -->
+        <button class="template-type-btn" 
+                onclick="switchTemplateType('category3')" 
+                id="category3TypeBtn"
+                title="Templates for actions">
+            ⚡ Action
+        </button>
+        <button class="template-type-btn" 
+                onclick="switchTemplateType('category4')" 
+                id="category4TypeBtn"
+                title="Miscellaneous templates">
+            📋 Misc
         </button>
     </div>
         </div>
@@ -769,24 +843,85 @@
                             </div>
                         </div>
 
-                        <!-- Enhanced Path Preview -->
-                        <div class="path-preview-section">
-                            <div class="preview-header">
-                                <div class="preview-icon">🎯</div>
-                                <h4>Full Project Path</h4>
-                            </div>
-                            <div class="path-preview-wrapper">
-                                <div id="fullPathPreview" class="path-preview">
-                                    Choose directory and project name
+                        <!-- Path & Filename Preview Container - Side by Side -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 8px;">
+                            
+                            <!-- Enhanced Path Preview (LEFT) -->
+                            <div class="path-preview-section" style="margin-top: 0;">
+                                <div class="preview-header">
+                                    <div class="preview-icon">🎯</div>
+                                    <h4>Full Project Path</h4>
                                 </div>
-                                <button class="copy-path-btn" onclick="copyPathToClipboard()" title="Copy path to clipboard">
-                                    📋
-                                </button>
+                                <div class="path-preview-wrapper">
+                                    <div id="fullPathPreview" class="path-preview">
+                                        Choose directory and project name
+                                    </div>
+                                    <button class="copy-path-btn" onclick="copyPathToClipboard()" title="Copy path to clipboard">
+                                        📋
+                                    </button>
+                                </div>
+                                <div class="preview-info">
+                                    <span class="info-text">This is where your project folder will be created</span>
+                                </div>
                             </div>
-                            <div class="preview-info">
-                                <span class="info-text">This is where your project folder will be created</span>
+
+                            <!-- Filename Suggestion (RIGHT) -->
+                            <div class="path-preview-section" style="margin-top: 0;">
+                                <div class="preview-header">
+                                    <div class="preview-icon">📝</div>
+                                    <h4>Filename Suggestion</h4>
+                                </div>
+                                
+                                <!-- Manual Prefix Input -->
+                                <div class="enhanced-input-wrapper" style="margin-bottom: 12px;">
+                                    <label for="filenamePrefix" style="display: block; margin-bottom: 6px; color: #9ca3af; font-size: 0.9rem;">
+                                        Manual Prefix (optional):
+                                    </label>
+                                    <input type="text" 
+                                           id="filenamePrefix" 
+                                           class="enhanced-input" 
+                                           placeholder="e.g., EXP_"
+                                           oninput="experimentForm.updateFilenamePreview()"
+                                           style="padding: 10px 14px;">
+                                </div>
+                                
+                                <!-- Filename Preview -->
+                                <div class="path-preview-wrapper">
+                                    <div id="filenamePreview" class="path-preview" style="color: #10b981;">
+                                        Select fields with "Use for filename"
+                                    </div>
+                                    <button class="copy-path-btn" 
+                                            onclick="experimentForm.copyFilenameToClipboard()" 
+                                            title="Copy filename to clipboard">
+                                        📋
+                                    </button>
+                                </div>
+                                
+                                <!-- Warning for long filenames -->
+                                <div id="filenameLengthWarning" 
+                                     style="display: none; color: #f59e0b; font-size: 0.85rem; margin-top: 8px; text-align: center;">
+                                    ⚠️ Filename exceeds 30 characters
+                                </div>
+                                
+                                <div class="preview-info">
+                                    <span class="info-text">
+                                        Generated filename based on selected metadata fields
+                                    </span>
+                                </div>
                             </div>
+
                         </div>
+
+                        <!-- Responsive CSS für schmale Bildschirme -->
+                        <style>
+                        @media (max-width: 1200px) {
+                            /* Auf schmalen Bildschirmen untereinander anzeigen */
+                            div[style*="grid-template-columns: 1fr 1fr"] {
+                                grid-template-columns: 1fr !important;
+                                gap: 20px !important;
+                            }
+                        }
+                        </style>
                     </div> 
 
                     <!-- elabFTW Integration Option -->
@@ -1299,41 +1434,10 @@
                         <div id="folderPreview" class="folder-tree"></div>
                     </div>
 
-                    <!-- Metadata Form for Experiments -->
+                    <!-- Metadata Form for Experiments - VEREINFACHT (Buttons entfernt) -->
                     <div id="experimentForm" class="metadata-editor" style="display: none;">
-                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3>🧪 Fill Experiment Metadata:</h3>
-                            <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
-                                <!-- Clear Template Actions Menu -->
-                                <button class="btn btn-secondary btn-small" onclick="showTemplateActionsMenu()" 
-                                        style="padding: 8px 16px; background: #ef4444; border-color: #ef4444; color: white;" 
-                                        title="Clear template values or form inputs">
-                                    🧹 Clear
-                                </button>
-                                
-                                <!-- Save Template & Paths (Fixed and Styled) -->
-                                <button class="btn btn-primary btn-small" onclick="saveExperimentTemplate()" 
-                                        style="padding: 8px 16px; background: #059669; border-color: #059669; color: white; font-weight: 500;" 
-                                        title="Save current metadata values and project paths with this template">
-                                    💾 Save Template & Paths
-                                </button>
-                            </div>
-                        </div>
+                        <h3 style="margin-bottom: 15px;">🧪 Fill Experiment Metadata:</h3>
                         <div id="experimentFields"></div>
-                    </div>
-
-                    <!-- ENHANCED ACTIONS SECTION - Replace existing actions div in index.html -->
-                    <div class="actions">
-                        <button class="btn" onclick="createProject()">🎯 Create Project</button>
-                        <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
-                        
-                        <!-- NEW: More Menu Container -->
-                        <div class="more-menu-container">
-                            <button class="more-menu-trigger" onclick="toggleMoreMenu()" id="moreMenuTrigger">
-                                <span>⚙️ More</span>
-                                <span class="more-menu-arrow">▼</span>
-                            </button>
-                        </div>
                     </div>
 
                     <!-- NEW: Slide-out Panel with Enhanced Import/Export -->
@@ -1905,15 +2009,15 @@
                     </script>
                     
 
-                    <!-- Info Message for additional information -->
-                    <div id="infoMessage" class="message info-message" style="display: none;"></div>
-                    <div id="successMessage" class="success-message" style="display: none;"></div>
-                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
                 </div>
-            </div>
 
 
-            <!-- PROJECT DISCOVERY TAB -->
+
+                    
+                        </div>
+
+                                    <!-- PROJECT DISCOVERY TAB -->
             <div id="discoverTabContent" class="main-tab-content">
                 <div class="discovery-container">
                     <div class="discovery-header">
@@ -1922,8 +2026,8 @@
                             <p>Scan directories to discover and analyze your MetaFold projects</p>
                         </div>
                         <div class="header-actions">
-                            <button class="btn" onclick="projectScanner.scanDirectory()" id="scanDirectoryBtn">
-                                🔍 Scan Directory
+                            <button class="btn" onclick="metadataLoader.loadMetadataFile()" id="loadMetadataBtn">
+                                📥 Load Metadata
                             </button>
                         </div>
                     </div>
@@ -1945,11 +2049,15 @@
                     <div id="projectScannerContainer" class="scanner-main-container">
                         <!-- Project scanner content will be rendered here -->
                     </div>
+                    
+                    <!-- Metadata Viewer & Sender Section -->
+                    <div id="metadataViewerContainer" class="metadata-viewer-container" style="display: none;">
+                        <!-- Metadata viewer will be rendered here by metadataLoader.js -->
+                    </div>
                 </div>
             </div>
 
-
-            <!-- ENHANCED: VISUALIZE TAB with JSONCrack Integration -->
+                        <!-- ENHANCED: VISUALIZE TAB with JSONCrack Integration -->
             <div id="visualizeTabContent" class="main-tab-content">
                 <div class="visualization-container">
                     <div class="visualization-header">
@@ -2004,12 +2112,55 @@
                     </div>
                 </div>
             </div>
+
+                    </div>
+                    <!-- Ende: main-content-wrapper -->
+
+                    <!-- Fixed Footer mit Actions und Messages -->
+                    <div class="main-content-footer">
+                        <!-- Actions Container -->
+                        <div class="footer-actions-container" id="footerActionsContainer">
+                            <!-- ENHANCED ACTIONS SECTION - MIT Clear & Save Buttons -->
+                            <div class="actions">
+                                <button class="btn" onclick="createProject()">🎯 Create Project</button>
+                                <button class="btn btn-secondary" onclick="editCurrentTemplate()">✏️ Edit</button>
+                                
+                                <!-- Moved from experimentForm: Clear & Save Buttons -->
+                                <button class="btn btn-secondary btn-small" onclick="showTemplateActionsMenu()" 
+                                        style="padding: 8px 16px; background: #ef4444; border-color: #ef4444; color: white;" 
+                                        title="Clear template values or form inputs">
+                                    🧹 Clear
+                                </button>
+                                
+                                <button class="btn btn-primary btn-small" onclick="saveExperimentTemplate()" 
+                                        style="padding: 8px 16px; background: #059669; border-color: #059669; color: white; font-weight: 500;" 
+                                        title="Save current metadata values and project paths with this template">
+                                    💾 Save Template & Paths
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Messages Container -->
+                        <div class="footer-messages-container" id="footerMessagesContainer">
+                                 <!-- Info Message for additional information -->
+                                <div id="infoMessage" class="message info-message" style="display: none;"></div>
+                                <div id="successMessage" class="success-message" style="display: none;"></div>
+                                <div id="errorMessage" class="error-message" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <!-- Ende: main-content-footer -->
+
+
+         
+        <!-- Ende: main-content (enthält alle Tabs + Footer) -->
+
         </div>
     </div>
-
+</div>
     <!-- Settings Modal (PRESERVED EXACTLY) -->
     <div id="settingsModal" class="modal" style="display: none;">
         <div class="modal-content">
+            <div class="main-content-wrapper"></div>
             <span class="close" onclick="closeSettingsModal()">&times;</span>
             <h2>⚙️ Settings</h2>
             
@@ -2060,6 +2211,498 @@
                     </label>
                     <small>Display helpful tips and guidance throughout the application.</small>
                 </div>
+                
+
+                <!-- =================== TEMPLATE CATEGORIES SETTINGS UI =================== -->
+                <div class="settings-section" id="templateCategoriesSettings" style="margin-top: 30px;">
+                    <h3 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; color: #e0e0e0; border-bottom: 2px solid rgba(124, 58, 237, 0.3); padding-bottom: 10px;">
+                        🎯 Template Categories
+                    </h3>
+                    <p style="color: #9ca3af; margin-bottom: 20px; font-size: 0.9rem;">
+                        Configure the 4 template category buttons (name, icon, color)
+                    </p>
+
+                    <!-- Category 1 -->
+                    <div class="category-config-group" style="margin-bottom: 20px; padding: 15px; background: rgba(139, 92, 246, 0.05); border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.2);">
+                        <h4 style="color: #a855f7; margin-bottom: 10px; font-size: 1rem;">🎯 Category 1</h4>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Name:</label>
+                                <input type="text" id="category1Name" placeholder="Main-Project" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Icon:</label>
+                                <input type="text" id="category1Icon" placeholder="🎯" maxlength="2" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 1.2rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Color:</label>
+                                <input type="color" id="category1Color" value="#8b5cf6" onchange="updateCategoryPreview()"
+                                    style="width: 100%; height: 38px; padding: 2px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category 2 -->
+                    <div class="category-config-group" style="margin-bottom: 20px; padding: 15px; background: rgba(6, 182, 212, 0.05); border-radius: 8px; border: 1px solid rgba(6, 182, 212, 0.2);">
+                        <h4 style="color: #06b6d4; margin-bottom: 10px; font-size: 1rem;">📊 Category 2</h4>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Name:</label>
+                                <input type="text" id="category2Name" placeholder="Sub-Project" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Icon:</label>
+                                <input type="text" id="category2Icon" placeholder="📊" maxlength="2" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 1.2rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Color:</label>
+                                <input type="color" id="category2Color" value="#06b6d4" onchange="updateCategoryPreview()"
+                                    style="width: 100%; height: 38px; padding: 2px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category 3 -->
+                    <div class="category-config-group" style="margin-bottom: 20px; padding: 15px; background: rgba(16, 185, 129, 0.05); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <h4 style="color: #10b981; margin-bottom: 10px; font-size: 1rem;">⚡ Category 3</h4>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Name:</label>
+                                <input type="text" id="category3Name" placeholder="Action" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Icon:</label>
+                                <input type="text" id="category3Icon" placeholder="⚡" maxlength="2" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 1.2rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Color:</label>
+                                <input type="color" id="category3Color" value="#10b981" onchange="updateCategoryPreview()"
+                                    style="width: 100%; height: 38px; padding: 2px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category 4 -->
+                    <div class="category-config-group" style="margin-bottom: 20px; padding: 15px; background: rgba(245, 158, 11, 0.05); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                        <h4 style="color: #f59e0b; margin-bottom: 10px; font-size: 1rem;">📋 Category 4</h4>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Name:</label>
+                                <input type="text" id="category4Name" placeholder="Misc" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Icon:</label>
+                                <input type="text" id="category4Icon" placeholder="📋" maxlength="2" onchange="updateCategoryPreview()"
+                                    style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 1.2rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #9ca3af; margin-bottom: 5px; font-size: 0.85rem;">Color:</label>
+                                <input type="color" id="category4Color" value="#f59e0b" onchange="updateCategoryPreview()"
+                                    style="width: 100%; height: 38px; padding: 2px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview -->
+                    <div style="margin-top: 25px; padding: 15px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h4 style="color: #e0e0e0; margin-bottom: 12px; font-size: 0.95rem;">👁️ Live Preview:</h4>
+                        <div id="categoryPreview" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <!-- Preview buttons will be generated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Group Standard Controls -->
+                    <div class="settings-section" style="margin-top: 30px; border-top: 2px solid rgba(124, 58, 237, 0.3); padding-top: 25px;">
+                        <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: #e0e0e0;">
+                            👥 Group Standard Settings
+                        </h3>
+                        
+                        <!-- Status Display -->
+                        <div id="groupCategoryStatus" style="padding: 15px; background: rgba(124, 58, 237, 0.1); border-radius: 8px; margin-bottom: 15px; border-left: 3px solid #7c3aed;">
+                            <p style="margin: 0; font-size: 0.9rem; color: #c4b5fd; line-height: 1.5;">
+                                <span id="groupCategoryStatusText">Loading...</span>
+                            </p>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                            <button 
+                                id="saveAsGroupStandardBtn"
+                                class="btn btn-primary"
+                                onclick="handleSaveAsGroupStandard()"
+                                style="flex: 1; min-width: 200px; padding: 10px 16px; background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
+                                💾 Save as Group Standard
+                            </button>
+                            
+                            <button 
+                                id="applyGroupStandardBtn"
+                                class="btn btn-secondary"
+                                onclick="handleApplyGroupStandard()"
+                                style="flex: 1; min-width: 200px; padding: 10px 16px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #e0e0e0; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
+                                ⬇️ Apply Group Standard
+                            </button>
+                        </div>
+                        
+                        <!-- Help Text -->
+                        <div style="padding: 12px; background: rgba(99, 102, 241, 0.05); border-radius: 6px; border-left: 3px solid #6366f1;">
+                            <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #c4b5fd; line-height: 1.6;">
+                                <strong style="color: #a855f7;">💾 Save as Group Standard:</strong> Share your current category settings with all group members. New users will automatically inherit these settings.
+                            </p>
+                            <p style="margin: 0; font-size: 0.85rem; color: #c4b5fd; line-height: 1.6;">
+                                <strong style="color: #a855f7;">⬇️ Apply Group Standard:</strong> Replace your personal settings with the group standard configuration.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Save Settings Button -->
+                    <div style="margin-top: 25px; text-align: right;">
+                        <button onclick="saveCategorySettings()" 
+                            style="padding: 10px 20px; background: linear-gradient(135deg, #059669, #047857); border: none; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3); transition: all 0.3s ease;">
+                            ✅ Save Category Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- JavaScript Functions -->
+                <script>
+                // Initialize category settings when settings modal opens
+                async function initializeCategorySettings() {
+                    console.log('🎯 Initializing category settings...');
+                    
+                    try {
+                        if (!window.settingsManager) {
+                            console.warn('⚠️ settingsManager not available');
+                            return;
+                        }
+                        
+                        const categories = ['category1', 'category2', 'category3', 'category4'];
+                        
+                        for (const cat of categories) {
+                            const nameInput = document.getElementById(`${cat}Name`);
+                            const iconInput = document.getElementById(`${cat}Icon`);
+                            const colorInput = document.getElementById(`${cat}Color`);
+                            
+                            if (nameInput) nameInput.value = await window.settingsManager.get(`templates.${cat}_name`) || '';
+                            if (iconInput) iconInput.value = await window.settingsManager.get(`templates.${cat}_icon`) || '';
+                            if (colorInput) colorInput.value = await window.settingsManager.get(`templates.${cat}_color`) || '#8b5cf6';
+                        }
+                        
+                        updateCategoryPreview();
+                        await initializeGroupCategoryStatus();
+                        
+                        console.log('✅ Category settings initialized');
+                        
+                    } catch (error) {
+                        console.error('❌ Error initializing category settings:', error);
+                    }
+                }
+
+                // Update live preview
+                function updateCategoryPreview() {
+                    const preview = document.getElementById('categoryPreview');
+                    if (!preview) return;
+                    
+                    const categories = ['category1', 'category2', 'category3', 'category4'];
+                    let html = '';
+                    
+                    categories.forEach(cat => {
+                        const name = document.getElementById(`${cat}Name`)?.value || 'Unnamed';
+                        const icon = document.getElementById(`${cat}Icon`)?.value || '📋';
+                        const color = document.getElementById(`${cat}Color`)?.value || '#8b5cf6';
+                        
+                        const lighterColor = lightenColor(color, 20);
+                        
+                        html += `
+                            <div style="
+                                padding: 10px 12px;
+                                background: linear-gradient(135deg, ${color}, ${lighterColor});
+                                border: 1px solid ${color}80;
+                                border-radius: 8px;
+                                color: white;
+                                font-weight: 500;
+                                text-align: center;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 6px;
+                                box-shadow: 0 2px 8px ${color}50;
+                            ">
+                                <span>${icon}</span>
+                                <span>${name}</span>
+                            </div>
+                        `;
+                    });
+                    
+                    preview.innerHTML = html;
+                }
+
+                function lightenColor(hex, percent) {
+                    if (!hex || typeof hex !== 'string') return '#9ca3af';
+                    
+                    const num = parseInt(hex.replace('#', ''), 16);
+                    const amt = Math.round(2.55 * percent);
+                    const R = Math.min(255, (num >> 16) + amt);
+                    const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+                    const B = Math.min(255, (num & 0x0000FF) + amt);
+                    
+                    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+                }
+
+                async function saveCategorySettings() {
+                    console.log('💾 Saving category settings...');
+                    
+                    try {
+                        if (!window.settingsManager) {
+                            throw new Error('settingsManager not available');
+                        }
+                        
+                        const categories = ['category1', 'category2', 'category3', 'category4'];
+                        
+                        for (const cat of categories) {
+                            const name = document.getElementById(`${cat}Name`)?.value;
+                            const icon = document.getElementById(`${cat}Icon`)?.value;
+                            const color = document.getElementById(`${cat}Color`)?.value;
+                            
+                            if (name) await window.settingsManager.set(`templates.${cat}_name`, name);
+                            if (icon) await window.settingsManager.set(`templates.${cat}_icon`, icon);
+                            if (color) await window.settingsManager.set(`templates.${cat}_color`, color);
+                        }
+                        
+                        if (window.templateTypeManager && window.templateTypeManager.updateUI) {
+                            window.templateTypeManager.updateUI();
+                        }
+                        
+                        if (window.app && window.app.showSuccess) {
+                            window.app.showSuccess('Category settings saved successfully!');
+                        } else {
+                            alert('✅ Category settings saved successfully!');
+                        }
+                        
+                        console.log('✅ Category settings saved');
+                        
+                    } catch (error) {
+                        console.error('❌ Error saving category settings:', error);
+                        if (window.app && window.app.showError) {
+                            window.app.showError('Error: ' + error.message);
+                        } else {
+                            alert('❌ Error saving settings: ' + error.message);
+                        }
+                    }
+                }
+
+                async function initializeGroupCategoryStatus() {
+                    const statusText = document.getElementById('groupCategoryStatusText');
+                    const saveBtn = document.getElementById('saveAsGroupStandardBtn');
+                    const applyBtn = document.getElementById('applyGroupStandardBtn');
+                    
+                    if (!statusText || !saveBtn || !applyBtn) {
+                        console.warn('⚠️ Group category status elements not found');
+                        return;
+                    }
+                    
+                    try {
+                        const currentUser = window.userManager?.currentUser;
+                        const currentGroup = window.userManager?.currentGroup;
+                        
+                        if (!currentGroup || currentGroup === 'Unknown' || currentGroup === 'Default') {
+                            statusText.textContent = 'Group standard settings are not available (no group or Default group).';
+                            saveBtn.disabled = true;
+                            applyBtn.disabled = true;
+                            saveBtn.style.opacity = '0.5';
+                            applyBtn.style.opacity = '0.5';
+                            return;
+                        }
+                        
+                        const hasGroupStandard = window.settingsManager.loadGroupCategorySettings(currentGroup) !== null;
+                        const hasCustomSettings = window.settingsManager.hasCustomCategorySettings(currentGroup);
+                        
+                        if (hasGroupStandard && hasCustomSettings) {
+                            statusText.textContent = `You have custom category settings (different from group "${currentGroup}").`;
+                        } else if (hasGroupStandard && !hasCustomSettings) {
+                            statusText.textContent = `Using group "${currentGroup}" standard category settings.`;
+                        } else {
+                            statusText.textContent = `No group standard set for "${currentGroup}". You can save yours as the standard.`;
+                        }
+                        
+                        saveBtn.disabled = false;
+                        applyBtn.disabled = !hasGroupStandard;
+                        saveBtn.style.opacity = '1';
+                        applyBtn.style.opacity = hasGroupStandard ? '1' : '0.5';
+                        
+                    } catch (error) {
+                        console.error('Error initializing group category status:', error);
+                        statusText.textContent = 'Error loading group category status.';
+                    }
+                }
+
+                async function handleSaveAsGroupStandard() {
+                    const currentGroup = window.userManager?.currentGroup;
+                    
+                    if (!currentGroup || currentGroup === 'Unknown' || currentGroup === 'Default') {
+                        if (window.app?.showError) {
+                            window.app.showError('Cannot save group standard without a valid group.');
+                        } else {
+                            alert('❌ Cannot save group standard without a valid group.');
+                        }
+                        return;
+                    }
+                    
+                    const confirmed = confirm(
+                        `Save your current category settings as the standard for group "${currentGroup}"?\n\n` +
+                        `All new members of this group will automatically inherit these settings.`
+                    );
+                    
+                    if (!confirmed) return;
+                    
+                    try {
+                        const success = await window.settingsManager.saveAsGroupStandard(currentGroup);
+                        
+                        if (success) {
+                            if (window.app?.showSuccess) {
+                                window.app.showSuccess(`Category settings saved as standard for group "${currentGroup}"!`);
+                            } else {
+                                alert(`✅ Category settings saved as standard for group "${currentGroup}"!`);
+                            }
+                            
+                            await initializeGroupCategoryStatus();
+                        } else {
+                            if (window.app?.showError) {
+                                window.app.showError('Failed to save group standard settings.');
+                            } else {
+                                alert('❌ Failed to save group standard settings.');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error saving group standard:', error);
+                        if (window.app?.showError) {
+                            window.app.showError('Error: ' + error.message);
+                        } else {
+                            alert('❌ Error: ' + error.message);
+                        }
+                    }
+                }
+
+                async function handleApplyGroupStandard() {
+                    const currentGroup = window.userManager?.currentGroup;
+                    
+                    if (!currentGroup || currentGroup === 'Unknown' || currentGroup === 'Default') {
+                        if (window.app?.showError) {
+                            window.app.showError('No group standard available.');
+                        } else {
+                            alert('❌ No group standard available.');
+                        }
+                        return;
+                    }
+                    
+                    const confirmed = confirm(
+                        `Replace your personal category settings with the group "${currentGroup}" standard?\n\n` +
+                        `This will overwrite your current category names, icons, and colors.`
+                    );
+                    
+                    if (!confirmed) return;
+                    
+                    try {
+                        const success = await window.settingsManager.applyGroupCategorySettings(currentGroup);
+                        
+                        if (success) {
+                            if (window.app?.showSuccess) {
+                                window.app.showSuccess('Group standard settings applied successfully!');
+                            } else {
+                                alert('✅ Group standard settings applied successfully!');
+                            }
+                            
+                            await initializeCategorySettings();
+                            await initializeGroupCategoryStatus();
+                        } else {
+                            if (window.app?.showError) {
+                                window.app.showError('No group standard settings available to apply.');
+                            } else {
+                                alert('❌ No group standard settings available to apply.');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error applying group standard:', error);
+                        if (window.app?.showError) {
+                            window.app.showError('Error: ' + error.message);
+                        } else {
+                            alert('❌ Error: ' + error.message);
+                        }
+                    }
+                }
+
+                // Auto-initialize when settings modal opens
+                document.addEventListener('DOMContentLoaded', () => {
+                    const settingsModal = document.getElementById('settingsModal');
+                    if (settingsModal) {
+                        const observer = new MutationObserver((mutations) => {
+                            mutations.forEach((mutation) => {
+                                if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
+                                    if (settingsModal.style.display === 'block' || settingsModal.classList.contains('active')) {
+                                        setTimeout(() => {
+                                            initializeCategorySettings();
+                                        }, 100);
+                                    }
+                                }
+                            });
+                        });
+                        
+                        observer.observe(settingsModal, {
+                            attributes: true,
+                            attributeFilter: ['style', 'class']
+                        });
+                    }
+                });
+
+                console.log('✅ Template Categories Settings UI loaded with Group Standard support');
+                </script>
+
+                <!-- CSS Styles -->
+                <style>
+                #saveAsGroupStandardBtn:hover:not(:disabled),
+                #applyGroupStandardBtn:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+                }
+
+                #saveAsGroupStandardBtn:disabled,
+                #applyGroupStandardBtn:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.5 !important;
+                }
+
+                #groupCategoryStatus {
+                    transition: all 0.3s ease;
+                }
+
+                #groupCategoryStatus:hover {
+                    background: rgba(124, 58, 237, 0.15);
+                }
+
+                .category-config-group {
+                    transition: all 0.3s ease;
+                }
+
+                .category-config-group:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                }
+
+                input[type="text"]:focus,
+                input[type="color"]:focus {
+                    outline: none;
+                    border-color: #7c3aed;
+                    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+                }
+                </style>
+
+
             </div>
 
             <!-- elabFTW Settings Tab -->
@@ -2280,31 +2923,6 @@
                 <input type="text" id="templateDescription" placeholder="Brief description of the template">
             </div>
 
-            <div class="form-group">
-                <label for="templateType">Template Type:</label>
-                <select id="templateType" onchange="toggleTemplateTypeContent()">
-                    <option value="folders">📂 Folder Structure</option>
-                    <option value="experiment">🧪 Experiment (Folders + Metadata)</option>
-                </select>
-            </div>
-
-            <!-- Folder Structure Tab -->
-            <div id="folderTab" class="tab-content active">
-                <div class="form-group">
-                    <label for="folderStructure">Folder Structure:</label>
-                    <textarea id="folderStructure" placeholder="Enter folder structure (2 spaces = one level deeper):
-src/
-  components/
-  assets/
-    images/
-    css/
-  js/
-docs/
-tests/
-README.md"></textarea>
-                </div>
-            </div>
-
             <!-- Experiment Tab -->
             <div id="experimentTab" class="tab-content">
                 <div class="tabs">
@@ -2428,7 +3046,9 @@ experiment_log.md"></textarea>
     <script src="js/app.js"></script>
     
     <script src="js/debug.js"></script>
-    
+    <!-- FIX: Integration Options for 4-Category System -->
+    <script src="js/integrationOptionsFix.js" defer></script>
+
     <!-- PRESERVED WORKING FUNCTIONS FROM OLDER VERSION -->
     <script>
         // =================== TEMPLATE TYPE MANAGEMENT ===================

@@ -53,34 +53,98 @@ const appUtils = {
         }
     },
 
-    // Show error message
+    // ✨ VERBESSERT: Show error message - NUR wenn Nachricht tatsächlich Inhalt hat
     showError(message) {
+        // Prüfe, ob die Nachricht tatsächlich Inhalt hat
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            console.warn('⚠️ showError called with empty message, ignoring');
+            return;
+        }
+        
         const errorMessage = document.getElementById('errorMessage');
+        if (!errorMessage) {
+            console.warn('⚠️ errorMessage element not found');
+            return;
+        }
+        
         errorMessage.innerHTML = `<strong>❌ Error!</strong><br>${message}`;
         errorMessage.style.display = 'block';
         
         // Hide after 8 seconds
         setTimeout(() => {
             errorMessage.style.display = 'none';
+            errorMessage.innerHTML = ''; // ✨ NEU: Inhalt auch löschen
         }, 8000);
     },
 
-    // Show success message
+    // ✨ VERBESSERT: Show success message - NUR wenn Nachricht tatsächlich Inhalt hat
     showSuccess(message) {
+        // Prüfe, ob die Nachricht tatsächlich Inhalt hat
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            console.warn('⚠️ showSuccess called with empty message, ignoring');
+            return;
+        }
+        
         const successMessage = document.getElementById('successMessage');
+        if (!successMessage) {
+            console.warn('⚠️ successMessage element not found');
+            return;
+        }
+        
         successMessage.innerHTML = message;
         successMessage.style.display = 'block';
         
         // Hide after 8 seconds
         setTimeout(() => {
             successMessage.style.display = 'none';
+            successMessage.innerHTML = ''; // ✨ NEU: Inhalt auch löschen
         }, 8000);
     },
 
-    // Hide messages
+    // ✨ NEU: Show info message - für allgemeine Informationen
+    showInfo(message) {
+        // Prüfe, ob die Nachricht tatsächlich Inhalt hat
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            console.warn('⚠️ showInfo called with empty message, ignoring');
+            return;
+        }
+        
+        const infoMessage = document.getElementById('infoMessage');
+        if (!infoMessage) {
+            console.warn('⚠️ infoMessage element not found');
+            return;
+        }
+        
+        infoMessage.innerHTML = `<strong>ℹ️ Info:</strong><br>${message}`;
+        infoMessage.style.display = 'block';
+        
+        // Hide after 6 seconds
+        setTimeout(() => {
+            infoMessage.style.display = 'none';
+            infoMessage.innerHTML = ''; // ✨ NEU: Inhalt auch löschen
+        }, 6000);
+    },
+
+    // ✨ VERBESSERT: Hide messages - leert auch den Inhalt
     hideMessages() {
-        document.getElementById('successMessage').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'none';
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const infoMessage = document.getElementById('infoMessage');
+        
+        if (successMessage) {
+            successMessage.style.display = 'none';
+            successMessage.innerHTML = '';
+        }
+        
+        if (errorMessage) {
+            errorMessage.style.display = 'none';
+            errorMessage.innerHTML = '';
+        }
+        
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+            infoMessage.innerHTML = '';
+        }
     },
 
     // Platform-specific adjustments

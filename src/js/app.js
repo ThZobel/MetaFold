@@ -37,6 +37,118 @@ const app = {
                 }
             }
             
+            // ✅ NEW STEP 1.5: Auto-create Admin account if password system is enabled
+            console.log('🔐 Checking Admin account status...');
+            
+            // Check if password system is enabled
+            let passwordSystemEnabled = false;
+            try {
+                if (window.settingsManager?.settings) {
+                    passwordSystemEnabled = window.settingsManager.settings['security.password_system_enabled'] === true;
+                }
+            } catch (error) {
+                console.warn('⚠️ Could not check password system status:', error);
+            }
+            
+            console.log('🔐 Password system enabled:', passwordSystemEnabled);
+            
+            // If password system is enabled, ensure Admin exists
+            if (passwordSystemEnabled) {
+                console.log('🔐 Password system active - ensuring Admin account exists...');
+                
+                // Wait for secureStorage to be available
+                let secureStorageAttempts = 0;
+                while (!window.secureStorage && secureStorageAttempts < 10) {
+                    console.log(`🔐 Waiting for secureStorage... (attempt ${secureStorageAttempts + 1}/10)`);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    secureStorageAttempts++;
+                }
+                
+                if (window.secureStorage) {
+                    // Initialize secureStorage if needed
+                    if (!window.secureStorage.isInitialized) {
+                        try {
+                            await window.secureStorage.init();
+                            console.log('✅ secureStorage initialized');
+                        } catch (error) {
+                            console.warn('⚠️ secureStorage init failed:', error);
+                        }
+                    }
+                    
+                    // Check if Admin exists
+                    const adminExists = window.secureStorage.hasUserPassword('Admin');
+                    console.log('🔐 Admin account exists:', adminExists);
+                    
+                    if (!adminExists) {
+                        console.log('🔐 Creating Admin account...');
+                        try {
+                            const result = await window.secureStorage.initializeAdminAccount();
+                            
+                            if (result.created) {
+                                console.log('✅ Admin account created with default password');
+                                
+                                // Show notification to user
+                                const notificationDiv = document.createElement('div');
+                                notificationDiv.style.cssText = `
+                                    position: fixed;
+                                    top: 20px;
+                                    right: 20px;
+                                    background: linear-gradient(135deg, #f59e0b, #d97706);
+                                    color: white;
+                                    padding: 1.5rem;
+                                    border-radius: 12px;
+                                    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+                                    max-width: 400px;
+                                    z-index: 10001;
+                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                `;
+                                
+                                notificationDiv.innerHTML = `
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;">
+                                        🔐 Admin Account Created
+                                    </div>
+                                    <div style="font-size: 0.9rem; line-height: 1.5;">
+                                        <strong>Username:</strong> Admin<br>
+                                        <strong>Password:</strong> admin<br>
+                                        <br>
+                                        <strong>⚠️ IMPORTANT:</strong> Please change the admin password immediately in User Management!
+                                    </div>
+                                    <button onclick="this.parentElement.remove()" style="
+                                        margin-top: 1rem;
+                                        background: rgba(255,255,255,0.2);
+                                        color: white;
+                                        border: none;
+                                        padding: 0.5rem 1rem;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-weight: 600;
+                                    ">OK, Got it!</button>
+                                `;
+                                
+                                document.body.appendChild(notificationDiv);
+                                
+                                // Auto-remove after 15 seconds
+                                setTimeout(() => {
+                                    if (notificationDiv.parentElement) {
+                                        notificationDiv.remove();
+                                    }
+                                }, 15000);
+                            } else {
+                                console.log('ℹ️ Admin account already existed');
+                            }
+                        } catch (error) {
+                            console.error('❌ Failed to create Admin account:', error);
+                        }
+                    } else {
+                        console.log('✅ Admin account already exists');
+                    }
+                } else {
+                    console.warn('⚠️ secureStorage not available - cannot create Admin account');
+                }
+            } else {
+                console.log('ℹ️ Password system disabled - no Admin account needed');
+            }
+            
             // STEP 2: Initialize userManager with settings support
             if (window.userManager) {
                 console.log('🔧 Initializing userManager...');
@@ -152,13 +264,14 @@ const app = {
     },
     
     setupEventListeners() {
-        // Close modal on click outside
-        window.onclick = (event) => {
-            const modal = document.getElementById('templateModal');
-            if (event.target === modal && window.templateModal) {
-                window.templateModal.close();
-            }
-        };
+        // ❌ REMOVED: Close modal on click outside - Modal should only close via explicit button clicks
+        // This prevents accidental closing when dragging text selection outside the modal
+        // window.onclick = (event) => {
+        //     const modal = document.getElementById('templateModal');
+        //     if (event.target === modal && window.templateModal) {
+        //         window.templateModal.close();
+        //     }
+        // };
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (event) => {
@@ -172,7 +285,7 @@ const app = {
             }
         });
         
-        console.log('✅ Event listeners set up');
+        console.log('✅ Event listeners set up (modal backdrop-click disabled)');
     },
 
     showSuccess(message) {

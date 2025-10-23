@@ -580,21 +580,39 @@ const loginModal = {
     },
 
     showUserManagement() {
+        // ✅ FIXED: Null-Check für this.modal
+        if (!this.modal) {
+            console.warn('⚠️ Login modal not available');
+            return;
+        }
+        
         this.modal.style.display = 'none';
         
         if (window.userManagementModal) {
             window.userManagementModal.show();
             
+            // ✅ FIXED: Sichere originalClose mit Null-Check
             const originalClose = window.userManagementModal.close;
             window.userManagementModal.close = () => {
-                originalClose.call(window.userManagementModal);
-                this.modal.style.display = 'flex';
-                this.loadSuggestions();
-                this.usernameInput.focus();
+                // Call original close if exists
+                if (originalClose && typeof originalClose === 'function') {
+                    originalClose.call(window.userManagementModal);
+                }
+                
+                // ✅ FIXED: Null-Check vor Style-Zugriff
+                if (this.modal) {
+                    this.modal.style.display = 'flex';
+                    this.loadSuggestions();
+                    if (this.usernameInput) {
+                        this.usernameInput.focus();
+                    }
+                }
             };
         } else {
             console.warn('User management modal not available');
-            this.modal.style.display = 'flex';
+            if (this.modal) {
+                this.modal.style.display = 'flex';
+            }
         }
     },
 
@@ -1111,5 +1129,4 @@ const loginModal = {
 
 window.loginModal = loginModal;
 console.log('✅ loginModal loaded (FIXED Group Assignment)');
-// Zeige das Login-Modal direkt mit Passwortabfrage beim Laden der Datei
-window.loginModal.show(true);
+// ✅ FIX: Auto-show removed - userManager.init() will show modal at correct time after Admin account check

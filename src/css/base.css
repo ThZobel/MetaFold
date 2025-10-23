@@ -29,43 +29,52 @@ body {
     left: 0;
 }
 
-/* LEFT SIDEBAR - Template Selection (WIDER) */
+/* LEFT SIDEBAR - Template Selection (WIDER) - FIXED HEADER VERSION */
 .sidebar {
-    width: 380px;
+    /* Width is controlled by sidebar-resize.css and JavaScript */
+    /* Default: 380px, resizable via JavaScript */
     background: rgba(30, 30, 46, 0.9);
     backdrop-filter: blur(10px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px;
-    overflow-y: auto;
+    padding: 0; /* Changed from 20px to 0 for better header control */
+    overflow: hidden; /* Changed from overflow-y: auto */
     /* CRITICAL: Ensure sidebar stays on the left edge */
     flex-shrink: 0;
     position: relative;
     left: 0;
     top: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 /* RIGHT MAIN CONTENT - Project Manager (ADJUSTED FOR WIDER SIDEBAR) */
 .main-content {
     flex: 1;
     padding: 20px;
+    padding-bottom: 100px; /* Space for sticky actions bar */
     overflow-y: auto;
     /* CRITICAL: Ensure main content takes ALL remaining space to the edge */
     min-width: 0;
-    width: calc(100vw - 380px);
+    /* Width is dynamically adjusted by JavaScript */
     max-width: none !important;
     height: 100vh;
     margin: 0 !important;
     box-sizing: border-box;
 }
 
-/* SIDEBAR HEADER (RESTORED) */
+/* SIDEBAR HEADER (FIXED VERSION) */
 .sidebar .header {
-    text-align: center;
-    margin-bottom: 30px;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 15px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(30, 30, 46, 0.95);
     backdrop-filter: blur(10px);
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    text-align: center;
 }
 
 .sidebar .header h1 {
@@ -118,20 +127,40 @@ body {
     box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
 }
 
-/* TEMPLATE LIST CONTAINER (RESTORED) */
+/* TEMPLATE LIST CONTAINER (SCROLLABLE VERSION) */
 #templateList {
-    /* CRITICAL: Ensure template list is properly contained in sidebar */
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px 20px 20px 20px;
     width: 100%;
-    margin-top: 0;
 }
 
-/* TEMPLATE ITEMS (RESTORED) */
+/* Custom Scrollbar for Template List */
+#templateList::-webkit-scrollbar {
+    width: 8px;
+}
+
+#templateList::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+#templateList::-webkit-scrollbar-thumb {
+    background: rgba(124, 58, 237, 0.5);
+    border-radius: 4px;
+}
+
+#templateList::-webkit-scrollbar-thumb:hover {
+    background: rgba(124, 58, 237, 0.7);
+}
+
+/* TEMPLATE ITEMS (COMPACT VERSION) */
 .template-item {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 8px;
+    border-radius: 6px; /* Smaller radius */
+    padding: 8px 10px; /* Reduced from 12px */
+    margin-bottom: 6px; /* Reduced from 8px */
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
@@ -147,24 +176,24 @@ body {
     border-color: #7c3aed;
 }
 
-/* TEMPLATE HEADER LAYOUT (RESTORED) */
+/* TEMPLATE HEADER LAYOUT (COMPACT VERSION) */
 .template-header {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: 6px; /* Reduced from 8px */
+    margin-bottom: 4px; /* Reduced from 6px */
 }
 
 .template-avatar {
-    width: 24px;
-    height: 24px;
+    width: 20px; /* Reduced from 24px */
+    height: 20px; /* Reduced from 24px */
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     font-weight: bold;
-    font-size: 0.7rem;
+    font-size: 0.6rem; /* Reduced from 0.7rem */
     flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
@@ -176,11 +205,11 @@ body {
 
 .template-info h3 {
     margin: 0 0 2px 0;
-    font-size: 0.9rem;
+    font-size: 0.85rem; /* Reduced from 0.9rem */
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px; /* Reduced from 6px */
     line-height: 1.2;
 }
 
@@ -667,4 +696,92 @@ body {
     .search-suggestion-name {
         font-size: 0.85rem;
     }
+}
+
+/* ===== COMPACT TEMPLATE ELEMENTS ===== */
+
+/* Template Badges */
+.template-badge {
+    font-size: 0.65rem; /* Reduced */
+    padding: 1px 4px; /* Reduced */
+    background: rgba(124, 58, 237, 0.2);
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.template-badge.experiment {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.shared-badge {
+    font-size: 0.6rem; /* Reduced */
+    padding: 1px 4px; /* Reduced */
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* Template Meta Information */
+.template-meta {
+    font-size: 0.65rem; /* Reduced from 0.75rem */
+    color: #9ca3af;
+    display: flex;
+    flex-direction: column;
+    gap: 2px; /* Reduced from 4px */
+}
+
+.creator-info {
+    font-weight: 500;
+    color: #a855f7;
+}
+
+.date-info {
+    color: #6b7280;
+}
+
+/* Template Description */
+.template-description {
+    font-size: 0.7rem; /* Reduced from 0.75rem */
+    color: #9ca3af;
+    margin: 4px 0 0 0; /* Reduced top margin */
+    line-height: 1.3;
+}
+
+/* HIDDEN: Storage Indicator - no longer shown */
+.storage-indicator {
+    display: none !important; /* Completely hide the storage indicator */
+}
+
+.storage-icon,
+.storage-text {
+    display: none !important;
+}
+
+/* Copy Link for Shared Templates */
+.copy-link {
+    color: #10b981;
+    font-size: 0.7rem; /* Reduced from 0.8rem */
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 4px; /* Reduced */
+    display: inline-block;
+}
+
+.copy-link:hover {
+    color: #059669;
+}
+
+/* Owner Indicator */
+.owner-indicator {
+    position: absolute;
+    top: 4px; /* Adjusted */
+    right: 4px; /* Adjusted */
+    width: 6px; /* Reduced from 8px */
+    height: 6px; /* Reduced from 8px */
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
 }

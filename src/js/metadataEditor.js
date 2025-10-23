@@ -32,6 +32,7 @@ const metadataEditor = {
         
         const fieldDiv = document.createElement('div');
         fieldDiv.className = 'metadata-field';
+        // ✅ FIXED: Field must be draggable for smooth drag operation
         fieldDiv.draggable = true;
         fieldDiv.setAttribute('data-field-id', fieldId);
         
@@ -43,16 +44,16 @@ const metadataEditor = {
                 <div class="drag-handle" title="Drag to reorder">
                     <span class="drag-icon">⋮⋮</span>
                 </div>
-                <input type="text" class="field-name-input" placeholder="Field Name" onchange="metadataEditor.updateJsonPreview()" style="flex: 1; margin-right: 10px;">
+                <input type="text" class="field-name-input" placeholder="Field Name" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1; margin-right: 10px;">
                 <div class="field-position-indicator">
                     <span class="position-number">Pos: ${this.getFieldPosition(fieldDiv)}</span>
                 </div>
                 <div class="metadata-field-controls">
                     <label class="required-label" style="display: flex; align-items: center; margin-right: 10px; font-size: 12px;">
-                        <input type="checkbox" class="required-checkbox" onchange="metadataEditor.updateJsonPreview()" style="margin-right: 5px; width: auto;">
+                        <input type="checkbox" class="required-checkbox" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="margin-right: 5px; width: auto;">
                         Required
                     </label>
-                    <select class="field-type-selector" onchange="metadataEditor.updateFieldType(this); metadataEditor.updateJsonPreview()">
+                    <select class="field-type-selector" draggable="false" onchange="metadataEditor.updateFieldType(this); metadataEditor.updateJsonPreview()">
                         <option value="text" ${defaultType === 'text' ? 'selected' : ''}>Text</option>
                         <option value="number" ${defaultType === 'number' ? 'selected' : ''}>Number</option>
                         <option value="date" ${defaultType === 'date' ? 'selected' : ''}>Date</option>
@@ -65,8 +66,8 @@ const metadataEditor = {
                 </div>
             </div>
             <div class="field-options">
-                <input type="text" class="field-label-input" placeholder="Label" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
-                <input type="text" class="field-description-input" placeholder="Description (optional)" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
+                <input type="text" class="field-label-input" placeholder="Label" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
+                <input type="text" class="field-description-input" placeholder="Description (optional)" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="width: 100%; margin-bottom: 8px;">
                 <div class="field-specific-options"></div>
             </div>
         `;
@@ -88,8 +89,44 @@ const metadataEditor = {
 
     // Add drag and drop event listeners to a field
     addDragEventListeners(fieldDiv) {
-        // Drag start
+        // ✅ Get the drag handle for reference
+        const dragHandle = fieldDiv.querySelector('.drag-handle');
+        if (!dragHandle) {
+            console.warn('⚠️ No drag handle found for field');
+            return;
+        }
+
+        // ✅ CRITICAL FIX: Track where the mousedown actually happened
+        let mouseDownTarget = null;
+        
+        fieldDiv.addEventListener('mousedown', (e) => {
+            mouseDownTarget = e.target;
+            console.log('🖱️ Mouse down on:', e.target, 'classes:', e.target.className);
+        });
+
+        // ✅ CRITICAL: Prevent drag from starting unless mousedown was on the handle
         fieldDiv.addEventListener('dragstart', (e) => {
+            console.log('🔍 Drag attempt - mouseDownTarget:', mouseDownTarget);
+            
+            // Check if mousedown was on handle or its children
+            const dragHandle = mouseDownTarget?.closest('.drag-handle');
+            const isInput = mouseDownTarget?.tagName === 'INPUT' || 
+                           mouseDownTarget?.tagName === 'SELECT' || 
+                           mouseDownTarget?.tagName === 'TEXTAREA' || 
+                           mouseDownTarget?.tagName === 'BUTTON';
+            
+            console.log('🔍 Mouse was on handle?', !!dragHandle, '| Was on input?', isInput);
+            
+            if (!dragHandle || isInput) {
+                // Mousedown was NOT on handle - PREVENT DRAG
+                e.preventDefault();
+                console.log('❌ Drag prevented - mousedown was not on handle');
+                mouseDownTarget = null; // Reset
+                return;
+            }
+            
+            // Mousedown was on handle - ALLOW DRAG
+            console.log('✅ Drag ALLOWED - mousedown was on handle');
             this.dragState.isDragging = true;
             this.dragState.draggedElement = fieldDiv;
             this.dragState.draggedIndex = this.getFieldIndex(fieldDiv);
@@ -102,10 +139,16 @@ const metadataEditor = {
             this.dragState.dropIndicator.style.display = 'block';
             
             console.log('🎯 Drag started for field:', this.dragState.draggedIndex);
+            
+            // Reset mouseDownTarget
+            mouseDownTarget = null;
         });
 
-        // Drag end
+        // ✅ Drag end - on the field
         fieldDiv.addEventListener('dragend', (e) => {
+            if (!this.dragState.isDragging) return;
+            if (this.dragState.draggedElement !== fieldDiv) return;
+            
             this.dragState.isDragging = false;
             fieldDiv.classList.remove('dragging');
             
@@ -120,24 +163,28 @@ const metadataEditor = {
             console.log('🎯 Drag ended');
         });
 
-        // Drag over (for drop zones)
+        // ✅ Drag over - ON THE FIELD (for drop zones)
         fieldDiv.addEventListener('dragover', (e) => {
             if (!this.dragState.isDragging) return;
             
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             
+            console.log('📍 Drag over field at index:', this.getFieldIndex(fieldDiv));
+            
             const afterElement = this.getDragAfterElement(fieldDiv, e.clientY);
             const container = document.getElementById('metadataFields');
             
             if (afterElement == null) {
                 container.appendChild(this.dragState.dropIndicator);
+                console.log('📍 Drop indicator: appended to end');
             } else {
                 container.insertBefore(this.dragState.dropIndicator, afterElement);
+                console.log('📍 Drop indicator: before element at', this.getFieldIndex(afterElement));
             }
         });
 
-        // Drop
+        // ✅ Drop - ON THE FIELD
         fieldDiv.addEventListener('drop', (e) => {
             if (!this.dragState.isDragging) return;
             
@@ -151,7 +198,7 @@ const metadataEditor = {
             }
         });
 
-        // Visual feedback
+        // ✅ Visual feedback - ON THE FIELD
         fieldDiv.addEventListener('dragenter', (e) => {
             if (!this.dragState.isDragging) return;
             fieldDiv.classList.add('drag-over');
@@ -165,7 +212,11 @@ const metadataEditor = {
 
     // Get the element that should come after the dragged element
     getDragAfterElement(container, y) {
-        const draggableElements = [...container.parentNode.querySelectorAll('.metadata-field:not(.dragging)')];
+        // ✅ IMPROVED: More robust element detection
+        const metadataContainer = document.getElementById('metadataFields');
+        if (!metadataContainer) return null;
+        
+        const draggableElements = [...metadataContainer.querySelectorAll('.metadata-field:not(.dragging)')];
         
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
@@ -282,13 +333,13 @@ const metadataEditor = {
             if (type === 'dropdown') {
                 optionsDiv.innerHTML = `
                     <input type="text" class="dropdown-options-input" placeholder="Options (comma-separated): Option1, Option2, Option3" 
-                           onchange="metadataEditor.updateJsonPreview()" style="width: 100%;">
+                           draggable="false" onchange="metadataEditor.updateJsonPreview()" style="width: 100%;">
                 `;
             } else if (type === 'number') {
                 optionsDiv.innerHTML = `
                     <div style="display: flex; gap: 10px;">
-                        <input type="number" class="number-min-input" placeholder="Min" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
-                        <input type="number" class="number-max-input" placeholder="Max" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
+                        <input type="number" class="number-min-input" placeholder="Min" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
+                        <input type="number" class="number-max-input" placeholder="Max" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
                     </div>
                 `;
             }

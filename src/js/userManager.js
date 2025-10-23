@@ -52,7 +52,15 @@ const userManager = {
         // Load user history for autocomplete suggestions
         this.loadUserHistory();
         
-        // ✅ KRITISCHER FIX: Immer nach Passwort-System prüfen
+        // ✅ NEW: Ensure Admin account exists before showing login
+        console.log('🔐 Ensuring Admin account exists...');
+        const adminCheckResult = await this.ensureAdminAccountExists();
+        
+        if (adminCheckResult.created) {
+            console.log('✅ Admin account was auto-created on startup');
+        }
+        
+        // Check if Password-System is active
         console.log('👥 User management enabled - checking password system...');
         
         try {
@@ -148,7 +156,23 @@ const userManager = {
             console.warn('Could not store last user:', error);
         }
 
-        // Update storage prefix
+        // ===== CRITICAL FIX: Switch settings BEFORE changing storage prefix =====
+        // Problem: If we change prefix first, saveSettingsUserSpecific() saves to wrong file
+        // Solution: Call switchToUser() BEFORE changing prefix
+        console.log('🔧 Switching settings BEFORE storage prefix change...');
+        
+        if (window.settingsManager && window.settingsManager.switchToUser) {
+            try {
+                await window.settingsManager.switchToUser(username, groupname);
+                console.log('✅ Settings switched for new user');
+            } catch (error) {
+                console.warn('⚠️ Could not switch settings for new user:', error);
+            }
+        }
+        // ===========================================================================
+
+        // Update storage prefix AFTER settings switch
+        // Note: This is also done in settingsManager.switchToUser(), but we do it here too for file storage
         if (window.storage && window.storage.setUserPrefix) {
             const prefix = `${groupname}_${username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
             window.storage.setUserPrefix(prefix);
@@ -156,16 +180,6 @@ const userManager = {
             // Reinitialize file storage for new user
             if (window.storage.initFileStorage) {
                 await window.storage.initFileStorage();
-            }
-        }
-
-        // NEUE FUNKTION: Switch settings to new user
-        if (window.settingsManager && window.settingsManager.switchToUser) {
-            try {
-                await window.settingsManager.switchToUser(username, groupname);
-                console.log('✅ Settings switched for new user');
-            } catch (error) {
-                console.warn('⚠️ Could not switch settings for new user:', error);
             }
         }
 
@@ -229,66 +243,43 @@ const userManager = {
     },
 
     
-    forceRefreshTemplates() {
-        try {
+        async forceRefreshTemplates() {
             console.log('🔄 FORCE refreshing templates...');
             
-            // 1. Template Manager komplett neu laden
-            if (window.templateManager) {
-                console.log('🔄 Reinitializing templateManager...');
-                
-                // Force reload templates from storage
-                if (window.templateManager.init) {
-                    window.templateManager.init();
-                    console.log('✅ templateManager reinitialized');
-                }
-                
-                // Force re-render template list
-                if (window.templateManager.renderList) {
-                    setTimeout(() => {
-                        window.templateManager.renderList();
-                        console.log('✅ Template list re-rendered');
-                    }, 100);
-                }
-                
-                // Force update template info
-                if (window.templateManager.updateTemplateInfo) {
-                    setTimeout(() => {
-                        window.templateManager.updateTemplateInfo();
-                        console.log('✅ Template info updated');
-                    }, 150);
-                }
-            }
+            // Reinitialize templateManager
+            console.log('🔄 Reinitializing templateManager...');
+            await window.templateManager.init();
+            console.log('✅ templateManager reinitialized');
             
-            // 2. Template Type Manager refresh
+            // Update template list in UI
+            window.templateManager.renderList();
+            console.log('✅ Template list re-rendered');
+            
+            // Update template info
+            window.templateManager.updateTemplateInfo();
+            console.log('✅ Template info updated');
+            
+            // FIXED: Refresh templateTypeManager properly
+            console.log('🔄 Refreshing templateTypeManager...');
+            
             if (window.templateTypeManager) {
-                console.log('🔄 Refreshing templateTypeManager...');
+                // FIXED: Get active category synchronously
+                let activeCategory = 'category1'; // Default
                 
-                const currentType = window.templateTypeManager.currentType || 'folders';
-                
-                // Force switch to trigger refresh
-                setTimeout(() => {
-                    if (window.templateTypeManager.switchType) {
-                        window.templateTypeManager.switchType(currentType);
-                        console.log(`✅ Template type refreshed: ${currentType}`);
-                    }
-                }, 200);
-            }
-            
-            // 3. Force update integration visibility
-            setTimeout(() => {
-                if (window.updateAllIntegrationOptions) {
-                    window.updateAllIntegrationOptions();
-                    console.log('✅ Integration options updated');
+                if (window.settingsManager && window.settingsManager.settings) {
+                    activeCategory = window.settingsManager.settings['templates.active_category'] || 'category1';
                 }
-            }, 250);
+                
+                console.log('🔧 Active category:', activeCategory);
+                
+                // FIXED: Switch to the active category without async/await issues
+                if (window.templateTypeManager.switchType) {
+                    window.templateTypeManager.switchType(activeCategory);
+                }
+            }
             
             console.log('✅ Template force refresh completed');
-            
-        } catch (error) {
-            console.error('❌ Error in force refresh templates:', error);
-        }
-    },
+        },
 
     // Update user display in UI
     updateUserDisplay() {
@@ -337,7 +328,7 @@ const userManager = {
             
             // Trigger user switched event for other UI components
             if (typeof window.dispatchEvent === 'function') {
-                window.dispatchEvent(new CustomEvent('userSwitched', {
+                window.dispatchEvent(new CustomEvent('UserSwitched', {
                     detail: { 
                         username: this.currentUser,
                         groupname: this.currentGroup 
@@ -761,6 +752,95 @@ const userManager = {
     },
 
     // =================== PASSWORD SYSTEM MANAGEMENT ===================
+
+    /**
+     * Automatically initialize Admin account if password system is enabled but Admin doesn't exist
+     * This function should be called during userManager.init()
+     * @returns {Promise<Object>} - Initialization result
+     */
+    async ensureAdminAccountExists() {
+        try {
+            console.log('🔐 Checking if Admin account initialization is needed...');
+            
+            // Wait for secureStorage to be available
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!window.secureStorage && attempts < maxAttempts) {
+                console.log(`🔐 Waiting for secureStorage... (attempt ${attempts + 1}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (!window.secureStorage) {
+                console.warn('⚠️ secureStorage not available, skipping Admin check');
+                return { success: false, reason: 'secureStorage_unavailable' };
+            }
+            
+            // Check if password system is enabled
+            const passwordSystemEnabled = await this.isPasswordSystemEnabled();
+            
+            if (!passwordSystemEnabled) {
+                console.log('ℹ️ Password system not enabled, no Admin account needed');
+                return { success: true, reason: 'password_system_disabled' };
+            }
+            
+            // Check if Admin account already exists
+            if (window.secureStorage.hasUserPassword('Admin')) {
+                console.log('✅ Admin account already exists');
+                return { success: true, reason: 'admin_exists' };
+            }
+            
+            // Admin doesn't exist but password system is enabled - create it!
+            console.log('🔐 Admin account missing - creating default Admin account...');
+            
+            const initResult = await window.secureStorage.initializeAdminAccount();
+            
+            if (initResult.success && initResult.created) {
+                console.log('✅ Admin account created successfully');
+                
+                // Show alert to user about default password
+                if (window.app?.showInfo) {
+                    window.app.showInfo(
+                        `Admin account was created with default password.\n\n` +
+                        `Username: Admin\n` +
+                        `Password: admin\n\n` +
+                        `⚠️ IMPORTANT: Please change the admin password immediately!`,
+                        10000 // Show for 10 seconds
+                    );
+                } else {
+                    // Fallback alert
+                    alert(
+                        `Admin Account Created\n\n` +
+                        `Username: Admin\n` +
+                        `Password: admin\n\n` +
+                        `⚠️ Please change the admin password immediately!`
+                    );
+                }
+                
+                return { 
+                    success: true, 
+                    created: true,
+                    reason: 'admin_created',
+                    credentials: {
+                        username: 'Admin',
+                        defaultPassword: 'admin'
+                    }
+                };
+            } else {
+                console.warn('⚠️ Admin account already existed');
+                return { success: true, reason: 'admin_existed' };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error ensuring Admin account exists:', error);
+            return { 
+                success: false, 
+                reason: 'error',
+                error: error.message 
+            };
+        }
+    },
 
     /**
      * Check if password system is enabled
@@ -1242,6 +1322,186 @@ const userManager = {
     // Get current user information (ENHANCED VERSION)
     // Removed duplicate getCurrentUserInfo definition to fix syntax error.
 
+    // =================== ADMIN DEBUG FUNCTIONS ===================
+
+    /**
+     * Debug function to check Admin account status
+     * Can be called from browser console: await window.userManager.debugAdminStatus()
+     * @returns {Promise<Object>} - Complete Admin status
+     */
+    async debugAdminStatus() {
+        console.log('🔐 =================== ADMIN STATUS DEBUG ===================');
+        
+        const status = {
+            timestamp: new Date().toISOString(),
+            userManagement: null,
+            passwordSystem: null,
+            adminAccount: null,
+            recommendations: []
+        };
+        
+        try {
+            // Check User Management
+            const userMgmtEnabled = await this.isUserManagementEnabled();
+            status.userManagement = {
+                enabled: userMgmtEnabled,
+                currentUser: this.currentUser,
+                currentGroup: this.currentGroup
+            };
+            
+            console.log('👥 User Management:', status.userManagement);
+            
+            // Check Password System
+            if (window.settingsManager) {
+                const passwordSystemEnabled = await window.settingsManager.get('security.password_system_enabled');
+                status.passwordSystem = {
+                    enabled: passwordSystemEnabled === true,
+                    settingsManager: '✅ Available'
+                };
+            } else {
+                status.passwordSystem = {
+                    enabled: false,
+                    settingsManager: '❌ Not Available'
+                };
+            }
+            
+            console.log('🔐 Password System:', status.passwordSystem);
+            
+            // Check Admin Account
+            if (window.secureStorage) {
+                const adminExists = window.secureStorage.hasUserPassword('Admin');
+                
+                status.adminAccount = {
+                    exists: adminExists,
+                    secureStorage: '✅ Available'
+                };
+                
+                if (adminExists) {
+                    console.log('✅ Admin account exists');
+                    
+                    // Try to verify default password
+                    const defaultPasswordWorks = await window.secureStorage.verifyUserPassword('Admin', 'admin');
+                    status.adminAccount.usesDefaultPassword = defaultPasswordWorks;
+                    
+                    if (defaultPasswordWorks) {
+                        status.recommendations.push({
+                            type: 'warning',
+                            message: 'Admin is still using default password "admin" - CHANGE IT IMMEDIATELY!'
+                        });
+                    }
+                } else {
+                    console.log('❌ Admin account does NOT exist');
+                    status.adminAccount.message = 'Admin account missing - needs to be created';
+                    
+                    if (status.passwordSystem.enabled) {
+                        status.recommendations.push({
+                            type: 'critical',
+                            message: 'Password system is enabled but Admin account missing - call await window.userManager.ensureAdminAccountExists()'
+                        });
+                    }
+                }
+            } else {
+                status.adminAccount = {
+                    exists: false,
+                    secureStorage: '❌ Not Available'
+                };
+            }
+            
+            console.log('🔐 Admin Account:', status.adminAccount);
+            
+            // Generate recommendations
+            if (!userMgmtEnabled && status.passwordSystem.enabled) {
+                status.recommendations.push({
+                    type: 'info',
+                    message: 'Password system is enabled but user management is disabled - inconsistent state'
+                });
+            }
+            
+            if (userMgmtEnabled && !status.passwordSystem.enabled) {
+                status.recommendations.push({
+                    type: 'info',
+                    message: 'User management enabled without password system - users can login without passwords'
+                });
+            }
+            
+            // Print recommendations
+            if (status.recommendations.length > 0) {
+                console.log('\n📋 Recommendations:');
+                status.recommendations.forEach((rec, i) => {
+                    const icon = rec.type === 'critical' ? '🚨' : rec.type === 'warning' ? '⚠️' : 'ℹ️';
+                    console.log(`${i + 1}. ${icon} ${rec.message}`);
+                });
+            }
+            
+            console.log('\n🔐 =================== END DEBUG ===================');
+            
+            return status;
+            
+        } catch (error) {
+            console.error('❌ Error in debugAdminStatus:', error);
+            status.error = error.message;
+            return status;
+        }
+    },
+
+    /**
+     * Quick fix function to create Admin account if missing
+     * Can be called from browser console: await window.userManager.quickFixAdminAccount()
+     * @returns {Promise<Object>} - Fix result
+     */
+    async quickFixAdminAccount() {
+        console.log('🔧 Quick Fix: Creating Admin account...');
+        
+        try {
+            // Check if secureStorage is available
+            if (!window.secureStorage) {
+                throw new Error('secureStorage not available - cannot create Admin account');
+            }
+            
+            // Initialize if needed
+            if (!window.secureStorage.isInitialized) {
+                await window.secureStorage.init();
+            }
+            
+            // Create Admin account
+            const result = await window.secureStorage.initializeAdminAccount();
+            
+            if (result.created) {
+                console.log('✅ Admin account created successfully!');
+                console.log('📋 Username: Admin');
+                console.log('📋 Password: admin');
+                console.log('⚠️ IMPORTANT: Change the password immediately!');
+                
+                alert(
+                    'Admin Account Created!\n\n' +
+                    'Username: Admin\n' +
+                    'Password: admin\n\n' +
+                    '⚠️ Please change the admin password immediately!'
+                );
+                
+                return {
+                    success: true,
+                    message: 'Admin account created',
+                    username: 'Admin',
+                    defaultPassword: 'admin'
+                };
+            } else {
+                console.log('ℹ️ Admin account already exists');
+                return {
+                    success: true,
+                    message: 'Admin account already exists'
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Quick fix failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+
     // ENHANCED: Force update all user-related displays
     forceUpdateAllDisplays() {
         try {
@@ -1272,7 +1532,7 @@ const userManager = {
             }
             
             // 4. Dispatch user switched event
-            window.dispatchEvent(new CustomEvent('userSwitched', {
+            window.dispatchEvent(new CustomEvent('UserSwitched', {
                 detail: { 
                     username: this.currentUser,
                     groupname: this.currentGroup 

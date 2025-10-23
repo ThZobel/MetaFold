@@ -667,8 +667,37 @@ async syncToOMERO(projectName, targetPath, metadata) {
         return links;
     },
 
-    // Show enhanced success message - KORRIGIERTE OBJEKTMETHODE
+    // =================== FIXED MESSAGE FUNCTIONS ===================
+    
+    /**
+     * Central function to clear ALL messages
+     * This ensures old messages are completely removed before showing new ones
+     */
+    clearAllMessages() {
+        const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
+        messageIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.display = 'none';
+                element.innerHTML = '';  // Clear content completely
+            }
+        });
+    },
+
+    /**
+     * Show enhanced success message
+     * FIXED: Validates BEFORE clearing (prevents empty divs from being displayed)
+     */
     showEnhancedSuccess(message, projectPath = null, links = []) {
+        // ✅ CRITICAL FIX: Validate FIRST, before any DOM manipulation
+        if (!message || message.trim() === '') {
+            console.warn('⚠️ Attempted to show empty success message - BLOCKED');
+            return;
+        }
+        
+        // Only clear messages if we have valid content
+        this.clearAllMessages();
+        
         const successDiv = document.getElementById('successMessage');
         if (successDiv) {
             let content = message;
@@ -682,7 +711,7 @@ async syncToOMERO(projectName, targetPath, metadata) {
                 buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-top: 8px; margin-right: 8px;">📂 Open Folder</button>`;
             }
             
-            // Add external links - ROBUSTE VERSION
+            // Add external links
             links.forEach((link, index) => {
                 try {
                     let urlToUse = '';
@@ -706,8 +735,6 @@ async syncToOMERO(projectName, targetPath, metadata) {
                     
                     buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openExternalLink('${escapedUrl}')" style="margin-top: 8px; margin-right: 8px;">${linkText}</button>`;
                     
-                    console.log(`✅ Added link ${index}: ${linkText} -> ${urlToUse}`);
-                    
                 } catch (error) {
                     console.error(`❌ Error processing link ${index}:`, link, error);
                 }
@@ -720,10 +747,12 @@ async syncToOMERO(projectName, targetPath, metadata) {
             successDiv.innerHTML = content;
             successDiv.style.display = 'block';
             
-            this.hideOtherMessages('successMessage');
+            console.log('✅ Success message displayed:', message.substring(0, 50) + '...');
             
+            // Auto-hide after 20 seconds
             setTimeout(() => {
                 successDiv.style.display = 'none';
+                successDiv.innerHTML = '';
             }, 20000);
         }
     },
@@ -749,23 +778,46 @@ async syncToOMERO(projectName, targetPath, metadata) {
         }
     },
 
-    // Show error message
+    /**
+     * Show error message
+     * FIXED: Validates BEFORE clearing
+     */
     showError(message) {
+        // ✅ CRITICAL FIX: Validate FIRST
+        if (!message || message.trim() === '') {
+            console.warn('⚠️ Attempted to show empty error message - BLOCKED');
+            return;
+        }
+        
+        // Only clear if we have valid content
+        this.clearAllMessages();
+        
         const errorDiv = document.getElementById('errorMessage');
         if (errorDiv) {
-            errorDiv.textContent = message;
+            errorDiv.innerHTML = `❌ ${message}`;
             errorDiv.style.display = 'block';
             
-            this.hideOtherMessages('errorMessage');
+            // Reset to original error styling
+            errorDiv.style.background = '';
+            errorDiv.style.borderLeft = '';
+            errorDiv.style.color = '';
             
+            console.log('⚠️ Error message displayed:', message.substring(0, 50) + '...');
+            
+            // Auto-hide after 10 seconds
             setTimeout(() => {
                 errorDiv.style.display = 'none';
-            }, 5000);
+                errorDiv.innerHTML = '';
+            }, 10000);
         }
     },
 
-    // Show success message (legacy)
+    /**
+     * Show success message (legacy version)
+     * FIXED: Validates BEFORE clearing
+     */
     showSuccess(message, projectPath = null, elabFTWUrl = null) {
+        // ✅ Validation happens in showEnhancedSuccess
         const links = [];
         if (elabFTWUrl) {
             links.push({
@@ -777,40 +829,60 @@ async syncToOMERO(projectName, targetPath, metadata) {
         this.showEnhancedSuccess(message, projectPath, links);
     },
 
-    // Show info message
+    /**
+     * Show info message
+     * FIXED: Validates BEFORE clearing
+     */
     showInfo(message) {
+        // ✅ CRITICAL FIX: Validate FIRST
+        if (!message || message.trim() === '') {
+            console.warn('⚠️ Attempted to show empty info message - BLOCKED');
+            return;
+        }
+        
+        // Only clear if we have valid content
+        this.clearAllMessages();
+        
         const infoDiv = document.getElementById('infoMessage');
         if (infoDiv) {
-            infoDiv.textContent = message;
+            infoDiv.innerHTML = `ℹ️ ${message}`;
             infoDiv.style.display = 'block';
             
-            this.hideOtherMessages('infoMessage');
+            console.log('ℹ️ Info message displayed:', message.substring(0, 50) + '...');
             
+            // Auto-hide after 6 seconds
             setTimeout(() => {
                 infoDiv.style.display = 'none';
-            }, 4000);
+                infoDiv.innerHTML = '';
+            }, 6000);
         }
     },
 
-    // Hide all messages
+    /**
+     * Hide all messages immediately
+     */
     hideMessages() {
-        const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
-        messageIds.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.style.display = 'none';
-            }
-        });
+        this.clearAllMessages();
     },
 
-    // Hide other messages
+    /**
+     * Hide other messages (DEPRECATED - use clearAllMessages instead)
+     * Kept for backwards compatibility but now just calls clearAllMessages
+     */
     hideOtherMessages(keepVisible) {
+        if (!keepVisible) {
+            this.clearAllMessages();
+            return;
+        }
+        
+        // Legacy behavior: hide all except one
         const messageIds = ['errorMessage', 'successMessage', 'infoMessage'];
         messageIds.forEach(id => {
             if (id !== keepVisible) {
                 const element = document.getElementById(id);
                 if (element) {
                     element.style.display = 'none';
+                    element.innerHTML = '';
                 }
             }
         });
@@ -1092,12 +1164,16 @@ async syncToOMERO(projectName, targetPath, metadata) {
                         }
                     }
                 }
+                // ✅ FIX: Use projectData.projectName instead of undefined finalProjectName
+                const projectName = projectData.projectName;
+                
                 // Insert links if we have any
                 if (elabftwUrl || omeroUrl) {
                     const insertResult = await window.electronAPI.insertLinksIntoReadme(
                         projectPath, 
                         elabftwUrl, 
-                        omeroUrl
+                        omeroUrl,
+                        projectName  // ✅ FIXED: Now using defined variable
                     );
                     
                     if (insertResult.success) {
@@ -1184,56 +1260,41 @@ async syncToOMERO(projectName, targetPath, metadata) {
     },
 
     /**
-     * Show OMERO group validation warning in the UI
-     * Creates a red warning message similar to other error displays
+     * Show OMERO group warning
+     * FIXED: Validates BEFORE clearing
      */
     showOMEROGroupWarning(message, guidance = null) {
-        // Find or create warning container
-        let warningContainer = document.getElementById('omeroGroupWarning');
-        
-        if (!warningContainer) {
-            // Create warning container if it doesn't exist
-            const omeroOption = document.getElementById('omeroOption');
-            if (omeroOption) {
-                warningContainer = document.createElement('div');
-                warningContainer.id = 'omeroGroupWarning';
-                warningContainer.style.cssText = `
-                    margin-top: 10px;
-                    padding: 12px;
-                    background: rgba(239, 68, 68, 0.1);
-                    border: 1px solid #ef4444;
-                    border-radius: 8px;
-                    color: #dc2626;
-                    font-weight: 500;
-                    display: none;
-                `;
-                omeroOption.appendChild(warningContainer);
-            }
+        // ✅ CRITICAL FIX: Validate FIRST
+        if (!message || message.trim() === '') {
+            console.warn('⚠️ Attempted to show empty OMERO warning message - BLOCKED');
+            return;
         }
         
-        if (warningContainer) {
-            // Set warning content
-            let content = `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 1.2em;">⚠️</span>
-                <strong>${message}</strong>
-            </div>`;
+        console.log('🚨 Showing OMERO group warning:', message);
+        
+        // Only clear if we have valid content
+        this.clearAllMessages();
+        
+        const errorDiv = document.getElementById('errorMessage');
+        if (errorDiv) {
+            let content = `⚠️ ${message}`;
             
             if (guidance) {
-                content += `<div style="font-size: 0.9em; color: #b91c1c; margin-left: 28px;">
-                    💡 ${guidance}
-                </div>`;
+                content += `<br><small style="margin-top: 5px; display: block;">${guidance}</small>`;
             }
             
-            warningContainer.innerHTML = content;
-            warningContainer.style.display = 'block';
+            errorDiv.innerHTML = content;
+            errorDiv.style.display = 'block';
             
-            console.log('🚨 OMERO group warning displayed:', message);
+            // Reset to original error message style
+            errorDiv.style.background = '';
+            errorDiv.style.borderLeft = '';
+            
+            console.log('🚨 OMERO warning displayed:', message.substring(0, 50) + '...');
             
             // Auto-hide after 10 seconds
             setTimeout(() => {
-                if (warningContainer) {
-                    warningContainer.style.display = 'none';
-                }
+                this.hideOMEROGroupWarning();
             }, 10000);
         }
     },
@@ -1242,9 +1303,10 @@ async syncToOMERO(projectName, targetPath, metadata) {
      * Hide OMERO group warning
      */
     hideOMEROGroupWarning() {
-        const warningContainer = document.getElementById('omeroGroupWarning');
-        if (warningContainer) {
-            warningContainer.style.display = 'none';
+        const errorDiv = document.getElementById('errorMessage');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+            errorDiv.innerHTML = '';
         }
     },
 
@@ -1288,35 +1350,9 @@ async syncToOMERO(projectName, targetPath, metadata) {
     /**
      * Show OMERO group warning in results area (where success/error messages appear)
      * Simple implementation that shows warning at the bottom like other messages
+     * FIXED: This is a duplicate - the main implementation above is already fixed
      */
-    showOMEROGroupWarning(message, guidance = null) {
-        console.log('🚨 Showing OMERO group warning:', message);
-        
-        // Use the same error message area where other messages appear
-        const errorDiv = document.getElementById('errorMessage');
-        if (errorDiv) {
-            let content = `⚠️ ${message}`;
-            
-            if (guidance) {
-                content += `<br><small style="margin-top: 5px; display: block;">${guidance}</small>`;
-            }
-            
-            errorDiv.innerHTML = content;
-            errorDiv.style.display = 'block';
-            
-            // Reset to original error message style (completely red)
-            errorDiv.style.background = '';
-            errorDiv.style.borderLeft = '';
-            
-            // Hide other messages
-            this.hideOtherMessages('errorMessage');
-            
-            // Auto-hide after 10 seconds
-            setTimeout(() => {
-                this.hideOMEROGroupWarning();
-            }, 10000);
-        }
-    },
+    // NOTE: This duplicate function will use the main implementation above
 
     /**
      * Hide OMERO group warning
@@ -1458,9 +1494,19 @@ async syncToOMERO(projectName, targetPath, metadata) {
     },
 
     /**
-     * Show warning message (similar to showError but with different styling)
+     * Show warning message
+     * FIXED: Validates BEFORE clearing
      */
     showWarning(message) {
+        // ✅ CRITICAL FIX: Validate FIRST
+        if (!message || message.trim() === '') {
+            console.warn('⚠️ Attempted to show empty warning message - BLOCKED');
+            return;
+        }
+        
+        // Only clear if we have valid content
+        this.clearAllMessages();
+        
         const warningDiv = document.getElementById('errorMessage'); // Reuse error message div
         if (warningDiv) {
             warningDiv.innerHTML = `⚠️ ${message}`;
@@ -1469,15 +1515,17 @@ async syncToOMERO(projectName, targetPath, metadata) {
             warningDiv.style.color = '#d97706';
             warningDiv.style.borderLeft = '4px solid #f59e0b';
             
-            this.hideOtherMessages('errorMessage');
+            console.log('⚠️ Warning message displayed:', message.substring(0, 50) + '...');
             
+            // Auto-hide after 8 seconds
             setTimeout(() => {
                 warningDiv.style.display = 'none';
+                warningDiv.innerHTML = '';
                 // Reset to original error styling
                 warningDiv.style.background = '';
                 warningDiv.style.color = '';
                 warningDiv.style.borderLeft = '';
-            }, 6000);
+            }, 8000);
         }
     }
 };

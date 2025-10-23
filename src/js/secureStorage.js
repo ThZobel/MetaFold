@@ -49,6 +49,42 @@ const secureStorage = {
         const method = this.getBestEncryptionMethod();
         console.log(`🔐 Secure Storage initialized with method: ${method}`);
         
+        // ✅ AUTO-INIT ADMIN ACCOUNT
+        console.log('🔍 Checking if Admin account needs to be created...');
+
+        // Check if password system is enabled
+        let passwordSystemEnabled = false;
+        try {
+            if (window.settingsManager?.settings) {
+                passwordSystemEnabled = window.settingsManager.settings['security.password_system_enabled'] === true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not check password system status:', error);
+        }
+
+        if (passwordSystemEnabled) {
+            console.log('🔍 Password system active - checking Admin account...');
+            
+            const adminExists = this.hasUserPassword('Admin');
+            if (!adminExists) {
+                console.log('🔍 Auto-creating Admin account...');
+                
+                const result = await this.initializeAdminAccount();
+                if (result.created) {
+                    console.log('✅ Admin account auto-created on init');
+                    
+                    // Optional: Show notification
+                    if (typeof window.app?.showSuccess === 'function') {
+                        window.app.showSuccess('Admin account created! Username: Admin, Password: admin');
+                    }
+                }
+            } else {
+                console.log('✅ Admin account already exists');
+            }
+        } else {
+            console.log('ℹ️ Password system disabled - no Admin needed');
+        }
+        
         return this.capabilities;
     },
 

@@ -124,8 +124,16 @@ const metadataLinksManager = {
         
         try {
             if (window.electronAPI && window.electronAPI.saveJsonFile) {
-                // Electron environment - use IPC
-                const metadataPath = projectPath + '/elabftw-metadata.json';
+                // ✅ FIX: Extrahiere Projektnamen aus dem Pfad (Browser-kompatibel)
+                const pathParts = projectPath.replace(/\\/g, '/').split('/');
+                const projectName = pathParts[pathParts.length - 1];
+                
+                // ✅ FIX: Verwende korrekten Dateinamen: ${projectName}-metadata.json
+                const metadataFilename = `${projectName}-metadata.json`;
+                const metadataPath = `${projectPath}/${metadataFilename}`;
+                
+                console.log(`💾 Saving to: ${metadataFilename}`);
+                
                 const result = await window.electronAPI.saveJsonFile(enhancedMetadata, metadataPath);
                 
                 if (result.success) {

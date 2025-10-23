@@ -541,7 +541,7 @@ const templateManager = {
         if (window.templateTypeManager && window.templateTypeManager.currentType) {
             return window.templateTypeManager.currentType;
         }
-        return 'folders';
+        return 'category1'; // Default fallback for 4-category system
     },
 
     
@@ -561,11 +561,12 @@ const templateManager = {
             }
         }
         
-        // 1. Get own templates first
-        const ownTemplates = this.templates.filter(t => 
-            (currentType === 'folders' && t.type !== 'experiment') ||
-            (currentType === 'experiments' && t.type === 'experiment')
-        );
+        // 1. Get own templates first (ENHANCED: Filter by category)
+        const ownTemplates = this.templates.filter(t => {
+            // Templates without category field are treated as 'category1' for backward compatibility
+            const templateCategory = t.category || 'category1';
+            return templateCategory === currentType;
+        });
 
         // 2. Load group templates with enhanced error handling
         let groupTemplates = [];
@@ -594,17 +595,15 @@ const templateManager = {
                         }
                         if (t.createdBy === currentUser || t.createdBy === 'System') {
                             return false;
-                        }
-                        
-                        // Apply type filter if active
-                        if (currentType === 'folders' && t.type === 'experiment') {
-                            return false;
-                        }
-                        if (currentType === 'experiments' && t.type !== 'experiment') {
-                            return false;
-                        }
-                        
-                        return true;
+                            }
+                            
+                            // ENHANCED: Apply category filter
+                            const templateCategory = t.category || 'category1';
+                            if (templateCategory !== currentType) {
+                                return false;
+                            }
+                            
+                            return true;
                     });
                     
                     console.log(`🤝 Loaded ${groupTemplates.length} group templates after filtering`);
@@ -625,7 +624,8 @@ const templateManager = {
             isOwn: true, 
             originalIndex: i,
             userDisplayName: t.createdBy || window.userManager?.currentUser || 'Unknown',
-            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown'
+            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+            category: t.category || 'category1'  // Ensure category field exists
         }));
         
         const groupTemplatesMarked = groupTemplates.map(t => ({ 
@@ -634,7 +634,8 @@ const templateManager = {
             originalIndex: -1,
             isShared: true,
             userDisplayName: t.createdBy || 'Unknown',
-            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown'
+            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+            category: t.category || 'category1'  // Ensure category field exists
         }));
 
         // 4. Combine and cache
@@ -673,6 +674,16 @@ const templateManager = {
             console.warn('Error getting current template type:', error);
             return 'experiments';
         }
+    },
+
+    // NEW: Get category badge HTML for template list rendering
+    getCategoryBadge(template) {
+        const category = template.category || 'category1';
+        const categoryConfig = window.templateTypeManager.getCategoryConfig(category);
+        
+        return `<span class="template-badge ${category}" style="background: ${categoryConfig.color};">
+            ${categoryConfig.icon}
+        </span>`;
     },
 
     // Update shared toggle visibility
@@ -785,9 +796,8 @@ const templateManager = {
         }
 
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
-            const badge = template.type === 'experiment' ? 
-                '<span class="template-badge experiment">🧪</span>' : 
-                '<span class="template-badge">📁</span>';
+            // ENHANCED: Use category badge instead of type badge
+            const badge = this.getCategoryBadge(template);
             
             const color = this.getUserColor(template.createdBy);
             const initials = this.getUserInitials(template.createdBy);
@@ -1140,14 +1150,18 @@ const templateManager = {
         console.log('➕ Adding template (fixed version):', template.name);
         
         try {
-            // Prepare template with user context
+            // Prepare template with user context AND category
+            const currentCategory = window.templateTypeManager ? 
+                window.templateTypeManager.currentType : 'category1';
+            
             const enhancedTemplate = {
                 ...template,
                 id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 createdBy: window.userManager?.currentUser || 'Unknown',
                 createdByGroup: window.userManager?.currentGroup || 'Unknown',
                 createdAt: template.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                category: template.category || currentCategory  // NEW: Add category field
             };
             
             // Check for duplicates before adding
@@ -2273,6 +2287,58 @@ async forceRefreshWithGroupSync() {
 
 
 
+
+    /**
+     * MIGRATION: Migrate old templates to category system
+     * Converts old 'type' field to 'category' field
+     */
+    async migrateOldTemplatesToCategories() {
+        console.log('🔄 Migrating old templates to category system...');
+        
+        let migratedCount = 0;
+        let changed = false;
+        
+        for (let i = 0; i < this.templates.length; i++) {
+            const template = this.templates[i];
+            
+            // Check if template has old 'type' field but no 'category' field
+            if (!template.category && template.type) {
+                // Migrate based on old type
+                if (template.type === 'experiment') {
+                    template.category = 'category2'; // Sub-Project
+                } else {
+                    template.category = 'category1'; // Main-Project
+                }
+                
+                migratedCount++;
+                changed = true;
+                console.log(`🔄 Migrated template "${template.name}" to category ${template.category}`);
+            } else if (!template.category) {
+                // No type and no category - default to category1
+                template.category = 'category1';
+                migratedCount++;
+                changed = true;
+            }
+        }
+        
+        if (changed) {
+            // Save migrated templates
+            if (window.storage) {
+                await window.storage.saveTemplates(this.templates);
+            }
+            
+            console.log(`✅ Migration completed: ${migratedCount} templates migrated`);
+            
+            // Refresh UI
+            this.invalidateCache();
+            this.buildSearchIndex();
+            this.renderList();
+        } else {
+            console.log('ℹ️ No migration needed - all templates have categories');
+        }
+        
+        return migratedCount;
+    }
 
 };
 

@@ -1,0 +1,63 @@
+/* ===== STICKY ACTIONS SECTION - DEACTIVATED ===== */
+/* This file is now INACTIVE - the new footer system handles actions */
+
+/* IMPORTANT: The new footer system (main-content-footer.css) now handles
+   the actions bar. This file is kept for reference but all styles are 
+   overridden by the footer system. */
+
+/* Original sticky functionality is disabled */
+.actions {
+    /* All sticky positioning is removed */
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    
+    /* Keep display flex for button layout */
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Ensure buttons maintain proper size */
+.actions .btn,
+.actions button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Responsive adjustments for mobile - SIMPLIFIED */
+@media (max-width: 768px) {
+    .actions {
+        gap: 8px;
+    }
+    
+    .actions .btn,
+    .actions button {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .actions .btn,
+    .actions button {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+}
+
+/* Remove bottom padding from templateDetails - handled by footer now */
+#templateDetails {
+    padding-bottom: 20px !important;
+}

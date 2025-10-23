@@ -204,10 +204,16 @@ Built for NFDI4BioImage and life sciences research.`,
     dialog.showMessageBox(mainWindow, aboutOptions);
 }
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
+async function createWindow() {
+    // Load saved window state
+    const savedState = await loadWindowState();
+    
+    // Use saved state or defaults
+    const windowOptions = {
+        width: savedState?.width || 1200,
+        height: savedState?.height || 800,
+        x: savedState?.x,
+        y: savedState?.y,
         minWidth: 800,
         minHeight: 600,
         webPreferences: {
@@ -218,16 +224,25 @@ function createWindow() {
         icon: path.join(__dirname, 'assets','icon.png'),
         titleBarStyle: 'default',
         show: false
-    });
+    };
+    
+    mainWindow = new BrowserWindow(windowOptions);
 
     mainWindow.loadFile('index.html');
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
         
+        // Apply saved fullscreen/maximized state
+        if (savedState) {
+            applyWindowState(mainWindow, savedState);
+        }
+        
         if (process.argv.includes('--dev')) {
             mainWindow.webContents.openDevTools();
         }
+        
+        console.log('✅ Window restored with saved state:', savedState ? 'Yes' : 'No (using defaults)');
     });
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -235,9 +250,161 @@ function createWindow() {
         return { action: 'deny' };
     });
 
-     const menuTemplate = createMenuTemplate();
+    const menuTemplate = createMenuTemplate();
     const menu = Menu.buildFromTemplate(menuTemplate);
     Menu.setApplicationMenu(menu);
+    
+    // Setup window state management
+    setupWindowStateManagement(mainWindow);
+}
+
+// =================== WINDOW STATE MANAGEMENT ===================
+
+/**
+ * Save window state (size, position, fullscreen) to file
+ */
+function saveWindowState(window) {
+    try {
+        const bounds = window.getBounds();
+        const isFullScreen = window.isFullScreen();
+        const isMaximized = window.isMaximized();
+        
+        const windowState = {
+            width: bounds.width,
+            height: bounds.height,
+            x: bounds.x,
+            y: bounds.y,
+            isFullScreen: isFullScreen,
+            isMaximized: isMaximized,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to file in user data directory for persistence
+        const userDataPath = app.getPath('userData');
+        const windowStatePath = path.join(userDataPath, 'window-state.json');
+        
+        fs.writeFile(windowStatePath, JSON.stringify(windowState, null, 2), 'utf8')
+            .then(() => {
+                console.log('💾 Window state saved:', windowState);
+            })
+            .catch(error => {
+                console.error('❌ Failed to save window state:', error);
+            });
+            
+    } catch (error) {
+        console.error('❌ Error saving window state:', error);
+    }
+}
+
+/**
+ * Load window state from file
+ * @returns {Object|null} - Saved window state or null
+ */
+async function loadWindowState() {
+    try {
+        const userDataPath = app.getPath('userData');
+        const windowStatePath = path.join(userDataPath, 'window-state.json');
+        
+        const data = await fs.readFile(windowStatePath, 'utf8');
+        const windowState = JSON.parse(data);
+        
+        console.log('📂 Window state loaded:', windowState);
+        return windowState;
+        
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            console.warn('⚠️ Could not load window state:', error.message);
+        }
+        return null;
+    }
+}
+
+/**
+ * Apply saved window state to window
+ * @param {BrowserWindow} window - Window to apply state to
+ * @param {Object} state - Window state to apply
+ */
+function applyWindowState(window, state) {
+    if (!state) return;
+    
+    try {
+        // Validate bounds are within screen
+        const { screen } = require('electron');
+        const displayBounds = screen.getPrimaryDisplay().bounds;
+        
+        // Ensure window is visible on screen
+        if (state.x >= 0 && state.y >= 0 && 
+            state.x < displayBounds.width && state.y < displayBounds.height) {
+            window.setBounds({
+                x: state.x,
+                y: state.y,
+                width: state.width,
+                height: state.height
+            });
+        } else {
+            // Window would be off-screen, just apply size
+            window.setSize(state.width, state.height);
+        }
+        
+        // Apply fullscreen/maximized state
+        if (state.isFullScreen) {
+            window.setFullScreen(true);
+        } else if (state.isMaximized) {
+            window.maximize();
+        }
+        
+        console.log('✅ Window state applied');
+        
+    } catch (error) {
+        console.error('❌ Error applying window state:', error);
+    }
+}
+
+/**
+ * Setup window state management
+ * @param {BrowserWindow} window - Window to manage
+ */
+function setupWindowStateManagement(window) {
+    // Save state on various events
+    
+    // Save on resize
+    window.on('resize', () => {
+        if (!window.isFullScreen() && !window.isMaximized()) {
+            saveWindowState(window);
+        }
+    });
+    
+    // Save on move
+    window.on('move', () => {
+        if (!window.isFullScreen() && !window.isMaximized()) {
+            saveWindowState(window);
+        }
+    });
+    
+    // Save on enter/leave fullscreen
+    window.on('enter-full-screen', () => {
+        saveWindowState(window);
+    });
+    
+    window.on('leave-full-screen', () => {
+        saveWindowState(window);
+    });
+    
+    // Save on maximize/unmaximize
+    window.on('maximize', () => {
+        saveWindowState(window);
+    });
+    
+    window.on('unmaximize', () => {
+        saveWindowState(window);
+    });
+    
+    // Save final state before closing
+    window.on('close', () => {
+        saveWindowState(window);
+    });
+    
+    console.log('✅ Window state management setup complete');
 }
 
 app.whenReady().then(() => {
@@ -566,9 +733,26 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
             console.log(`📋 No folder structure defined - skipping structure creation`);
         }
         
-        // Metadaten-JSON erstellen (falls vorhanden)
+        // ✅ FIX: Metadaten-JSON erstellen mit korrektem Dateinamen UND projectName
         if (metadata && Object.keys(metadata).length > 0) {
-            await createMetadataFiles(projectPath, metadata, projectName);
+            // ✅ CRITICAL: Add projectName to metadata before saving
+            const enhancedMetadata = {
+                ...metadata,
+                projectName: projectName  // Add project name for later loading
+            };
+            
+            // Erstelle Metadaten-JSON mit ${projectName}-metadata.json
+            const metadataFilename = `${projectName}-metadata.json`;
+            const metadataPath = path.join(projectPath, metadataFilename);
+            await fs.writeFile(metadataPath, JSON.stringify(enhancedMetadata, null, 2), 'utf8');
+            console.log(`✅ Metadata file created with projectName: ${metadataFilename}`);
+            
+            // Erstelle README.html mit enhanced Metadaten
+            const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName);
+            const readmeFilename = `${projectName}-README.html`;
+            const readmePath = path.join(projectPath, readmeFilename);
+            await fs.writeFile(readmePath, readmeHtml, 'utf8');
+            console.log(`✅ README file created: ${readmeFilename}`);
         }
         
         // Adjust success message based on created content
@@ -654,12 +838,85 @@ ipcMain.handle('save-json-file', async (event, data) => {
     if (!result.canceled && result.filePath) {
         try {
             await fs.writeFile(result.filePath, JSON.stringify(data, null, 2), 'utf8');
-            return { success: true, message: 'JSON file saved successfully!' };
+            return { success: true, message: 'JSON file saved successfully!', filePath: result.filePath };
         } catch (error) {
             return { success: false, message: `Error saving JSON file: ${error.message}` };
         }
     }
     return { success: false, message: 'Save cancelled' };
+});
+
+// Generate README.html content without saving (for metadataLoader)
+ipcMain.handle('generate-readme-html-content', async (event, metadata, projectName, elabftwUrl = null, omeroUrl = null) => {
+    try {
+        console.log(`📄 IPC: Generating README.html content for: ${projectName}`);
+        console.log('  elabFTW URL:', elabftwUrl || 'none');
+        console.log('  OMERO URL:', omeroUrl || 'none');
+        
+        // Use existing generateReadmeHtmlWithMetadata function
+        const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl);
+        
+        console.log(`✅ IPC: README.html content generated successfully (${readmeHtml.length} chars)`);
+        
+        return {
+            success: true,
+            html: readmeHtml,
+            message: 'README content generated successfully'
+        };
+        
+    } catch (error) {
+        console.error('❌ IPC: Error generating README content:', error);
+        return {
+            success: false,
+            message: error.message,
+            error: error.toString()
+        };
+    }
+});
+
+// Save HTML file with save dialog
+ipcMain.handle('save-html-file', async (event, htmlContent, suggestedFilename = 'file.html') => {
+    try {
+        console.log(`💾 IPC: Opening save dialog for HTML file...`);
+        console.log('  Suggested filename:', suggestedFilename);
+        
+        const result = await dialog.showSaveDialog(mainWindow, {
+            title: 'Save README.html',
+            filters: [
+                { name: 'HTML Files', extensions: ['html', 'htm'] }
+            ],
+            defaultPath: suggestedFilename
+        });
+        
+        if (!result.canceled && result.filePath) {
+            // Write the HTML file
+            await fs.writeFile(result.filePath, htmlContent, 'utf8');
+            
+            console.log(`✅ IPC: HTML file saved successfully: ${result.filePath}`);
+            
+            return {
+                success: true,
+                filePath: result.filePath,
+                filename: path.basename(result.filePath),
+                message: 'HTML file saved successfully'
+            };
+        }
+        
+        console.log('ℹ️ IPC: User cancelled save dialog');
+        return {
+            success: false,
+            message: 'Save cancelled by user',
+            cancelled: true
+        };
+        
+    } catch (error) {
+        console.error('❌ IPC: Error saving HTML file:', error);
+        return {
+            success: false,
+            message: error.message,
+            error: error.toString()
+        };
+    }
 });
 
 
@@ -743,12 +1000,59 @@ ipcMain.handle('getAppPath', async (event) => {
     }
 });
 
-// Insert integration links into existing README.html
-ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl) => {
+// Regenerate README.html with metadata and integration links
+ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, projectName, elabftwUrl = null, omeroUrl = null) => {
     try {
-        console.log(`📄 IPC: Inserting integration links into existing README.html: ${projectPath}`);
+        console.log(`📄 IPC: Regenerating README.html for: ${projectName}`);
+        console.log('  Project path:', projectPath);
+        console.log('  elabFTW URL:', elabftwUrl || 'none');
+        console.log('  OMERO URL:', omeroUrl || 'none');
         
-        const readmePath = path.join(projectPath, 'README.html');
+        // Generate complete README.html with metadata and integration links
+        const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl);
+        
+        // Construct the README filename
+        const sanitizedProjectName = projectName 
+            ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
+            : 'Project';
+        
+        const readmeFilename = `${sanitizedProjectName}-README.html`;
+        const readmePath = path.join(projectPath, readmeFilename);
+        
+        // Write the README file
+        await fs.writeFile(readmePath, readmeHtml, 'utf8');
+        
+        console.log(`✅ IPC: README.html regenerated successfully: ${readmeFilename}`);
+        
+        return {
+            success: true,
+            message: 'README.html regenerated successfully',
+            path: readmePath,
+            filename: readmeFilename
+        };
+        
+    } catch (error) {
+        console.error('❌ IPC: Error regenerating README.html:', error);
+        return {
+            success: false,
+            message: error.message,
+            error: error.toString()
+        };
+    }
+});
+
+// Insert integration links into existing README.html
+ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null) => {
+    try {
+        console.log(`📄 IPC: Inserting integration links into README: ${projectPath}`);
+        
+        // Construct the correct README filename with project name
+        const sanitizedProjectName = projectName 
+            ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
+            : path.basename(projectPath); // Fallback: use folder name
+        
+        const readmeFilename = `${sanitizedProjectName}-README.html`;
+        const readmePath = path.join(projectPath, readmeFilename);
         
         // Read existing README.html
         let htmlContent = await fs.readFile(readmePath, 'utf8');
@@ -1557,6 +1861,230 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
     }
 });
 
+// =================== PROJECT SCANNER HELPER FUNCTIONS ===================
+// These functions must be added BEFORE the "PROJECT SCANNER API" section
+
+/**
+ * Recursively scan directory for MetaFold projects
+ * A MetaFold project is identified by *-metadata.json files
+ * @param {string} basePath - Root directory to start scanning
+ * @param {number} maxDepth - Maximum recursion depth (default: 5)
+ * @param {number} currentDepth - Current recursion level (internal)
+ * @returns {Array} Array of project objects
+ */
+async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0) {
+    const projects = [];
+    
+    // Stop if max depth reached
+    if (currentDepth > maxDepth) {
+        console.log(`⚠️ Max depth ${maxDepth} reached at ${basePath}`);
+        return projects;
+    }
+    
+    try {
+        const entries = await fs.readdir(basePath, { withFileTypes: true });
+        
+        // Look for metadata files in current directory
+        const metadataFiles = entries.filter(entry => 
+            entry.isFile() && entry.name.endsWith('-metadata.json')
+        );
+        
+        // If metadata files found, this is a project directory
+        for (const metadataFile of metadataFiles) {
+            console.log(`📁 Found project in: ${basePath}`);
+            
+            const project = await parseMetaFoldProject(basePath, metadataFile.name);
+            if (project) {
+                projects.push(project);
+            }
+        }
+        
+        // Recursively scan subdirectories
+        const directories = entries.filter(entry => entry.isDirectory());
+        
+        for (const dir of directories) {
+            const subdirPath = path.join(basePath, dir.name);
+            
+            // Skip common directories that shouldn't be scanned
+            const skipDirs = ['node_modules', '.git', '.vscode', 'dist', 'build', '__pycache__'];
+            if (skipDirs.includes(dir.name)) {
+                continue;
+            }
+            
+            try {
+                const subProjects = await scanForMetaFoldProjects(subdirPath, maxDepth, currentDepth + 1);
+                projects.push(...subProjects);
+            } catch (error) {
+                // Skip directories that can't be accessed
+                console.log(`⚠️ Skipping ${subdirPath}: ${error.message}`);
+            }
+        }
+        
+    } catch (error) {
+        console.error(`❌ Error scanning ${basePath}:`, error);
+    }
+    
+    return projects;
+}
+
+/**
+ * Get detailed information about a specific project
+ * @param {string} projectPath - Path to project directory
+ * @returns {Object} Detailed project information
+ */
+async function getProjectDetails(projectPath) {
+    try {
+        const entries = await fs.readdir(projectPath, { withFileTypes: true });
+        
+        // Find metadata file
+        const metadataFile = entries.find(entry => 
+            entry.isFile() && entry.name.endsWith('-metadata.json')
+        );
+        
+        if (!metadataFile) {
+            throw new Error('No metadata file found in project directory');
+        }
+        
+        // Parse project
+        const project = await parseMetaFoldProject(projectPath, metadataFile.name);
+        
+        if (!project) {
+            throw new Error('Failed to parse project');
+        }
+        
+        // Add additional details
+        const files = entries.filter(entry => entry.isFile());
+        const directories = entries.filter(entry => entry.isDirectory());
+        
+        return {
+            ...project,
+            fileCount: files.length,
+            directoryCount: directories.length,
+            files: files.map(f => f.name),
+            directories: directories.map(d => d.name)
+        };
+        
+    } catch (error) {
+        throw new Error(`Error getting project details: ${error.message}`);
+    }
+}
+
+/**
+ * Analyze statistics for a collection of projects
+ * @param {Array} projects - Array of project objects
+ * @returns {Object} Statistical analysis
+ */
+function analyzeProjectStatistics(projects) {
+    if (!projects || projects.length === 0) {
+        return {
+            totalProjects: 0,
+            totalSize: 0,
+            averageSize: 0,
+            totalMetadataFields: 0,
+            averageMetadataFields: 0,
+            projectsWithReadme: 0,
+            oldestProject: null,
+            newestProject: null,
+            fieldFrequency: {},
+            typeDistribution: {}
+        };
+    }
+    
+    // Calculate basic statistics
+    const totalProjects = projects.length;
+    const totalSize = projects.reduce((sum, p) => sum + (p.size || 0), 0);
+    const averageSize = totalSize / totalProjects;
+    
+    const totalMetadataFields = projects.reduce((sum, p) => sum + (p.metadataFieldCount || 0), 0);
+    const averageMetadataFields = totalMetadataFields / totalProjects;
+    
+    const projectsWithReadme = projects.filter(p => p.hasReadme).length;
+    
+    // Find oldest and newest projects
+    const sortedByDate = [...projects].sort((a, b) => 
+        new Date(a.created) - new Date(b.created)
+    );
+    const oldestProject = sortedByDate[0];
+    const newestProject = sortedByDate[sortedByDate.length - 1];
+    
+    // Analyze metadata field frequency
+    const fieldFrequency = {};
+    const typeDistribution = {};
+    
+    projects.forEach(project => {
+        if (project.metadata && typeof project.metadata === 'object') {
+            Object.keys(project.metadata).forEach(fieldName => {
+                fieldFrequency[fieldName] = (fieldFrequency[fieldName] || 0) + 1;
+                
+                const field = project.metadata[fieldName];
+                if (field && field.type) {
+                    typeDistribution[field.type] = (typeDistribution[field.type] || 0) + 1;
+                }
+            });
+        }
+    });
+    
+    // Calculate completeness scores
+    const completenessScores = projects.map(project => {
+        let score = 0;
+        let maxScore = 10;
+        
+        // Has metadata
+        if (project.metadata && Object.keys(project.metadata).length > 0) {
+            score += 4;
+        }
+        
+        // Has README
+        if (project.hasReadme) {
+            score += 2;
+        }
+        
+        // Has filled metadata fields
+        if (project.metadata) {
+            const filledFields = Object.values(project.metadata).filter(field => 
+                field.value && field.value.toString().trim() !== ''
+            ).length;
+            const totalFields = Object.keys(project.metadata).length;
+            
+            if (totalFields > 0) {
+                score += Math.round((filledFields / totalFields) * 4);
+            }
+        }
+        
+        return Math.round((score / maxScore) * 100);
+    });
+    
+    const averageCompleteness = completenessScores.reduce((sum, s) => sum + s, 0) / completenessScores.length;
+    
+    return {
+        totalProjects,
+        totalSize,
+        averageSize: Math.round(averageSize),
+        totalMetadataFields,
+        averageMetadataFields: Math.round(averageMetadataFields * 10) / 10,
+        projectsWithReadme,
+        readmePercentage: Math.round((projectsWithReadme / totalProjects) * 100),
+        oldestProject: {
+            name: oldestProject.name,
+            created: oldestProject.created,
+            path: oldestProject.path
+        },
+        newestProject: {
+            name: newestProject.name,
+            created: newestProject.created,
+            path: newestProject.path
+        },
+        fieldFrequency,
+        typeDistribution,
+        averageCompleteness: Math.round(averageCompleteness),
+        completenessDistribution: {
+            low: completenessScores.filter(s => s < 40).length,
+            medium: completenessScores.filter(s => s >= 40 && s < 70).length,
+            high: completenessScores.filter(s => s >= 70).length
+        }
+    };
+}
+
 // =================== PROJECT SCANNER API ===================
 
 // Scan directory recursively for MetaFold projects
@@ -2126,242 +2654,8 @@ function logProxyActivity(activity, details = {}) {
     console.log(`[${timestamp}] 🔬 OMERO Proxy: ${activity}`, details);
 }
 
-// Create metadata files - ONLY ELABFTW FORMAT + ENHANCED README
-async function createMetadataFiles(projectPath, metadata, projectName = null) {
-    // 1. elabftw-metadata.json (elabFTW-compatible format)
-    const elabftwPath = path.join(projectPath, 'elabftw-metadata.json');
-    const elabftwContent = convertToElabFTWFormat(metadata);
-    
-    await fs.writeFile(elabftwPath, JSON.stringify(elabftwContent, null, 2), 'utf8');
-    console.log(`📄 elabFTW metadata created: ${elabftwPath}`);
-    
-    // Create enhanced README.html with metadata info - ALWAYS CREATE/OVERWRITE for experiments
-    const readmePath = path.join(projectPath, 'README.html');
-    const readmeContent = generateReadmeHtmlWithMetadata(metadata, projectName);
-    await fs.writeFile(readmePath, readmeContent, 'utf8');
-    console.log(`📄 Enhanced README.html with experiment metadata created: ${readmePath}`);
-    }
-
-// Convert to elabFTW format
-function convertToElabFTWFormat(metadata) {
-    const elabftwData = {
-        extra_fields: {},
-        elabftw: {
-            display_main_text: true
-        }
-    };
-    
-    const groups = new Map(); // Collect all groups
-    let groupIdCounter = 1;
-    let positionCounter = 1;
-    
-    // First pass: identify groups
-    Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        if (fieldInfo.type === 'group') {
-            const groupId = groupIdCounter++;
-            groups.set(key, {
-                id: groupId,
-                name: fieldInfo.label || key
-            });
-        }
-    });
-    
-    // Add groups to elabftw.extra_fields_groups
-    if (groups.size > 0) {
-        elabftwData.elabftw.extra_fields_groups = [];
-        groups.forEach(group => {
-            elabftwData.elabftw.extra_fields_groups.push(group);
-        });
-    }
-    
-    // Second pass: convert fields
-    Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        // Skip group headers (handled separately)
-        if (fieldInfo.type === 'group') {
-            return;
-        }
-        
-        // IMPORTANT: ensure value
-        let safeValue = fieldInfo.value;
-        
-        // Base field properties
-        const elabField = {
-            type: mapFieldTypeToElabFTW(fieldInfo.type)
-        };
-        
-        // Adjust value by type
-        switch (fieldInfo.type) {
-			case 'checkbox':
-				// elabFTW expects "on" for true, "" for false
-				elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
-				break;
-			case 'number':
-				// Save numbers as string
-				elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
-				break;
-            case 'dropdown':
-                // Dropdown value as string
-                elabField.value = String(safeValue || '');
-                break;
-            default:
-                // All others as string
-                elabField.value = String(safeValue || '');
-        }
-        
-        // Position only if needed
-        if (positionCounter > 1) {
-            elabField.position = positionCounter;
-        }
-        positionCounter++;
-        
-        // Add description
-        if (fieldInfo.description) {
-            elabField.description = fieldInfo.description;
-        }
-        
-        // Optional properties
-        if (fieldInfo.required) {
-            elabField.required = true;
-        }
-        
-        // Mark textarea as multiline
-        if (fieldInfo.type === 'textarea') {
-            elabField.multiline = true;
-        }
-        
-        // Dropdown options - IMPORTANT: as simple string array!
-        if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
-            elabField.options = fieldInfo.options.map(opt => String(opt));
-        }
-        
-        // Number constraints
-        if (fieldInfo.type === 'number') {
-            if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
-            if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
-        }
-        
-        // Assign to group (if field belongs to a group)
-        if (key.includes('.')) {
-            // Extract group name from nested field name
-            const parts = key.split('.');
-            const possibleGroupKey = parts[0] + '_group';
-            
-            if (groups.has(possibleGroupKey)) {
-                elabField.group_id = groups.get(possibleGroupKey).id;
-            }
-        }
-        
-        // Add field (use label as key if available)
-        const fieldKey = fieldInfo.label || key;
-        elabftwData.extra_fields[fieldKey] = elabField;
-    });
-    
-    return elabftwData;
-}
-
-// Map field types to elabFTW types
-function mapFieldTypeToElabFTW(type) {
-    const typeMap = {
-        'text': 'text',
-        'number': 'number',
-        'date': 'date',
-        'textarea': 'text', // elabFTW has no separate textarea
-        'dropdown': 'select',
-        'checkbox': 'checkbox'
-    };
-    
-    return typeMap[type] || 'text';
-}
-
-// Generate README with metadata - ENHANCED for experiments
-function generateReadmeWithMetadata(metadata, projectName = null) {
-    const date = new Date().toISOString().split('T')[0];
-    const formattedDate = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-    });
-    
-    // Start with project header
-    let content = '';
-    if (projectName) {
-        content += `# ${projectName}\n\n`;
-    } else {
-        content += `# Project\n\n`;
-    }
-    
-    content += `**Created:** ${formattedDate}\n\n`;
-    
-    // Add metadata section
-    content += `## Experiment Metadata\n\n`;
-    
-    let hasMetadata = false;
-    Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        if (fieldInfo.type !== 'group') {
-            hasMetadata = true;
-            const value = fieldInfo.value || '_Not filled_';
-            const label = fieldInfo.label || key;
-            
-			// Format different types appropriately
-			let formattedValue = value;
-			if (fieldInfo.type === 'checkbox') {
-				// Fix checkbox display: check the actual boolean value
-				formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
-			} else if (fieldInfo.type === 'date' && value) {
-				try {
-					const dateObj = new Date(value);
-					if (!isNaN(dateObj.getTime())) {
-						formattedValue = dateObj.toLocaleDateString('en-US');
-					} else {
-						formattedValue = value || '_Not filled_';
-					}
-				} catch (e) {
-					formattedValue = value || '_Not filled_';
-				}
-			} else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
-				// For long text, use blockquote format
-				formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
-			} else {
-				formattedValue = value || '_Not filled_';
-			}
-            
-            content += `- **${label}:** ${formattedValue}\n`;
-            
-            // Add description if available
-            if (fieldInfo.description) {
-                content += `  - *${fieldInfo.description}*\n`;
-            }
-        }
-    });
-    
-    if (!hasMetadata) {
-        content += `*No metadata fields defined.*\n\n`;
-    } else {
-        content += `\n`;
-    }
-    
-    // Add project description section
-    content += `## Project Description\n\n`;
-    content += `*Add your project description here. Describe the purpose, methodology, expected outcomes, and any important notes about this experiment.*\n\n`;
-    
-    // Add sections for experiment documentation
-    content += `## Methodology\n\n`;
-    content += `*Describe your experimental methodology, procedures, and protocols here.*\n\n`;
-    
-    content += `## Results\n\n`;
-    content += `*Document your findings, observations, and results here.*\n\n`;
-    
-    content += `## Notes\n\n`;
-    content += `*Add any additional notes, observations, or important information here.*\n\n`;
-    
-    // Add footer with generation info
-    content += `---\n`;
-    content += `*This README was automatically generated by MetaFold on ${formattedDate}*\n`;
-    
-    return content;
-}
     // Generate HTML README with metadata info instead of Markdown
-    function generateReadmeHtmlWithMetadata(metadata, projectName) {
+    function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null) {
         const currentDate = new Date();
         const formattedDate = currentDate.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -2627,9 +2921,9 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
                         } catch (e) {
                             formattedValue = value || '<em>Not filled</em>';
                         }
-                    } else if (fieldInfo.type === 'textarea' && value && value.length > 100) {
-                        // For long text, truncate with expand option
-                        formattedValue = value.substring(0, 100) + '...';
+                    } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+                        // For long text, use blockquote format
+                        formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
                     } else {
                         formattedValue = value || '<em>Not filled</em>';
                     }
@@ -2789,378 +3083,355 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
         return htmlContent;
     }
 
-// Default value for metadata types
-function getDefaultValueForType(type) {
-    switch (type) {
-        case 'number': return 0;
-        case 'checkbox': return false;
-        case 'date': return new Date().toISOString().split('T')[0];
-        case 'textarea': return '';
-        case 'dropdown': return '';
-        default: return '';
+// Create metadata files - WITH PROJECT NAME IN FILENAMES
+async function createMetadataFiles(projectPath, metadata, projectName = null) {
+    // Sanitize project name for use in filename (remove invalid characters)
+    const sanitizedProjectName = projectName 
+        ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
+        : 'Project';
+    
+    // 1. <Project Name>-metadata.json (elabFTW-compatible format)
+    const metadataFilename = `${sanitizedProjectName}-metadata.json`;
+    const metadataPath = path.join(projectPath, metadataFilename);
+    const metadataContent = convertToElabFTWFormat(metadata);
+    
+    await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2), 'utf8');
+    console.log(`📄 Metadata file created: ${metadataPath}`);
+    
+    // 2. <Project Name>-README.html with metadata info
+    const readmeFilename = `${sanitizedProjectName}-README.html`;
+    const readmePath = path.join(projectPath, readmeFilename);
+    const readmeContent = generateReadmeHtmlWithMetadata(metadata, projectName);
+    
+    await fs.writeFile(readmePath, readmeContent, 'utf8');
+    console.log(`📄 Enhanced README created: ${readmePath}`);
+    
+    console.log(`✅ Project files created with name prefix: "${sanitizedProjectName}"`);
     }
+
+// Convert to elabFTW format
+function convertToElabFTWFormat(metadata) {
+    const elabftwData = {
+        extra_fields: {},
+        elabftw: {
+            display_main_text: true
+        }
+    };
+    
+    const groups = new Map(); // Collect all groups
+    let groupIdCounter = 1;
+    let positionCounter = 1;
+    
+    // First pass: identify groups
+    Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        if (fieldInfo.type === 'group') {
+            const groupId = groupIdCounter++;
+            groups.set(key, {
+                id: groupId,
+                name: fieldInfo.label || key
+            });
+        }
+    });
+    
+    // Add groups to elabftw.extra_fields_groups
+    if (groups.size > 0) {
+        elabftwData.elabftw.extra_fields_groups = [];
+        groups.forEach(group => {
+            elabftwData.elabftw.extra_fields_groups.push(group);
+        });
+    }
+    
+    // Second pass: convert fields
+    Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        // Skip group headers (handled separately)
+        if (fieldInfo.type === 'group') {
+            return;
+        }
+        
+        // IMPORTANT: ensure value
+        let safeValue = fieldInfo.value;
+        
+        // Base field properties
+        const elabField = {
+            type: mapFieldTypeToElabFTW(fieldInfo.type)
+        };
+        
+        // Adjust value by type
+        switch (fieldInfo.type) {
+			case 'checkbox':
+				// elabFTW expects "on" for true, "" for false
+				elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
+				break;
+			case 'number':
+				// Save numbers as string
+				elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
+				break;
+            case 'dropdown':
+                // Dropdown value as string
+                elabField.value = String(safeValue || '');
+                break;
+            default:
+                // All others as string
+                elabField.value = String(safeValue || '');
+        }
+        
+        // Position only if needed
+        if (positionCounter > 1) {
+            elabField.position = positionCounter;
+        }
+        positionCounter++;
+        
+        // Add description
+        if (fieldInfo.description) {
+            elabField.description = fieldInfo.description;
+        }
+        
+        // Optional properties
+        if (fieldInfo.required) {
+            elabField.required = true;
+        }
+        
+        // Mark textarea as multiline
+        if (fieldInfo.type === 'textarea') {
+            elabField.multiline = true;
+        }
+        
+        // Dropdown options - IMPORTANT: as simple string array!
+        if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
+            elabField.options = fieldInfo.options.map(opt => String(opt));
+        }
+        
+        // Number constraints
+        if (fieldInfo.type === 'number') {
+            if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
+            if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
+        }
+        
+        // Assign to group (if field belongs to a group)
+        if (key.includes('.')) {
+            // Extract group name from nested field name
+            const parts = key.split('.');
+            const possibleGroupKey = parts[0] + '_group';
+            
+            if (groups.has(possibleGroupKey)) {
+                elabField.group_id = groups.get(possibleGroupKey).id;
+            }
+        }
+        
+        // Add field (use label as key if available)
+        const fieldKey = fieldInfo.label || key;
+        elabftwData.extra_fields[fieldKey] = elabField;
+    });
+    
+    return elabftwData;
 }
 
-// Main scanning function - recursively finds MetaFold projects
-async function scanForMetaFoldProjects(basePath, maxDepth, currentDepth = 0) {
-    const projects = [];
+// Map field types to elabFTW types
+function mapFieldTypeToElabFTW(type) {
+    const typeMap = {
+        'text': 'text',
+        'number': 'number',
+        'date': 'date',
+        'textarea': 'text', // elabFTW has no separate textarea
+        'dropdown': 'select',
+        'checkbox': 'checkbox'
+    };
     
-    if (currentDepth >= maxDepth) {
-        console.log(`⚠️ Maximum depth (${maxDepth}) reached at: ${basePath}`);
-        return projects;
+    return typeMap[type] || 'text';
+}
+
+// Generate README with metadata - ENHANCED for experiments
+function generateReadmeWithMetadata(metadata, projectName = null) {
+    const date = new Date().toISOString().split('T')[0];
+    const formattedDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    // Start with project header
+    let content = '';
+    if (projectName) {
+        content += `# ${projectName}\n\n`;
+    } else {
+        content += `# Project\n\n`;
     }
     
-    try {
-        // Check if current directory is a MetaFold project
-        const metadataPath = path.join(basePath, 'elabftw-metadata.json');
-        
-        try {
-            await fs.access(metadataPath);
-            // This directory contains elabftw-metadata.json - it's a MetaFold project!
-            const project = await parseMetaFoldProject(basePath);
-            if (project) {
-                projects.push(project);
-                console.log(`📁 Found MetaFold project: ${project.name} (${project.path})`);
-            }
-        } catch (accessError) {
-            // No elabftw-metadata.json in this directory, continue scanning
-        }
-        
-        // Recursively scan subdirectories
-        const entries = await fs.readdir(basePath, { withFileTypes: true });
-        
-        for (const entry of entries) {
-            if (entry.isDirectory()) {
-                const subPath = path.join(basePath, entry.name);
-                
-                // Skip hidden directories and common non-project directories
-                if (shouldSkipDirectory(entry.name)) {
-                    continue;
-                }
-                
+    content += `**Created:** ${formattedDate}\n\n`;
+    
+    // Add metadata section
+    content += `## Experiment Metadata\n\n`;
+    
+    let hasMetadata = false;
+    Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        if (fieldInfo.type !== 'group') {
+            hasMetadata = true;
+            const value = fieldInfo.value || '_Not filled_';
+            const label = fieldInfo.label || key;
+            
+			// Format different types appropriately
+			let formattedValue = value;
+			if (fieldInfo.type === 'checkbox') {
+				// Fix checkbox display: check the actual boolean value
+				formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
+            } else if (fieldInfo.type === 'date' && value) {
                 try {
-                    const subProjects = await scanForMetaFoldProjects(subPath, maxDepth, currentDepth + 1);
-                    projects.push(...subProjects);
-                } catch (subError) {
-                    console.warn(`⚠️ Error scanning subdirectory ${subPath}:`, subError.message);
-                    // Continue with other directories
+                    const dateObj = new Date(value);
+                    if (!isNaN(dateObj.getTime())) {
+                        formattedValue = dateObj.toLocaleDateString('en-US');
+                    } else {
+                        formattedValue = value || '_Not filled_';
+                    }
+                } catch (e) {
+                    formattedValue = value || '_Not filled_';
                 }
+            } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+                // For long text, use blockquote format
+                formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+            } else {
+                formattedValue = value || '_Not filled_';
+            }
+            
+            content += `- **${label}:** ${formattedValue}\n`;
+            
+            // Add description if available
+            if (fieldInfo.description) {
+                content += `  - *${fieldInfo.description}*\n`;
             }
         }
-        
-    } catch (error) {
-        console.warn(`⚠️ Error accessing directory ${basePath}:`, error.message);
+    });
+    
+    if (!hasMetadata) {
+        content += `*No metadata fields defined.*\n\n`;
+    } else {
+        content += `\n`;
     }
     
-    return projects;
+    // Add project description section
+    content += `## Project Description\n\n`;
+    content += `*Add your project description here. Describe the purpose, methodology, expected outcomes, and any important notes about this experiment.*\n\n`;
+    
+    // Add sections for experiment documentation
+    content += `## Methodology\n\n`;
+    content += `*Describe your experimental methodology, procedures, and protocols here.*\n\n`;
+    
+    content += `## Results\n\n`;
+    content += `*Document your findings, observations, and results here.*\n\n`;
+    
+    content += `## Notes\n\n`;
+    content += `*Add any additional notes, observations, or important information here.*\n\n`;
+    
+    // Add footer with generation info
+    content += `---\n`;
+    content += `*This README was automatically generated by MetaFold on ${formattedDate}*\n`;
+    
+    return content;
+}
+    
+
+// Helper function to find README file in project directory
+async function findReadmeFile(projectPath) {
+    try {
+        const entries = await fs.readdir(projectPath, { withFileTypes: true });
+        
+        // Look for *-README.html pattern
+        const readmeFile = entries.find(entry => 
+            entry.isFile() && 
+            entry.name.endsWith('-README.html')
+        );
+        
+        if (readmeFile) {
+            console.log(`📖 Found README file: ${readmeFile.name} in ${projectPath}`);
+            return readmeFile.name;
+        }
+        
+        // Fallback: check for old README.html
+        const legacyReadme = entries.find(entry => 
+            entry.isFile() && 
+            entry.name === 'README.html'
+        );
+        
+        if (legacyReadme) {
+            console.log(`📖 Found legacy README.html in ${projectPath}`);
+            return 'README.html';
+        }
+        
+        console.log(`⚠️ No README file found in ${projectPath}`);
+        return null;
+    } catch (error) {
+        console.error(`❌ Error finding README file in ${projectPath}:`, error);
+        return null;
+    }
 }
 
 // Parse a single MetaFold project directory
-async function parseMetaFoldProject(projectPath) {
+async function parseMetaFoldProject(projectPath, metadataFilename) {
     try {
-    const metadataPath = path.join(projectPath, 'elabftw-metadata.json');
-            
-            // Read metadata
-            const metadataContent = await fs.readFile(metadataPath, 'utf8');
-            const metadata = JSON.parse(metadataContent);
-            
-            // VERBESSERTE README-ERKENNUNG: Prüfe README.html zuerst, dann README.md
-            let readmeContent = null;
-            let readmePath = null;
-            
-            // 1. Prüfe README.html (Priorität - wird von MetaFold erstellt)
-            const readmeHtmlPath = path.join(projectPath, 'README.html');
-            try {
-                await fs.access(readmeHtmlPath);
-                readmeContent = await fs.readFile(readmeHtmlPath, 'utf8');
-                readmePath = readmeHtmlPath;
-                console.log(`📖 Found README.html: ${readmeHtmlPath}`);
-            } catch (htmlError) {
-                // README.html doesn't exist, try README.md as fallback
-                const readmeMdPath = path.join(projectPath, 'README.md');
-                try {
-                    await fs.access(readmeMdPath);
-                    readmeContent = await fs.readFile(readmeMdPath, 'utf8');
-                    readmePath = readmeMdPath;
-                    console.log(`📖 Found README.md: ${readmeMdPath}`);
-                } catch (mdError) {
-                    // No README found - that's okay
-                    console.log(`📝 No README found in: ${projectPath}`);
-                }
-            }
-        
+        const metadataPath = path.join(projectPath, metadataFilename);
+        const metadataContent = await fs.readFile(metadataPath, 'utf8');
+        const metadata = JSON.parse(metadataContent);
+
+        // Find README file
+        const readmeFilename = await findReadmeFile(projectPath);
+        const hasReadme = readmeFilename !== null;
+
         // Get directory stats
         const stats = await fs.stat(projectPath);
-        
+        const created = stats.birthtime;
+        const modified = stats.mtime;
+
+        // Calculate directory size
+        const totalSize = await calculateDirectorySize(projectPath);
+
         // Extract project name from directory path
         const projectName = path.basename(projectPath);
-        
-        // Analyze metadata
-        const metadataAnalysis = analyzeProjectMetadata(metadata);
-        
-        // Build project object
-        const project = {
+
+        // Count metadata fields
+        const metadataFieldCount = metadata.extra_fields ? 
+            Object.keys(metadata.extra_fields).length : 0;
+
+        return {
             name: projectName,
             path: projectPath,
-            relativePath: projectPath, // Will be updated by caller if needed
-            created: stats.birthtime || stats.ctime,
-            modified: stats.mtime,
-            size: await getDirectorySize(projectPath),
-            
-            // Metadata information
-            metadata: metadata,
-            metadataFieldCount: metadataAnalysis.fieldCount,
-            metadataTypes: metadataAnalysis.types,
-            
-            // Content information
-            hasReadme: readmeContent !== null,
-            readmePreview: readmeContent ? readmeContent.substring(0, 200) + '...' : null,
-            
-            // Project structure
-            depth: 0, // Will be calculated by caller
-            parentPath: path.dirname(projectPath),
-            
-            // Quick access info
-            type: 'metafold-project',
-            version: '1.1.0' // MetaFold version that created this
+            metadata: metadata.extra_fields || {},
+            metadataFieldCount: metadataFieldCount,
+            created: created.toISOString(),
+            modified: modified.toISOString(),
+            size: totalSize,
+            hasReadme: hasReadme,
+            readmeFilename: readmeFilename,  // NEW: Add README filename
+            metadataFilename: metadataFilename
         };
-        
-        return project;
-        
     } catch (error) {
         console.error(`❌ Error parsing MetaFold project at ${projectPath}:`, error);
         return null;
     }
 }
 
-// Analyze metadata structure
-function analyzeProjectMetadata(metadata) {
-    const analysis = {
-        fieldCount: 0,
-        types: {},
-        hasRequiredFields: false,
-        completedFields: 0
-    };
+// Calculate directory size recursively
+async function calculateDirectorySize(dirPath) {
+    let totalSize = 0;
     
-    if (metadata && metadata.extra_fields) {
-        const fields = metadata.extra_fields;
-        analysis.fieldCount = Object.keys(fields).length;
-        
-        Object.values(fields).forEach(field => {
-            const type = field.type || 'unknown';
-            analysis.types[type] = (analysis.types[type] || 0) + 1;
-            
-            if (field.required) {
-                analysis.hasRequiredFields = true;
-            }
-            
-            if (field.value && field.value.trim() !== '') {
-                analysis.completedFields++;
-            }
-        });
-    }
-    
-    return analysis;
-}
-
-// Get directory size recursively
-async function getDirectorySize(dirPath) {
     try {
-        let totalSize = 0;
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
         
         for (const entry of entries) {
-            const entryPath = path.join(dirPath, entry.name);
+            const fullPath = path.join(dirPath, entry.name);
             
             if (entry.isDirectory()) {
-                totalSize += await getDirectorySize(entryPath);
-            } else {
-                const stats = await fs.stat(entryPath);
-                totalSize += stats.size;
-            }
-        }
-        
-        return totalSize;
-    } catch (error) {
-        console.warn(`⚠️ Error calculating directory size for ${dirPath}:`, error.message);
-        return 0;
-    }
-}
-
-// Check if directory should be skipped during scanning
-function shouldSkipDirectory(dirName) {
-    const skipPatterns = [
-        // Hidden directories
-        /^\./,
-        // Version control
-        /^\.git$/,
-        /^\.svn$/,
-        // Node.js
-        /^node_modules$/,
-        // Build directories
-        /^build$/,
-        /^dist$/,
-        /^target$/,
-        // Temporary directories
-        /^tmp$/,
-        /^temp$/,
-        // Cache directories
-        /^cache$/,
-        /^\.cache$/,
-        // OS specific
-        /^__pycache__$/,
-        /^\.DS_Store$/,
-        /^Thumbs\.db$/
-    ];
-    
-    return skipPatterns.some(pattern => pattern.test(dirName));
-}
-
-// Get detailed information about a specific project
-async function getProjectDetails(projectPath) {
-    try {
-        const project = await parseMetaFoldProject(projectPath);
-        if (!project) {
-            throw new Error('Not a valid MetaFold project');
-        }
-        
-        // Get additional details
-        const entries = await fs.readdir(projectPath, { withFileTypes: true });
-        
-        const details = {
-            ...project,
-            fileCount: entries.filter(entry => entry.isFile()).length,
-            directoryCount: entries.filter(entry => entry.isDirectory()).length,
-            files: entries.filter(entry => entry.isFile()).map(entry => entry.name),
-            directories: entries.filter(entry => entry.isDirectory()).map(entry => entry.name),
-            
-            // Check for nested MetaFold projects
-            hasNestedProjects: false
-        };
-        
-        // Check for nested projects
-        for (const entry of entries) {
-            if (entry.isDirectory()) {
-                const subPath = path.join(projectPath, entry.name);
-                const nestedMetadataPath = path.join(subPath, 'elabftw-metadata.json');
-                
+                totalSize += await calculateDirectorySize(fullPath);
+            } else if (entry.isFile()) {
                 try {
-                    await fs.access(nestedMetadataPath);
-                    details.hasNestedProjects = true;
-                    break;
-                } catch {
-                    // No nested project in this directory
+                    const stats = await fs.stat(fullPath);
+                    totalSize += stats.size;
+                } catch (err) {
+                    // Skip files that can't be accessed
                 }
             }
         }
-        
-        return details;
-        
     } catch (error) {
-        throw new Error(`Failed to get project details: ${error.message}`);
-    }
-}
-
-// Analyze statistics across multiple projects
-function analyzeProjectStatistics(projects) {
-    const stats = {
-        totalProjects: projects.length,
-        totalSize: 0,
-        averageFieldCount: 0,
-        fieldTypes: {},
-        projectsByDepth: {},
-        creationDates: [],
-        mostRecentProject: null,
-        oldestProject: null,
-        largestProject: null,
-        
-        // MetaFold specific statistics
-        projectsWithReadme: 0,
-        averageCompletionRate: 0,
-        commonFieldTypes: {},
-        projectHierarchy: {
-            rootProjects: 0,
-            nestedProjects: 0,
-            maxDepth: 0
-        }
-    };
-    
-    if (projects.length === 0) {
-        return stats;
+        // Return accumulated size even if there's an error
     }
     
-    let totalFieldCount = 0;
-    let totalCompletedFields = 0;
-    let totalPossibleFields = 0;
-    
-    projects.forEach(project => {
-        // Basic stats
-        stats.totalSize += project.size || 0;
-        totalFieldCount += project.metadataFieldCount || 0;
-        
-        if (project.hasReadme) {
-            stats.projectsWithReadme++;
-        }
-        
-        // Field types analysis
-        if (project.metadataTypes) {
-            Object.entries(project.metadataTypes).forEach(([type, count]) => {
-                stats.fieldTypes[type] = (stats.fieldTypes[type] || 0) + count;
-            });
-        }
-        
-        // Creation dates
-        if (project.created) {
-            stats.creationDates.push(project.created);
-            
-            if (!stats.mostRecentProject || project.created > stats.mostRecentProject.created) {
-                stats.mostRecentProject = project;
-            }
-            
-            if (!stats.oldestProject || project.created < stats.oldestProject.created) {
-                stats.oldestProject = project;
-            }
-        }
-        
-        // Largest project
-        if (!stats.largestProject || (project.size || 0) > (stats.largestProject.size || 0)) {
-            stats.largestProject = project;
-        }
-        
-        // Completion rate calculation
-        if (project.metadata && project.metadata.extra_fields) {
-            const fields = project.metadata.extra_fields;
-            const fieldCount = Object.keys(fields).length;
-            const completedCount = Object.values(fields).filter(field => 
-                field.value && field.value.toString().trim() !== ''
-            ).length;
-            
-            totalPossibleFields += fieldCount;
-            totalCompletedFields += completedCount;
-        }
-    });
-    
-    // Calculate averages
-    stats.averageFieldCount = totalFieldCount / projects.length;
-    stats.averageCompletionRate = totalPossibleFields > 0 ? 
-        (totalCompletedFields / totalPossibleFields) * 100 : 0;
-    
-    // Format sizes
-    stats.totalSizeFormatted = formatBytes(stats.totalSize);
-    stats.averageSizeFormatted = formatBytes(stats.totalSize / projects.length);
-    
-    return stats;
-}
-
-// Format bytes to human readable format
-function formatBytes(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return totalSize;
 }

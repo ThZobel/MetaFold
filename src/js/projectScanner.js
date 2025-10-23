@@ -202,7 +202,7 @@ const projectScanner = {
                     <div class="spinner"></div>
                     <h3>🔍 Scanning for MetaFold Projects...</h3>
                     <p>Searching in: <code>${path}</code></p>
-                    <p>Looking for <code>elabftw-metadata.json</code> files...</p>
+                    <p>Looking for <code>*-metadata.json</code> and <code>*-README.html</code> files...</p>
                 </div>
             </div>
         `;
@@ -398,6 +398,7 @@ const projectScanner = {
     },
     
     // Render empty state
+    // Render empty state - AKTUALISIERT für neue Dateinamen
     renderEmptyState() {
         const container = this.getContainer();
         if (!container) return;
@@ -406,7 +407,8 @@ const projectScanner = {
             <div class="project-scanner-empty">
                 <div class="empty-icon">📁</div>
                 <h3>No MetaFold Projects Found</h3>
-                <p>No directories with <code>elabftw-metadata.json</code> files were found in the scanned location.</p>
+                <p>No directories with <code>*-metadata.json</code> files were found in the scanned location.</p>
+                <p>MetaFold projects contain files named <code>&lt;ProjectName&gt;-metadata.json</code> and <code>&lt;ProjectName&gt;-README.html</code></p>
                 <div class="empty-actions">
                     <button class="btn" onclick="projectScanner.scanDirectory()">
                         📁 Choose Different Directory
@@ -418,7 +420,6 @@ const projectScanner = {
             </div>
         `;
     },
-    
     // =================== EVENT HANDLERS ===================
     
     // Setup event handlers for results
@@ -608,73 +609,79 @@ ${project.hasNestedProjects ? '\nContains nested projects' : ''}
     
     // Show help for creating projects
     showCreateProjectHelp() {
-        alert('To create MetaFold projects:\n\n1. Go to the "Create Project" tab\n2. Select an experiment template\n3. Fill in metadata\n4. Click "Create Project"\n\nThis will create a project with elabftw-metadata.json that can be discovered by the scanner.');
+        alert('To create MetaFold projects:\n\n1. Go to the "Create Project" tab\n2. Select an experiment template\n3. Fill in metadata\n4. Click "Create Project"\n\nThis will create a project with <ProjectName>-metadata.json that can be discovered by the scanner.');
     },
 
-    // Export scanned projects as HTML and JSON summary
-async exportScanResults() {
-    try {
-        console.log('💾 Starting export of scanned projects...');
-        
-        if (!this.projects || this.projects.length === 0) {
-            this.showError('No projects to export. Please scan a directory first.');
-            return;
+    // Export scanned projects as HTML and JSON summary - VEREINFACHT
+    // READMEs werden NICHT kopiert, sondern direkt aus den Originalpfaden geladen
+    async exportScanResults() {
+        try {
+            console.log('💾 Starting export of scanned projects...');
+            
+            if (!this.projects || this.projects.length === 0) {
+                this.showError('No projects to export. Please scan a directory first.');
+                return;
+            }
+            
+            // Show export dialog to select location
+            const exportPath = await window.electronAPI.selectFolder('Select folder to save export files');
+            if (!exportPath) {
+                console.log('🚫 Export cancelled by user');
+                return;
+            }
+            
+            console.log(`📁 Export directory: ${exportPath}`);
+            
+            // Generate export data WITHOUT copying README files
+            // Die READMEs bleiben in den Original-Projektordnern
+            const exportData = this.prepareExportData();
+            
+            // Create HTML summary - READMEs werden direkt aus Original-Pfaden geladen
+            const htmlContent = this.generateProjectSummaryHTML(exportData);
+            const htmlFilename = `MetaFold-Projects-Summary-${this.getTimestamp()}.html`;
+            
+            // Create JSON summary
+            const jsonContent = JSON.stringify(exportData, null, 2);
+            const jsonFilename = `MetaFold-Projects-Data-${this.getTimestamp()}.json`;
+            
+            // Write files using electronAPI
+            const htmlResult = await window.electronAPI.writeFile(
+                await window.utils.joinPath(exportPath, htmlFilename),
+                htmlContent
+            );
+
+            const jsonResult = await window.electronAPI.writeFile(
+                await window.utils.joinPath(exportPath, jsonFilename),
+                jsonContent
+            );
+            
+            if (htmlResult.success && jsonResult.success) {
+                const readmeCount = this.projects.filter(p => p.hasReadme).length;
+                
+                this.showSuccess(`✅ Export completed successfully!
+                
+    📄 HTML: ${htmlFilename}
+    📊 JSON: ${jsonFilename}
+    📖 Projects with README: ${readmeCount}
+
+    📁 Location: ${exportPath}
+
+    💡 The HTML file will load READMEs directly from the original project folders.
+    Make sure not to move the scanned projects!`);
+            } else {
+                this.showError(`Export failed:
+    ${htmlResult.message || ''}
+    ${jsonResult.message || ''}`);
+            }
+            
+        } catch (error) {
+            console.error('⚠️ Error exporting scan results:', error);
+            this.showError(`Export failed: ${error.message}`);
         }
-        
-        // Show export dialog to select location
-        const exportPath = await window.electronAPI.selectFolder('Select folder to save export files');
-        if (!exportPath) {
-            console.log('🚫 Export cancelled by user');
-            return;
-        }
-        
-        // Generate export data
-        const exportData = this.prepareExportData();
-        
-        // Create HTML summary with external CSS reference
-        const htmlContent = this.generateProjectSummaryHTML(exportData);
-        const htmlFilename = `MetaFold-Projects-Summary-${this.getTimestamp()}.html`;
-        
-        // Create JSON summary
-        const jsonContent = JSON.stringify(exportData, null, 2);
-        const jsonFilename = `MetaFold-Projects-Data-${this.getTimestamp()}.json`;
-        
-        // Copy CSS file to export directory for standalone HTML
-        await this.copyExportCSS(exportPath);
-        
-        // Write files using electronAPI
-    const htmlResult = await window.electronAPI.writeFile(
-        await window.utils.joinPath(exportPath, htmlFilename),
-        htmlContent
-    );
+    },
 
-    const jsonResult = await window.electronAPI.writeFile(
-        await window.utils.joinPath(exportPath, jsonFilename),
-        jsonContent
-    );
-        
-        if (htmlResult.success && jsonResult.success) {
-            this.showSuccess(`✅ Export completed successfully!
-
-            📄 HTML: ${htmlFilename}
-            📊 JSON: ${jsonFilename}
-            🎨 CSS: projectScanner-export.css
-
-            📁 Location: ${exportPath}
-
-            💡 The HTML file includes interactive features and is self-contained with the CSS file.`);
-
-        } else {
-            this.showError(`Export failed:
-${htmlResult.message || ''}
-${jsonResult.message || ''}`);
-        }
-        
-    } catch (error) {
-        console.error('⚠️ Error exporting scan results:', error);
-        this.showError(`Export failed: ${error.message}`);
-    }
-},
+// =================== UPDATED HELPER FUNCTION ===================
+// Replace the existing getReadmePath function
 
 async copyExportCSS(exportPath) {
     try {
@@ -1424,7 +1431,7 @@ renderProjectInTree(project) {
                             <li><strong>${key}:</strong> ${field.value || '(empty)'}</li>
                         `).join('')}
                         ${metadataCount > 3 ? `<li class="more-fields">... and ${metadataCount - 3} more fields</li>` : ''}
-                    </ul>
+                    </div>
                 </div>
             ` : '<div class="no-metadata">No metadata available</div>'}
             
@@ -1988,7 +1995,8 @@ generateNavigationPanel(exportData) {
 // Generate project list in navigation
 generateProjectList(projects) {
     return projects.map(project => {
-        const readmePath = this.getReadmePath(project.path);
+        // KRITISCHER FIX: Übergebe das gesamte project-Objekt, nicht nur project.path
+        const readmePath = this.getReadmePath(project);  // VORHER: this.getReadmePath(project.path)
         const fieldCount = project.metadataFieldCount || 0;
         const hasReadme = project.hasReadme;
         const createdDate = new Date(project.created).toLocaleDateString();
@@ -2008,12 +2016,15 @@ generateProjectList(projects) {
     }).join('');
 },
 
-// Generate enhanced navigation JavaScript
+    
+// Generate enhanced navigation JavaScript for standalone HTML
 generateNavigationScript(exportData) {
     const projectPaths = exportData.projects.map(project => ({
         name: project.name,
         path: project.path,
-        readmePath: this.getReadmePath(project.path),
+        // WICHTIG: Verwende getReadmePath() um den korrekten README-Pfad zu bekommen
+        // Das stellt sicher, dass readmeFilename verwendet wird wenn verfügbar
+        readmePath: this.getReadmePath(project),
         hasReadme: project.hasReadme,
         metadataFieldCount: project.metadataFieldCount || 0,
         created: project.created
@@ -2050,233 +2061,17 @@ generateNavigationScript(exportData) {
             console.log('📊 Showing overview screen');
         }
         
-        // Load project README
+        // Load project README with improved path handling
         function loadProject(readmePath, projectName) {
             const project = projectData.find(p => p.name === projectName);
             
             if (!project || !project.hasReadme) {
                 alert('📄 No README.html file found for this project.\\n\\n' +
-                      'To create a README file with experiment metadata:\\n' +
-                      '1. Open MetaFold application\\n' +
-                      '2. Use "Create Project" feature\\n' +
-                      '3. Fill in metadata and create project\\n\\n' +
-                      'This will generate a README.html file automatically.');
-                return;
-            }
-            
-            console.log('🔬 Loading project:', projectName);
-            console.log('📄 README path:', readmePath);
-            
-            currentProject = project;
-            showLoading(true);
-            
-            document.getElementById('welcome-screen').style.display = 'none';
-            
-            const frame = document.getElementById('project-frame');
-            
-            frame.onload = function() {
-                console.log('✅ README loaded successfully');
-                showLoading(false);
-                frame.style.display = 'block';
-            };
-            
-            frame.onerror = function() {
-                console.error('❌ Failed to load README.html from:', readmePath);
-                handleLoadError();
-            };
-            
-            // Load README.html
-            let finalPath = readmePath;
-            if (!finalPath.startsWith('file://')) {
-                finalPath = 'file://' + (finalPath.startsWith('/') ? '' : '/') + finalPath;
-            }
-            
-            frame.src = finalPath;
-            updateActiveNavigation(projectName);
-        }
-        
-        // Handle load errors
-        function handleLoadError() {
-            showLoading(false);
-            const errorHtml = \`
-                <div style="padding: 40px; text-align: center; color: #e0e0e0; 
-                            background: linear-gradient(135deg, #1a1a2e, #16213e); height: 100vh; 
-                            display: flex; flex-direction: column; justify-content: center;">
-                    <div style="font-size: 4rem; margin-bottom: 20px;">🚫</div>
-                    <h2 style="color: #ef4444; margin-bottom: 10px;">Failed to Load README</h2>
-                    <p style="margin-bottom: 20px;">Could not load the README.html file for <strong>\${currentProject?.name || 'this project'}</strong></p>
-                    
-                    <button onclick="showWelcomeScreen()" 
-                            style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; 
-                                   color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; 
-                                   font-size: 1rem; margin-top: 20px;">
-                        ← Back to Overview
-                    </button>
-                </div>
-            \`;
-            
-            const frame = document.getElementById('project-frame');
-            frame.style.display = 'block';
-            frame.srcdoc = errorHtml;
-        }
-        
-        // Update navigation active state
-        function updateActiveNavigation(projectName) {
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            const clickedItem = Array.from(document.querySelectorAll('.project-item')).find(item => 
-                item.textContent.includes(projectName)
-            );
-            if (clickedItem) {
-                clickedItem.classList.add('active');
-            }
-        }
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                showWelcomeScreen();
-            }
-        });
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            showWelcomeScreen();
-            console.log('🚀 MetaFold Project Navigator initialized');
-            console.log('📊 Projects:', projectData.length);
-            console.log('📄 With README:', projectData.filter(p => p.hasReadme).length);
-            
-            window.projectData = projectData;
-            window.loadProjectByName = function(name) {
-                const project = projectData.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
-                if (project && project.hasReadme) {
-                    loadProject(project.readmePath, project.name);
-                } else {
-                    console.log('Project not found or no README available:', name);
-                }
-            };
-        });
-    `;
-},
-
-// Helper functions
-getReadmePath(projectPath) {
-    const separator = projectPath.includes('\\') ? '\\' : '/';
-    return projectPath + (projectPath.endsWith(separator) ? '' : separator) + 'README.html';
-},
-
-escapeForJS(str) {
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-},
-
-
-// Generate simple navigation panel
-generateNavigationPanel(exportData) {
-    return `
-        <div class="nav-header">
-            <div class="nav-title">🔬 MetaFold</div>
-            <div class="nav-subtitle">Project Navigator</div>
-            <div class="project-count">${exportData.exportInfo.totalProjects} Projects</div>
-        </div>
-        
-        <div class="nav-content">
-            <div class="nav-section">
-                <div class="nav-section-title">📊 Overview</div>
-                <div class="nav-item" onclick="showWelcomeScreen()">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-label">Project Summary</span>
-                </div>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">🗂️ Projects</div>
-                <div class="project-list">
-                    ${this.generateProjectList(exportData.projects)}
-                </div>
-            </div>
-        </div>
-    `;
-},
-
-// Generate project list in navigation
-generateProjectList(projects) {
-    return projects.map(project => {
-        const readmePath = this.getReadmePath(project.path);
-        const fieldCount = project.metadataFieldCount || 0;
-        const hasReadme = project.hasReadme;
-        const createdDate = new Date(project.created).toLocaleDateString();
-        
-        return `
-            <div class="nav-item project-item ${hasReadme ? 'has-readme' : 'no-readme'}" 
-                 onclick="loadProject('${this.escapeForJS(readmePath)}', '${this.escapeForJS(project.name)}')"
-                 title="${hasReadme ? 'Click to view project details' : 'No README.html found in this project'}">
-                <span class="nav-icon">${hasReadme ? '🔬' : '📁'}</span>
-                <div class="project-info">
-                    <div class="project-name">${project.name}</div>
-                    <div class="project-meta">${fieldCount} fields • ${createdDate}${hasReadme ? ' • README' : ''}</div>
-                </div>
-                ${!hasReadme ? '<span class="no-readme-badge">No README</span>' : ''}
-            </div>
-        `;
-    }).join('');
-},
-
-// Generate enhanced navigation JavaScript with better error handling
-generateNavigationScript(exportData) {
-    // Create mapping of project paths for JavaScript
-    const projectPaths = exportData.projects.map(project => ({
-        name: project.name,
-        path: project.path,
-        readmePath: this.getReadmePath(project.path),
-        hasReadme: project.hasReadme,
-        metadataFieldCount: project.metadataFieldCount || 0,
-        created: project.created
-    }));
-    
-    return `
-        // Project data
-        const projectData = ${JSON.stringify(projectPaths, null, 2)};
-        let currentProject = null;
-        
-        // Show loading overlay
-        function showLoading(show = true) {
-            const overlay = document.getElementById('loading-overlay');
-            if (show) {
-                overlay.classList.add('active');
-            } else {
-                overlay.classList.remove('active');
-            }
-        }
-        
-        // Show welcome screen
-        function showWelcomeScreen() {
-            document.getElementById('welcome-screen').style.display = 'flex';
-            document.getElementById('project-frame').style.display = 'none';
-            showLoading(false);
-            currentProject = null;
-            
-            // Update active state
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            document.querySelector('.nav-item[onclick="showWelcomeScreen()"]').classList.add('active');
-            
-            console.log('📊 Showing overview screen');
-        }
-        
-        // Load project README with better error handling
-        function loadProject(readmePath, projectName) {
-            const project = projectData.find(p => p.name === projectName);
-            
-            if (!project || !project.hasReadme) {
-                alert('📄 No README.html file found for this project.\\n\\n' +
-                      'To create a README file with experiment metadata:\\n' +
-                      '1. Open MetaFold application\\n' +
-                      '2. Use "Create Project" feature\\n' +
-                      '3. Fill in metadata and create project\\n\\n' +
-                      'This will generate a README.html file automatically.');
+                    'To create a README file with experiment metadata:\\n' +
+                    '1. Open MetaFold application\\n' +
+                    '2. Use "Create Project" feature\\n' +
+                    '3. Fill in metadata and create project\\n\\n' +
+                    'This will generate a README.html file automatically.');
                 return;
             }
             
@@ -2309,9 +2104,8 @@ generateNavigationScript(exportData) {
             // Handle case where file doesn't exist (iframe doesn't trigger onerror for file:// URLs)
             setTimeout(() => {
                 try {
-                    // Check if iframe content is accessible (will throw if file doesn't exist)
+                    // Check if iframe content is accessible
                     if (frame.style.display === 'none') {
-                        // Still loading after timeout, might be an issue
                         console.warn('⚠️ README taking long to load, checking...');
                     }
                 } catch (error) {
@@ -2320,21 +2114,32 @@ generateNavigationScript(exportData) {
                 }
             }, 3000);
             
-            // Load README.html - try different path formats for cross-platform compatibility
+            // KORRIGIERTE PFAD-BEHANDLUNG:
+            // Direkt den absoluten Pfad verwenden mit file:// Protokoll
             let finalPath = readmePath;
             
-            // Ensure proper file:// protocol
+            // Füge file:// Protokoll hinzu wenn nicht vorhanden
             if (!finalPath.startsWith('file://')) {
-                finalPath = 'file://' + (finalPath.startsWith('/') ? '' : '/') + finalPath;
+                // Windows Pfade: C:\\ -> file:///C:/
+                if (finalPath.match(/^[A-Z]:\\\\/i)) {
+                    finalPath = 'file:///' + finalPath.replace(/\\\\/g, '/');
+                } else if (finalPath.startsWith('/')) {
+                    // Unix Pfade
+                    finalPath = 'file://' + finalPath;
+                } else {
+                    // Relativer Pfad - sollte nicht vorkommen
+                    finalPath = 'file:///' + finalPath.replace(/\\\\/g, '/');
+                }
             }
             
+            console.log('📁 Loading README from:', finalPath);
             frame.src = finalPath;
             
             // Update active state
             updateActiveNavigation(projectName);
         }
         
-        // Handle load errors
+        // Handle load errors with better error messages
         function handleLoadError() {
             showLoading(false);
             
@@ -2346,25 +2151,32 @@ generateNavigationScript(exportData) {
                     <h2 style="color: #ef4444; margin-bottom: 10px;">Failed to Load README</h2>
                     <p style="margin-bottom: 20px;">Could not load the README.html file for <strong>\${currentProject?.name || 'this project'}</strong></p>
                     
-                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
                         <strong>Possible causes:</strong><br>
                         • README.html file is missing<br>
                         • File path is incorrect<br>
                         • Browser security restrictions<br>
-                        • File permissions issue
+                        • Project was moved after scanning
                     </div>
                     
                     <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); 
-                                padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left;">
-                        <strong>💡 Solution:</strong><br>
-                        Open the project folder manually and look for README.html:<br>
-                        <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">\${currentProject?.path || 'Project Path'}</code>
+                                padding: 15px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
+                        <strong>💡 Solutions:</strong><br>
+                        • Check that the README file exists in the project folder<br>
+                        • Re-scan the directory with MetaFold<br>
+                        • Make sure projects haven't been moved or deleted<br>
+                        • Try opening the README directly from the file system
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; max-width: 600px; margin: 20px auto;">
+                        <strong>Expected path:</strong><br>
+                        <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px;">\${currentProject?.readmePath || 'Unknown'}</code>
                     </div>
                     
                     <button onclick="showWelcomeScreen()" 
                             style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; 
-                                   color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; 
-                                   font-size: 1rem; margin-top: 20px;">
+                                color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; 
+                                font-size: 1rem; margin-top: 20px;">
                         ← Back to Overview
                     </button>
                 </div>
@@ -2430,7 +2242,7 @@ generateNavigationScript(exportData) {
             console.log('📊 Projects:', projectData.length);
             console.log('📄 With README:', projectData.filter(p => p.hasReadme).length);
             
-            // Add some helpful console commands
+            // Add helpful console commands
             window.projectData = projectData;
             window.loadProjectByName = function(name) {
                 const project = projectData.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
@@ -2455,12 +2267,23 @@ async copyExportCSS(exportPath) {
     return true;
 },
 
-// Helper functions (unverändert)
-getReadmePath(projectPath) {
-    // Construct path to README.html in project directory
-    // Normalize path separators for cross-platform compatibility
-    const separator = projectPath.includes('\\') ? '\\' : '/';
-    return projectPath + (projectPath.endsWith(separator) ? '' : separator) + 'README.html';
+
+// Get README path - verwendet readmeFilename aus Backend-Scan
+getReadmePath(project) {
+    // WICHTIG: Verwende readmeFilename, das vom Backend (main.js) kommt
+    // Das Backend sucht bereits nach *-README.html Dateien
+    
+    // Use stored readmeFilename if available (from backend scan)
+    if (project.readmeFilename) {
+        const separator = project.path.includes('\\') ? '\\' : '/';
+        return project.path + (project.path.endsWith(separator) ? '' : separator) + project.readmeFilename;
+    }
+    
+    // Fallback: try to construct from project name using new naming pattern
+    const projectName = project.name || 'README';
+    const sanitized = projectName.replace(/[<>:"/\\|?*]/g, '_').trim();
+    const separator = project.path.includes('\\') ? '\\' : '/';
+    return project.path + (project.path.endsWith(separator) ? '' : separator) + sanitized + '-README.html';
 },
 
 escapeForJS(str) {
