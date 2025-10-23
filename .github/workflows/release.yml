@@ -155,7 +155,7 @@ jobs:
         if: matrix.platform == 'windows'
         run: |
           echo "=== Building for Windows ==="
-          npx electron-builder --win
+          npx electron-builder --win --publish=never
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -165,7 +165,7 @@ jobs:
         if: matrix.platform == 'mac'
         run: |
           echo "=== Building for macOS ==="
-          npx electron-builder --mac
+          npx electron-builder --mac --publish=never
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -175,7 +175,7 @@ jobs:
         if: matrix.platform == 'linux'  
         run: |
           echo "=== Building for Linux ==="
-          npx electron-builder --linux
+          npx electron-builder --linux --publish=never
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
