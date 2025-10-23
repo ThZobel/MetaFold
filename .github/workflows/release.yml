@@ -92,12 +92,38 @@ jobs:
           npm run 2>&1 || echo "No scripts or error showing scripts"
           echo "=== Checking build commands exist ==="
           npm run build-visualization --dry-run 2>&1 || echo "build-visualization command not found"
-          npm run build-${{ matrix.platform }} --dry-run 2>&1 || echo "build-${{ matrix.platform }} command not found"
+          npm run build-win --dry-run 2>&1 || echo "build-win command not found"
 
-      - name: Install dependencies
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
         run: |
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
+          echo "=== Post-install verification ==="
+          echo "Checking if webpack was installed..."
+          if (Test-Path "node_modules\.bin\webpack.cmd") { 
+            echo "✅ webpack.cmd found in node_modules\.bin\"
+          } else { 
+            echo "❌ webpack.cmd NOT found - installing webpack-cli"
+            npm install webpack webpack-cli --save-dev
+          }
+        working-directory: src
+        shell: pwsh
+        continue-on-error: false
+
+      - name: Install dependencies (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          echo "=== Installing npm dependencies ==="
+          npm ci --verbose
+          echo "=== Post-install verification ==="
+          echo "Checking if webpack was installed..."
+          if [ -f "node_modules/.bin/webpack" ]; then
+            echo "✅ webpack found in node_modules/.bin/"
+          else
+            echo "❌ webpack NOT found - installing webpack-cli"
+            npm install webpack webpack-cli --save-dev
+          fi
         working-directory: src
         continue-on-error: false
 
@@ -126,7 +152,8 @@ jobs:
       - name: Build visualization (webpack)
         run: |
           echo "=== Building visualization ==="
-          npm run build-visualization 2>&1
+          echo "Trying with npx webpack..."
+          npx webpack --mode=production 2>&1
         working-directory: src
         continue-on-error: false
 
