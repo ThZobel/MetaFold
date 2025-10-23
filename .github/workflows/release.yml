@@ -252,6 +252,55 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Prepare release body
+        id: release_body
+        run: |
+          cat << 'EOF' > release_body.md
+          # MetaFold ${{ steps.version.outputs.version }}
+          
+          **Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronic lab notebooks.**
+          
+          EOF
+          
+          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+            echo "" >> release_body.md
+            echo "## 📝 Release Notes" >> release_body.md
+            echo "" >> release_body.md
+            echo "${{ github.event.inputs.release_notes }}" >> release_body.md
+            echo "" >> release_body.md
+          fi
+          
+          cat << 'EOF' >> release_body.md
+          ## 📥 Downloads
+          
+          Choose the version for your operating system:
+          
+          ### Windows
+          - `*.exe` - Windows Installer
+          
+          ### macOS  
+          - `*.dmg` - macOS Disk Image
+          
+          ### Linux
+          - `*.AppImage` - Universal Linux AppImage
+          - `*.deb` - Debian/Ubuntu Package
+          
+          ## 🚀 Installation
+          
+          - **Windows**: Run the `.exe` installer
+          - **macOS**: Open the `.dmg` and drag MetaFold to Applications  
+          - **Linux**: Make the `.AppImage` executable (`chmod +x`) or install the `.deb` package
+          
+          ## 📖 Documentation
+          
+          See the [README](https://github.com/ThZobel/MetaFold/blob/main/README.md) for detailed usage instructions.
+          
+          ---
+          
+          **Admin User Password:** `admin`  
+          **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -262,43 +311,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/**/*
-          body: |
-            # MetaFold ${{ steps.version.outputs.version }}
-            
-            **Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronic lab notebooks.**
-            
-            ${{ github.event.inputs.release_notes && format('## 📝 Release Notes
-
-{0}
-
-', github.event.inputs.release_notes) || '' }}
-            ## 📥 Downloads
-            
-            Choose the version for your operating system:
-            
-            ### Windows
-            - `*.exe` - Windows Installer
-            
-            ### macOS  
-            - `*.dmg` - macOS Disk Image
-            
-            ### Linux
-            - `*.AppImage` - Universal Linux AppImage
-            - `*.deb` - Debian/Ubuntu Package
-            
-            ## 🚀 Installation
-            
-            - **Windows**: Run the `.exe` installer
-            - **macOS**: Open the `.dmg` and drag MetaFold to Applications  
-            - **Linux**: Make the `.AppImage` executable (`chmod +x`) or install the `.deb` package
-            
-            ## 📖 Documentation
-            
-            See the [README](https://github.com/ThZobel/MetaFold/blob/main/README.md) for detailed usage instructions.
-            
-            ---
-            
-            **Admin User Password:** `admin`  
-            **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
+          body_path: release_body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
