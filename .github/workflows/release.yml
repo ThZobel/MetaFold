@@ -20,6 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     strategy:
+      fail-fast: false  # Wichtig: Verhindert Abbruch bei einem Fehler
       matrix:
         include:
           - os: ubuntu-latest
@@ -33,31 +34,67 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Debug: Check file structure
+      - name: Debug - Check repository structure
+        run: |
+          echo "=== Repository root ==="
+          ls -la
+          echo "=== src directory ==="
+          ls -la src/ || echo "src directory not found"
+          echo "=== Find package files ==="
+          find . -name "package*.json" -type f
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'  # Updated to Node 20
           cache: 'npm'
           cache-dependency-path: src/package-lock.json
 
+      # Linux specific dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3-dev \
+            libatk-bridge2.0-dev \
+            libdrm2 \
+            libxcomposite-dev \
+            libxdamage-dev \
+            libxrandr-dev \
+            libgbm-dev \
+            libxss1 \
+            libasound2-dev \
+            libatspi2.0-0 \
+            libgtk-3-0
+
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "=== Installing npm dependencies ==="
+          npm ci --verbose
         working-directory: src
 
       - name: Build visualization (webpack)
-        run: npm run build-visualization
+        run: |
+          echo "=== Building visualization ==="
+          npm run build-visualization
         working-directory: src
 
       - name: Build for Windows
         if: matrix.platform == 'windows'
-        run: npm run build-win
+        run: |
+          echo "=== Building for Windows ==="
+          npm run build-win
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build for macOS  
         if: matrix.platform == 'mac'
-        run: npm run build-mac
+        run: |
+          echo "=== Building for macOS ==="
+          npm run build-mac
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,10 +104,19 @@ jobs:
 
       - name: Build for Linux
         if: matrix.platform == 'linux'  
-        run: npm run build-linux
+        run: |
+          echo "=== Building for Linux ==="
+          npm run build-linux
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Debug: Check what was built
+      - name: Debug - Check build output
+        run: |
+          echo "=== Build output ==="
+          ls -la src/dist/ || echo "No dist directory found"
+          find src/dist -type f -name "*.*" 2>/dev/null || echo "No files in dist"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -83,6 +129,7 @@ jobs:
             src/dist/*.AppImage
             src/dist/*.deb
           retention-days: 5
+          if-no-files-found: warn
 
   release:
     needs: build
@@ -98,6 +145,11 @@ jobs:
         with:
           path: ./artifacts
 
+      - name: Debug - Check downloaded artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find ./artifacts -type f -ls || echo "No artifacts found"
+
       - name: Get version number
         id: version
         run: |
@@ -108,15 +160,15 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1  # Updated to modern action
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          release_name: MetaFold ${{ steps.version.outputs.version }}
+          name: MetaFold ${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*
           body: |
             # MetaFold ${{ steps.version.outputs.version }}
             
@@ -127,14 +179,14 @@ jobs:
             Choose the version for your operating system:
             
             ### Windows
-            - `MetaFold-Setup-${{ steps.version.outputs.version }}.exe` - Windows Installer
+            - `*.exe` - Windows Installer
             
             ### macOS  
-            - `MetaFold-${{ steps.version.outputs.version }}.dmg` - macOS Disk Image
+            - `*.dmg` - macOS Disk Image
             
             ### Linux
-            - `MetaFold-${{ steps.version.outputs.version }}.AppImage` - Universal Linux AppImage
-            - `MetaFold-${{ steps.version.outputs.version }}.deb` - Debian/Ubuntu Package
+            - `*.AppImage` - Universal Linux AppImage
+            - `*.deb` - Debian/Ubuntu Package
             
             ## 🚀 Installation
             
@@ -150,20 +202,5 @@ jobs:
             
             **Admin User Password:** `admin`  
             **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
-
-      - name: Upload Release Assets
-        run: |
-          # Finde alle Dateien in artifacts und lade sie zum Release hoch
-          set -e
-          # Wenn gh nicht installiert ist, hier optional installieren
-          if ! command -v gh >/dev/null 2>&1; then
-            echo "gh CLI not found, installing..."
-            sudo apt-get update && sudo apt-get install -y gh
-          fi
-          while IFS= read -r -d '' file; do
-            filename=$(basename "$file")
-            echo "Uploading: $filename (from $file)"
-            gh release upload ${{ steps.version.outputs.version }} "$file" --clobber || echo "Upload failed for $file"
-          done < <(find ./artifacts -type f -print0)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
