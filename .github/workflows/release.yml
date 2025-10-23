@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     strategy:
-      fail-fast: false  # Wichtig: Verhindert Abbruch bei einem Fehler
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'  # Updated to Node 20
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: src/package-lock.json
 
@@ -81,19 +81,7 @@ jobs:
             libatspi2.0-0 \
             libgtk-3-0
 
-      # Debug: Check npm setup
-      - name: Debug - Check npm and build commands
-        working-directory: src
-        run: |
-          echo "=== Node and NPM versions ==="
-          node --version
-          npm --version
-          echo "=== Package.json scripts ==="
-          npm run 2>&1 || echo "No scripts or error showing scripts"
-          echo "=== Checking build commands exist ==="
-          npm run build-visualization --dry-run 2>&1 || echo "build-visualization command not found"
-          npm run build-win --dry-run 2>&1 || echo "build-win command not found"
-
+      # WICHTIG: Dependencies ZUERST installieren!
       - name: Install dependencies (Windows)
         if: matrix.platform == 'windows'
         run: |
@@ -127,10 +115,14 @@ jobs:
         working-directory: src
         continue-on-error: false
 
-      - name: Debug - Post-install check (Windows)
+      # Debug NACH der Installation
+      - name: Debug - Check npm setup (Windows)
         if: matrix.platform == 'windows'
         working-directory: src
         run: |
+          echo "=== Node and NPM versions ==="
+          node --version
+          npm --version
           echo "=== Checking node_modules ==="
           dir node_modules\ 2>nul | Select-Object -First 10 || echo "No node_modules"
           echo "=== Checking webpack ==="
@@ -138,10 +130,13 @@ jobs:
           echo "=== Checking electron-builder ==="
           npx electron-builder --version || echo "electron-builder not found"
 
-      - name: Debug - Post-install check (Unix)
+      - name: Debug - Check npm setup (Unix)
         if: matrix.platform != 'windows'
         working-directory: src
         run: |
+          echo "=== Node and NPM versions ==="
+          node --version
+          npm --version
           echo "=== Checking node_modules ==="
           ls -la node_modules/ | head -10 || echo "No node_modules"
           echo "=== Checking webpack ==="
@@ -152,8 +147,7 @@ jobs:
       - name: Build visualization (webpack)
         run: |
           echo "=== Building visualization ==="
-          echo "Trying with npx webpack..."
-          npx webpack --mode=production 2>&1
+          npx webpack --mode=production
         working-directory: src
         continue-on-error: false
 
@@ -161,8 +155,7 @@ jobs:
         if: matrix.platform == 'windows'
         run: |
           echo "=== Building for Windows ==="
-          echo "Command: npm run build-win"
-          npm run build-win 2>&1
+          npx electron-builder --win
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -172,22 +165,17 @@ jobs:
         if: matrix.platform == 'mac'
         run: |
           echo "=== Building for macOS ==="
-          echo "Command: npm run build-mac"
-          npm run build-mac 2>&1
+          npx electron-builder --mac
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
-          # Für Code Signing (falls du später willst):
-          # CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
-          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
 
       - name: Build for Linux
         if: matrix.platform == 'linux'  
         run: |
           echo "=== Building for Linux ==="
-          echo "Command: npm run build-linux"
-          npm run build-linux 2>&1
+          npx electron-builder --linux
         working-directory: src
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -251,7 +239,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1  # Updated to modern action
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: MetaFold ${{ steps.version.outputs.version }}
