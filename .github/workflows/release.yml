@@ -9,6 +9,15 @@ on:
         description: 'Release version (e.g., v0.0.3)'
         required: true
         default: 'v0.0.3'
+      release_notes:
+        description: 'Release notes (Bug fixes, new features, etc.)'
+        required: false
+        default: ''
+      create_release:
+        description: 'Create GitHub Release after build?'
+        required: true
+        type: boolean
+        default: true
   
   # Automatischer Trigger bei Tag-Push (optional)
   push:
@@ -213,7 +222,12 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: success()
+    # Läuft wenn: Tag-Push ODER (workflow_dispatch UND create_release=true)
+    if: |
+      always() && 
+      needs.build.result == 'success' &&
+      (github.event_name == 'push' || 
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'))
     
     steps:
       - name: Checkout repository
@@ -253,6 +267,11 @@ jobs:
             
             **Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronic lab notebooks.**
             
+            ${{ github.event.inputs.release_notes && format('## 📝 Release Notes
+
+{0}
+
+', github.event.inputs.release_notes) || '' }}
             ## 📥 Downloads
             
             Choose the version for your operating system:
