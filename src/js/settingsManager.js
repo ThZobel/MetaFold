@@ -10,6 +10,67 @@ const settingsManager = {
         migratedKeys: []
     },
     
+    // 🔐 NEW: Temporary in-memory password cache (NEVER stored in localStorage!)
+    _temporaryPasswordCache: {
+        username: null,
+        password: null,
+        timestamp: null,
+        maxAge: 30 * 60 * 1000 // 30 minutes
+    },
+
+    /**
+     * 🔐 Set current user's password for entropy generation (temporary, in-memory only)
+     * @param {string} username - Username
+     * @param {string} password - Password (NEVER stored in localStorage!)
+     */
+    setUserPasswordForEntropy(username, password) {
+        this._temporaryPasswordCache = {
+            username: username,
+            password: password,
+            timestamp: Date.now()
+        };
+        console.log('🔐 User password cached for entropy (in memory only)');
+    },
+
+    /**
+     * 🔐 Get cached user password (if still valid)
+     * @param {string} username - Username to verify
+     * @returns {string|null} - Password or null if expired/invalid
+     */
+    getUserPasswordForEntropy(username) {
+        const cache = this._temporaryPasswordCache;
+        
+        if (!cache.username || !cache.password || !cache.timestamp) {
+            return null;
+        }
+        
+        if (cache.username !== username) {
+            return null;
+        }
+        
+        const age = Date.now() - cache.timestamp;
+        if (age > cache.maxAge) {
+            console.warn('🔐 Cached password expired, clearing cache');
+            this.clearPasswordCache();
+            return null;
+        }
+        
+        return cache.password;
+    },
+
+    /**
+     * 🔐 Clear password cache
+     */
+    clearPasswordCache() {
+        this._temporaryPasswordCache = {
+            username: null,
+            password: null,
+            timestamp: null,
+            maxAge: 30 * 60 * 1000
+        };
+        console.log('🔐 Password cache cleared');
+    },
+    
     // ENHANCED Default Settings - Add these to settingsManager.js defaultSettings object
 
 	defaultSettings: {
@@ -207,6 +268,13 @@ const settingsManager = {
     // New function: Switch settings when user changes (ENHANCED with Group Categories)
     async switchToUser(username, groupname) {
         console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
+        
+        // 🔐 WICHTIG: Cache NICHT löschen beim Switch!
+        // Cache wird nur beim Logout gelöscht (siehe userManager.js)
+        console.log('🔐 Password cache preserved during user switch');
+    
+    // Save current settings before switching
+    this.saveSettingsUserSpecific();
         
         // Save current settings before switching
         this.saveSettingsUserSpecific();
@@ -742,23 +810,63 @@ const settingsManager = {
         }
 
         try {
-            const encrypted = await window.secureStorage.storeCredential(key, value, {
+            // 🔐 NEW: Get current user info for entropy
+            const currentUsername = window.userManager?.currentUser || 'Admin';
+            const currentPassword = this.getUserPasswordForEntropy(currentUsername);
+            
+            if (!currentPassword) {
+                console.error('🔐 ❌ CRITICAL: No password cached for user entropy!');
+                console.error('🔐 ❌ Cannot encrypt OMERO/eLab settings without user password!');
+                
+                if (window.app?.showError) {
+                    window.app.showError(
+                        'Security Error: Cannot save credentials without user password. ' +
+                        'Please log out and log in again with your password.'
+                    );
+                }
+                
+                return false;
+            }
+            
+            console.log(`🔐 Encrypting ${key} WITH user-specific entropy for: ${currentUsername}`);
+            
+            // Encrypt with user-specific entropy
+            const encrypted = await window.secureStorage.encryptData(value, {
+                type: 'user_credential',
                 key: key,
+                username: currentUsername,        // ✅ NEW
+                userPassword: currentPassword,    // ✅ NEW  
                 timestamp: new Date().toISOString(),
                 source: 'settings'
             });
 
-            this.secureCredentials[key] = encrypted;
-            await this.saveSecureCredentials();
+            if (encrypted.success) {
+                this.secureCredentials[key] = {
+                    encrypted: encrypted.encrypted,
+                    method: encrypted.method,
+                    timestamp: encrypted.timestamp,
+                    metadata: encrypted.metadata
+                };
+                
+                await this.saveSecureCredentials();
+                
+                console.log(`🔐 ✅ Stored ${key} WITH user-specific entropy using ${encrypted.method}`);
+                return true;
+            } else {
+                throw new Error('Encryption failed');
+            }
             
-            console.log(`🔐 Stored secure credential: ${key.replace(/password|key/gi, '***')} using ${encrypted.method}`);
-            return true;
         } catch (error) {
             console.error(`🔐 Failed to store secure credential ${key}:`, error);
             
-            // Fallback to plaintext if encryption fails
-            console.warn('🔐 Falling back to plaintext storage');
-            return this.set(key, value);
+            // Do NOT fall back to plaintext for OMERO/eLab!
+            console.error('🔐 ❌ Security-critical credential - refusing to store without encryption!');
+            
+            if (window.app?.showError) {
+                window.app.showError('Failed to securely store credential: ' + error.message);
+            }
+            
+            return false;
         }
     },
 
@@ -766,19 +874,72 @@ const settingsManager = {
         // Check if credential is stored securely
         if (this.secureCredentials[key]) {
             try {
-                const decrypted = await window.secureStorage.retrieveCredential(this.secureCredentials[key]);
-                return decrypted || '';
+                // 🔐 NEW: Get current user info for entropy verification
+                const currentUsername = window.userManager?.currentUser || 'Admin';
+                const currentPassword = this.getUserPasswordForEntropy(currentUsername);
+                
+                if (!currentPassword) {
+                    console.error('🔐 ❌ No password cached - cannot decrypt credential!');
+                    
+                    // Check if this is entropy-protected data
+                    const storedData = this.secureCredentials[key];
+                    if (storedData.metadata?.hasEntropy) {
+                        console.error('🔐 ❌ Credential requires user entropy - decryption blocked');
+                        
+                        if (window.app?.showWarning) {
+                            window.app.showWarning(
+                                'Cannot decrypt credential. Please log out and log in again.'
+                            );
+                        }
+                        
+                        return ''; // Return empty, do NOT expose data
+                    }
+                    
+                    // Legacy data without entropy - try to decrypt anyway
+                    console.warn('🔐 ⚠️ Legacy credential without entropy protection');
+                }
+                
+                console.log(`🔐 Decrypting ${key} WITH entropy verification for: ${currentUsername}`);
+                
+                // Decrypt with entropy verification
+                const decrypted = await window.secureStorage.decryptData(
+                    this.secureCredentials[key].encrypted,
+                    this.secureCredentials[key].method,
+                    {
+                        ...this.secureCredentials[key].metadata,
+                        username: currentUsername,       // ✅ NEW
+                        userPassword: currentPassword    // ✅ NEW
+                    }
+                );
+                
+                if (decrypted.success) {
+                    return decrypted.decrypted || '';
+                } else {
+                    throw new Error('Decryption failed');
+                }
+                
             } catch (error) {
                 console.error(`🔐 Failed to decrypt credential ${key}:`, error);
                 
-                // FIXED: Fallback to plaintext setting WITHOUT recursion
-                const plaintextValue = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
-                console.warn(`🔐 Using plaintext fallback for ${key}`);
-                return plaintextValue || '';
+                // Check if this was an entropy error
+                if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
+                    console.error('🔐 ❌ Cross-user access blocked by entropy protection');
+                    
+                    if (window.app?.showError) {
+                        window.app.showError(
+                            'Cannot access this credential - it belongs to another user.'
+                        );
+                    }
+                    
+                    return ''; // Return empty, do NOT expose data
+                }
+                
+                // Other error - return empty for safety
+                return '';
             }
         }
         
-        // FIXED: Fallback to regular settings WITHOUT recursion
+        // Fallback to regular settings (legacy)
         const regularValue = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
         return regularValue || '';
     },

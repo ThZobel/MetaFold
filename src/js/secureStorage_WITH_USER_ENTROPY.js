@@ -322,13 +322,7 @@ const secureStorage = {
         } catch (error) {
             console.error(`🔐 Decryption failed with ${method}:`, error);
             
-            // ⚠️ CRITICAL: Re-throw ENTROPY_ERROR to prevent bypass
-            if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
-                console.error('🚨 Re-throwing entropy error - cross-user access DENIED');
-                throw error;
-            }
-            
-            // Return original data as fallback for other errors
+            // Return original data as fallback
             return {
                 success: false,
                 decrypted: encryptedData,

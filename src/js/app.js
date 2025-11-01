@@ -53,6 +53,7 @@ const app = {
             console.log('🔐 Password system enabled:', passwordSystemEnabled);
             
             // If password system is enabled, ensure Admin exists
+            // =================== PHASE 1: SECURE STORAGE ===================
             if (passwordSystemEnabled) {
                 console.log('🔐 Password system active - ensuring Admin account exists...');
                 
@@ -70,6 +71,10 @@ const app = {
                         try {
                             await window.secureStorage.init();
                             console.log('✅ secureStorage initialized');
+                            
+                            // ⚠️ WICHTIG: Security Guard NICHT hier initialisieren!
+                            // Es wird später initialisiert, NACH userManager
+                            
                         } catch (error) {
                             console.warn('⚠️ secureStorage init failed:', error);
                         }
@@ -148,20 +153,86 @@ const app = {
             } else {
                 console.log('ℹ️ Password system disabled - no Admin account needed');
             }
-            
-            // STEP 2: Initialize userManager with settings support
+
+            // =================== PHASE 2: USER MANAGER ===================
             if (window.userManager) {
                 console.log('🔧 Initializing userManager...');
                 
+                let userInfo;
+                
                 // Check if new settings-aware function is available
                 if (typeof window.userManager.initWithSettingsSupport === 'function') {
-                    const userResult = await window.userManager.initWithSettingsSupport();
-                    console.log('✅ User initialized with settings support:', userResult);
+                    userInfo = await window.userManager.initWithSettingsSupport();
+                    console.log('✅ User initialized with settings support:', userInfo);
                 } else {
                     // Fallback to original init
                     console.warn('⚠️ User-settings integration not available - using standard init');
-                    const userResult = await window.userManager.init();
-                    console.log('✅ User initialized (fallback):', userResult);
+                    userInfo = await window.userManager.init();
+                    console.log('✅ User initialized (fallback):', userInfo);
+                }
+                
+                // =================== PHASE 3: SECURITY GUARD (AFTER userManager!) ===================
+                // CRITICAL: Security Guard needs userManager to be initialized first!
+                if (window.securityGuard && passwordSystemEnabled) {
+                    console.log('🛡️ Initializing Security Guard...');
+                    try {
+                        await window.securityGuard.init();
+                        console.log('✅ Security Guard initialized');
+                        
+                        // Notify Electron about current user (for DevTools control)
+                        if (window.electronAPI && window.electronAPI.invoke && userInfo) {
+                            try {
+                                await window.electronAPI.invoke('check-admin-user', userInfo.username);
+                                console.log('✅ Electron notified about current user:', userInfo.username);
+                            } catch (error) {
+                                console.warn('⚠️ Failed to notify Electron:', error);
+                            }
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ Security Guard initialization failed:', error);
+                    }
+                } else {
+                    if (!window.securityGuard) {
+                        console.warn('⚠️ Security Guard not available');
+                    }
+                    if (!passwordSystemEnabled) {
+                        console.log('ℹ️ Security Guard skipped (password system disabled)');
+                    }
+                }
+                
+                // =================== PHASE 4: ADMIN PASSWORD MANAGER ===================
+                // CRITICAL: After Security Guard, check if Admin needs password change
+                if (window.adminPasswordManager && passwordSystemEnabled && userInfo) {
+                    console.log('🔐 Checking Admin Password Manager...');
+                    
+                    // Only check if current user is Admin
+                    if (userInfo.username === 'Admin') {
+                        try {
+                            // Small delay to ensure everything is ready
+                            setTimeout(async () => {
+                                try {
+                                    const changed = await window.adminPasswordManager.init();
+                                    if (changed) {
+                                        console.log('✅ Admin password change completed');
+                                    }
+                                } catch (error) {
+                                    console.error('❌ Admin Password Manager failed:', error);
+                                }
+                            }, 1000); // 1 second delay
+                        } catch (error) {
+                            console.error('❌ Admin Password Manager setup failed:', error);
+                        }
+                    } else {
+                        console.log('ℹ️ Current user is not Admin, skipping password check');
+                    }
+                } else {
+                    if (!window.adminPasswordManager) {
+                        console.warn('⚠️ Admin Password Manager not available');
+                    }
+                    if (!passwordSystemEnabled) {
+                        console.log('ℹ️ Admin Password Manager skipped (password system disabled)');
+                    }
                 }
             }
             

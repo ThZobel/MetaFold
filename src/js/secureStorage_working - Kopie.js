@@ -1,6 +1,5 @@
-// Secure Storage Module - Multi-Layer Encryption WITH USER-SPECIFIC ENTROPY
+// Secure Storage Module - Multi-Layer Encryption
 // Provides secure storage for sensitive credentials (passwords, API keys)
-// 🔐 ENHANCED: Adds user-specific entropy to DPAPI encryption to prevent cross-user access
 
 const secureStorage = {
     isInitialized: false,
@@ -18,7 +17,7 @@ const secureStorage = {
             return this.capabilities;
         }
 
-        console.log('🔐 Initializing Secure Storage with User-Specific Entropy...');
+        console.log('🔐 Initializing Secure Storage...');
 
         // Check Electron safeStorage capability
         try {
@@ -49,7 +48,6 @@ const secureStorage = {
         
         const method = this.getBestEncryptionMethod();
         console.log(`🔐 Secure Storage initialized with method: ${method}`);
-        console.log('🔐 ✅ User-specific entropy ENABLED for DPAPI');
         
         // ✅ AUTO-INIT ADMIN ACCOUNT
         console.log('🔍 Checking if Admin account needs to be created...');
@@ -126,98 +124,6 @@ const secureStorage = {
         }
     },
 
-    // =================== USER-SPECIFIC ENTROPY ===================
-
-    /**
-     * Derive user-specific entropy from username and password
-     * This creates a unique salt for each user that prevents cross-user decryption
-     * even when sharing the same Windows account (DPAPI limitation)
-     * 
-     * @param {string} username - The MetaFold username
-     * @param {string} password - The user's MetaFold password (plaintext)
-     * @returns {Promise<string>} - Base64 encoded user entropy
-     */
-    async deriveUserEntropy(username, password) {
-        if (!username || !password) {
-            throw new Error('Username and password required for user entropy');
-        }
-
-        try {
-            console.log(`🔐 Deriving user-specific entropy for: ${username}`);
-            
-            // Combine username and password
-            const combined = `${username}:${password}`;
-            
-            if (window.crypto && window.crypto.subtle) {
-                // Use PBKDF2 to derive entropy (same as password hashing)
-                const encoder = new TextEncoder();
-                const keyMaterial = await window.crypto.subtle.importKey(
-                    'raw',
-                    encoder.encode(combined),
-                    'PBKDF2',
-                    false,
-                    ['deriveBits']
-                );
-
-                // Use username as salt (deterministic per user)
-                const salt = encoder.encode(username);
-                
-                // Derive 256 bits of entropy
-                const derivedBits = await window.crypto.subtle.deriveBits(
-                    {
-                        name: 'PBKDF2',
-                        salt: salt,
-                        iterations: 50000, // 50k iterations for security
-                        hash: 'SHA-256'
-                    },
-                    keyMaterial,
-                    256 // 256-bit output
-                );
-
-                // Convert to base64
-                const entropyArray = new Uint8Array(derivedBits);
-                const entropy = btoa(String.fromCharCode(...entropyArray));
-                
-                console.log(`🔐 ✅ User entropy derived (${entropy.length} chars)`);
-                return entropy;
-                
-            } else {
-                // Fallback: Simple hash-based entropy
-                return this.deriveUserEntropyFallback(username, password);
-            }
-            
-        } catch (error) {
-            console.error('🔐 User entropy derivation failed:', error);
-            // Fallback
-            return this.deriveUserEntropyFallback(username, password);
-        }
-    },
-
-    /**
-     * Fallback entropy derivation without crypto API
-     * @param {string} username - Username
-     * @param {string} password - Password
-     * @returns {string} - User entropy
-     */
-    deriveUserEntropyFallback(username, password) {
-        const combined = `${username}:${password}`;
-        let hash = '';
-        
-        // Multiple rounds of hashing
-        for (let round = 0; round < 1000; round++) {
-            let roundHash = '';
-            for (let i = 0; i < combined.length; i++) {
-                const char = combined.charCodeAt(i);
-                const usernameChar = username.charCodeAt(i % username.length);
-                const combined = (char + usernameChar + round) % 256;
-                roundHash += String.fromCharCode(combined);
-            }
-            hash = btoa(roundHash);
-        }
-        
-        return hash;
-    },
-
     // =================== ENCRYPTION METHODS ===================
 
     // Get best available encryption method
@@ -231,12 +137,7 @@ const secureStorage = {
         }
     },
 
-    /**
-     * Encrypt data using best available method
-     * @param {string} plaintext - Data to encrypt
-     * @param {Object} metadata - Metadata (MUST include username and userPassword for DPAPI)
-     * @returns {Promise<Object>} - Encryption result
-     */
+    // Encrypt data using best available method
     async encryptData(plaintext, metadata = {}) {
         if (!this.isInitialized) {
             await this.init();
@@ -281,13 +182,7 @@ const secureStorage = {
         }
     },
 
-    /**
-     * Decrypt data using specified method
-     * @param {string} encryptedData - Encrypted data
-     * @param {string} method - Encryption method used
-     * @param {Object} metadata - Metadata (MUST include username and userPassword for DPAPI)
-     * @returns {Promise<Object>} - Decryption result
-     */
+    // Decrypt data using specified method
     async decryptData(encryptedData, method, metadata = {}) {
         if (!this.isInitialized) {
             await this.init();
@@ -322,13 +217,7 @@ const secureStorage = {
         } catch (error) {
             console.error(`🔐 Decryption failed with ${method}:`, error);
             
-            // ⚠️ CRITICAL: Re-throw ENTROPY_ERROR to prevent bypass
-            if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
-                console.error('🚨 Re-throwing entropy error - cross-user access DENIED');
-                throw error;
-            }
-            
-            // Return original data as fallback for other errors
+            // Return original data as fallback
             return {
                 success: false,
                 decrypted: encryptedData,
@@ -339,70 +228,17 @@ const secureStorage = {
         }
     },
 
-    // =================== ELECTRON SAFESTORAGE WITH USER ENTROPY ===================
+    // =================== ELECTRON SAFESTORAGE METHODS ===================
 
-    /**
-     * Encrypt with Electron safeStorage + User-Specific Entropy
-     * 🔐 SECURITY: Adds user-specific entropy to prevent cross-user access
-     * 
-     * @param {string} plaintext - Data to encrypt
-     * @param {Object} metadata - Must contain: username, userPassword
-     * @returns {Promise<Object>} - Encryption result
-     */
     async encryptWithElectron(plaintext, metadata) {
         try {
-            // Check if we have user credentials for entropy
-            const hasUserContext = metadata.username && metadata.userPassword;
-            
-            if (!hasUserContext) {
-                console.warn('🔐 ⚠️ No user context provided - encrypting WITHOUT user-specific entropy!');
-                console.warn('🔐 ⚠️ This data will be vulnerable to cross-user access on shared Windows accounts');
-            }
-            
-            let dataToEncrypt = plaintext;
-            let entropyMetadata = { hasEntropy: false };
-            
-            // Add user-specific entropy if credentials provided
-            if (hasUserContext) {
-                console.log('🔐 Adding user-specific entropy...');
-                
-                // Derive user entropy
-                const userEntropy = await this.deriveUserEntropy(
-                    metadata.username, 
-                    metadata.userPassword
-                );
-                
-                // Create entropy-protected package
-                const entropyPackage = {
-                    data: plaintext,
-                    entropy: userEntropy,
-                    username: metadata.username,
-                    version: 3 // Version 3 = with user entropy
-                };
-                
-                dataToEncrypt = JSON.stringify(entropyPackage);
-                entropyMetadata = {
-                    hasEntropy: true,
-                    entropyUser: metadata.username,
-                    entropyVersion: 3
-                };
-                
-                console.log('🔐 ✅ User-specific entropy added');
-            }
-            
-            // Encrypt with DPAPI
-            const result = await window.electronAPI.invoke(
-                'store-secure-credential', 
-                'temp', 
-                dataToEncrypt, 
-                { ...metadata, ...entropyMetadata }
-            );
+            // FIXED: Use consistent method parameter
+            const result = await window.electronAPI.invoke('store-secure-credential', 'temp', plaintext, metadata);
             
             if (result.success) {
                 console.log('🔐 Electron encryption result:', {
                     method: result.method,
                     encryptedLength: result.stored?.length || 0,
-                    hasUserEntropy: entropyMetadata.hasEntropy,
                     timestamp: result.timestamp
                 });
                 
@@ -411,7 +247,7 @@ const secureStorage = {
                     encrypted: result.stored,
                     method: 'electronSafeStorage',
                     timestamp: result.timestamp,
-                    metadata: { ...metadata, ...entropyMetadata }
+                    metadata: metadata
                 };
             } else {
                 throw new Error(result.error || 'Electron encryption failed');
@@ -422,105 +258,37 @@ const secureStorage = {
         }
     },
 
-    /**
-     * Decrypt with Electron safeStorage + User-Specific Entropy Verification
-     * 🔐 SECURITY: Verifies user entropy before returning decrypted data
-     * 
-     * @param {string} encryptedData - Encrypted data
-     * @param {Object} metadata - Must contain: username, userPassword (if data has entropy)
-     * @returns {Promise<Object>} - Decryption result
-     */
     async decryptWithElectron(encryptedData, metadata) {
-        try {
-            // Decrypt with DPAPI
-            const result = await window.electronAPI.invoke(
-                'retrieve-secure-credential', 
-                encryptedData, 
-                'safeStorage'
-            );
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Electron decryption failed');
-            }
-            
-            let decryptedValue = result.value;
-            let isEntropyProtected = false;
-            
-            // Check if data has user entropy
             try {
-                const possiblePackage = JSON.parse(result.value);
+                // FIXED: Use 'safeStorage' to match main.js expectation
+                const result = await window.electronAPI.invoke('retrieve-secure-credential', encryptedData, 'safeStorage');
                 
-                // Version 3 = with user entropy
-                if (possiblePackage.version === 3 && possiblePackage.entropy) {
-                    isEntropyProtected = true;
-                    console.log('🔐 Detected entropy-protected data, verifying user...');
+                if (result.success) {
+                    // SICHERHEITS-FIX: Keine sensiblen Daten im Log
+                    console.log('🔐 Electron decryption result:', {
+                        hasValue: !!result.value,
+                        valueLength: result.value?.length || 0,
+                        // ENTFERNT: valuePreview - keine Passwort-Fragmente im Log
+                        decryptionMethod: 'electronSafeStorage'
+                    });
                     
-                    // CRITICAL: Verify user entropy
-                    if (!metadata.username || !metadata.userPassword) {
-                        console.error('🔐 ❌ Entropy-protected data requires user credentials!');
-                        throw new Error('ENTROPY_ERROR: User credentials required to decrypt this data');
-                    }
-                    
-                    // Derive expected entropy
-                    const expectedEntropy = await this.deriveUserEntropy(
-                        metadata.username,
-                        metadata.userPassword
-                    );
-                    
-                    // Verify entropy matches
-                    if (possiblePackage.entropy !== expectedEntropy) {
-                        console.error('🔐 ❌ User entropy mismatch! Cross-user access denied.');
-                        console.error('🔐 ❌ Expected user:', possiblePackage.username);
-                        console.error('🔐 ❌ Attempting user:', metadata.username);
-                        throw new Error('ENTROPY_ERROR: User entropy verification failed - access denied');
-                    }
-                    
-                    // Verify username matches
-                    if (possiblePackage.username !== metadata.username) {
-                        console.error('🔐 ❌ Username mismatch! Cross-user access denied.');
-                        throw new Error('ENTROPY_ERROR: Username verification failed - access denied');
-                    }
-                    
-                    console.log('🔐 ✅ User entropy verified - access granted');
-                    
-                    // Extract original data
-                    decryptedValue = possiblePackage.data;
+                    return {
+                        success: true,
+                        decrypted: result.value,
+                        method: 'electronSafeStorage',
+                        timestamp: result.timestamp,
+                        metadata: result.metadata || metadata
+                    };
+                } else {
+                    throw new Error(result.error || 'Electron decryption failed');
                 }
-                
-            } catch (parseError) {
-                // Re-throw entropy verification errors (they must NOT be caught!)
-                if (parseError.message && parseError.message.startsWith('ENTROPY_ERROR:')) {
-                    throw parseError;
-                }
-                
-                // Not JSON or legacy format - use as-is (only if NOT entropy protected)
-                if (!isEntropyProtected) {
-                    console.log('🔐 Legacy format detected (no entropy protection)');
-                }
+            } catch (error) {
+                console.error('🔐 Electron decryption error:', error);
+                throw error;
             }
-            
-            // SICHERHEITS-FIX: Keine sensiblen Daten im Log
-            console.log('🔐 Electron decryption result:', {
-                hasValue: !!decryptedValue,
-                valueLength: decryptedValue?.length || 0,
-                decryptionMethod: 'electronSafeStorage'
-            });
-            
-            return {
-                success: true,
-                decrypted: decryptedValue,
-                method: 'electronSafeStorage',
-                timestamp: result.timestamp,
-                metadata: result.metadata || metadata
-            };
-            
-        } catch (error) {
-            console.error('🔐 Electron decryption error:', error);
-            throw error;
-        }
-    },
+        },
 
-    // =================== BROWSER CRYPTO METHODS (unchanged) ===================
+    // =================== BROWSER CRYPTO METHODS ===================
 
     async encryptWithBrowserCrypto(plaintext, metadata) {
         if (!this.capabilities.browserCrypto || !this.encryptionKey) {
@@ -598,7 +366,7 @@ const secureStorage = {
         }
     },
 
-    // =================== FALLBACK BASE64 METHODS (unchanged) ===================
+    // =================== FALLBACK BASE64 METHODS ===================
 
     async encryptWithFallback(plaintext, metadata) {
         try {
@@ -862,10 +630,10 @@ const secureStorage = {
         return hash;
     },
 
-    // =================== USER PASSWORD STORAGE WITH ENTROPY ===================
+    // =================== USER PASSWORD STORAGE ===================
 
     /**
-     * Store a user's password (hashed) WITH user-specific entropy
+     * Store a user's password (hashed)
      * @param {string} username - Username
      * @param {string} password - Plain text password
      * @returns {Promise<Object>} - Storage result
@@ -876,17 +644,16 @@ const secureStorage = {
         }
 
         try {
-            console.log(`🔐 Storing password with user entropy for: ${username}`);
+            console.log(`🔐 Storing password for user: ${username}`);
             
             // Hash the password
             const hashedPassword = await this.hashPassword(password);
             
-            // Store the hash securely WITH user-specific entropy
+            // Store the hash securely
             const storageKey = `user_password_${username}`;
             const encrypted = await this.encryptData(JSON.stringify(hashedPassword), {
                 type: 'user_password',
                 username: username,
-                userPassword: password, // ✅ Pass password for entropy derivation
                 createdAt: new Date().toISOString()
             });
 
@@ -898,7 +665,7 @@ const secureStorage = {
                     metadata: encrypted.metadata
                 }));
 
-                console.log('✅ User password stored successfully WITH user-specific entropy');
+                console.log('✅ User password stored successfully');
                 return { success: true };
             } else {
                 throw new Error('Failed to encrypt password');
@@ -910,7 +677,7 @@ const secureStorage = {
     },
 
     /**
-     * Verify a user's password WITH user-specific entropy verification
+     * Verify a user's password
      * @param {string} username - Username
      * @param {string} password - Plain text password to verify
      * @returns {Promise<boolean>} - True if password is correct
@@ -921,7 +688,7 @@ const secureStorage = {
         }
 
         try {
-            console.log(`🔐 Verifying password with entropy check for: ${username}`);
+            console.log(`🔐 Verifying password for user: ${username}`);
             
             // Retrieve stored password hash
             const storageKey = `user_password_${username}`;
@@ -934,25 +701,21 @@ const secureStorage = {
 
             const encryptedData = JSON.parse(storedData);
             
-            // Decrypt the stored hash WITH entropy verification
+            // Decrypt the stored hash
             const decrypted = await this.decryptData(
                 encryptedData.encrypted,
                 encryptedData.method,
-                {
-                    ...encryptedData.metadata,
-                    username: username,
-                    userPassword: password // ✅ Pass password for entropy verification
-                }
+                encryptedData.metadata
             );
 
             if (!decrypted.success) {
-                console.error('🔐 Failed to decrypt stored password (entropy mismatch or wrong password)');
+                console.error('🔐 Failed to decrypt stored password');
                 return false;
             }
 
             const storedHash = JSON.parse(decrypted.decrypted);
             
-            // Verify the password hash
+            // Verify the password
             return await this.verifyPassword(password, storedHash);
             
         } catch (error) {
@@ -1008,7 +771,6 @@ const secureStorage = {
             initialized: this.isInitialized,
             capabilities: this.capabilities,
             encryptionMethod: this.getBestEncryptionMethod(),
-            userEntropyEnabled: true, // ✅ NEW
             usersWithPasswords: passwordStatus,
             totalUsers: users.length,
             usersWithPasswordsCount: Object.values(passwordStatus).filter(Boolean).length
@@ -1032,7 +794,7 @@ const secureStorage = {
                 return { success: true, existed: true };
             }
 
-            // Create admin password WITH user entropy
+            // Create admin password
             await this.storeUserPassword(adminUsername, defaultPassword);
             
             // Add admin to user list if not exists
@@ -1042,7 +804,7 @@ const secureStorage = {
                 }
             }
             
-            console.log('✅ Admin account created with default password (WITH user entropy)');
+            console.log('✅ Admin account created with default password');
             return { 
                 success: true, 
                 created: true, 
@@ -1079,7 +841,7 @@ const secureStorage = {
                 throw new Error('Only Admin user can reset passwords');
             }
             
-            // Set new password for target user WITH user entropy
+            // Set new password for target user
             await this.storeUserPassword(targetUsername, newPassword);
             
             console.log(`✅ Password reset successful for user: ${targetUsername}`);
@@ -1215,164 +977,368 @@ const secureStorage = {
             initialized: this.isInitialized,
             capabilities: this.capabilities,
             bestMethod: this.getBestEncryptionMethod(),
-            hasEncryptionKey: !!this.encryptionKey,
-            userEntropyEnabled: true // ✅ NEW
+            hasEncryptionKey: !!this.encryptionKey
         };
     },
 
     // =================== ENHANCED PASSWORD STORAGE WITH TAMPER PROTECTION ===================
-    // (Keep existing enhanced methods - they still work and add another layer of security)
-    // The existing createHMAC, verifyUserPasswordEnhanced, etc. methods remain unchanged
-    // They work on top of the entropy-protected storage layer
 
-    /**
-     * Create HMAC signature for data integrity
-     * @param {string} data - Data to sign
-     * @returns {Promise<string>} - HMAC signature
-     */
-    async createHMAC(data) {
-        try {
-            if (window.crypto && window.crypto.subtle) {
-                // Get or create signing key
-                let signingKey = localStorage.getItem('metafold_signing_key');
-                
-                if (!signingKey) {
-                    // Generate new signing key
-                    const key = await window.crypto.subtle.generateKey(
-                        { name: 'HMAC', hash: 'SHA-256' },
-                        true,
-                        ['sign', 'verify']
-                    );
-                    
-                    const exportedKey = await window.crypto.subtle.exportKey('jwk', key);
-                    signingKey = JSON.stringify(exportedKey);
-                    localStorage.setItem('metafold_signing_key', signingKey);
-                }
-                
-                // Import key
-                const keyData = JSON.parse(signingKey);
-                const key = await window.crypto.subtle.importKey(
-                    'jwk',
-                    keyData,
+/**
+ * Store user password with enhanced encryption and tamper protection
+ * @param {string} username - Username
+ * @param {string} password - Plain text password
+ * @returns {Promise<Object>} - Storage result
+ */
+async storeUserPasswordEnhanced(username, password) {
+    if (!username || !password) {
+        throw new Error('Username and password are required');
+    }
+
+    try {
+        console.log(`🔐 Storing password with enhanced protection for: ${username}`);
+        
+        // 1. Hash the password with PBKDF2
+        const hashedPassword = await this.hashPassword(password);
+        
+        // 2. Create tamper-proof package
+        const passwordPackage = {
+            hash: hashedPassword.hash,
+            salt: hashedPassword.salt,
+            method: hashedPassword.method,
+            timestamp: hashedPassword.timestamp,
+            username: username,
+            version: 2 // Enhanced version marker
+        };
+        
+        // 3. Create HMAC signature for integrity
+        const signature = await this.createHMAC(JSON.stringify(passwordPackage));
+        
+        // 4. Combine package with signature
+        const signedPackage = {
+            data: passwordPackage,
+            signature: signature,
+            signedAt: new Date().toISOString()
+        };
+        
+        // 5. Encrypt the entire signed package
+        const storageKey = `user_password_${username}`;
+        const encrypted = await this.encryptData(JSON.stringify(signedPackage), {
+            type: 'user_password_enhanced',
+            username: username,
+            createdAt: new Date().toISOString(),
+            requiresAdmin: true
+        });
+
+        if (encrypted.success) {
+            // 6. Store with additional metadata
+            localStorage.setItem(storageKey, JSON.stringify({
+                encrypted: encrypted.encrypted,
+                method: encrypted.method,
+                metadata: encrypted.metadata,
+                enhanced: true, // Mark as enhanced version
+                checksum: this.createSimpleChecksum(encrypted.encrypted)
+            }));
+
+            // 7. Create backup signature in separate key
+            localStorage.setItem(`${storageKey}_signature`, signature);
+            
+            console.log('✅ User password stored with enhanced protection');
+            return { success: true, enhanced: true };
+        } else {
+            throw new Error('Failed to encrypt password');
+        }
+    } catch (error) {
+        console.error('🔐 Enhanced password storage failed:', error);
+        throw error;
+    }
+},
+
+/**
+ * Verify user password with tamper detection
+ * @param {string} username - Username
+ * @param {string} password - Plain text password to verify
+ * @returns {Promise<boolean>} - True if password is correct and not tampered
+ */
+async verifyUserPasswordEnhanced(username, password) {
+    if (!username || !password) {
+        return false;
+    }
+
+    try {
+        console.log(`🔐 Verifying password with tamper detection for: ${username}`);
+        
+        // 1. Retrieve stored password data
+        const storageKey = `user_password_${username}`;
+        const storedData = localStorage.getItem(storageKey);
+        
+        if (!storedData) {
+            console.log('🔐 No password found for user');
+            return false;
+        }
+
+        const encryptedData = JSON.parse(storedData);
+        
+        // 2. Check if enhanced version
+        if (!encryptedData.enhanced) {
+            console.log('⚠️ Using legacy password verification');
+            return await this.verifyUserPassword(username, password);
+        }
+        
+        // 3. Verify checksum
+        const currentChecksum = this.createSimpleChecksum(encryptedData.encrypted);
+        if (currentChecksum !== encryptedData.checksum) {
+            console.error('🚨 TAMPER DETECTED: Checksum mismatch!');
+            this.handleTamperDetection(username, 'checksum_mismatch');
+            return false;
+        }
+        
+        // 4. Decrypt the stored package
+        const decrypted = await this.decryptData(
+            encryptedData.encrypted,
+            encryptedData.method,
+            encryptedData.metadata
+        );
+
+        if (!decrypted.success) {
+            console.error('🔐 Failed to decrypt stored password');
+            return false;
+        }
+
+        const signedPackage = JSON.parse(decrypted.decrypted);
+        
+        // 5. Verify signature
+        const expectedSignature = await this.createHMAC(JSON.stringify(signedPackage.data));
+        if (signedPackage.signature !== expectedSignature) {
+            console.error('🚨 TAMPER DETECTED: Signature mismatch!');
+            this.handleTamperDetection(username, 'signature_mismatch');
+            return false;
+        }
+        
+        // 6. Cross-check with backup signature
+        const backupSignature = localStorage.getItem(`${storageKey}_signature`);
+        if (backupSignature && backupSignature !== signedPackage.signature) {
+            console.error('🚨 TAMPER DETECTED: Backup signature mismatch!');
+            this.handleTamperDetection(username, 'backup_signature_mismatch');
+            return false;
+        }
+        
+        // 7. Verify the password
+        const storedHash = signedPackage.data;
+        const isValid = await this.verifyPassword(password, storedHash);
+        
+        if (isValid) {
+            console.log('✅ Password verified - No tampering detected');
+        }
+        
+        return isValid;
+        
+    } catch (error) {
+        console.error('🔐 Enhanced password verification failed:', error);
+        return false;
+    }
+},
+
+/**
+ * Create HMAC signature for data integrity
+ * @param {string} data - Data to sign
+ * @returns {Promise<string>} - HMAC signature
+ */
+async createHMAC(data) {
+    try {
+        if (window.crypto && window.crypto.subtle) {
+            // Get or create signing key
+            let signingKey = localStorage.getItem('metafold_signing_key');
+            
+            if (!signingKey) {
+                // Generate new signing key
+                const key = await window.crypto.subtle.generateKey(
                     { name: 'HMAC', hash: 'SHA-256' },
-                    false,
-                    ['sign']
+                    true,
+                    ['sign', 'verify']
                 );
                 
-                // Sign data
-                const encoder = new TextEncoder();
-                const signature = await window.crypto.subtle.sign(
-                    'HMAC',
-                    key,
-                    encoder.encode(data)
-                );
-                
-                // Convert to base64
-                return btoa(String.fromCharCode(...new Uint8Array(signature)));
-                
-            } else {
-                // Fallback: Simple hash-based signature
-                return this.createSimpleSignature(data);
+                const exportedKey = await window.crypto.subtle.exportKey('jwk', key);
+                signingKey = JSON.stringify(exportedKey);
+                localStorage.setItem('metafold_signing_key', signingKey);
             }
-        } catch (error) {
-            console.error('🔐 HMAC creation failed:', error);
+            
+            // Import key
+            const keyData = JSON.parse(signingKey);
+            const key = await window.crypto.subtle.importKey(
+                'jwk',
+                keyData,
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+            
+            // Sign data
+            const encoder = new TextEncoder();
+            const signature = await window.crypto.subtle.sign(
+                'HMAC',
+                key,
+                encoder.encode(data)
+            );
+            
+            // Convert to base64
+            return btoa(String.fromCharCode(...new Uint8Array(signature)));
+            
+        } else {
+            // Fallback: Simple hash-based signature
             return this.createSimpleSignature(data);
         }
-    },
-
-    /**
-     * Simple signature fallback
-     * @param {string} data - Data to sign
-     * @returns {string} - Signature
-     */
-    createSimpleSignature(data) {
-        let hash = 0;
-        const salt = localStorage.getItem('metafold_signature_salt') || this.generateClientSalt();
-        
-        if (!localStorage.getItem('metafold_signature_salt')) {
-            localStorage.setItem('metafold_signature_salt', salt);
-        }
-        
-        const combined = data + salt;
-        for (let i = 0; i < combined.length; i++) {
-            const char = combined.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        
-        return btoa(hash.toString(36));
-    },
-
-    /**
-     * Create simple checksum for quick integrity check
-     * @param {string} data - Data to checksum
-     * @returns {string} - Checksum
-     */
-    createSimpleChecksum(data) {
-        let hash = 0;
-        for (let i = 0; i < data.length; i++) {
-            const char = data.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return hash.toString(36);
-    },
-
-    /**
-     * Handle tamper detection
-     * @param {string} username - Username of tampered account
-     * @param {string} type - Type of tampering detected
-     */
-    handleTamperDetection(username, type) {
-        console.error('🚨 SECURITY ALERT: Tampering detected!');
-        console.error('🚨 Username:', username);
-        console.error('🚨 Tampering type:', type);
-        console.error('🚨 Timestamp:', new Date().toISOString());
-        
-        // Log to localStorage for audit trail
-        const auditLog = JSON.parse(localStorage.getItem('metafold_security_audit') || '[]');
-        auditLog.push({
-            type: 'tamper_detection',
-            username: username,
-            tamperType: type,
-            timestamp: new Date().toISOString()
-        });
-        
-        // Keep only last 100 entries
-        if (auditLog.length > 100) {
-            auditLog.shift();
-        }
-        
-        localStorage.setItem('metafold_security_audit', JSON.stringify(auditLog));
-        
-        // Show warning
-        if (window.confirm('🚨 SECURITY WARNING!\n\nTampering detected in user password data.\n\nThis could indicate:\n- Unauthorized access attempt\n- Data corruption\n- Malicious activity\n\nRecommended action: Reset password immediately.\n\nClick OK to open User Management.')) {
-            if (window.userManagementModal) {
-                window.userManagementModal.show();
-            }
-        }
-    },
-
-    /**
-     * Get security audit log
-     * @returns {Array} - Audit log entries
-     */
-    getSecurityAuditLog() {
-        try {
-            return JSON.parse(localStorage.getItem('metafold_security_audit') || '[]');
-        } catch (error) {
-            console.error('Failed to read audit log:', error);
-            return [];
-        }
-    },
-
-    /**
-     * Clear security audit log (Admin only)
-     */
-    clearSecurityAuditLog() {
-        localStorage.removeItem('metafold_security_audit');
-        console.log('🗑️ Security audit log cleared');
+    } catch (error) {
+        console.error('🔐 HMAC creation failed:', error);
+        return this.createSimpleSignature(data);
     }
+},
+
+/**
+ * Simple signature fallback
+ * @param {string} data - Data to sign
+ * @returns {string} - Signature
+ */
+createSimpleSignature(data) {
+    let hash = 0;
+    const salt = localStorage.getItem('metafold_signature_salt') || this.generateClientSalt();
+    
+    if (!localStorage.getItem('metafold_signature_salt')) {
+        localStorage.setItem('metafold_signature_salt', salt);
+    }
+    
+    const combined = data + salt;
+    for (let i = 0; i < combined.length; i++) {
+        const char = combined.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    
+    return btoa(hash.toString(36));
+},
+
+/**
+ * Create simple checksum for quick integrity check
+ * @param {string} data - Data to checksum
+ * @returns {string} - Checksum
+ */
+createSimpleChecksum(data) {
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+        const char = data.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash.toString(36);
+},
+
+/**
+ * Handle tamper detection
+ * @param {string} username - Username of tampered account
+ * @param {string} type - Type of tampering detected
+ */
+handleTamperDetection(username, type) {
+    console.error('🚨 SECURITY ALERT: Tampering detected!');
+    console.error('🚨 Username:', username);
+    console.error('🚨 Tampering type:', type);
+    console.error('🚨 Timestamp:', new Date().toISOString());
+    
+    // Log to localStorage for audit trail
+    const auditLog = JSON.parse(localStorage.getItem('metafold_security_audit') || '[]');
+    auditLog.push({
+        type: 'tamper_detection',
+        username: username,
+        tamperType: type,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Keep only last 100 entries
+    if (auditLog.length > 100) {
+        auditLog.shift();
+    }
+    
+    localStorage.setItem('metafold_security_audit', JSON.stringify(auditLog));
+    
+    // Show warning
+    if (window.confirm('🚨 SECURITY WARNING!\n\nTampering detected in user password data.\n\nThis could indicate:\n- Unauthorized access attempt\n- Data corruption\n- Malicious activity\n\nRecommended action: Reset password immediately.\n\nClick OK to open User Management.')) {
+        if (window.userManagementModal) {
+            window.userManagementModal.show();
+        }
+    }
+},
+
+/**
+ * Migrate existing passwords to enhanced format
+ * @returns {Promise<Object>} - Migration result
+ */
+async migratePasswordsToEnhanced() {
+    console.log('🔄 Migrating passwords to enhanced format...');
+    
+    const results = {
+        total: 0,
+        migrated: 0,
+        failed: 0,
+        skipped: 0
+    };
+    
+    // Get all users
+    const users = window.userManager?.users || [];
+    
+    for (const username of users) {
+        results.total++;
+        
+        try {
+            const storageKey = `user_password_${username}`;
+            const storedData = localStorage.getItem(storageKey);
+            
+            if (!storedData) {
+                results.skipped++;
+                continue;
+            }
+            
+            const data = JSON.parse(storedData);
+            
+            // Check if already enhanced
+            if (data.enhanced) {
+                console.log(`⏭️ ${username}: Already enhanced`);
+                results.skipped++;
+                continue;
+            }
+            
+            // Cannot migrate without original password
+            // User must reset password to upgrade to enhanced format
+            console.log(`⚠️ ${username}: Requires password reset for enhanced security`);
+            results.skipped++;
+            
+        } catch (error) {
+            console.error(`❌ ${username}: Migration failed:`, error);
+            results.failed++;
+        }
+    }
+    
+    console.log('✅ Password migration completed:', results);
+    return results;
+},
+
+/**
+ * Get security audit log
+ * @returns {Array} - Audit log entries
+ */
+getSecurityAuditLog() {
+    try {
+        return JSON.parse(localStorage.getItem('metafold_security_audit') || '[]');
+    } catch (error) {
+        console.error('Failed to read audit log:', error);
+        return [];
+    }
+},
+
+/**
+ * Clear security audit log (Admin only)
+ */
+clearSecurityAuditLog() {
+    localStorage.removeItem('metafold_security_audit');
+    console.log('🗑️ Security audit log cleared');
+}
 };
 
 // Auto-initialize on load
@@ -1387,5 +1353,4 @@ if (document.readyState === 'loading') {
 // Make globally available
 window.secureStorage = secureStorage;
 
-console.log('✅ Secure Storage Module loaded - Multi-Layer Encryption WITH User-Specific Entropy Ready');
-console.log('🔐 User entropy protection: ACTIVE');
+console.log('✅ Secure Storage Module loaded - Multi-Layer Encryption Ready');

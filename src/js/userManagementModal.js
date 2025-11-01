@@ -483,14 +483,12 @@ const userManagementModal = {
                 return;
             }
 
-            // ✅ FIX: Admin gets "System" as group
             const actualGroup = username === 'Admin' ? 'System' : group;
             
             console.log(`🔄 Switching to user: ${username} (${actualGroup})`);
 
-            // Check if user has password
             const hasPassword = this.isPasswordSystemEnabled() && 
-                              window.secureStorage?.hasUserPassword?.(username);
+                            window.secureStorage?.hasUserPassword?.(username);
 
             if (hasPassword) {
                 const password = await this.promptForPassword(username);
@@ -506,6 +504,12 @@ const userManagementModal = {
                 }
 
                 console.log(`✅ Password verified for user switch: ${username}`);
+                
+                // 🔐 NEW: Cache password for settings encryption
+                if (window.settingsManager && window.settingsManager.setUserPasswordForEntropy) {
+                    window.settingsManager.setUserPasswordForEntropy(username, password);
+                    console.log('🔐 Password cached for secure settings (user management)');
+                }
             }
 
             // Perform switch

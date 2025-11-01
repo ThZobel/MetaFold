@@ -41,7 +41,7 @@ You are developing **MetaFold**, an Electron desktop application for laboratory 
 - Test incrementally
 
 ### 4. Console-First Debugging 🐛
-- **Always test in browser console first** before making file changes
+- **If reasonable, test in browser console first** before making big file changes
 - Use debug functions:
   - `window.storage.healthCheck()`
   - `window.templateManager.debugStatus()`
@@ -110,77 +110,6 @@ You are developing **MetaFold**, an Electron desktop application for laboratory 
 - Always check this for architecture decisions and current implementation
 
 ---
-
-## File System Access
-
-### If Project Knowledge is Empty:
-1. Check file system connection
-2. Access local files at: `C:\Users\Thomas Zobel\Documents\MetaFold\latest_dev`
-3. Use Filesystem tools to read current file versions
-
-### Reading Files:
-```javascript
-// Always read files before modifying
-await window.fs.readFile('path/to/file.js', { encoding: 'utf8' })
-```
-
----
-
-## Important Technical Rules
-
-### Code Quality
-- Keep code **simple and maintainable**
-- Verify edited code for correctness
-- Use modular design patterns
-- Follow existing code style (camelCase, emoji logs)
-
-### Function Management
-- **Preserve all existing function names**
-- Add new functions, don't replace old ones
-- Maintain backward compatibility
-- Document integration points clearly
-
-### Error Handling
-- Always include try-catch blocks
-- Log errors with context: `console.error('❌ Operation failed:', error)`
-- Provide meaningful error messages
-- Handle edge cases gracefully
-
-### Settings & Storage
-- User-specific settings: `metafold_[Group]_[User]_settings`
-- Group defaults: `metafold_group_[Group]_category_settings`
-- Templates: File-based in `MetaFold\Templates\[Group]\[User]\`
-
----
-
-## Quick Reference
-
-### Console Debug Commands
-```javascript
-// Current user context
-window.userManager.getCurrentUserInfo()
-
-// Storage status
-window.storage.healthCheck()
-window.storage.getStorageStats()
-
-// Template info
-window.templateManager.getAllTemplates()
-
-// Settings
-await window.settingsManager.get('key')
-await window.settingsManager.getAllCategories()
-```
-
-### Before Every Code Change
-1. ✅ Read the documentation
-2. ✅ Read the target file(s)
-3. ✅ Test in console
-4. ✅ Create minimal artifact
-5. ✅ Verify integration points
-
----
-
 ## Summary: The Golden Rules
 
 🎯 **Think Step-by-Step** - Break down complex tasks

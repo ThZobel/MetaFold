@@ -140,8 +140,20 @@ const userManager = {
         // Update user info
         this.currentUser = username;
         this.currentGroup = groupname || 'Default';
+        
+        // 🛡️ NEW: Notify Electron about current user (for DevTools control)
+        if (window.electronAPI && window.electronAPI.invoke) {
+            try {
+                await window.electronAPI.invoke('check-admin-user', username);
+            } catch (error) {
+                console.warn('Failed to notify Electron about user:', error);
+            }
+        }
+        
         this.isInitialized = true;
         
+
+
         // Add to history
         this.addUserToHistory(username, groupname);
         

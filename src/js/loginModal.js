@@ -656,6 +656,18 @@ const loginModal = {
                 }
                 
                 console.log(`✅ Password verified for continue: ${lastUser.username}`);
+                console.log('✅ Password verified for continue:', lastUser.username);
+
+                // 🐛 DEBUG
+                console.log('🐛 DEBUG: Trying to cache password...');
+                console.log('🐛 window.settingsManager exists:', !!window.settingsManager);
+                console.log('🐛 setUserPasswordForEntropy exists:', typeof window.settingsManager?.setUserPasswordForEntropy);
+
+                // 🔐 NEW: Cache password for settings encryption
+                if (window.settingsManager && window.settingsManager.setUserPasswordForEntropy) {
+                    window.settingsManager.setUserPasswordForEntropy(lastUser.username, password);
+                    console.log('🔐 Password cached for secure settings (continue)');
+                }
                 
             } catch (error) {
                 console.error('❌ Password verification failed:', error);
@@ -935,7 +947,21 @@ const loginModal = {
                         }
                         
                         console.log(`✅ Password verified via modal for user: ${username}`);
-                    } else {
+                    
+                        
+
+                     console.log(`✅ Password verified via modal for user: ${username}`);
+
+                    // 🐛 DEBUG
+                    console.log('🐛 DEBUG: Trying to cache password (modal)...');
+                    console.log('🐛 window.settingsManager exists:', !!window.settingsManager);
+                    console.log('🐛 setUserPasswordForEntropy exists:', typeof window.settingsManager?.setUserPasswordForEntropy);
+                // 🔐 NEW: Cache password for settings encryption
+                if (window.settingsManager && window.settingsManager.setUserPasswordForEntropy) {
+                    window.settingsManager.setUserPasswordForEntropy(username, modalPassword);
+                    console.log('🔐 Password cached for secure settings (modal)');
+                }
+            } else {
                         // Passwort-Feld ist sichtbar, verwende dessen Wert
                         if (!password) {
                             this.setLoadingState(false);
@@ -957,6 +983,21 @@ const loginModal = {
                         }
                         
                         console.log(`✅ Password verified via field for user: ${username}`);
+
+                        // 🐛 DEBUG
+                        console.log('🐛 DEBUG: Trying to cache password (field)...');
+                        console.log('🐛 window.settingsManager exists:', !!window.settingsManager);
+                        console.log('🐛 setUserPasswordForEntropy exists:', typeof window.settingsManager?.setUserPasswordForEntropy);
+
+
+                        // 🔐 NEW: Cache password for settings encryption
+                        if (window.settingsManager && window.settingsManager.setUserPasswordForEntropy) {
+                            window.settingsManager.setUserPasswordForEntropy(username, password);
+                            console.log('🐛 DEBUG: About to cache password via modal');
+                            console.log('🐛 settingsManager exists:', !!window.settingsManager);
+                            console.log('🐛 setUserPasswordForEntropy exists:', !!window.settingsManager?.setUserPasswordForEntropy);
+                            console.log('🔐 Password cached for secure settings (field)');
+                        }
                     }
                 } else {
                     console.log(`🔓 No password required for user: ${username}`);

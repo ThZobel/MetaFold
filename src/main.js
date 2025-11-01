@@ -228,6 +228,125 @@ async function createWindow() {
     
     mainWindow = new BrowserWindow(windowOptions);
 
+        // =================== DEVTOOLS PROTECTION ===================
+
+        // Track if DevTools are currently allowed
+        let devToolsAllowed = false;
+        let currentMetaFoldUser = null;
+
+        // IPC Handler: Check if current user is Admin
+        ipcMain.handle('check-admin-user', async (event, username) => {
+            currentMetaFoldUser = username;
+            const isAdmin = username === 'Admin';
+            console.log(`🔐 User "${username}" is ${isAdmin ? 'ADMIN' : 'NOT admin'}`);
+            return { isAdmin };
+        });
+
+        // IPC Handler: Request to open DevTools (Admin only)
+        ipcMain.handle('open-devtools', async (event) => {
+            console.log('🔓 DevTools open requested by:', currentMetaFoldUser);
+            
+            if (currentMetaFoldUser === 'Admin') {
+                devToolsAllowed = true;
+                if (mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
+                    mainWindow.webContents.openDevTools();
+                    console.log('✅ DevTools opened for Admin');
+                }
+                return { success: true, message: 'DevTools enabled' };
+            } else {
+                console.warn('⚠️ Non-admin user attempted to open DevTools:', currentMetaFoldUser);
+                return { success: false, message: 'Admin privileges required' };
+            }
+        });
+
+        // IPC Handler: Close DevTools for non-admin
+        ipcMain.handle('close-devtools', async (event) => {
+            console.log('🔒 DevTools close requested');
+            
+            if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+                devToolsAllowed = false;
+                console.log('✅ DevTools closed');
+            }
+            
+            return { success: true };
+        });
+
+        // Monitor DevTools state
+        if (mainWindow) {
+            mainWindow.webContents.on('devtools-opened', () => {
+                console.log('🔍 DevTools opened event detected');
+                
+                // If not admin, close immediately
+                if (currentMetaFoldUser !== 'Admin' && !devToolsAllowed) {
+                    console.warn('⚠️ Unauthorized DevTools access detected');
+                    setTimeout(() => {
+                        if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
+                            mainWindow.webContents.closeDevTools();
+                            console.log('🔒 DevTools auto-closed for non-admin');
+                            
+                            // Show warning
+                            mainWindow.webContents.send('security-warning', {
+                                message: 'DevTools access requires administrator privileges.',
+                                severity: 'warning'
+                            });
+                        }
+                    }, 100);
+                }
+            });
+            
+            // Prevent right-click context menu for non-admin users
+            mainWindow.webContents.on('context-menu', (event, params) => {
+                if (currentMetaFoldUser !== 'Admin') {
+                    // Block "Inspect Element" and similar
+                    event.preventDefault();
+                }
+            });
+            
+            // Block keyboard shortcuts for DevTools (F12, Ctrl+Shift+I, etc.)
+            mainWindow.webContents.on('before-input-event', (event, input) => {
+                if (currentMetaFoldUser !== 'Admin') {
+                    // Block F12
+                    if (input.key === 'F12') {
+                        event.preventDefault();
+                        console.log('🔒 F12 blocked for non-admin');
+                    }
+                    
+                    // Block Ctrl+Shift+I (Inspect)
+                    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+                        event.preventDefault();
+                        console.log('🔒 Ctrl+Shift+I blocked for non-admin');
+                    }
+                    
+                    // Block Ctrl+Shift+J (Console)
+                    if (input.control && input.shift && input.key.toLowerCase() === 'j') {
+                        event.preventDefault();
+                        console.log('🔒 Ctrl+Shift+J blocked for non-admin');
+                    }
+                    
+                    // Block Ctrl+Shift+C (Inspect Element)
+                    if (input.control && input.shift && input.key.toLowerCase() === 'c') {
+                        event.preventDefault();
+                        console.log('🔒 Ctrl+Shift+C blocked for non-admin');
+                    }
+                }
+            });
+        }
+
+        // Disable DevTools in production for non-admin by default
+        if (!process.argv.includes('--dev')) {
+            if (mainWindow) {
+                mainWindow.webContents.on('dom-ready', () => {
+                    if (currentMetaFoldUser !== 'Admin') {
+                        mainWindow.webContents.closeDevTools();
+                        console.log('🔒 DevTools disabled for non-admin users');
+                    }
+                });
+            }
+        }
+
+        console.log('✅ DevTools protection system initialized');
+    
     mainWindow.loadFile('index.html');
 
     mainWindow.once('ready-to-show', () => {
