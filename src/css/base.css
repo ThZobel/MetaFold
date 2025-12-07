@@ -33,11 +33,14 @@ body {
 .sidebar {
     /* Width is controlled by sidebar-resize.css and JavaScript */
     /* Default: 380px, resizable via JavaScript */
-    background: rgba(30, 30, 46, 0.9);
+    background: rgba(30, 30, 46, 0.95);
+    /* Matched to right sidebar opacity */
     backdrop-filter: blur(10px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0; /* Changed from 20px to 0 for better header control */
-    overflow: hidden; /* Changed from overflow-y: auto */
+    padding: 0;
+    /* Changed from 20px to 0 for better header control */
+    overflow: hidden;
+    /* Changed from overflow-y: auto */
     /* CRITICAL: Ensure sidebar stays on the left edge */
     flex-shrink: 0;
     position: relative;
@@ -52,7 +55,8 @@ body {
 .main-content {
     flex: 1;
     padding: 20px;
-    padding-bottom: 100px; /* Space for sticky actions bar */
+    padding-bottom: 100px;
+    /* Space for sticky actions bar */
     overflow-y: auto;
     /* CRITICAL: Ensure main content takes ALL remaining space to the edge */
     min-width: 0;
@@ -64,17 +68,22 @@ body {
 }
 
 /* SIDEBAR HEADER (FIXED VERSION) */
+/* SIDEBAR HEADER (FIXED VERSION) */
+#left-sidebar-container .header,
 .sidebar .header {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(30, 30, 46, 0.95);
-    backdrop-filter: blur(10px);
+    background: rgba(30, 30, 46, 0.95) !important;
+    backdrop-filter: none !important;
     padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    flex-shrink: 0; /* Prevent header from shrinking */
+    box-shadow: none !important;
+    flex-shrink: 0;
     text-align: center;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    width: 100%;
 }
 
 .sidebar .header h1 {
@@ -158,9 +167,12 @@ body {
 .template-item {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px; /* Smaller radius */
-    padding: 8px 10px; /* Reduced from 12px */
-    margin-bottom: 6px; /* Reduced from 8px */
+    border-radius: 6px;
+    /* Smaller radius */
+    padding: 8px 10px;
+    /* Reduced from 12px */
+    margin-bottom: 6px;
+    /* Reduced from 8px */
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
@@ -180,22 +192,27 @@ body {
 .template-header {
     display: flex;
     align-items: flex-start;
-    gap: 6px; /* Reduced from 8px */
-    margin-bottom: 4px; /* Reduced from 6px */
+    gap: 6px;
+    /* Reduced from 8px */
+    margin-bottom: 4px;
+    /* Reduced from 6px */
 }
 
 .template-avatar {
-    width: 20px; /* Reduced from 24px */
-    height: 20px; /* Reduced from 24px */
+    width: 20px;
+    /* Reduced from 24px */
+    height: 20px;
+    /* Reduced from 24px */
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     font-weight: bold;
-    font-size: 0.6rem; /* Reduced from 0.7rem */
+    font-size: 0.6rem;
+    /* Reduced from 0.7rem */
     flex-shrink: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .template-info {
@@ -205,11 +222,13 @@ body {
 
 .template-info h3 {
     margin: 0 0 2px 0;
-    font-size: 0.85rem; /* Reduced from 0.9rem */
+    font-size: 0.85rem;
+    /* Reduced from 0.9rem */
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 4px; /* Reduced from 6px */
+    gap: 4px;
+    /* Reduced from 6px */
     line-height: 1.2;
 }
 
@@ -228,7 +247,7 @@ body {
     align-items: end;
 }
 
-.project-input-group > div {
+.project-input-group>div {
     flex: 1;
 }
 
@@ -324,7 +343,7 @@ body {
         width: 100vw;
         position: relative;
     }
-    
+
     .sidebar {
         width: 100%;
         padding: 15px;
@@ -333,34 +352,34 @@ body {
         max-height: 40vh;
         overflow-y: auto;
     }
-    
+
     .main-content {
         padding: 15px;
         flex: 1;
         width: 100%;
         height: auto;
     }
-    
+
     .sidebar .header h1,
     .main-content .header h1 {
         font-size: 2rem;
     }
-    
+
     .project-input-group {
         flex-direction: column;
         gap: 15px;
     }
-    
+
     .actions {
         flex-direction: column;
         gap: 8px;
     }
-    
+
     .template-type-selector {
         flex-direction: column;
         gap: 8px;
     }
-    
+
     .template-type-btn {
         padding: 15px;
         font-size: 14px;
@@ -372,35 +391,36 @@ body {
     body {
         overflow-x: hidden;
     }
-    
+
     .sidebar {
         padding: 10px;
         max-height: 35vh;
     }
-    
+
     .main-content {
         padding: 10px;
     }
-    
+
     .sidebar .header,
     .main-content .header {
         padding: 15px;
         margin-bottom: 20px;
     }
-    
+
     .sidebar .header h1,
     .main-content .header h1 {
         font-size: 1.8rem;
     }
-    
+
     .project-setup {
         padding: 15px;
     }
-    
+
     .folder-structure {
         padding: 15px;
     }
 }
+
 /* ===== TEMPLATE SEARCH STYLES ===== */
 
 .template-search {
@@ -443,7 +463,7 @@ body {
     background: linear-gradient(135deg, #2a2a40, #1e1e2e);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     display: none;
     z-index: 1000;
     max-height: 200px;
@@ -597,8 +617,13 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: translateY(-50%) rotate(0deg); }
-    100% { transform: translateY(-50%) rotate(360deg); }
+    0% {
+        transform: translateY(-50%) rotate(0deg);
+    }
+
+    100% {
+        transform: translateY(-50%) rotate(360deg);
+    }
 }
 
 /* Virtualization support */
@@ -627,7 +652,8 @@ body {
 /* Optimized animations for performance */
 .template-item {
     will-change: transform, background-color;
-    transform: translateZ(0); /* Force hardware acceleration */
+    transform: translateZ(0);
+    /* Force hardware acceleration */
 }
 
 .template-item:hover {
@@ -657,20 +683,21 @@ body {
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
 
 @media (max-width: 768px) {
+
     /* Reduce animations on mobile for better performance */
     .template-item {
         transition: background-color 0.2s ease;
     }
-    
+
     .template-item:hover {
         transform: none;
     }
-    
+
     /* Optimize search suggestions for mobile */
     #searchSuggestions {
         max-height: 120px;
     }
-    
+
     .search-suggestion {
         padding: 14px 12px;
         font-size: 0.9rem;
@@ -678,21 +705,23 @@ body {
 }
 
 @media (max-width: 480px) {
+
     /* Further mobile optimizations */
     .template-search {
         margin-bottom: 10px;
     }
-    
+
     #templateSearchInput {
-        font-size: 16px; /* Prevent zoom on iOS */
+        font-size: 16px;
+        /* Prevent zoom on iOS */
         padding: 12px;
     }
-    
+
     /* Reduce suggestion complexity on small screens */
     .search-suggestion-meta {
         display: none;
     }
-    
+
     .search-suggestion-name {
         font-size: 0.85rem;
     }
@@ -702,8 +731,10 @@ body {
 
 /* Template Badges */
 .template-badge {
-    font-size: 0.65rem; /* Reduced */
-    padding: 1px 4px; /* Reduced */
+    font-size: 0.65rem;
+    /* Reduced */
+    padding: 1px 4px;
+    /* Reduced */
     background: rgba(124, 58, 237, 0.2);
     border-radius: 3px;
     font-weight: 500;
@@ -715,8 +746,10 @@ body {
 }
 
 .shared-badge {
-    font-size: 0.6rem; /* Reduced */
-    padding: 1px 4px; /* Reduced */
+    font-size: 0.6rem;
+    /* Reduced */
+    padding: 1px 4px;
+    /* Reduced */
     background: rgba(16, 185, 129, 0.2);
     color: #10b981;
     border-radius: 3px;
@@ -725,11 +758,13 @@ body {
 
 /* Template Meta Information */
 .template-meta {
-    font-size: 0.65rem; /* Reduced from 0.75rem */
+    font-size: 0.65rem;
+    /* Reduced from 0.75rem */
     color: #9ca3af;
     display: flex;
     flex-direction: column;
-    gap: 2px; /* Reduced from 4px */
+    gap: 2px;
+    /* Reduced from 4px */
 }
 
 .creator-info {
@@ -743,15 +778,18 @@ body {
 
 /* Template Description */
 .template-description {
-    font-size: 0.7rem; /* Reduced from 0.75rem */
+    font-size: 0.7rem;
+    /* Reduced from 0.75rem */
     color: #9ca3af;
-    margin: 4px 0 0 0; /* Reduced top margin */
+    margin: 4px 0 0 0;
+    /* Reduced top margin */
     line-height: 1.3;
 }
 
 /* HIDDEN: Storage Indicator - no longer shown */
 .storage-indicator {
-    display: none !important; /* Completely hide the storage indicator */
+    display: none !important;
+    /* Completely hide the storage indicator */
 }
 
 .storage-icon,
@@ -762,11 +800,13 @@ body {
 /* Copy Link for Shared Templates */
 .copy-link {
     color: #10b981;
-    font-size: 0.7rem; /* Reduced from 0.8rem */
+    font-size: 0.7rem;
+    /* Reduced from 0.8rem */
     text-decoration: underline;
     cursor: pointer;
     font-weight: 500;
-    margin-top: 4px; /* Reduced */
+    margin-top: 4px;
+    /* Reduced */
     display: inline-block;
 }
 
@@ -777,10 +817,14 @@ body {
 /* Owner Indicator */
 .owner-indicator {
     position: absolute;
-    top: 4px; /* Adjusted */
-    right: 4px; /* Adjusted */
-    width: 6px; /* Reduced from 8px */
-    height: 6px; /* Reduced from 8px */
+    top: 4px;
+    /* Adjusted */
+    right: 4px;
+    /* Adjusted */
+    width: 6px;
+    /* Reduced from 8px */
+    height: 6px;
+    /* Reduced from 8px */
     background: #10b981;
     border-radius: 50%;
     box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);

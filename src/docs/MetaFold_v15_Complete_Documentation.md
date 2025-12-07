@@ -143,7 +143,32 @@ js/omero/
 └── omeroTestFunctions.js          # Integration testing
 ```
 
----
+js/omero/
+├── metaFoldOMEROIntegration.js    # Main OMERO integration
+├── omeroAuth.js                   # Authentication & sessions
+├── omeroAPI.js                    # API requests & testing
+├── omeroUIIntegration.js          # UI controls & status
+├── omeroGroups.js                 # Group management
+├── omeroProjects.js               # Project & dataset handling
+├── omeroAnnotations.js            # Map annotation creation
+├── omeroDatasetCreation.js        # Dataset creation (legacy)
+├── omeroDatasetCreation_fix.js    # Fixed dataset creation
+└── omeroTestFunctions.js          # Integration testing
+```
+
+### Metadata Loader System
+
+**File**: `js/metadataLoader.js`
+
+**Purpose**: Load existing metadata JSON files and send them to integrations (elabFTW/OMERO) without creating new local folders.
+
+**Key Features**:
+- **Direct File Update**: Updates the loaded JSON file directly with integration links (no "Save As" dialog).
+- **Unified UI**: "Send to Integrations" button located in the main footer for consistency.
+- **Integration Handling**:
+  - **elabFTW**: Automatic retry on 403 Forbidden errors (tries without category).
+  - **OMERO**: Uses Right Sidebar for Group/Project selection.
+
 
 ## Core Systems
 
@@ -615,6 +640,11 @@ await window.omeroUIIntegration.logout()
 - Group-level category defaults
 - Fixed user settings overwrite bug
 - Enhanced category UI with live preview
+- **Metadata Loader Improvements**:
+  - Unified "Send to Integrations" button in footer
+  - Direct JSON file update (no save prompt)
+  - Automatic retry for elabFTW permission errors
+  - Centralized integration controls in Right Sidebar
 
 ### v14
 - Template file storage system

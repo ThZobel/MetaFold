@@ -186,11 +186,10 @@ function showAboutDialog() {
         message: 'MetaFold',
         detail: `Laboratory Data Management & Experiment Organization
 
-Version: 0.0.1
+Version: 0.0.4
 License: MIT
 
 Developed by: Dr. Thomas Zobel
-(with assistance from Claude AI)
 
 GitHub: https://github.com/ThZobel/MetaFold
 Documentation: https://metafold-docs.readthedocs.io/en/latest/
@@ -207,7 +206,7 @@ Built for NFDI4BioImage and life sciences research.`,
 async function createWindow() {
     // Load saved window state
     const savedState = await loadWindowState();
-    
+
     // Use saved state or defaults
     const windowOptions = {
         width: savedState?.width || 1200,
@@ -221,146 +220,146 @@ async function createWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, 'assets','icon.png'),
+        icon: path.join(__dirname, 'assets', 'icon.png'),
         titleBarStyle: 'default',
         show: false
     };
-    
+
     mainWindow = new BrowserWindow(windowOptions);
 
-        // =================== DEVTOOLS PROTECTION ===================
+    // =================== DEVTOOLS PROTECTION ===================
 
-        // Track if DevTools are currently allowed
-        let devToolsAllowed = false;
-        let currentMetaFoldUser = null;
+    // Track if DevTools are currently allowed
+    let devToolsAllowed = false;
+    let currentMetaFoldUser = null;
 
-        // IPC Handler: Check if current user is Admin
-        ipcMain.handle('check-admin-user', async (event, username) => {
-            currentMetaFoldUser = username;
-            const isAdmin = username === 'Admin';
-            console.log(`🔐 User "${username}" is ${isAdmin ? 'ADMIN' : 'NOT admin'}`);
-            return { isAdmin };
-        });
+    // IPC Handler: Check if current user is Admin
+    ipcMain.handle('check-admin-user', async (event, username) => {
+        currentMetaFoldUser = username;
+        const isAdmin = username === 'Admin';
+        console.log(`🔐 User "${username}" is ${isAdmin ? 'ADMIN' : 'NOT admin'}`);
+        return { isAdmin };
+    });
 
-        // IPC Handler: Request to open DevTools (Admin only)
-        ipcMain.handle('open-devtools', async (event) => {
-            console.log('🔓 DevTools open requested by:', currentMetaFoldUser);
-            
-            if (currentMetaFoldUser === 'Admin') {
-                devToolsAllowed = true;
-                if (mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
-                    mainWindow.webContents.openDevTools();
-                    console.log('✅ DevTools opened for Admin');
-                }
-                return { success: true, message: 'DevTools enabled' };
-            } else {
-                console.warn('⚠️ Non-admin user attempted to open DevTools:', currentMetaFoldUser);
-                return { success: false, message: 'Admin privileges required' };
+    // IPC Handler: Request to open DevTools (Admin only)
+    ipcMain.handle('open-devtools', async (event) => {
+        console.log('🔓 DevTools open requested by:', currentMetaFoldUser);
+
+        if (currentMetaFoldUser === 'Admin') {
+            devToolsAllowed = true;
+            if (mainWindow && !mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.openDevTools();
+                console.log('✅ DevTools opened for Admin');
             }
-        });
+            return { success: true, message: 'DevTools enabled' };
+        } else {
+            console.warn('⚠️ Non-admin user attempted to open DevTools:', currentMetaFoldUser);
+            return { success: false, message: 'Admin privileges required' };
+        }
+    });
 
-        // IPC Handler: Close DevTools for non-admin
-        ipcMain.handle('close-devtools', async (event) => {
-            console.log('🔒 DevTools close requested');
-            
-            if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
-                mainWindow.webContents.closeDevTools();
-                devToolsAllowed = false;
-                console.log('✅ DevTools closed');
-            }
-            
-            return { success: true };
-        });
+    // IPC Handler: Close DevTools for non-admin
+    ipcMain.handle('close-devtools', async (event) => {
+        console.log('🔒 DevTools close requested');
 
-        // Monitor DevTools state
-        if (mainWindow) {
-            mainWindow.webContents.on('devtools-opened', () => {
-                console.log('🔍 DevTools opened event detected');
-                
-                // If not admin, close immediately
-                if (currentMetaFoldUser !== 'Admin' && !devToolsAllowed) {
-                    console.warn('⚠️ Unauthorized DevTools access detected');
-                    setTimeout(() => {
-                        if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
-                            mainWindow.webContents.closeDevTools();
-                            console.log('🔒 DevTools auto-closed for non-admin');
-                            
-                            // Show warning
-                            mainWindow.webContents.send('security-warning', {
-                                message: 'DevTools access requires administrator privileges.',
-                                severity: 'warning'
-                            });
-                        }
-                    }, 100);
-                }
-            });
-            
-            // Prevent right-click context menu for non-admin users
-            mainWindow.webContents.on('context-menu', (event, params) => {
-                if (currentMetaFoldUser !== 'Admin') {
-                    // Block "Inspect Element" and similar
-                    event.preventDefault();
-                }
-            });
-            
-            // Block keyboard shortcuts for DevTools (F12, Ctrl+Shift+I, etc.)
-            mainWindow.webContents.on('before-input-event', (event, input) => {
-                if (currentMetaFoldUser !== 'Admin') {
-                    // Block F12
-                    if (input.key === 'F12') {
-                        event.preventDefault();
-                        console.log('🔒 F12 blocked for non-admin');
-                    }
-                    
-                    // Block Ctrl+Shift+I (Inspect)
-                    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-                        event.preventDefault();
-                        console.log('🔒 Ctrl+Shift+I blocked for non-admin');
-                    }
-                    
-                    // Block Ctrl+Shift+J (Console)
-                    if (input.control && input.shift && input.key.toLowerCase() === 'j') {
-                        event.preventDefault();
-                        console.log('🔒 Ctrl+Shift+J blocked for non-admin');
-                    }
-                    
-                    // Block Ctrl+Shift+C (Inspect Element)
-                    if (input.control && input.shift && input.key.toLowerCase() === 'c') {
-                        event.preventDefault();
-                        console.log('🔒 Ctrl+Shift+C blocked for non-admin');
-                    }
-                }
-            });
+        if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
+            mainWindow.webContents.closeDevTools();
+            devToolsAllowed = false;
+            console.log('✅ DevTools closed');
         }
 
-        // Disable DevTools in production for non-admin by default
-        if (!process.argv.includes('--dev')) {
-            if (mainWindow) {
-                mainWindow.webContents.on('dom-ready', () => {
-                    if (currentMetaFoldUser !== 'Admin') {
+        return { success: true };
+    });
+
+    // Monitor DevTools state
+    if (mainWindow) {
+        mainWindow.webContents.on('devtools-opened', () => {
+            console.log('🔍 DevTools opened event detected');
+
+            // If not admin, close immediately
+            if (currentMetaFoldUser !== 'Admin' && !devToolsAllowed) {
+                console.warn('⚠️ Unauthorized DevTools access detected');
+                setTimeout(() => {
+                    if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
                         mainWindow.webContents.closeDevTools();
-                        console.log('🔒 DevTools disabled for non-admin users');
-                    }
-                });
-            }
-        }
+                        console.log('🔒 DevTools auto-closed for non-admin');
 
-        console.log('✅ DevTools protection system initialized');
-    
+                        // Show warning
+                        mainWindow.webContents.send('security-warning', {
+                            message: 'DevTools access requires administrator privileges.',
+                            severity: 'warning'
+                        });
+                    }
+                }, 100);
+            }
+        });
+
+        // Prevent right-click context menu for non-admin users
+        mainWindow.webContents.on('context-menu', (event, params) => {
+            if (currentMetaFoldUser !== 'Admin') {
+                // Block "Inspect Element" and similar
+                event.preventDefault();
+            }
+        });
+
+        // Block keyboard shortcuts for DevTools (F12, Ctrl+Shift+I, etc.)
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            if (currentMetaFoldUser !== 'Admin') {
+                // Block F12
+                if (input.key === 'F12') {
+                    event.preventDefault();
+                    console.log('🔒 F12 blocked for non-admin');
+                }
+
+                // Block Ctrl+Shift+I (Inspect)
+                if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+                    event.preventDefault();
+                    console.log('🔒 Ctrl+Shift+I blocked for non-admin');
+                }
+
+                // Block Ctrl+Shift+J (Console)
+                if (input.control && input.shift && input.key.toLowerCase() === 'j') {
+                    event.preventDefault();
+                    console.log('🔒 Ctrl+Shift+J blocked for non-admin');
+                }
+
+                // Block Ctrl+Shift+C (Inspect Element)
+                if (input.control && input.shift && input.key.toLowerCase() === 'c') {
+                    event.preventDefault();
+                    console.log('🔒 Ctrl+Shift+C blocked for non-admin');
+                }
+            }
+        });
+    }
+
+    // Disable DevTools in production for non-admin by default
+    if (!process.argv.includes('--dev')) {
+        if (mainWindow) {
+            mainWindow.webContents.on('dom-ready', () => {
+                if (currentMetaFoldUser !== 'Admin') {
+                    mainWindow.webContents.closeDevTools();
+                    console.log('🔒 DevTools disabled for non-admin users');
+                }
+            });
+        }
+    }
+
+    console.log('✅ DevTools protection system initialized');
+
     mainWindow.loadFile('index.html');
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        
+
         // Apply saved fullscreen/maximized state
         if (savedState) {
             applyWindowState(mainWindow, savedState);
         }
-        
+
         if (process.argv.includes('--dev')) {
             mainWindow.webContents.openDevTools();
         }
-        
+
         console.log('✅ Window restored with saved state:', savedState ? 'Yes' : 'No (using defaults)');
     });
 
@@ -372,7 +371,7 @@ async function createWindow() {
     const menuTemplate = createMenuTemplate();
     const menu = Menu.buildFromTemplate(menuTemplate);
     Menu.setApplicationMenu(menu);
-    
+
     // Setup window state management
     setupWindowStateManagement(mainWindow);
 }
@@ -387,7 +386,7 @@ function saveWindowState(window) {
         const bounds = window.getBounds();
         const isFullScreen = window.isFullScreen();
         const isMaximized = window.isMaximized();
-        
+
         const windowState = {
             width: bounds.width,
             height: bounds.height,
@@ -397,11 +396,11 @@ function saveWindowState(window) {
             isMaximized: isMaximized,
             timestamp: new Date().toISOString()
         };
-        
+
         // Save to file in user data directory for persistence
         const userDataPath = app.getPath('userData');
         const windowStatePath = path.join(userDataPath, 'window-state.json');
-        
+
         fs.writeFile(windowStatePath, JSON.stringify(windowState, null, 2), 'utf8')
             .then(() => {
                 console.log('💾 Window state saved:', windowState);
@@ -409,7 +408,7 @@ function saveWindowState(window) {
             .catch(error => {
                 console.error('❌ Failed to save window state:', error);
             });
-            
+
     } catch (error) {
         console.error('❌ Error saving window state:', error);
     }
@@ -423,13 +422,13 @@ async function loadWindowState() {
     try {
         const userDataPath = app.getPath('userData');
         const windowStatePath = path.join(userDataPath, 'window-state.json');
-        
+
         const data = await fs.readFile(windowStatePath, 'utf8');
         const windowState = JSON.parse(data);
-        
+
         console.log('📂 Window state loaded:', windowState);
         return windowState;
-        
+
     } catch (error) {
         if (error.code !== 'ENOENT') {
             console.warn('⚠️ Could not load window state:', error.message);
@@ -445,14 +444,14 @@ async function loadWindowState() {
  */
 function applyWindowState(window, state) {
     if (!state) return;
-    
+
     try {
         // Validate bounds are within screen
         const { screen } = require('electron');
         const displayBounds = screen.getPrimaryDisplay().bounds;
-        
+
         // Ensure window is visible on screen
-        if (state.x >= 0 && state.y >= 0 && 
+        if (state.x >= 0 && state.y >= 0 &&
             state.x < displayBounds.width && state.y < displayBounds.height) {
             window.setBounds({
                 x: state.x,
@@ -464,16 +463,16 @@ function applyWindowState(window, state) {
             // Window would be off-screen, just apply size
             window.setSize(state.width, state.height);
         }
-        
+
         // Apply fullscreen/maximized state
         if (state.isFullScreen) {
             window.setFullScreen(true);
         } else if (state.isMaximized) {
             window.maximize();
         }
-        
+
         console.log('✅ Window state applied');
-        
+
     } catch (error) {
         console.error('❌ Error applying window state:', error);
     }
@@ -485,44 +484,44 @@ function applyWindowState(window, state) {
  */
 function setupWindowStateManagement(window) {
     // Save state on various events
-    
+
     // Save on resize
     window.on('resize', () => {
         if (!window.isFullScreen() && !window.isMaximized()) {
             saveWindowState(window);
         }
     });
-    
+
     // Save on move
     window.on('move', () => {
         if (!window.isFullScreen() && !window.isMaximized()) {
             saveWindowState(window);
         }
     });
-    
+
     // Save on enter/leave fullscreen
     window.on('enter-full-screen', () => {
         saveWindowState(window);
     });
-    
+
     window.on('leave-full-screen', () => {
         saveWindowState(window);
     });
-    
+
     // Save on maximize/unmaximize
     window.on('maximize', () => {
         saveWindowState(window);
     });
-    
+
     window.on('unmaximize', () => {
         saveWindowState(window);
     });
-    
+
     // Save final state before closing
     window.on('close', () => {
         saveWindowState(window);
     });
-    
+
     console.log('✅ Window state management setup complete');
 }
 
@@ -538,20 +537,34 @@ app.whenReady().then(() => {
 
 // Graceful shutdown handler - stop proxy server when app closes
 app.on('before-quit', async (event) => {
+    console.log('🔴 App closing - initiating cleanup...');
+
+    // Phase 5.1: Send app-closing event to renderer for OMERO logout
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log('📤 Sending app-closing event to renderer');
+        mainWindow.webContents.send('app-closing');
+
+        // Give renderer time to logout (but don't wait too long)
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Stop OMERO proxy server if running
     if (omeroProxyServer && omeroProxyServer.getStatus().running) {
         console.log('🔬 Stopping OMERO proxy server before app shutdown...');
         event.preventDefault(); // Prevent immediate quit
-        
+
         try {
             await omeroProxyServer.stop();
             console.log('✅ OMERO proxy server stopped successfully');
         } catch (error) {
             console.error('❌ Error stopping OMERO proxy server:', error);
         }
-        
+
         // Now allow the app to quit
         app.quit();
     }
+
+    console.log('🟢 Cleanup complete - app will now quit');
 });
 
 app.on('window-all-closed', () => {
@@ -567,7 +580,7 @@ function generateStableTemplateFilename(template) {
         .replace(/\s+/g, '_')               // Replace spaces with underscores
         .toLowerCase()                      // Lowercase
         .substring(0, 80);                  // Increased limit
-    
+
     // FIXED: Just name + .json, no user/type suffix
     return `${safeName}.json`;
 }
@@ -577,14 +590,14 @@ function isStableFilename(filename) {
     // Check if filename contains timestamp patterns like _202X_ or long numeric sequences
     const timestampPattern = /_20\d{2}[01]\d[0-3]\d/; // YYYYMMDD pattern
     const longNumberPattern = /\d{10,}/; // 10+ consecutive digits (timestamps)
-    
+
     return !timestampPattern.test(filename) && !longNumberPattern.test(filename);
 }
 
 // Clean template for file storage
 function cleanTemplateForFileStorage(template) {
     const clean = { ...template };
-    
+
     // Remove UI-specific properties
     delete clean._uiState;
     delete clean._dirty;
@@ -600,7 +613,7 @@ function cleanTemplateForFileStorage(template) {
     delete clean.isOwn;
     delete clean.isShared;
     delete clean.originalIndex;
-    
+
     // Ensure essential fields exist
     return {
         ...clean,
@@ -632,29 +645,29 @@ ipcMain.handle('encrypt-data', (event, plaintext) => {
         if (!plaintext || plaintext.trim() === '') {
             return { success: true, encrypted: '', method: 'empty' };
         }
-        
+
         if (safeStorage.isEncryptionAvailable()) {
             const buffer = safeStorage.encryptString(plaintext);
             const encrypted = buffer.toString('base64');
             console.log('🔐 Data encrypted using safeStorage');
-            return { 
-                success: true, 
+            return {
+                success: true,
                 encrypted: encrypted,
                 method: 'safeStorage'
             };
         } else {
             // Fallback: Return plaintext for browser-side encryption
             console.log('⚠️ safeStorage not available, using fallback method');
-            return { 
-                success: true, 
+            return {
+                success: true,
                 encrypted: plaintext,
                 method: 'fallback'
             };
         }
     } catch (error) {
         console.error('❌ Encryption failed:', error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: error.message,
             encrypted: plaintext // Fallback to plaintext
         };
@@ -667,26 +680,26 @@ ipcMain.handle('decrypt-data', (event, encryptedData, method = 'safeStorage') =>
         if (!encryptedData || encryptedData.trim() === '') {
             return { success: true, decrypted: '' };
         }
-        
+
         if (method === 'safeStorage' && safeStorage.isEncryptionAvailable()) {
             const buffer = Buffer.from(encryptedData, 'base64');
             const decrypted = safeStorage.decryptString(buffer);
             console.log('🔓 Data decrypted using safeStorage');
-            return { 
-                success: true, 
-                decrypted: decrypted 
+            return {
+                success: true,
+                decrypted: decrypted
             };
         } else {
             // For fallback method, return as-is (will be handled by browser-side crypto)
-            return { 
-                success: true, 
-                decrypted: encryptedData 
+            return {
+                success: true,
+                decrypted: encryptedData
             };
         }
     } catch (error) {
         console.error('❌ Decryption failed:', error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: error.message,
             decrypted: encryptedData // Fallback to original data
         };
@@ -697,12 +710,12 @@ ipcMain.handle('decrypt-data', (event, encryptedData, method = 'safeStorage') =>
 ipcMain.handle('migrate-credentials', async (event, credentials) => {
     try {
         const migratedCredentials = {};
-        
+
         for (const [key, value] of Object.entries(credentials)) {
             if (value && typeof value === 'string' && value.trim() !== '') {
                 const encryptResult = await ipcMain.emit('encrypt-data', event, value);
                 const result = encryptResult[0]; // Get the first result from the event
-                
+
                 migratedCredentials[key] = {
                     encrypted: result?.encrypted || value,
                     method: result?.method || 'fallback'
@@ -712,7 +725,7 @@ ipcMain.handle('migrate-credentials', async (event, credentials) => {
                 migratedCredentials[key] = { encrypted: '', method: 'none' };
             }
         }
-        
+
         return { success: true, migrated: migratedCredentials };
     } catch (error) {
         console.error('❌ Migration failed:', error);
@@ -749,9 +762,9 @@ ipcMain.handle('store-secure-credential', async (event, key, value, metadata = {
         if (safeStorage.isEncryptionAvailable()) {
             const buffer = safeStorage.encryptString(JSON.stringify(credentialData));
             const encrypted = buffer.toString('base64');
-            
+
             console.log(`🔐 Credential '${key.replace(/password|key/gi, '***')}' encrypted and stored`);
-            
+
             return {
                 success: true,
                 stored: encrypted,
@@ -826,7 +839,7 @@ ipcMain.handle('select-folder', async () => {
         properties: ['openDirectory'],
         title: 'Select Target Folder'
     });
-    
+
     if (!result.canceled && result.filePaths.length > 0) {
         return result.filePaths[0];
     }
@@ -838,20 +851,20 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
     try {
         // Construct path correctly - path.join normalizes automatically
         const projectPath = path.join(basePath, projectName);
-        
+
         console.log(`📁 Creating project: ${projectPath}`);
-        
+
         // Create main project folder
         await fs.mkdir(projectPath, { recursive: true });
         console.log(`📁 Project folder created: ${projectPath}`);
-        
+
         // Only create folder structure if present
         if (structure && structure.trim() !== '') {
             await createFolderStructure(projectPath, structure);
         } else {
             console.log(`📋 No folder structure defined - skipping structure creation`);
         }
-        
+
         // ✅ FIX: Metadaten-JSON erstellen mit korrektem Dateinamen UND projectName
         if (metadata && Object.keys(metadata).length > 0) {
             // ✅ CRITICAL: Add projectName to metadata before saving
@@ -859,13 +872,13 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 ...metadata,
                 projectName: projectName  // Add project name for later loading
             };
-            
+
             // Erstelle Metadaten-JSON mit ${projectName}-metadata.json
             const metadataFilename = `${projectName}-metadata.json`;
             const metadataPath = path.join(projectPath, metadataFilename);
             await fs.writeFile(metadataPath, JSON.stringify(enhancedMetadata, null, 2), 'utf8');
             console.log(`✅ Metadata file created with projectName: ${metadataFilename}`);
-            
+
             // Erstelle README.html mit enhanced Metadaten
             const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName);
             const readmeFilename = `${projectName}-README.html`;
@@ -873,12 +886,12 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
             await fs.writeFile(readmePath, readmeHtml, 'utf8');
             console.log(`✅ README file created: ${readmeFilename}`);
         }
-        
+
         // Adjust success message based on created content
         let message = 'Project created successfully!';
         const hasStructure = structure && structure.trim() !== '';
         const hasMetadata = metadata && Object.keys(metadata).length > 0;
-        
+
         if (!hasStructure && hasMetadata) {
             message = 'Project with metadata created successfully!';
         } else if (hasStructure && hasMetadata) {
@@ -886,12 +899,12 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
         } else if (hasStructure && !hasMetadata) {
             message = 'Project with folder structure created successfully!';
         }
-        
+
         // Normalize path for consistent return
         const normalizedPath = path.resolve(projectPath);
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             message: message,
             projectPath: normalizedPath,
             hasStructure: hasStructure,
@@ -933,11 +946,16 @@ ipcMain.handle('load-json-file', async () => {
         ],
         title: 'Select JSON File'
     });
-    
+
     if (!result.canceled && result.filePaths.length > 0) {
         try {
             const content = await fs.readFile(result.filePaths[0], 'utf8');
-            return { success: true, content: JSON.parse(content) };
+            return {
+                success: true,
+                content: JSON.parse(content),
+                filePath: result.filePaths[0],
+                fileName: path.basename(result.filePaths[0])
+            };
         } catch (error) {
             return { success: false, message: `Error loading JSON file: ${error.message}` };
         }
@@ -953,7 +971,7 @@ ipcMain.handle('save-json-file', async (event, data) => {
         ],
         title: 'Save JSON File'
     });
-    
+
     if (!result.canceled && result.filePath) {
         try {
             await fs.writeFile(result.filePath, JSON.stringify(data, null, 2), 'utf8');
@@ -971,18 +989,18 @@ ipcMain.handle('generate-readme-html-content', async (event, metadata, projectNa
         console.log(`📄 IPC: Generating README.html content for: ${projectName}`);
         console.log('  elabFTW URL:', elabftwUrl || 'none');
         console.log('  OMERO URL:', omeroUrl || 'none');
-        
+
         // Use existing generateReadmeHtmlWithMetadata function
         const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl);
-        
+
         console.log(`✅ IPC: README.html content generated successfully (${readmeHtml.length} chars)`);
-        
+
         return {
             success: true,
             html: readmeHtml,
             message: 'README content generated successfully'
         };
-        
+
     } catch (error) {
         console.error('❌ IPC: Error generating README content:', error);
         return {
@@ -998,7 +1016,7 @@ ipcMain.handle('save-html-file', async (event, htmlContent, suggestedFilename = 
     try {
         console.log(`💾 IPC: Opening save dialog for HTML file...`);
         console.log('  Suggested filename:', suggestedFilename);
-        
+
         const result = await dialog.showSaveDialog(mainWindow, {
             title: 'Save README.html',
             filters: [
@@ -1006,13 +1024,13 @@ ipcMain.handle('save-html-file', async (event, htmlContent, suggestedFilename = 
             ],
             defaultPath: suggestedFilename
         });
-        
+
         if (!result.canceled && result.filePath) {
             // Write the HTML file
             await fs.writeFile(result.filePath, htmlContent, 'utf8');
-            
+
             console.log(`✅ IPC: HTML file saved successfully: ${result.filePath}`);
-            
+
             return {
                 success: true,
                 filePath: result.filePath,
@@ -1020,14 +1038,14 @@ ipcMain.handle('save-html-file', async (event, htmlContent, suggestedFilename = 
                 message: 'HTML file saved successfully'
             };
         }
-        
+
         console.log('ℹ️ IPC: User cancelled save dialog');
         return {
             success: false,
             message: 'Save cancelled by user',
             cancelled: true
         };
-        
+
     } catch (error) {
         console.error('❌ IPC: Error saving HTML file:', error);
         return {
@@ -1045,21 +1063,21 @@ ipcMain.handle('save-json-file-direct', async (event, filePath, data) => {
         // Ensure the directory exists
         const dir = path.dirname(filePath);
         await fs.mkdir(dir, { recursive: true });
-        
+
         // Write the JSON file
         await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-        
+
         console.log(`✅ JSON file saved directly: ${filePath}`);
-        return { 
-            success: true, 
+        return {
+            success: true,
             message: 'JSON file saved successfully!',
-            filePath: filePath 
+            filePath: filePath
         };
     } catch (error) {
         console.error('❌ Error saving JSON file directly:', error);
-        return { 
-            success: false, 
-            message: `Error saving JSON file: ${error.message}` 
+        return {
+            success: false,
+            message: `Error saving JSON file: ${error.message}`
         };
     }
 });
@@ -1126,30 +1144,30 @@ ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, pr
         console.log('  Project path:', projectPath);
         console.log('  elabFTW URL:', elabftwUrl || 'none');
         console.log('  OMERO URL:', omeroUrl || 'none');
-        
+
         // Generate complete README.html with metadata and integration links
         const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl);
-        
+
         // Construct the README filename
-        const sanitizedProjectName = projectName 
+        const sanitizedProjectName = projectName
             ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
             : 'Project';
-        
+
         const readmeFilename = `${sanitizedProjectName}-README.html`;
         const readmePath = path.join(projectPath, readmeFilename);
-        
+
         // Write the README file
         await fs.writeFile(readmePath, readmeHtml, 'utf8');
-        
+
         console.log(`✅ IPC: README.html regenerated successfully: ${readmeFilename}`);
-        
+
         return {
             success: true,
             message: 'README.html regenerated successfully',
             path: readmePath,
             filename: readmeFilename
         };
-        
+
     } catch (error) {
         console.error('❌ IPC: Error regenerating README.html:', error);
         return {
@@ -1161,21 +1179,22 @@ ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, pr
 });
 
 // Insert integration links into existing README.html
-ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null) => {
+// Insert integration links into existing README.html
+ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null) => {
     try {
         console.log(`📄 IPC: Inserting integration links into README: ${projectPath}`);
-        
+
         // Construct the correct README filename with project name
-        const sanitizedProjectName = projectName 
+        const sanitizedProjectName = projectName
             ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
             : path.basename(projectPath); // Fallback: use folder name
-        
+
         const readmeFilename = `${sanitizedProjectName}-README.html`;
         const readmePath = path.join(projectPath, readmeFilename);
-        
+
         // Read existing README.html
         let htmlContent = await fs.readFile(readmePath, 'utf8');
-        
+
         // Create integration links HTML
         let linksHtml = `
             <section class="section integration-section">
@@ -1198,6 +1217,14 @@ ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl
                     <a href="${omeroUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
                         <span class="link-icon">🔬</span>
                         <span class="link-text">Open in OMERO</span>
+                    </a>`;
+        }
+
+        if (rspaceUrl) {
+            linksHtml += `
+                    <a href="${rspaceUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
+                        <span class="link-icon">📝</span>
+                        <span class="link-text">Open in RSpace</span>
                     </a>`;
         }
 
@@ -1269,15 +1296,15 @@ ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl
 
         // Write updated README
         await fs.writeFile(readmePath, htmlContent, 'utf8');
-        
+
         console.log(`✅ IPC: Integration links inserted successfully into README.html`);
-        
+
         return {
             success: true,
             message: 'Integration links inserted into README.html',
             path: readmePath
         };
-        
+
     } catch (error) {
         console.error('❌ IPC: Error inserting links into README:', error);
         return {
@@ -1290,47 +1317,47 @@ ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl
 
 // =================== ENHANCED TEMPLATE FILE STORAGE ===================
 
-    // Get templates directory with user/group support
-    function getTemplatesDirectory(userInfo = null) {
-        // GEÄNDERT: Verwende Home Directory statt userData
-        const homePath = app.getPath('home');
-        let templatesDir = path.join(homePath, 'MetaFold', 'Templates');
-        
-        // Add user/group specific paths if provided
-        if (userInfo) {
-            const { username, groupname } = userInfo;
-            
-            if (groupname && groupname !== 'Unknown' && groupname !== 'Default') {
-                // Group-specific directory
-                templatesDir = path.join(templatesDir, sanitizeFilename(groupname));
-                
-                if (username && username !== 'Unknown' && username !== 'User') {
-                    // User-specific within group
-                    templatesDir = path.join(templatesDir, sanitizeFilename(username));
-                }
-            } else if (username && username !== 'Unknown' && username !== 'User') {
-                // User-specific directory without group
+// Get templates directory with user/group support
+function getTemplatesDirectory(userInfo = null) {
+    // GEÄNDERT: Verwende Home Directory statt userData
+    const homePath = app.getPath('home');
+    let templatesDir = path.join(homePath, 'MetaFold', 'Templates');
+
+    // Add user/group specific paths if provided
+    if (userInfo) {
+        const { username, groupname } = userInfo;
+
+        if (groupname && groupname !== 'Unknown' && groupname !== 'Default') {
+            // Group-specific directory
+            templatesDir = path.join(templatesDir, sanitizeFilename(groupname));
+
+            if (username && username !== 'Unknown' && username !== 'User') {
+                // User-specific within group
                 templatesDir = path.join(templatesDir, sanitizeFilename(username));
             }
+        } else if (username && username !== 'Unknown' && username !== 'User') {
+            // User-specific directory without group
+            templatesDir = path.join(templatesDir, sanitizeFilename(username));
         }
-        
-        console.log(`📁 Templates directory (Home): ${templatesDir}`);
-        return templatesDir;
     }
 
-    // Get storage location information for UI display
-    function getStorageLocationInfo() {
-        const homePath = app.getPath('home');
-        const templatesDir = path.join(homePath, 'MetaFold', 'Templates');
-        
-        return {
-            currentPath: templatesDir,
-            fullPath: templatesDir,
-            userFriendlyPath: `~/MetaFold/Templates/`,
-            isHomeDirectory: true,
-            basePath: homePath
-        };
-    }
+    console.log(`📁 Templates directory (Home): ${templatesDir}`);
+    return templatesDir;
+}
+
+// Get storage location information for UI display
+function getStorageLocationInfo() {
+    const homePath = app.getPath('home');
+    const templatesDir = path.join(homePath, 'MetaFold', 'Templates');
+
+    return {
+        currentPath: templatesDir,
+        fullPath: templatesDir,
+        userFriendlyPath: `~/MetaFold/Templates/`,
+        isHomeDirectory: true,
+        basePath: homePath
+    };
+}
 
 // Ensure templates directory exists
 async function ensureTemplatesDirectory(userInfo = null) {
@@ -1356,7 +1383,7 @@ function generateTemplateFilename(templateName, templateId = null) {
         .replace(/\s+/g, '_')
         .toLowerCase()
         .substring(0, 80);  // Increased limit
-    
+
     // FIXED: Just name + .json, no timestamp/ID suffix
     return `${safeName}.json`;
 }
@@ -1365,14 +1392,14 @@ function generateTemplateFilename(templateName, templateId = null) {
 ipcMain.handle('save-template-to-file', async (event, template, userInfo = null) => {
     try {
         console.log(`💾 Saving template "${template.name}"...`);
-        
+
         // Ensure templates directory exists
         const templatesDir = await ensureTemplatesDirectory(userInfo);
-        
+
         let filename;
         let filePath;
         let isUpdate = false;
-        
+
         // ===== DATEINAME-LOGIK (FIXED: Clean names) =====
         // 1. Prüfe ob Template bereits eine Datei hat (_fileInfo)
         if (template._fileInfo && template._fileInfo.filename) {
@@ -1388,10 +1415,10 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
             isUpdate = false;
             console.log(`📄 Creating new file: ${filename}`);
         }
-        
+
         // Clean template data before saving
         const cleanTemplate = cleanTemplateForFileStorage(template);
-        
+
         // Add/update file metadata
         cleanTemplate._fileInfo = {
             filename: filename,
@@ -1403,16 +1430,16 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
             version: '2.0',
             isUpdate: isUpdate // Track whether this was an update or new file
         };
-        
+
         // Write to file
         await fs.writeFile(filePath, JSON.stringify(cleanTemplate, null, 2), 'utf8');
-        
+
         if (isUpdate) {
             console.log(`✅ Template "${template.name}" updated in existing file: ${filename}`);
         } else {
             console.log(`✅ Template "${template.name}" saved to new file: ${filename}`);
         }
-        
+
         return {
             success: true,
             filePath: filePath,
@@ -1422,7 +1449,7 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
             savedAt: cleanTemplate._fileInfo.savedAt,
             isUpdate: isUpdate
         };
-        
+
     } catch (error) {
         console.error('❌ Error saving template:', error);
         return {
@@ -1439,16 +1466,16 @@ ipcMain.handle('load-template-from-file', async (event, filePath) => {
     try {
         const content = await fs.readFile(filePath, 'utf8');
         const template = JSON.parse(content);
-        
+
         // Update file info with current stats
         const stats = await fs.stat(filePath);
         if (template._fileInfo) {
             template._fileInfo.lastModified = stats.mtime;
             template._fileInfo.fileSize = stats.size;
         }
-        
+
         console.log(`✅ Template loaded from file: ${path.basename(filePath)}`);
-        
+
         return {
             success: true,
             template: template
@@ -1462,194 +1489,194 @@ ipcMain.handle('load-template-from-file', async (event, filePath) => {
     }
 });
 
-    // Load all templates for user
-    ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
-        try {
-            console.log('📂 Loading templates from current user directory...');
-            
-            // WICHTIG: Verwende AKTUELLEN User-Ordner, nicht Template-Info
-            const templatesDir = await ensureTemplatesDirectory(userInfo);
-            const files = await fs.readdir(templatesDir);
-            
-            // Alle JSON-Dateien finden
-            const jsonFiles = files.filter(file => file.endsWith('.json'));
-            console.log(`📂 Found ${jsonFiles.length} JSON files in ${templatesDir}`);
-            
-            const templates = [];
-            const errors = [];
-            
-            // ===== ENHANCED FILENAME-TO-NAME FUNCTION =====
-            const generateEnhancedNameFromFilename = (filename) => {
-                let name = filename.replace('.json', '');
-                
-                return name
-                    // Replace underscores and hyphens with spaces
-                    .replace(/[_-]/g, ' ')
-                    
-                    // Handle camelCase (e.g., "LSM980" stays together)
-                    .replace(/([a-z])([A-Z])/g, '$1 $2')
-                    
-                    // Clean up multiple spaces
-                    .replace(/\s+/g, ' ')
-                    
-                    // Capitalize each word
-                    .replace(/\b\w/g, l => l.toUpperCase())
-                    
-                    // Handle special cases for scientific terms
-                    .replace(/\bLsm\b/g, 'LSM')        // LSM should stay uppercase
-                    .replace(/\bRdm\b/g, 'RDM')        // RDM should stay uppercase  
-                    .replace(/\bOmero\b/g, 'OMERO')    // OMERO should stay uppercase
-                    .replace(/\bApi\b/g, 'API')        // API should stay uppercase
-                    .replace(/\bDna\b/g, 'DNA')        // DNA should stay uppercase
-                    .replace(/\bRna\b/g, 'RNA')        // RNA should stay uppercase
-                    
-                    .trim();
-            };
-            
-            // Jede JSON-Datei laden
-            for (const file of jsonFiles) {
-                const filePath = path.join(templatesDir, file);
-                
-                try {
-                    const content = await fs.readFile(filePath, 'utf8');
-                    let template = JSON.parse(content);
-                    
-                    console.log(`📄 Loading: ${file}`);
-                    
-                    // ===== FILENAME-BASED NAMING =====
-                    // Store original name for reference
-                    template.originalName = template.name;
-                    template.sourceFilename = file;
-                    
-                    // Generate new unique name from filename
-                    const uniqueName = generateEnhancedNameFromFilename(file);
-                    template.name = uniqueName;
-                    
-                    console.log(`🔧 Template name updated: "${template.originalName}" → "${template.name}" (from ${file})`);
-                    
-                    // Add helpful metadata
-                    template.fileBasedNaming = true;
-                    template.nameSource = 'filename';
-                    template.lastFileUpdate = new Date().toISOString();
-                    
-                    // ===== EXISTING AUTO-CORRECTION LOGIC =====
-                    // Fallback if name generation failed
-                    if (!template.name || template.name === 'undefined' || template.name.trim() === '') {
-                        template.name = file.replace('.json', '').replace(/[_-]/g, ' ');
-                        console.log(`🔧 Fallback name generation: "${template.name}"`);
-                    }
-                    
-                    // Auto-fix type
-                    if (!template.type) {
-                        template.type = template.metadata && Object.keys(template.metadata).length > 0 ? 'experiment' : 'folders';
-                        console.log(`🔧 Auto-fixed type: "${template.type}"`);
-                    }
-                    
-                    // WICHTIG: Überschreibe createdBy/createdByGroup mit AKTUELLEM User
-                    // Das verhindert, dass fremde Gruppen-Ordner erstellt werden
-                    if (userInfo) {
-                        template.createdBy = userInfo.username || template.createdBy || 'Manual';
-                        template.createdByGroup = userInfo.groupname || template.createdByGroup || 'Manual';
-                        console.log(`👤 Updated user info: ${template.createdBy} (${template.createdByGroup})`);
-                    }
-                    
-                    // Ensure timestamps
-                    if (!template.createdAt) {
-                        template.createdAt = new Date().toISOString();
-                    }
-                    
-                    if (!template.updatedAt) {
-                        template.updatedAt = template.createdAt;
-                    }
-                    
-                    // Ensure template ID
-                    if (!template.id) {
-                        template.id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                    }
-                    
-                    // _fileInfo hinzufügen/aktualisieren
-                    const stats = await fs.stat(filePath);
-                    template._fileInfo = {
-                        ...(template._fileInfo || {}),
-                        filename: file,
-                        filePath: filePath,
-                        lastModified: stats.mtime.toISOString(),
-                        fileSize: stats.size,
-                        source: 'file',
-                        directory: templatesDir,
-                        stable: isStableFilename(file),
-                        version: '2.0' // Version for tracking improvements
-                    };
-                    
-                    // ENTFERNE NUR ÜBERFLÜSSIGE FELDER - metadata.fields bleibt unverändert!
-                    delete template.migrationMetadata;
-                    delete template.savedLocally;
-                    delete template.storageType;
-                    delete template.storageDisplay;
-                    delete template.storageIcon;
-                    delete template.recoveredAt;
-                    // projectDefaults kann bleiben - wird manchmal gebraucht
-                    
-                    templates.push(template);
-                    console.log(`✅ Template loaded: "${template.name}" (${templates.length}/${jsonFiles.length})`);
-                    
-                } catch (fileError) {
-                    console.warn(`⚠️ Error loading ${file}:`, fileError.message);
-                    errors.push({ file, error: fileError.message });
+// Load all templates for user
+ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
+    try {
+        console.log('📂 Loading templates from current user directory...');
+
+        // WICHTIG: Verwende AKTUELLEN User-Ordner, nicht Template-Info
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const files = await fs.readdir(templatesDir);
+
+        // Alle JSON-Dateien finden
+        const jsonFiles = files.filter(file => file.endsWith('.json'));
+        console.log(`📂 Found ${jsonFiles.length} JSON files in ${templatesDir}`);
+
+        const templates = [];
+        const errors = [];
+
+        // ===== ENHANCED FILENAME-TO-NAME FUNCTION =====
+        const generateEnhancedNameFromFilename = (filename) => {
+            let name = filename.replace('.json', '');
+
+            return name
+                // Replace underscores and hyphens with spaces
+                .replace(/[_-]/g, ' ')
+
+                // Handle camelCase (e.g., "LSM980" stays together)
+                .replace(/([a-z])([A-Z])/g, '$1 $2')
+
+                // Clean up multiple spaces
+                .replace(/\s+/g, ' ')
+
+                // Capitalize each word
+                .replace(/\b\w/g, l => l.toUpperCase())
+
+                // Handle special cases for scientific terms
+                .replace(/\bLsm\b/g, 'LSM')        // LSM should stay uppercase
+                .replace(/\bRdm\b/g, 'RDM')        // RDM should stay uppercase  
+                .replace(/\bOmero\b/g, 'OMERO')    // OMERO should stay uppercase
+                .replace(/\bApi\b/g, 'API')        // API should stay uppercase
+                .replace(/\bDna\b/g, 'DNA')        // DNA should stay uppercase
+                .replace(/\bRna\b/g, 'RNA')        // RNA should stay uppercase
+
+                .trim();
+        };
+
+        // Jede JSON-Datei laden
+        for (const file of jsonFiles) {
+            const filePath = path.join(templatesDir, file);
+
+            try {
+                const content = await fs.readFile(filePath, 'utf8');
+                let template = JSON.parse(content);
+
+                console.log(`📄 Loading: ${file}`);
+
+                // ===== FILENAME-BASED NAMING =====
+                // Store original name for reference
+                template.originalName = template.name;
+                template.sourceFilename = file;
+
+                // Generate new unique name from filename
+                const uniqueName = generateEnhancedNameFromFilename(file);
+                template.name = uniqueName;
+
+                console.log(`🔧 Template name updated: "${template.originalName}" → "${template.name}" (from ${file})`);
+
+                // Add helpful metadata
+                template.fileBasedNaming = true;
+                template.nameSource = 'filename';
+                template.lastFileUpdate = new Date().toISOString();
+
+                // ===== EXISTING AUTO-CORRECTION LOGIC =====
+                // Fallback if name generation failed
+                if (!template.name || template.name === 'undefined' || template.name.trim() === '') {
+                    template.name = file.replace('.json', '').replace(/[_-]/g, ' ');
+                    console.log(`🔧 Fallback name generation: "${template.name}"`);
                 }
-            }
-            
-            // ===== FINAL SUMMARY =====
-            console.log(`\n📊 === TEMPLATE LOADING SUMMARY ===`);
-            console.log(`📁 Directory: ${templatesDir}`);
-            console.log(`📄 JSON files found: ${jsonFiles.length}`);
-            console.log(`✅ Templates loaded: ${templates.length}`);
-            console.log(`❌ Loading errors: ${errors.length}`);
-            
-            if (templates.length > 0) {
-                console.log(`📋 Loaded templates:`);
-                templates.forEach((template, i) => {
-                    console.log(`  ${i+1}. "${template.name}" (${template.type}) from ${template._fileInfo.filename}`);
-                });
-            }
-            
-            if (errors.length > 0) {
-                console.log(`❌ Failed to load:`);
-                errors.forEach((error, i) => {
-                    console.log(`  ${i+1}. ${error.file}: ${error.error}`);
-                });
-            }
-            
-            console.log(`📊 === END SUMMARY ===\n`);
-            
-            return {
-                success: true,
-                templates: templates,  
-                directory: templatesDir,
-                loadedCount: templates.length,
-                errorCount: errors.length,
-                errors: errors,
-                // Note: duplicateCount removed since we're not doing deduplication
-                summary: {
-                    totalFiles: jsonFiles.length,
-                    successfullyLoaded: templates.length,
-                    failed: errors.length,
-                    fileBasedNaming: true
+
+                // Auto-fix type
+                if (!template.type) {
+                    template.type = template.metadata && Object.keys(template.metadata).length > 0 ? 'experiment' : 'folders';
+                    console.log(`🔧 Auto-fixed type: "${template.type}"`);
                 }
-            };
-            
-        } catch (error) {
-            console.error('❌ Error loading templates:', error);
-            return {
-                success: false,
-                error: error.message,
-                templates: [],
-                loadedCount: 0,
-                errorCount: 1,
-                errors: [{ file: 'system', error: error.message }]
-            };
+
+                // WICHTIG: Überschreibe createdBy/createdByGroup mit AKTUELLEM User
+                // Das verhindert, dass fremde Gruppen-Ordner erstellt werden
+                if (userInfo) {
+                    template.createdBy = userInfo.username || template.createdBy || 'Manual';
+                    template.createdByGroup = userInfo.groupname || template.createdByGroup || 'Manual';
+                    console.log(`👤 Updated user info: ${template.createdBy} (${template.createdByGroup})`);
+                }
+
+                // Ensure timestamps
+                if (!template.createdAt) {
+                    template.createdAt = new Date().toISOString();
+                }
+
+                if (!template.updatedAt) {
+                    template.updatedAt = template.createdAt;
+                }
+
+                // Ensure template ID
+                if (!template.id) {
+                    template.id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
+
+                // _fileInfo hinzufügen/aktualisieren
+                const stats = await fs.stat(filePath);
+                template._fileInfo = {
+                    ...(template._fileInfo || {}),
+                    filename: file,
+                    filePath: filePath,
+                    lastModified: stats.mtime.toISOString(),
+                    fileSize: stats.size,
+                    source: 'file',
+                    directory: templatesDir,
+                    stable: isStableFilename(file),
+                    version: '2.0' // Version for tracking improvements
+                };
+
+                // ENTFERNE NUR ÜBERFLÜSSIGE FELDER - metadata.fields bleibt unverändert!
+                delete template.migrationMetadata;
+                delete template.savedLocally;
+                delete template.storageType;
+                delete template.storageDisplay;
+                delete template.storageIcon;
+                delete template.recoveredAt;
+                // projectDefaults kann bleiben - wird manchmal gebraucht
+
+                templates.push(template);
+                console.log(`✅ Template loaded: "${template.name}" (${templates.length}/${jsonFiles.length})`);
+
+            } catch (fileError) {
+                console.warn(`⚠️ Error loading ${file}:`, fileError.message);
+                errors.push({ file, error: fileError.message });
+            }
         }
-    });
+
+        // ===== FINAL SUMMARY =====
+        console.log(`\n📊 === TEMPLATE LOADING SUMMARY ===`);
+        console.log(`📁 Directory: ${templatesDir}`);
+        console.log(`📄 JSON files found: ${jsonFiles.length}`);
+        console.log(`✅ Templates loaded: ${templates.length}`);
+        console.log(`❌ Loading errors: ${errors.length}`);
+
+        if (templates.length > 0) {
+            console.log(`📋 Loaded templates:`);
+            templates.forEach((template, i) => {
+                console.log(`  ${i + 1}. "${template.name}" (${template.type}) from ${template._fileInfo.filename}`);
+            });
+        }
+
+        if (errors.length > 0) {
+            console.log(`❌ Failed to load:`);
+            errors.forEach((error, i) => {
+                console.log(`  ${i + 1}. ${error.file}: ${error.error}`);
+            });
+        }
+
+        console.log(`📊 === END SUMMARY ===\n`);
+
+        return {
+            success: true,
+            templates: templates,
+            directory: templatesDir,
+            loadedCount: templates.length,
+            errorCount: errors.length,
+            errors: errors,
+            // Note: duplicateCount removed since we're not doing deduplication
+            summary: {
+                totalFiles: jsonFiles.length,
+                successfullyLoaded: templates.length,
+                failed: errors.length,
+                fileBasedNaming: true
+            }
+        };
+
+    } catch (error) {
+        console.error('❌ Error loading templates:', error);
+        return {
+            success: false,
+            error: error.message,
+            templates: [],
+            loadedCount: 0,
+            errorCount: 1,
+            errors: [{ file: 'system', error: error.message }]
+        };
+    }
+});
 
 
 // Update template file
@@ -1662,9 +1689,9 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
             console.log('⚠️ No file info found, treating as new file');
             return await ipcMain.emit('save-template-to-file', event, templateData);
         }
-        
+
         const filePath = templateData._fileInfo.filePath;
-        
+
         // Check if file exists
         try {
             await fs.access(filePath);
@@ -1673,12 +1700,12 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
             console.log('⚠️ Original file not found, creating new file');
             return await ipcMain.emit('save-template-to-file', event, templateData);
         }
-        
+
         console.log(`📝 Updating template file: ${path.basename(filePath)}`);
-        
+
         // Clean template data
         const cleanTemplate = cleanTemplateForFileStorage(templateData);
-        
+
         // Update file info
         cleanTemplate._fileInfo = {
             ...templateData._fileInfo,
@@ -1686,15 +1713,15 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
             lastModified: new Date().toISOString(),
             isUpdate: true
         };
-        
+
         // Write updated data
         await fs.writeFile(filePath, JSON.stringify(cleanTemplate, null, 2), 'utf8');
-        
+
         // Get updated stats
         const stats = await fs.stat(filePath);
-        
+
         console.log(`✅ Template updated: ${path.basename(filePath)}`);
-        
+
         return {
             success: true,
             filename: cleanTemplate._fileInfo.filename,
@@ -1703,7 +1730,7 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
             updatedAt: cleanTemplate._fileInfo.savedAt,
             isUpdate: true
         };
-        
+
     } catch (error) {
         console.error('❌ Error updating template file:', error);
         return {
@@ -1717,7 +1744,7 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
 ipcMain.handle('delete-template-file', async (event, filePath) => {
     try {
         console.log(`🗑️ Deleting template file: ${filePath}`);
-        
+
         // Check if file exists
         try {
             await fs.access(filePath);
@@ -1725,7 +1752,7 @@ ipcMain.handle('delete-template-file', async (event, filePath) => {
             console.log(`⚠️ Template file already deleted or doesn't exist: ${filePath}`);
             return { success: true, message: 'File already deleted' };
         }
-        
+
         // Read template before deletion (for logging)
         let templateName = 'Unknown';
         try {
@@ -1735,18 +1762,18 @@ ipcMain.handle('delete-template-file', async (event, filePath) => {
         } catch {
             // Could not read template, continue with deletion
         }
-        
+
         // Delete the file
         await fs.unlink(filePath);
-        
+
         console.log(`✅ Template file deleted successfully: ${templateName} (${path.basename(filePath)})`);
-        
+
         return {
             success: true,
             message: `Template "${templateName}" deleted successfully`,
             deletedFile: path.basename(filePath)
         };
-        
+
     } catch (error) {
         console.error('❌ Error deleting template file:', error);
         return {
@@ -1778,7 +1805,7 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
     try {
         // Generate template-based filename if no defaultPath provided
         let suggestedFileName = defaultPath;
-        
+
         if (!suggestedFileName) {
             if (exportType === 'bulk') {
                 suggestedFileName = 'metafold_templates_export.json';
@@ -1792,7 +1819,7 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
                         .replace(/\s+/g, '_')              // Replace spaces with underscores
                         .toLowerCase()                     // Convert to lowercase
                         .substring(0, 100);                // Limit length
-                    
+
                     suggestedFileName = `${safeName}_template.json`;
                     console.log(`📝 Generated template-based filename: ${suggestedFileName}`);
                 } else {
@@ -1800,7 +1827,7 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
                 }
             }
         }
-        
+
         const result = await dialog.showSaveDialog(mainWindow, {
             title: exportType === 'bulk' ? 'Export All Templates' : 'Export Template',
             filters: [
@@ -1808,13 +1835,13 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
             ],
             defaultPath: suggestedFileName
         });
-        
+
         if (!result.canceled && result.filePath) {
             const dataToExport = exportType === 'bulk' ? { templates, exportDate: new Date().toISOString() } : templates;
             await fs.writeFile(result.filePath, JSON.stringify(dataToExport, null, 2), 'utf8');
-            
+
             console.log(`✅ Template exported successfully to: ${result.filePath}`);
-            
+
             return {
                 success: true,
                 message: `Templates exported successfully to ${result.filePath}`,
@@ -1822,7 +1849,7 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
                 fileName: path.basename(result.filePath)
             };
         }
-        
+
         return {
             success: false,
             message: 'Export cancelled'
@@ -1838,38 +1865,65 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
 });
 
 // Import templates from file
-ipcMain.handle('import-templates-from-file', async () => {
+// Import templates from file
+ipcMain.handle('import-templates-from-file', async (event, importType = 'single') => {
     try {
+        const properties = ['openFile'];
+        if (importType === 'multi') {
+            properties.push('multiSelections');
+        }
+
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: 'Import Templates',
+            title: importType === 'multi' ? 'Import Templates (Select Multiple)' : 'Import Template',
             filters: [
                 { name: 'JSON Files', extensions: ['json'] }
             ],
-            properties: ['openFile']
+            properties: properties
         });
-        
+
         if (!result.canceled && result.filePaths.length > 0) {
-            const content = await fs.readFile(result.filePaths[0], 'utf8');
-            const data = JSON.parse(content);
-            
-            // Handle both single template and bulk export formats
-            let templates = [];
-            if (Array.isArray(data)) {
-                templates = data;
-            } else if (data.templates && Array.isArray(data.templates)) {
-                templates = data.templates;
-            } else if (data.name) {
-                // Single template
-                templates = [data];
+            let allTemplates = [];
+            const errors = [];
+            const fixedFiles = [];
+
+            // Process all selected files
+            for (const filePath of result.filePaths) {
+                try {
+                    const content = await fs.readFile(filePath, 'utf8');
+                    const data = JSON.parse(content);
+
+                    let templatesInFile = [];
+
+                    // Handle different formats
+                    if (Array.isArray(data)) {
+                        templatesInFile = data;
+                    } else if (data.templates && Array.isArray(data.templates)) {
+                        templatesInFile = data.templates;
+                    } else if (data.name) {
+                        // Single template
+                        templatesInFile = [data];
+                    }
+
+                    if (templatesInFile.length > 0) {
+                        allTemplates = allTemplates.concat(templatesInFile);
+                    } else {
+                        console.warn(`⚠️ No valid ISO templates found in ${path.basename(filePath)}`);
+                    }
+
+                } catch (fileError) {
+                    console.error(`❌ Error reading file ${path.basename(filePath)}:`, fileError);
+                    errors.push({ file: path.basename(filePath), error: fileError.message });
+                }
             }
-            
+
             return {
                 success: true,
-                templates: templates,
-                count: templates.length
+                templates: allTemplates,
+                count: allTemplates.length,
+                errors: errors.length > 0 ? errors : undefined
             };
         }
-        
+
         return {
             success: false,
             message: 'Import cancelled'
@@ -1893,7 +1947,7 @@ ipcMain.handle('bulk-export-templates', async (event, templates, options = {}) =
             ],
             defaultPath: `metafold_templates_backup_${new Date().toISOString().split('T')[0]}.json`
         });
-        
+
         if (!result.canceled && result.filePath) {
             const exportData = {
                 version: '1.0',
@@ -1902,9 +1956,9 @@ ipcMain.handle('bulk-export-templates', async (event, templates, options = {}) =
                 templates: templates,
                 metadata: options.metadata || {}
             };
-            
+
             await fs.writeFile(result.filePath, JSON.stringify(exportData, null, 2), 'utf8');
-            
+
             return {
                 success: true,
                 message: `Exported ${templates.length} templates successfully`,
@@ -1912,7 +1966,7 @@ ipcMain.handle('bulk-export-templates', async (event, templates, options = {}) =
                 count: templates.length
             };
         }
-        
+
         return {
             success: false,
             message: 'Export cancelled'
@@ -1936,16 +1990,16 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
             ],
             properties: ['openFile', 'multiSelections']
         });
-        
+
         if (!result.canceled && result.filePaths.length > 0) {
             let allTemplates = [];
             const errors = [];
-            
+
             for (const filePath of result.filePaths) {
                 try {
                     const content = await fs.readFile(filePath, 'utf8');
                     const data = JSON.parse(content);
-                    
+
                     if (data.templates && Array.isArray(data.templates)) {
                         allTemplates = allTemplates.concat(data.templates);
                     } else if (Array.isArray(data)) {
@@ -1957,7 +2011,7 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
                     errors.push({ file: path.basename(filePath), error: error.message });
                 }
             }
-            
+
             return {
                 success: true,
                 templates: allTemplates,
@@ -1966,7 +2020,7 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
                 errors: errors
             };
         }
-        
+
         return {
             success: false,
             message: 'Import cancelled'
@@ -1993,43 +2047,43 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
  */
 async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0) {
     const projects = [];
-    
+
     // Stop if max depth reached
     if (currentDepth > maxDepth) {
         console.log(`⚠️ Max depth ${maxDepth} reached at ${basePath}`);
         return projects;
     }
-    
+
     try {
         const entries = await fs.readdir(basePath, { withFileTypes: true });
-        
+
         // Look for metadata files in current directory
-        const metadataFiles = entries.filter(entry => 
+        const metadataFiles = entries.filter(entry =>
             entry.isFile() && entry.name.endsWith('-metadata.json')
         );
-        
+
         // If metadata files found, this is a project directory
         for (const metadataFile of metadataFiles) {
             console.log(`📁 Found project in: ${basePath}`);
-            
+
             const project = await parseMetaFoldProject(basePath, metadataFile.name);
             if (project) {
                 projects.push(project);
             }
         }
-        
+
         // Recursively scan subdirectories
         const directories = entries.filter(entry => entry.isDirectory());
-        
+
         for (const dir of directories) {
             const subdirPath = path.join(basePath, dir.name);
-            
+
             // Skip common directories that shouldn't be scanned
             const skipDirs = ['node_modules', '.git', '.vscode', 'dist', 'build', '__pycache__'];
             if (skipDirs.includes(dir.name)) {
                 continue;
             }
-            
+
             try {
                 const subProjects = await scanForMetaFoldProjects(subdirPath, maxDepth, currentDepth + 1);
                 projects.push(...subProjects);
@@ -2038,11 +2092,11 @@ async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0)
                 console.log(`⚠️ Skipping ${subdirPath}: ${error.message}`);
             }
         }
-        
+
     } catch (error) {
         console.error(`❌ Error scanning ${basePath}:`, error);
     }
-    
+
     return projects;
 }
 
@@ -2054,27 +2108,27 @@ async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0)
 async function getProjectDetails(projectPath) {
     try {
         const entries = await fs.readdir(projectPath, { withFileTypes: true });
-        
+
         // Find metadata file
-        const metadataFile = entries.find(entry => 
+        const metadataFile = entries.find(entry =>
             entry.isFile() && entry.name.endsWith('-metadata.json')
         );
-        
+
         if (!metadataFile) {
             throw new Error('No metadata file found in project directory');
         }
-        
+
         // Parse project
         const project = await parseMetaFoldProject(projectPath, metadataFile.name);
-        
+
         if (!project) {
             throw new Error('Failed to parse project');
         }
-        
+
         // Add additional details
         const files = entries.filter(entry => entry.isFile());
         const directories = entries.filter(entry => entry.isDirectory());
-        
+
         return {
             ...project,
             fileCount: files.length,
@@ -2082,7 +2136,7 @@ async function getProjectDetails(projectPath) {
             files: files.map(f => f.name),
             directories: directories.map(d => d.name)
         };
-        
+
     } catch (error) {
         throw new Error(`Error getting project details: ${error.message}`);
     }
@@ -2108,33 +2162,33 @@ function analyzeProjectStatistics(projects) {
             typeDistribution: {}
         };
     }
-    
+
     // Calculate basic statistics
     const totalProjects = projects.length;
     const totalSize = projects.reduce((sum, p) => sum + (p.size || 0), 0);
     const averageSize = totalSize / totalProjects;
-    
+
     const totalMetadataFields = projects.reduce((sum, p) => sum + (p.metadataFieldCount || 0), 0);
     const averageMetadataFields = totalMetadataFields / totalProjects;
-    
+
     const projectsWithReadme = projects.filter(p => p.hasReadme).length;
-    
+
     // Find oldest and newest projects
-    const sortedByDate = [...projects].sort((a, b) => 
+    const sortedByDate = [...projects].sort((a, b) =>
         new Date(a.created) - new Date(b.created)
     );
     const oldestProject = sortedByDate[0];
     const newestProject = sortedByDate[sortedByDate.length - 1];
-    
+
     // Analyze metadata field frequency
     const fieldFrequency = {};
     const typeDistribution = {};
-    
+
     projects.forEach(project => {
         if (project.metadata && typeof project.metadata === 'object') {
             Object.keys(project.metadata).forEach(fieldName => {
                 fieldFrequency[fieldName] = (fieldFrequency[fieldName] || 0) + 1;
-                
+
                 const field = project.metadata[fieldName];
                 if (field && field.type) {
                     typeDistribution[field.type] = (typeDistribution[field.type] || 0) + 1;
@@ -2142,39 +2196,39 @@ function analyzeProjectStatistics(projects) {
             });
         }
     });
-    
+
     // Calculate completeness scores
     const completenessScores = projects.map(project => {
         let score = 0;
         let maxScore = 10;
-        
+
         // Has metadata
         if (project.metadata && Object.keys(project.metadata).length > 0) {
             score += 4;
         }
-        
+
         // Has README
         if (project.hasReadme) {
             score += 2;
         }
-        
+
         // Has filled metadata fields
         if (project.metadata) {
-            const filledFields = Object.values(project.metadata).filter(field => 
+            const filledFields = Object.values(project.metadata).filter(field =>
                 field.value && field.value.toString().trim() !== ''
             ).length;
             const totalFields = Object.keys(project.metadata).length;
-            
+
             if (totalFields > 0) {
                 score += Math.round((filledFields / totalFields) * 4);
             }
         }
-        
+
         return Math.round((score / maxScore) * 100);
     });
-    
+
     const averageCompleteness = completenessScores.reduce((sum, s) => sum + s, 0) / completenessScores.length;
-    
+
     return {
         totalProjects,
         totalSize,
@@ -2210,20 +2264,20 @@ function analyzeProjectStatistics(projects) {
 ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5) => {
     try {
         console.log(`🔍 Scanning for MetaFold projects in: ${basePath}`);
-        
+
         const projects = await scanForMetaFoldProjects(basePath, maxDepth);
-        
+
         console.log(`✅ Found ${projects.length} MetaFold projects`);
-        return { 
-            success: true, 
+        return {
+            success: true,
             projects: projects,
             scannedPath: basePath,
             projectCount: projects.length
         };
     } catch (error) {
         console.error('❌ Error scanning for MetaFold projects:', error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             message: `Error scanning projects: ${error.message}`,
             projects: []
         };
@@ -2234,17 +2288,17 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5) =
 ipcMain.handle('get-project-details', async (event, projectPath) => {
     try {
         console.log(`📋 Getting project details for: ${projectPath}`);
-        
+
         const details = await getProjectDetails(projectPath);
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             details: details
         };
     } catch (error) {
         console.error('❌ Error getting project details:', error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             message: `Error getting project details: ${error.message}`
         };
     }
@@ -2254,15 +2308,15 @@ ipcMain.handle('get-project-details', async (event, projectPath) => {
 ipcMain.handle('get-projects-statistics', async (event, projects) => {
     try {
         const stats = analyzeProjectStatistics(projects);
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             statistics: stats
         };
     } catch (error) {
         console.error('❌ Error analyzing project statistics:', error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             message: `Error analyzing statistics: ${error.message}`
         };
     }
@@ -2274,16 +2328,16 @@ ipcMain.handle('get-projects-statistics', async (event, projects) => {
 ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
     try {
         console.log(`🔍 Checking directory existence: ${directoryPath}`);
-        
+
         try {
             const stats = await fs.stat(directoryPath);
-            
+
             if (stats.isDirectory()) {
                 // Directory exists - get contents
                 const contents = await fs.readdir(directoryPath);
-                
+
                 console.log(`📁 Directory exists with ${contents.length} items`);
-                
+
                 return {
                     exists: true,
                     isEmpty: contents.length === 0,
@@ -2316,7 +2370,7 @@ ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
                 throw accessError;
             }
         }
-        
+
     } catch (error) {
         console.error(`❌ Error checking directory: ${directoryPath}`, error);
         return {
@@ -2331,14 +2385,14 @@ ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
 ipcMain.handle('generate-alternative-names', async (event, basePath, originalName) => {
     try {
         console.log(`🔄 Generating alternative names for: ${originalName} in ${basePath}`);
-        
+
         const alternatives = [];
-        
+
         // Strategy 1: Add _02, _03, etc.
         for (let i = 2; i <= 10; i++) {
             const altName = `${originalName}_${i.toString().padStart(2, '0')}`;
             const altPath = path.join(basePath, altName);
-            
+
             try {
                 await fs.access(altPath);
                 // Path exists, try next number
@@ -2352,20 +2406,20 @@ ipcMain.handle('generate-alternative-names', async (event, basePath, originalNam
                 if (alternatives.length >= 3) break; // Limit to first 3 options
             }
         }
-        
+
         // Strategy 2: Add date suffix
         const today = new Date();
         const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
         const dateAltName = `${originalName}_${dateStr}`;
         const dateAltPath = path.join(basePath, dateAltName);
-        
+
         try {
             await fs.access(dateAltPath);
             // Date version exists, try with time
             const timeStr = today.toTimeString().substring(0, 5).replace(':', ''); // HHMM
             const timeAltName = `${originalName}_${dateStr}_${timeStr}`;
             const timeAltPath = path.join(basePath, timeAltName);
-            
+
             try {
                 await fs.access(timeAltPath);
                 // Both date and time versions exist
@@ -2383,7 +2437,7 @@ ipcMain.handle('generate-alternative-names', async (event, basePath, originalNam
                 type: 'date'
             });
         }
-        
+
         // Strategy 3: Add timestamp suffix (as last resort)
         if (alternatives.length === 0) {
             const timestamp = Date.now();
@@ -2394,16 +2448,16 @@ ipcMain.handle('generate-alternative-names', async (event, basePath, originalNam
                 type: 'timestamp'
             });
         }
-        
+
         console.log(`✅ Generated ${alternatives.length} alternative names`);
-        
+
         return {
             success: true,
             alternatives: alternatives,
             originalName: originalName,
             basePath: basePath
         };
-        
+
     } catch (error) {
         console.error(`❌ Error generating alternative names:`, error);
         return {
@@ -2418,19 +2472,19 @@ ipcMain.handle('generate-alternative-names', async (event, basePath, originalNam
 ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
     try {
         const { projectName, directoryPath, directoryInfo, alternatives } = options;
-        
+
         let message = `The project directory already exists:\n\n"${projectName}"\n\n`;
-        
+
         if (directoryInfo.isEmpty) {
             message += 'The directory is empty.';
         } else {
             message += `The directory contains ${directoryInfo.itemCount} item(s).`;
         }
-        
+
         message += '\n\nWhat would you like to do?';
-        
+
         const buttons = ['Cancel', 'Overwrite', 'Use Different Name'];
-        
+
         const result = await dialog.showMessageBox(mainWindow, {
             type: 'warning',
             title: 'Directory Already Exists',
@@ -2441,16 +2495,16 @@ ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
             cancelId: 0,  // "Cancel" 
             icon: path.join(__dirname, 'assets', 'icon.png')
         });
-        
+
         console.log(`🤔 User choice for directory conflict: ${buttons[result.response]}`);
-        
+
         return {
             success: true,
             choice: result.response,
             choiceName: buttons[result.response],
             alternatives: alternatives
         };
-        
+
     } catch (error) {
         console.error(`❌ Error showing directory confirmation dialog:`, error);
         return {
@@ -2467,38 +2521,38 @@ ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
 async function createFolderStructure(basePath, structure) {
     const lines = structure.split('\n').filter(line => line.trim() !== '');
     const pathStack = [basePath];
-    
+
     console.log(`📋 Creating structure in: ${basePath}`);
     console.log(`📋 Structure:\n${structure}`);
-    
+
     for (const line of lines) {
         if (!line.trim()) continue;
-        
+
         // Determine indentation (2 spaces = 1 level)
         const indentMatch = line.match(/^(\s*)/);
         const indent = indentMatch ? indentMatch[1].length : 0;
         const depth = Math.floor(indent / 2);
         const name = line.trim();
-        
+
         console.log(`📝 Processing: "${line}" (depth: ${depth}, name: "${name}")`);
-        
+
         // Adjust stack to correct depth
         pathStack.splice(depth + 1);
-        
+
         console.log(`📚 Stack after adjustment: [${pathStack.join(', ')}]`);
-        
+
         if (name.endsWith('/')) {
             // Create folder
             const folderName = name.slice(0, -1);
             const folderPath = path.join(...pathStack, folderName);
-            
+
             try {
                 await fs.mkdir(folderPath, { recursive: true });
                 console.log(`📁 Folder created: ${folderPath}`);
-                
+
                 pathStack.push(folderName);
                 console.log(`📚 Stack after folder addition: [${pathStack.join(', ')}]`);
-                
+
             } catch (error) {
                 if (error.code !== 'EEXIST') {
                     throw error;
@@ -2510,10 +2564,10 @@ async function createFolderStructure(basePath, structure) {
             // Create file
             const filePath = path.join(...pathStack, name);
             const dir = path.dirname(filePath);
-            
+
             try {
                 await fs.mkdir(dir, { recursive: true });
-                
+
                 // Check if file already exists
                 try {
                     await fs.access(filePath);
@@ -2528,7 +2582,7 @@ async function createFolderStructure(basePath, structure) {
             }
         }
     }
-    
+
     console.log(`✅ Folder structure creation completed`);
 }
 
@@ -2553,7 +2607,7 @@ ipcMain.handle('start-omero-proxy', async (event, settings = {}) => {
     try {
         console.log('🚀 Starting OMERO proxy server...');
         console.log('📋 Settings:', settings);
-        
+
         // Initialize proxy if not exists
         if (!omeroProxyServer) {
             if (!settings.serverUrl) {
@@ -2564,17 +2618,17 @@ ipcMain.handle('start-omero-proxy', async (event, settings = {}) => {
                 settings.serverUrl
             );
         }
-        
+
         // Start the proxy server
         const result = await omeroProxyServer.start(settings);
-        
+
         if (result.success) {
             console.log('✅ OMERO proxy server started successfully');
             console.log(`🔗 Proxy URL: http://localhost:${result.port}/omero-api`);
         }
-        
+
         return result;
-        
+
     } catch (error) {
         console.error('❌ Failed to start OMERO proxy server:', error);
         return {
@@ -2593,7 +2647,7 @@ ipcMain.handle('start-omero-proxy', async (event, settings = {}) => {
 ipcMain.handle('stop-omero-proxy', async (event) => {
     try {
         console.log('🛑 Stopping OMERO proxy server...');
-        
+
         if (!omeroProxyServer) {
             return {
                 success: true,
@@ -2601,15 +2655,15 @@ ipcMain.handle('stop-omero-proxy', async (event) => {
                 status: 'stopped'
             };
         }
-        
+
         const result = await omeroProxyServer.stop();
-        
+
         if (result.success) {
             console.log('✅ OMERO proxy server stopped successfully');
         }
-        
+
         return result;
-        
+
     } catch (error) {
         console.error('❌ Failed to stop OMERO proxy server:', error);
         return {
@@ -2633,15 +2687,15 @@ ipcMain.handle('get-omero-proxy-status', async (event) => {
                 message: 'OMERO proxy server not initialized'
             };
         }
-        
+
         const status = omeroProxyServer.getStatus();
         console.log('📊 OMERO proxy status requested:', status);
-        
+
         return {
             success: true,
             ...status
         };
-        
+
     } catch (error) {
         console.error('❌ Failed to get OMERO proxy status:', error);
         return {
@@ -2661,13 +2715,13 @@ ipcMain.handle('get-omero-proxy-status', async (event) => {
 ipcMain.handle('restart-omero-proxy', async (event, settings = {}) => {
     try {
         console.log('🔄 Restarting OMERO proxy server...');
-        
+
         // Stop existing proxy if running
         if (omeroProxyServer && omeroProxyServer.getStatus().running) {
             console.log('🛑 Stopping existing proxy...');
             await omeroProxyServer.stop();
         }
-        
+
         // Reset proxy instance to apply new settings
         if (!settings.serverUrl) {
             throw new Error('OMERO server URL not configured - cannot restart proxy');
@@ -2676,21 +2730,21 @@ ipcMain.handle('restart-omero-proxy', async (event, settings = {}) => {
             settings.proxyPort || 3000,
             settings.serverUrl
         );
-        
+
         // Start with new settings
         console.log('🚀 Starting proxy with new settings...');
         const result = await omeroProxyServer.start(settings);
-        
+
         if (result.success) {
             console.log('✅ OMERO proxy server restarted successfully');
             console.log(`🔗 New proxy URL: http://localhost:${result.port}/omero-api`);
         }
-        
+
         return {
             ...result,
             restarted: true
         };
-        
+
     } catch (error) {
         console.error('❌ Failed to restart OMERO proxy server:', error);
         return {
@@ -2709,10 +2763,10 @@ ipcMain.handle('restart-omero-proxy', async (event, settings = {}) => {
 ipcMain.handle('check-omero-proxy-port', async (event, port = 3000) => {
     try {
         const net = require('net');
-        
+
         return new Promise((resolve) => {
             const server = net.createServer();
-            
+
             server.listen(port, 'localhost', () => {
                 const actualPort = server.address().port;
                 server.close(() => {
@@ -2724,7 +2778,7 @@ ipcMain.handle('check-omero-proxy-port', async (event, port = 3000) => {
                     });
                 });
             });
-            
+
             server.on('error', (error) => {
                 resolve({
                     success: true,
@@ -2735,7 +2789,7 @@ ipcMain.handle('check-omero-proxy-port', async (event, port = 3000) => {
                 });
             });
         });
-        
+
     } catch (error) {
         console.error('❌ Failed to check port availability:', error);
         return {
@@ -2773,18 +2827,18 @@ function logProxyActivity(activity, details = {}) {
     console.log(`[${timestamp}] 🔬 OMERO Proxy: ${activity}`, details);
 }
 
-    // Generate HTML README with metadata info instead of Markdown
-    function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null) {
-        const currentDate = new Date();
-        const formattedDate = currentDate.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        let htmlContent = `<!DOCTYPE html>
+// Generate HTML README with metadata info instead of Markdown
+function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null) {
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    let htmlContent = `<!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
@@ -2992,9 +3046,9 @@ function logProxyActivity(activity, details = {}) {
 
             <main class="content">`;
 
-        // Metadata section
-        if (metadata && Object.keys(metadata).length > 0) {
-            htmlContent += `
+    // Metadata section
+    if (metadata && Object.keys(metadata).length > 0) {
+        htmlContent += `
                 <section class="section">
                     <h2 class="section-title">
                         <span class="section-icon">📊</span>
@@ -3002,86 +3056,86 @@ function logProxyActivity(activity, details = {}) {
                     </h2>
                     <div class="metadata-grid">`;
 
-            let hasMetadata = false;
-            
-            // Group fields by type for better organization
-            const groupFields = [];
-            const normalFields = [];
-            
-            Object.entries(metadata).forEach(([key, fieldInfo]) => {
-                if (fieldInfo && typeof fieldInfo === 'object') {
-                    if (fieldInfo.type === 'group') {
-                        groupFields.push([key, fieldInfo]);
-                    } else {
-                        normalFields.push([key, fieldInfo]);
-                    }
-                }
-            });
+        let hasMetadata = false;
 
-            // Process normal fields first
-            normalFields.forEach(([key, fieldInfo]) => {
-                if (fieldInfo.type !== 'group') {
-                    hasMetadata = true;
-                    const label = fieldInfo.label || key;
-                    let value = fieldInfo.value;
-                    
-                    // Format value based on type
-                    let formattedValue;
-                    if (fieldInfo.type === 'checkbox') {
-                        formattedValue = value ? '✅ Yes' : '❌ No';
-                    } else if (fieldInfo.type === 'date' && value) {
-                        try {
-                            const dateObj = new Date(value);
-                            if (!isNaN(dateObj.getTime())) {
-                                formattedValue = dateObj.toLocaleDateString('en-US');
-                            } else {
-                                formattedValue = value || '<em>Not filled</em>';
-                            }
-                        } catch (e) {
+        // Group fields by type for better organization
+        const groupFields = [];
+        const normalFields = [];
+
+        Object.entries(metadata).forEach(([key, fieldInfo]) => {
+            if (fieldInfo && typeof fieldInfo === 'object') {
+                if (fieldInfo.type === 'group') {
+                    groupFields.push([key, fieldInfo]);
+                } else {
+                    normalFields.push([key, fieldInfo]);
+                }
+            }
+        });
+
+        // Process normal fields first
+        normalFields.forEach(([key, fieldInfo]) => {
+            if (fieldInfo.type !== 'group') {
+                hasMetadata = true;
+                const label = fieldInfo.label || key;
+                let value = fieldInfo.value;
+
+                // Format value based on type
+                let formattedValue;
+                if (fieldInfo.type === 'checkbox') {
+                    formattedValue = value ? '✅ Yes' : '❌ No';
+                } else if (fieldInfo.type === 'date' && value) {
+                    try {
+                        const dateObj = new Date(value);
+                        if (!isNaN(dateObj.getTime())) {
+                            formattedValue = dateObj.toLocaleDateString('en-US');
+                        } else {
                             formattedValue = value || '<em>Not filled</em>';
                         }
-                    } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
-                        // For long text, use blockquote format
-                        formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
-                    } else {
+                    } catch (e) {
                         formattedValue = value || '<em>Not filled</em>';
                     }
-                    
-                    htmlContent += `
+                } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+                    // For long text, use blockquote format
+                    formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+                } else {
+                    formattedValue = value || '<em>Not filled</em>';
+                }
+
+                htmlContent += `
                         <div class="metadata-item">
                             <div class="metadata-label">${label}</div>
                             <div class="metadata-value">${formattedValue}</div>`;
-                    
-                    if (fieldInfo.description) {
-                        htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
-                    }
-                    
-                    htmlContent += `</div>`;
-                }
-            });
 
-            // Add group headers as visual separators if any exist
-            if (groupFields.length > 0) {
-                groupFields.forEach(([key, fieldInfo]) => {
-                    htmlContent += `
+                if (fieldInfo.description) {
+                    htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
+                }
+
+                htmlContent += `</div>`;
+            }
+        });
+
+        // Add group headers as visual separators if any exist
+        if (groupFields.length > 0) {
+            groupFields.forEach(([key, fieldInfo]) => {
+                htmlContent += `
                         <div class="metadata-item" style="grid-column: 1 / -1; background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(124, 58, 237, 0.3);">
                             <div class="metadata-label" style="font-size: 1rem; color: #c084fc;">${fieldInfo.label}</div>`;
-                    if (fieldInfo.description) {
-                        htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
-                    }
-                    htmlContent += `</div>`;
-                });
-            }
+                if (fieldInfo.description) {
+                    htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
+                }
+                htmlContent += `</div>`;
+            });
+        }
 
-            htmlContent += `</div>`;
-            
-            if (!hasMetadata) {
-                htmlContent += `<div class="no-metadata">No metadata fields have been filled out yet.</div>`;
-            }
+        htmlContent += `</div>`;
 
-            htmlContent += `</section>`;
-        } else {
-            htmlContent += `
+        if (!hasMetadata) {
+            htmlContent += `<div class="no-metadata">No metadata fields have been filled out yet.</div>`;
+        }
+
+        htmlContent += `</section>`;
+    } else {
+        htmlContent += `
                 <section class="section">
                     <h2 class="section-title">
                         <span class="section-icon">📊</span>
@@ -3089,10 +3143,10 @@ function logProxyActivity(activity, details = {}) {
                     </h2>
                     <div class="no-metadata">No metadata template was used for this project.</div>
                 </section>`;
-        }
+    }
 
-        // Editable sections for user content
-        htmlContent += `
+    // Editable sections for user content
+    htmlContent += `
                 <section class="section editable-section">
                     <h2 class="section-title">
                         <span class="section-icon">📝</span>
@@ -3199,34 +3253,34 @@ function logProxyActivity(activity, details = {}) {
     </body>
     </html>`;
 
-        return htmlContent;
-    }
+    return htmlContent;
+}
 
 // Create metadata files - WITH PROJECT NAME IN FILENAMES
 async function createMetadataFiles(projectPath, metadata, projectName = null) {
     // Sanitize project name for use in filename (remove invalid characters)
-    const sanitizedProjectName = projectName 
+    const sanitizedProjectName = projectName
         ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
         : 'Project';
-    
+
     // 1. <Project Name>-metadata.json (elabFTW-compatible format)
     const metadataFilename = `${sanitizedProjectName}-metadata.json`;
     const metadataPath = path.join(projectPath, metadataFilename);
     const metadataContent = convertToElabFTWFormat(metadata);
-    
+
     await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2), 'utf8');
     console.log(`📄 Metadata file created: ${metadataPath}`);
-    
+
     // 2. <Project Name>-README.html with metadata info
     const readmeFilename = `${sanitizedProjectName}-README.html`;
     const readmePath = path.join(projectPath, readmeFilename);
     const readmeContent = generateReadmeHtmlWithMetadata(metadata, projectName);
-    
+
     await fs.writeFile(readmePath, readmeContent, 'utf8');
     console.log(`📄 Enhanced README created: ${readmePath}`);
-    
+
     console.log(`✅ Project files created with name prefix: "${sanitizedProjectName}"`);
-    }
+}
 
 // Convert to elabFTW format
 function convertToElabFTWFormat(metadata) {
@@ -3236,11 +3290,11 @@ function convertToElabFTWFormat(metadata) {
             display_main_text: true
         }
     };
-    
+
     const groups = new Map(); // Collect all groups
     let groupIdCounter = 1;
     let positionCounter = 1;
-    
+
     // First pass: identify groups
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
         if (fieldInfo.type === 'group') {
@@ -3251,7 +3305,7 @@ function convertToElabFTWFormat(metadata) {
             });
         }
     });
-    
+
     // Add groups to elabftw.extra_fields_groups
     if (groups.size > 0) {
         elabftwData.elabftw.extra_fields_groups = [];
@@ -3259,32 +3313,32 @@ function convertToElabFTWFormat(metadata) {
             elabftwData.elabftw.extra_fields_groups.push(group);
         });
     }
-    
+
     // Second pass: convert fields
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
         // Skip group headers (handled separately)
         if (fieldInfo.type === 'group') {
             return;
         }
-        
+
         // IMPORTANT: ensure value
         let safeValue = fieldInfo.value;
-        
+
         // Base field properties
         const elabField = {
             type: mapFieldTypeToElabFTW(fieldInfo.type)
         };
-        
+
         // Adjust value by type
         switch (fieldInfo.type) {
-			case 'checkbox':
-				// elabFTW expects "on" for true, "" for false
-				elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
-				break;
-			case 'number':
-				// Save numbers as string
-				elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
-				break;
+            case 'checkbox':
+                // elabFTW expects "on" for true, "" for false
+                elabField.value = (safeValue === true || safeValue === 'true' || safeValue === 'on') ? "on" : "";
+                break;
+            case 'number':
+                // Save numbers as string
+                elabField.value = String(safeValue !== undefined && safeValue !== null && safeValue !== '' ? safeValue : 0);
+                break;
             case 'dropdown':
                 // Dropdown value as string
                 elabField.value = String(safeValue || '');
@@ -3293,55 +3347,55 @@ function convertToElabFTWFormat(metadata) {
                 // All others as string
                 elabField.value = String(safeValue || '');
         }
-        
+
         // Position only if needed
         if (positionCounter > 1) {
             elabField.position = positionCounter;
         }
         positionCounter++;
-        
+
         // Add description
         if (fieldInfo.description) {
             elabField.description = fieldInfo.description;
         }
-        
+
         // Optional properties
         if (fieldInfo.required) {
             elabField.required = true;
         }
-        
+
         // Mark textarea as multiline
         if (fieldInfo.type === 'textarea') {
             elabField.multiline = true;
         }
-        
+
         // Dropdown options - IMPORTANT: as simple string array!
         if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
             elabField.options = fieldInfo.options.map(opt => String(opt));
         }
-        
+
         // Number constraints
         if (fieldInfo.type === 'number') {
             if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
             if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
         }
-        
+
         // Assign to group (if field belongs to a group)
         if (key.includes('.')) {
             // Extract group name from nested field name
             const parts = key.split('.');
             const possibleGroupKey = parts[0] + '_group';
-            
+
             if (groups.has(possibleGroupKey)) {
                 elabField.group_id = groups.get(possibleGroupKey).id;
             }
         }
-        
+
         // Add field (use label as key if available)
         const fieldKey = fieldInfo.label || key;
         elabftwData.extra_fields[fieldKey] = elabField;
     });
-    
+
     return elabftwData;
 }
 
@@ -3355,19 +3409,19 @@ function mapFieldTypeToElabFTW(type) {
         'dropdown': 'select',
         'checkbox': 'checkbox'
     };
-    
+
     return typeMap[type] || 'text';
 }
 
 // Generate README with metadata - ENHANCED for experiments
 function generateReadmeWithMetadata(metadata, projectName = null) {
     const date = new Date().toISOString().split('T')[0];
-    const formattedDate = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+    const formattedDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
     });
-    
+
     // Start with project header
     let content = '';
     if (projectName) {
@@ -3375,24 +3429,24 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
     } else {
         content += `# Project\n\n`;
     }
-    
+
     content += `**Created:** ${formattedDate}\n\n`;
-    
+
     // Add metadata section
     content += `## Experiment Metadata\n\n`;
-    
+
     let hasMetadata = false;
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
         if (fieldInfo.type !== 'group') {
             hasMetadata = true;
             const value = fieldInfo.value || '_Not filled_';
             const label = fieldInfo.label || key;
-            
-			// Format different types appropriately
-			let formattedValue = value;
-			if (fieldInfo.type === 'checkbox') {
-				// Fix checkbox display: check the actual boolean value
-				formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
+
+            // Format different types appropriately
+            let formattedValue = value;
+            if (fieldInfo.type === 'checkbox') {
+                // Fix checkbox display: check the actual boolean value
+                formattedValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
             } else if (fieldInfo.type === 'date' && value) {
                 try {
                     const dateObj = new Date(value);
@@ -3410,71 +3464,71 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
             } else {
                 formattedValue = value || '_Not filled_';
             }
-            
+
             content += `- **${label}:** ${formattedValue}\n`;
-            
+
             // Add description if available
             if (fieldInfo.description) {
                 content += `  - *${fieldInfo.description}*\n`;
             }
         }
     });
-    
+
     if (!hasMetadata) {
         content += `*No metadata fields defined.*\n\n`;
     } else {
         content += `\n`;
     }
-    
+
     // Add project description section
     content += `## Project Description\n\n`;
     content += `*Add your project description here. Describe the purpose, methodology, expected outcomes, and any important notes about this experiment.*\n\n`;
-    
+
     // Add sections for experiment documentation
     content += `## Methodology\n\n`;
     content += `*Describe your experimental methodology, procedures, and protocols here.*\n\n`;
-    
+
     content += `## Results\n\n`;
     content += `*Document your findings, observations, and results here.*\n\n`;
-    
+
     content += `## Notes\n\n`;
     content += `*Add any additional notes, observations, or important information here.*\n\n`;
-    
+
     // Add footer with generation info
     content += `---\n`;
     content += `*This README was automatically generated by MetaFold on ${formattedDate}*\n`;
-    
+
     return content;
 }
-    
+
 
 // Helper function to find README file in project directory
 async function findReadmeFile(projectPath) {
     try {
         const entries = await fs.readdir(projectPath, { withFileTypes: true });
-        
+
         // Look for *-README.html pattern
-        const readmeFile = entries.find(entry => 
-            entry.isFile() && 
+        const readmeFile = entries.find(entry =>
+            entry.isFile() &&
             entry.name.endsWith('-README.html')
         );
-        
+
         if (readmeFile) {
             console.log(`📖 Found README file: ${readmeFile.name} in ${projectPath}`);
             return readmeFile.name;
         }
-        
+
         // Fallback: check for old README.html
-        const legacyReadme = entries.find(entry => 
-            entry.isFile() && 
+        const legacyReadme = entries.find(entry =>
+            entry.isFile() &&
             entry.name === 'README.html'
         );
-        
+
         if (legacyReadme) {
             console.log(`📖 Found legacy README.html in ${projectPath}`);
             return 'README.html';
         }
-        
+
         console.log(`⚠️ No README file found in ${projectPath}`);
         return null;
     } catch (error) {
@@ -3506,7 +3560,7 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         const projectName = path.basename(projectPath);
 
         // Count metadata fields
-        const metadataFieldCount = metadata.extra_fields ? 
+        const metadataFieldCount = metadata.extra_fields ?
             Object.keys(metadata.extra_fields).length : 0;
 
         return {
@@ -3530,13 +3584,13 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
 // Calculate directory size recursively
 async function calculateDirectorySize(dirPath) {
     let totalSize = 0;
-    
+
     try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        
+
         for (const entry of entries) {
             const fullPath = path.join(dirPath, entry.name);
-            
+
             if (entry.isDirectory()) {
                 totalSize += await calculateDirectorySize(fullPath);
             } else if (entry.isFile()) {
@@ -3551,6 +3605,6 @@ async function calculateDirectorySize(dirPath) {
     } catch (error) {
         // Return accumulated size even if there's an error
     }
-    
+
     return totalSize;
 }

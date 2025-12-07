@@ -1,6 +1,6 @@
 {
   "name": "metafold",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "MetaFold - Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronical lab notebooks like elabFTW and also OMERO. Built for life sciences research workflows.",
   "main": "main.js",
   "repository": {

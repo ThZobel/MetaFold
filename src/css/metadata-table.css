@@ -1,0 +1,105 @@
+/* =================== METADATA TABLE STYLING =================== */
+
+.metadata-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    margin-top: 10px;
+}
+
+.metadata-table th {
+    text-align: left;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0 12px 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metadata-table td {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    vertical-align: middle;
+}
+
+.metadata-table tr td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.metadata-table tr td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.metadata-table tr:hover td {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Type Badge */
+.type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Filename Checkbox Cell */
+.filename-cell {
+    text-align: center;
+}
+
+.filename-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #10b981;
+}
+
+/* Field Name & Desc */
+.field-name-cell {
+    width: 25%;
+}
+
+.field-name {
+    display: block;
+    color: #e0e0e0;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.field-desc {
+    display: block;
+    color: #9ca3af;
+    font-size: 0.75rem;
+    margin-top: 2px;
+}
+
+/* Value Input */
+.value-cell {
+    width: 45%;
+}
+
+.value-cell input,
+.value-cell select,
+.value-cell textarea {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+}
+
+.value-cell input:focus,
+.value-cell select:focus,
+.value-cell textarea:focus {
+    border-color: #10b981;
+    outline: none;
+}

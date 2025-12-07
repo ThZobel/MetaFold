@@ -1,0 +1,133 @@
+{
+  "mode": {
+    "label": "Mode",
+    "type": "dropdown",
+    "value": "jDCV",
+    "required": true,
+    "position": 2,
+    "options": [
+      "Airyscan SR",
+      "Airyscan Fast",
+      "LSM Plus (DCV)",
+      "MPLX (Multiplex)",
+      "jDCV",
+      "Linear Unmixing (34Ch)"
+    ],
+    "description": "Microscopy acquisition mode"
+  },
+  "laser_lines": {
+    "label": "Laser Lines (nm)",
+    "type": "text",
+    "value": "405, 488,561",
+    "required": false,
+    "position": 3,
+    "description": "Used laser wavelengths (multiple values separated by comma)"
+  },
+  "dyes": {
+    "label": "Dyes",
+    "type": "text",
+    "value": "4",
+    "required": false,
+    "position": 5,
+    "description": "Used fluorescent dyes (multiple values separated by comma)"
+  },
+  "fluorescent_proteins": {
+    "label": "Fluorescent Proteins",
+    "type": "text",
+    "value": "",
+    "required": false,
+    "position": 6,
+    "description": "Used fluorescent proteins (multiple values separated by comma)"
+  },
+  "organism": {
+    "label": "Organism",
+    "type": "dropdown",
+    "value": "Drosophila melanogaster",
+    "required": false,
+    "position": 7,
+    "options": [
+      "Homo sapiens",
+      "Mus musculus",
+      "Rattus norvegicus",
+      "Danio rerio",
+      "Drosophila melanogaster",
+      "Arabidopsis thaliana",
+      "Other"
+    ],
+    "description": "Source organism"
+  },
+  "cell_type": {
+    "label": "Cell Type",
+    "type": "text",
+    "value": "",
+    "required": false,
+    "position": 8,
+    "description": "Type of cells being imaged"
+  },
+  "organism_part": {
+    "label": "Organism Part",
+    "type": "text",
+    "value": "Wing Disc",
+    "required": false,
+    "position": 9,
+    "description": "Specific part of organism"
+  },
+  "fixation": {
+    "label": "Fixation",
+    "type": "dropdown",
+    "value": "Fixed",
+    "required": true,
+    "position": 10,
+    "options": [
+      "Fixed",
+      "Live"
+    ],
+    "description": "Sample fixation status"
+  },
+  "sample_type": {
+    "label": "Sample Type",
+    "type": "dropdown",
+    "value": "Tissue Sample",
+    "required": false,
+    "position": 11,
+    "options": [
+      "Cell Culture",
+      "Tissue Sample",
+      "Tissue Section",
+      "Embryo",
+      "Preparation",
+      "Primary Cells",
+      "Other"
+    ],
+    "description": "Type of sample preparation"
+  },
+  "sample_description": {
+    "label": "Sample Description",
+    "type": "textarea",
+    "value": "Wing Disc experiment 12\n",
+    "required": false,
+    "position": 12,
+    "description": "Detailed description of the sample"
+  },
+  "imaging_purpose": {
+    "label": "Imaging Purpose",
+    "type": "textarea",
+    "value": "find cool stuff",
+    "required": false,
+    "position": 13,
+    "description": "Purpose and goals of the imaging experiment"
+  },
+  "metafold_integration": {
+    "created_at": "2025-10-05T07:38:26.121Z",
+    "local_path": "C:\\Projekte\\wingDisc_11",
+    "external_links": {
+      "omero": {
+        "url": "https://omero-imaging.uni-muenster.de/webclient/?show=dataset-16246",
+        "dataset_id": "16246",
+        "user_name": "Thomas",
+        "uploaded_at": "2025-10-05T07:38:26.121Z",
+        "status": "uploaded"
+      }
+    }
+  }
+}

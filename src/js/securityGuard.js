@@ -336,18 +336,55 @@ const securityGuard = {
     
     /**
      * Setup integrity monitoring for localStorage
+     * ✅ DISABLED: Continuous monitoring not needed for MetaFold
      */
     setupIntegrityMonitoring() {
-        console.log('🔍 Setting up integrity monitoring...');
+        console.log('🔍 Integrity monitoring DISABLED by configuration');
+        console.log('ℹ️ Continuous monitoring not needed for MetaFold use case');
+        
+        // ✅ FIX: Keine kontinuierliche Überwachung mehr
+        // Die Überwachung ist für MetaFold nicht notwendig, da:
+        // 1. Settings sich legitim bei User-Wechsel ändern
+        // 2. Der physische Zugang zum Computer relevanter ist
+        // 3. Die Passwort-Verschlüsselung ausreichend Sicherheit bietet
+        
+        // Leere Map für Compatibility (falls Code darauf zugreift)
+        this.integrityChecks = new Map();
+        
+        console.log('✅ Integrity monitoring: OFF (manual security checks only)');
+    },
+    
+    /**
+     * ✅ NEW: Manual integrity check (on-demand)
+     */
+    async performManualIntegrityCheck() {
+        console.log('🔍 Performing manual integrity check...');
         
         const criticalKeys = [
-            'metafold_settings',
-            'metafold_migration_status'
+            'metafold_migration_status',
+            'metafold_user_management_enabled'
         ];
         
-        this.startIntegrityChecks(criticalKeys);
+        const issues = [];
         
-        console.log('✅ Integrity monitoring active');
+        for (const key of criticalKeys) {
+            const value = localStorage.getItem(key);
+            if (!value) {
+                issues.push({
+                    key: key,
+                    issue: 'Missing from localStorage',
+                    severity: 'warning'
+                });
+            }
+        }
+        
+        if (issues.length === 0) {
+            console.log('✅ Manual integrity check: No issues found');
+            return { success: true, issues: [] };
+        } else {
+            console.warn('⚠️ Manual integrity check found issues:', issues);
+            return { success: false, issues: issues };
+        }
     },
     
     /**

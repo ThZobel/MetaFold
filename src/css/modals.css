@@ -1,7 +1,8 @@
 /* Modal Styles - Template Modal, Settings Modal, User Management - MetaFold */
 
 /* Base Modal */
-.modal {
+.modal,
+#templateModal {
     display: none;
     position: fixed;
     z-index: 1000;
@@ -80,8 +81,15 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Settings Form Styling */
@@ -200,7 +208,7 @@
     background: linear-gradient(135deg, #2a2a40, #1e1e2e);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     display: none;
     z-index: 1000;
     max-height: 200px;
@@ -305,4 +313,70 @@
 .field-options input[placeholder*="Description"] {
     font-size: 12px;
     color: #9ca3af;
+}
+
+/* Integration Settings Card Styling */
+.integration-settings-container {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 25px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.integration-settings-container:hover {
+    border-color: rgba(124, 58, 237, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.integration-header {
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.integration-header label {
+    cursor: pointer;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.integration-body {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Override form-group styles inside integration body to look cleaner */
+.integration-body .form-group {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin-bottom: 20px;
+    box-shadow: none;
+}
+
+.integration-body .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.integration-body label {
+    color: #c4b5fd;
+    /* Light purple for labels inside the dark body */
 }

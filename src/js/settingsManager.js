@@ -9,7 +9,57 @@ const settingsManager = {
         lastMigration: null,
         migratedKeys: []
     },
-    
+
+    // Sensitive keys that should be encrypted
+    sensitiveKeys: [
+        'elabftw.api_key',
+        'omero.password',
+        'rspace.api_key'
+    ],
+
+    // Default settings
+    defaultSettings: {
+        'general.theme': 'light',
+        'general.auto_save': true,
+        'general.show_tips': true,
+        'general.user_management_enabled': true,
+        'security.password_system_enabled': false,
+        'security.auto_migrate': true,
+        'elabftw.enabled': false,
+        'elabftw.server_url': '',
+        'elabftw.api_key': '',
+        'elabftw.auto_sync': false,
+        'elabftw.default_category': '',
+        'elabftw.verify_ssl': true,
+        'elabftw.overwrite_enabled': false,
+        'elabftw.versioning_format': 'date',
+        'omero.enabled': false,
+        'omero.server_url': '',
+        'omero.username': '',
+        'omero.password': '',
+        'omero.default_project_id': '',
+        'omero.create_datasets': true,
+        'omero.verify_ssl': true,
+        'omero.auto_sync': false,
+        'omero.use_json_triplets': false,
+        'rspace.enabled': false,
+        'rspace.server_url': '',
+        'rspace.api_key': '',
+        'templates.active_category': 'category1',
+        'templates.category1_name': 'Main-Project',
+        'templates.category1_icon': '🎯',
+        'templates.category1_color': '#8b5cf6',
+        'templates.category2_name': 'Sub-Project',
+        'templates.category2_icon': '📊',
+        'templates.category2_color': '#06b6d4',
+        'templates.category3_name': 'Action',
+        'templates.category3_icon': '⚡',
+        'templates.category3_color': '#10b981',
+        'templates.category4_name': 'Misc',
+        'templates.category4_icon': '📋',
+        'templates.category4_color': '#f59e0b'
+    },
+
     // 🔐 NEW: Temporary in-memory password cache (NEVER stored in localStorage!)
     _temporaryPasswordCache: {
         username: null,
@@ -39,22 +89,22 @@ const settingsManager = {
      */
     getUserPasswordForEntropy(username) {
         const cache = this._temporaryPasswordCache;
-        
+
         if (!cache.username || !cache.password || !cache.timestamp) {
             return null;
         }
-        
+
         if (cache.username !== username) {
             return null;
         }
-        
+
         const age = Date.now() - cache.timestamp;
         if (age > cache.maxAge) {
             console.warn('🔐 Cached password expired, clearing cache');
             this.clearPasswordCache();
             return null;
         }
-        
+
         return cache.password;
     },
 
@@ -70,90 +120,10 @@ const settingsManager = {
         };
         console.log('🔐 Password cache cleared');
     },
-    
-    // ENHANCED Default Settings - Add these to settingsManager.js defaultSettings object
-
-	defaultSettings: {
-		// General Settings
-		'general.user_management_enabled': true,
-		'general.theme': 'dark',
-		'general.auto_save': true,
-		'general.show_tips': true,
-		'general.show_shared_templates': true,
-
-		// Security Settings
-		'security.encryption_enabled': true,
-		'security.auto_migrate': true,
-		'security.require_encryption': false,
-		
-		// Password System Settings (DEFAULT: ENABLED)
-		'security.password_system_enabled': true,  // Enable password system by default
-		'security.require_admin_password': true,   // Require admin password for sensitive operations
-		'security.password_min_length': 3,         // Minimum password length
-		'security.auto_logout_minutes': 30,        // Auto-logout after inactivity (0 = disabled)
-		'security.show_password_strength': true,   // Show password strength indicator
-		'security.allow_password_reset': true,     // Allow admin to reset user passwords
-		
-		// elabFTW Integration Settings
-		'elabftw.enabled': false,
-		'elabftw.server_url': '',
-		'elabftw.api_key': '', // Will be moved to secure storage
-		'elabftw.auto_sync': false,
-		'elabftw.default_category': 1,
-		'elabftw.verify_ssl': true,
-		
-		// NEW: elabFTW Conflict Resolution Settings
-		'elabftw.overwrite_enabled': false,        // SAFE MODE by default (versioning)
-		'elabftw.versioning_format': 'date',       // date, timestamp, or counter
-		
-		// OMERO Integration Settings
-		'omero.enabled': false,
-		'omero.server_url': '',
-		'omero.username': '', // Will be moved to secure storage
-		'omero.password': '', // Will be moved to secure storage
-		'omero.auto_sync': false,
-		'omero.default_project_id': '',
-		'omero.create_datasets': true,
-		'omero.verify_ssl': true,
-		'omero.session_timeout': 600000, // 10 minutes
-		
-		// Phase 2: OMERO Enhanced Settings
-		'omero.use_json_triplets': false,
-		'omero.use_template_groups_as_namespaces': true,
-		'omero.integration_links_as_keyvalue': true,
-		
-		// Template Category Configuration
-		'templates.category1_name': 'Main-Project',
-		'templates.category1_icon': '🎯',
-		'templates.category1_color': '#8b5cf6',
-		
-		'templates.category2_name': 'Sub-Project',
-		'templates.category2_icon': '📊',
-		'templates.category2_color': '#06b6d4',
-		
-		'templates.category3_name': 'Action',
-		'templates.category3_icon': '⚡',
-		'templates.category3_color': '#10b981',
-		
-		'templates.category4_name': 'Misc',
-		'templates.category4_icon': '📋',
-		'templates.category4_color': '#f59e0b',
-		
-		'templates.active_category': 'category1'
-	},
-
-    // Keys that should be stored securely
-    sensitiveKeys: [
-        'elabftw.api_key',
-        'omero.password',
-        'omero.username'
-    ],
-
-    // =================== INITIALIZATION ===================
 
     async init() {
         console.log('🔧 Initializing settingsManager with Secure Storage...');
-        
+
         // Initialize secure storage first
         if (window.secureStorage) {
             try {
@@ -165,37 +135,21 @@ const settingsManager = {
                 this.isSecureStorageReady = false;
             }
         }
-        
-        // ===== CRITICAL FIX: Load settings user-specific if userManager is active =====
-        // Problem: loadSettings() lädt IMMER global aus 'metafold_settings'
-        // Lösung: Prüfe ob userManager aktiv ist und lade dann user-spezifisch
-        
-        const isUserManagerActive = window.userManager && 
-                                    window.userManager.isInitialized && 
-                                    window.storage && 
-                                    typeof window.storage.getStorageKey === 'function';
-        
-        if (isUserManagerActive) {
-            console.log('📂 Loading user-specific settings...');
-            this.loadSettingsUserSpecific();
-        } else {
-            console.log('📂 Loading global settings (userManager not active)...');
-            this.loadSettings();
-        }
-        
+
+        // Load settings
+        this.loadSettings();
+
         // Load secure credentials
-        await this.loadSecureCredentials();
-        
-        // Check if migration is needed
-        await this.checkAndPerformMigration();
-        
+        if (this.loadSecureCredentials) {
+            await this.loadSecureCredentials();
+        }
+
         // Apply initial settings
         this.applyInitialSettings();
-        
-        console.log('✅ settingsManager initialized with secure storage support');
-    },
 
-    // =================== CORE SETTINGS METHODS ===================
+        console.log('✅ settingsManager initialized with secure storage support');
+        window.dispatchEvent(new Event('settingsLoaded'));
+    },
 
     loadSettings() {
         try {
@@ -215,7 +169,6 @@ const settingsManager = {
     saveSettings() {
         try {
             localStorage.setItem('metafold_settings', JSON.stringify(this.settings));
-            console.log('💾 Settings saved successfully');
             return true;
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -223,325 +176,13 @@ const settingsManager = {
         }
     },
 
-    // Enhanced loadSettings - now user-specific
-    loadSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-                console.log(`📂 User-specific settings loaded from: ${storageKey}`);
-            } else {
-                // Try to load global settings for migration
-                const globalStored = localStorage.getItem('metafold_settings');
-                if (globalStored) {
-                    this.settings = { ...this.defaultSettings, ...JSON.parse(globalStored) };
-                    console.log('📂 Global settings found - will migrate to user-specific on save');
-                } else {
-                    this.settings = { ...this.defaultSettings };
-                    console.log('📂 No existing settings found - using defaults');
-                }
-            }
-        } catch (error) {
-            console.warn('Error loading user-specific settings, using defaults:', error);
-            this.settings = { ...this.defaultSettings };
-        }
-    },
-
-    // Enhanced saveSettings - now user-specific
-    saveSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            localStorage.setItem(storageKey, JSON.stringify(this.settings));
-            console.log(`💾 User-specific settings saved to: ${storageKey}`);
-            return true;
-        } catch (error) {
-            console.error('Error saving user-specific settings:', error);
-            return false;
-        }
-    },
-
-    // New function: Switch settings when user changes (ENHANCED with Group Categories)
-    async switchToUser(username, groupname) {
-        console.log(`🔄 Switching settings to user: ${username} (${groupname})`);
-        
-        // 🔐 WICHTIG: Cache NICHT löschen beim Switch!
-        // Cache wird nur beim Logout gelöscht (siehe userManager.js)
-        console.log('🔐 Password cache preserved during user switch');
-    
-    // Save current settings before switching
-    this.saveSettingsUserSpecific();
-        
-        // Save current settings before switching
-        this.saveSettingsUserSpecific();
-        
-        // Update user context (this should trigger storage prefix update)
-        if (window.storage && window.storage.setUserPrefix) {
-            const prefix = `${groupname}_${username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-            window.storage.setUserPrefix(prefix);
-        }
-        
-        // ===== CRITICAL FIX 2: Clear settings BEFORE loading new user =====
-        // Problem: this.settings contains old user's values after prefix change
-        // Solution: Clear settings object to prevent old values being saved to new user's file
-        console.log('🔄 Clearing settings before loading new user...');
-        this.settings = {};
-        console.log('✅ Settings cleared - ready for user switch');
-        // ====================================================================
-        
-        // Check if this is a new user (no existing settings)
-        const storageKey = window.storage ? 
-            window.storage.getStorageKey('settings') : 
-            `metafold_${groupname}_${username}_settings`;
-        
-        const existingSettings = localStorage.getItem(storageKey);
-        const isNewUser = !existingSettings;
-        
-        // Load settings for new user
-        this.loadSettingsUserSpecific();
-        
-        // ===== NEW: Apply group category settings for new users =====
-        if (isNewUser && groupname && groupname !== 'Unknown' && groupname !== 'Default') {
-            console.log(`👤 New user detected: ${username} - checking for group category settings...`);
-            
-            const groupSettings = this.loadGroupCategorySettings(groupname);
-            
-            if (groupSettings) {
-                console.log(`👥 Applying group category settings from: ${groupname}`);
-                
-                // Apply group category settings without triggering save
-                for (const [key, value] of Object.entries(groupSettings)) {
-                    this.settings[key] = value;
-                }
-                
-                // Save the inherited settings
-                this.saveSettingsUserSpecific();
-                
-                console.log(`✅ New user ${username} inherited group category settings`);
-            } else {
-                console.log(`📋 No group category settings found - using defaults`);
-            }
-        } else if (isNewUser) {
-            console.log(`📋 New user ${username} using default category settings (no group)`);
-        } else {
-            console.log(`👤 Existing user ${username} - using personal category settings`);
-        }
-        
-        // Apply theme and other initial settings
-        this.applyInitialSettings();
-        
-        // Reload secure credentials for new user
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        // ===== UPDATE CATEGORY UI =====
-        if (window.templateTypeManager && window.templateTypeManager.updateUI) {
-            console.log('🎨 Updating category UI after user switch...');
-            setTimeout(() => {
-                window.templateTypeManager.updateUI();
-            }, 100);
-        }
-        
-        // FORCE UPDATE SETTINGS UI
-        setTimeout(async () => {
-            await this.forceUpdateSettingsUI();
-        }, 100);
-        
-        console.log('✅ Settings switched successfully with category support');
-    },
-
-        async forceUpdateSettingsUI() {
-            try {
-                console.log('🔄 FORCE updating settings UI...');
-                
-                // Clear secure credentials cache to force reload
-                this.secureCredentials = {};
-                await this.loadSecureCredentials();
-                
-                // Force update OMERO username field
-                const omeroField = document.getElementById('omeroUsername');
-                if (omeroField) {
-                    const omeroUsername = await this.get('omero.username');
-                    console.log(`Force OMERO update: "${omeroField.value}" → "${omeroUsername}"`);
-                    omeroField.value = omeroUsername || '';
-                }
-                
-                // Phase 2: JSON-Triplet Checkbox Handler 
-                const omeroUseJsonTriplets = document.getElementById('omeroUseJsonTriplets');
-                if (omeroUseJsonTriplets) {
-                    const useJsonTriplets = await this.get('omero.use_json_triplets');
-                    omeroUseJsonTriplets.checked = useJsonTriplets || false;
-                    
-                    omeroUseJsonTriplets.addEventListener('change', async () => {
-                        await this.set('omero.use_json_triplets', omeroUseJsonTriplets.checked);
-                        console.log('🔬 OMERO JSON-Triplet mode:', omeroUseJsonTriplets.checked ? 'enabled' : 'disabled');
-                    });
-                    
-                    console.log('✅ Phase 2 JSON-Triplet checkbox initialized:', useJsonTriplets);
-                } else {
-                    console.warn('⚠️ Phase 2 JSON-Triplet checkbox not found in DOM');
-                }
-                
-                console.log('✅ Settings UI force updated');
-                
-            } catch (error) {
-                console.error('❌ Error in force settings UI update:', error);
-            }
-        },
-
-    // =================== GROUP TEMPLATE CATEGORIES SUPPORT ===================
-
-    /**
-     * Load group-level category settings (shared by all group members)
-     * @param {string} groupname - Group name
-     * @returns {Object} - Group category settings
-     */
-    loadGroupCategorySettings(groupname) {
-        if (!groupname || groupname === 'Unknown' || groupname === 'Default') {
-            return null;
-        }
-        
-        try {
-            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
-            const stored = localStorage.getItem(groupSettingsKey);
-            
-            if (stored) {
-                const groupSettings = JSON.parse(stored);
-                console.log(`👥 Loaded group category settings for: ${groupname}`);
-                return groupSettings;
-            }
-        } catch (error) {
-            console.warn('Could not load group category settings:', error);
-        }
-        
-        return null;
-    },
-
-    /**
-     * Save current user's category settings as group standard
-     * @param {string} groupname - Group name
-     * @returns {boolean} - Success status
-     */
-    async saveAsGroupStandard(groupname) {
-        if (!groupname || groupname === 'Unknown' || groupname === 'Default') {
-            console.warn('Cannot save group standard for invalid group');
-            return false;
-        }
-        
-        try {
-            // Extract current category settings
-            const categorySettings = {};
-            
-            const categoryKeys = [
-                'templates.category1_name', 'templates.category1_icon', 'templates.category1_color',
-                'templates.category2_name', 'templates.category2_icon', 'templates.category2_color',
-                'templates.category3_name', 'templates.category3_icon', 'templates.category3_color',
-                'templates.category4_name', 'templates.category4_icon', 'templates.category4_color',
-                'templates.active_category'
-            ];
-            
-            for (const key of categoryKeys) {
-                categorySettings[key] = await this.get(key);
-            }
-            
-            // Save to group storage
-            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
-            localStorage.setItem(groupSettingsKey, JSON.stringify(categorySettings));
-            
-            console.log(`✅ Category settings saved as group standard for: ${groupname}`);
-            
-            if (window.app && window.app.showSuccess) {
-                window.app.showSuccess('Category settings saved as group standard!');
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('Error saving group standard:', error);
-            return false;
-        }
-    },
-
-    /**
-     * Apply group category settings to current user
-     * @param {string} groupname - Group name
-     * @returns {Promise<boolean>} - Success status
-     */
-    async applyGroupCategorySettings(groupname) {
-        const groupSettings = this.loadGroupCategorySettings(groupname);
-        
-        if (!groupSettings) {
-            console.log('No group category settings to apply');
-            return false;
-        }
-        
-        try {
-            console.log(`🔄 Applying group category settings for: ${groupname}`);
-            
-            // Apply each category setting
-            for (const [key, value] of Object.entries(groupSettings)) {
-                await this.set(key, value);
-            }
-            
-            console.log('✅ Group category settings applied successfully');
-            
-            // Update UI
-            if (window.templateTypeManager && window.templateTypeManager.updateUI) {
-                window.templateTypeManager.updateUI();
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('Error applying group category settings:', error);
-            return false;
-        }
-    },
-
-    /**
-     * Check if user has custom category settings (different from group)
-     * @param {string} groupname - Group name
-     * @returns {boolean} - True if user has custom settings
-     */
-    hasCustomCategorySettings(groupname) {
-        const groupSettings = this.loadGroupCategorySettings(groupname);
-        
-        if (!groupSettings) {
-            return true; // No group settings = user settings are custom
-        }
-        
-        try {
-            const categoryKeys = [
-                'templates.category1_name', 'templates.category1_icon', 'templates.category1_color',
-                'templates.category2_name', 'templates.category2_icon', 'templates.category2_color',
-                'templates.category3_name', 'templates.category3_icon', 'templates.category3_color',
-                'templates.category4_name', 'templates.category4_icon', 'templates.category4_color'
-            ];
-            
-            for (const key of categoryKeys) {
-                if (this.settings[key] !== groupSettings[key]) {
-                    return true; // Found a difference
-                }
-            }
-            
-            return false; // All settings match group
-        } catch (error) {
-            console.warn('Error checking custom category settings:', error);
-            return true;
-        }
-    },
-
-    // New function: Migrate global settings to user-specific
     migrateGlobalSettingsToUser() {
         try {
             const globalSettings = localStorage.getItem('metafold_settings');
             if (globalSettings && window.storage) {
                 const userKey = window.storage.getStorageKey('settings');
                 const userSettings = localStorage.getItem(userKey);
-                
+
                 // Only migrate if user doesn't have settings yet
                 if (!userSettings) {
                     localStorage.setItem(userKey, globalSettings);
@@ -556,149 +197,54 @@ const settingsManager = {
         }
     },
 
-    // Enhanced init function to use user-specific storage
     async initUserSpecific() {
         console.log('🔧 Initializing settingsManager with user-specific support...');
-        
+
         // Wait for dependencies
         let attempts = 0;
         while ((!window.storage || !window.userManager) && attempts < 20) {
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
-        
+
         if (!window.storage) {
             console.warn('⚠️ Storage system not available - falling back to global settings');
             this.loadSettings(); // Use original function
             this.applyInitialSettings();
             return;
         }
-        
+
         // ===== CRITICAL FIX: Clear existing settings before loading =====
         // Problem: Settings könnten bereits global geladen sein von init()
         // Lösung: Settings-Object leeren und neu laden
         console.log('🔄 Clearing existing settings before user-specific load...');
         this.settings = {};
-        
+
         // Load user-specific settings (now from clean slate)
         this.loadSettingsUserSpecific();
-        
         // Load secure credentials
         if (this.loadSecureCredentials) {
             await this.loadSecureCredentials();
         }
-        
+
         // Apply initial settings
         this.applyInitialSettings();
-        
+
         console.log('✅ settingsManager initialized with user-specific support');
+        window.dispatchEvent(new Event('settingsLoaded'));
     },
 
-    // =================== USER-SPECIFIC SETTINGS ENHANCEMENT ===================
-    // This enhancement makes settings user-specific by utilizing the existing storage system
-
-    // Enhanced loadSettings - now user-specific
-    loadSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-                console.log(`📂 User-specific settings loaded from: ${storageKey}`);
-            } else {
-                // Try to load global settings for migration
-                const globalStored = localStorage.getItem('metafold_settings');
-                if (globalStored) {
-                    this.settings = { ...this.defaultSettings, ...JSON.parse(globalStored) };
-                    console.log('📂 Global settings found - will migrate to user-specific on save');
-                } else {
-                    this.settings = { ...this.defaultSettings };
-                    console.log('📂 No existing settings found - using defaults');
-                }
+    applyInitialSettings() {
+        // Apply active category if exists
+        if (this.settings['templates.category']) {
+            console.log('🔄 Applying initial category:', this.settings['templates.category']);
+            if (window.templateTypeManager) {
+                // Small delay to ensure UI is ready
+                setTimeout(() => {
+                    window.templateTypeManager.switchType(this.settings['templates.category']);
+                }, 500);
             }
-        } catch (error) {
-            console.warn('Error loading user-specific settings, using defaults:', error);
-            this.settings = { ...this.defaultSettings };
         }
-    },
-
-    // Enhanced saveSettings - now user-specific
-    saveSettingsUserSpecific() {
-        try {
-            // Use storage system's getStorageKey for user-specific key
-            const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
-            
-            localStorage.setItem(storageKey, JSON.stringify(this.settings));
-            console.log(`💾 User-specific settings saved to: ${storageKey}`);
-            return true;
-        } catch (error) {
-            console.error('Error saving user-specific settings:', error);
-            return false;
-        }
-    },
-
-    // New function: Migrate global settings to user-specific
-    migrateGlobalSettingsToUser() {
-        try {
-            const globalSettings = localStorage.getItem('metafold_settings');
-            if (globalSettings && window.storage) {
-                const userKey = window.storage.getStorageKey('settings');
-                const userSettings = localStorage.getItem(userKey);
-                
-                // Only migrate if user doesn't have settings yet
-                if (!userSettings) {
-                    localStorage.setItem(userKey, globalSettings);
-                    console.log('📦 Global settings migrated to user-specific');
-                    return true;
-                }
-            }
-            return false;
-        } catch (error) {
-            console.warn('Could not migrate global settings:', error);
-            return false;
-        }
-    },
-
-    // Enhanced init function to use user-specific storage
-    async initUserSpecific() {
-        console.log('🔧 Initializing settingsManager with user-specific support...');
-        
-        // Wait for dependencies
-        let attempts = 0;
-        while ((!window.storage || !window.userManager) && attempts < 20) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        
-        if (!window.storage) {
-        console.warn('⚠️ Storage system not available - falling back to global settings');
-        this.loadSettings(); // Use original function
-        this.applyInitialSettings();
-        return;
-        }
-        
-        // ===== CRITICAL FIX: Clear existing settings before user-specific load =====
-        // Problem: init() lädt Settings global, die dann im this.settings Object bleiben
-    // Lösung: Object leeren, damit nur user-spezifische Settings geladen werden
-    console.log('🔄 Clearing existing settings before user-specific load...');
-    this.settings = {};
-    console.log('✅ Settings object cleared - ready for user-specific load');
-    // ============================================================================
-    
-    // Load user-specific settings
-    this.loadSettingsUserSpecific();
-        
-        // Load secure credentials
-        if (this.loadSecureCredentials) {
-            await this.loadSecureCredentials();
-        }
-        
-        // Apply initial settings
-        this.applyInitialSettings();
-        
-        console.log('✅ settingsManager initialized with user-specific support');
     },
 
     async get(key) {
@@ -706,22 +252,22 @@ const settingsManager = {
         if (this.sensitiveKeys.includes(key)) {
             return await this.getSecureCredential(key);
         }
-        
+
         // Regular setting retrieval
         const value = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
-        
+
         // Debug log für wichtige Keys
         if (key.startsWith('templates.category')) {
             const storageKey = window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings';
             console.log(`🔍 Get ${key}: "${value}" (from ${storageKey})`);
         }
-        
+
         return value;
     },
 
     async set(key, value) {
         console.log(`📝 Set setting "${key}":`, this.sensitiveKeys.includes(key) ? '[HIDDEN]' : value);
-        
+
         // Check if this is a sensitive key that should be stored securely
         if (this.sensitiveKeys.includes(key) && this.isSecureStorageReady) {
             const success = await this.setSecureCredential(key, value);
@@ -730,47 +276,55 @@ const settingsManager = {
             }
             return success;
         }
-        
+
         // Regular setting storage
         this.settings[key] = value;
-        
+
         // ===== CRITICAL FIX: Check if userManager is ACTIVE, not just enabled =====
         // Problem: isUserManagementEnabled() liest aus settings, die noch global sein könnten
         // Lösung: Prüfe ob userManager existiert UND initialisiert ist
-        
-        const isUserManagerActive = window.userManager && 
-                                    window.userManager.isInitialized && 
-                                    window.storage && 
-                                    typeof window.storage.getStorageKey === 'function';
-        
-        const saved = isUserManagerActive ? 
+
+        const isUserManagerActive = window.userManager &&
+            window.userManager.isInitialized &&
+            window.storage &&
+            typeof window.storage.getStorageKey === 'function';
+
+        const saved = isUserManagerActive ?
             this.saveSettingsUserSpecific() :  // User-spezifisch wenn userManager aktiv
             this.saveSettings();               // Global als Fallback
-        
+
         console.log(`💾 Saved using ${isUserManagerActive ? 'user-specific' : 'global'} method`);
         console.log(`   UserManager active: ${!!isUserManagerActive}`);
         console.log(`   Storage key: ${isUserManagerActive && window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings'}`);
-        
+
         if (saved) {
             this.handleSettingChange(key, value);
         }
-        
+
         return saved;
     },
 
-    // =================== SECURE CREDENTIAL MANAGEMENT ===================
-
     async loadSecureCredentials() {
         try {
-            const storageKey = window.storage ? 
-            window.storage.getStorageKey('secure_credentials') : 
-            'metafold_secure_credentials';
-        const storedCredentials = localStorage.getItem(storageKey);
+            const storageKey = window.storage ?
+                window.storage.getStorageKey('secure_credentials') :
+                'metafold_secure_credentials';
+
+            console.log('🔐 📂 Loading secure credentials from:', storageKey);
+
+            const storedCredentials = localStorage.getItem(storageKey);
+
             if (storedCredentials) {
                 this.secureCredentials = JSON.parse(storedCredentials);
-                console.log('🔐 Loaded secure credentials store');
+                console.log('✅ Loaded secure credentials store');
+                console.log('🔐 Storage key used:', storageKey);
+                console.log('🔐 Keys loaded:', Object.keys(this.secureCredentials));
+            } else {
+                console.warn('⚠️ No secure credentials found in localStorage');
+                console.warn('🔐 Searched in key:', storageKey);
+                this.secureCredentials = {};
             }
-            
+
             // Load migration status
             const migrationStatus = localStorage.getItem('metafold_migration_status');
             if (migrationStatus) {
@@ -782,219 +336,176 @@ const settingsManager = {
         }
     },
 
-    async saveSecureCredentials() {
+    loadSettingsUserSpecific() {
+        if (!window.storage) return false;
         try {
-           const storageKey = window.storage ? 
-            window.storage.getStorageKey('secure_credentials') : 
-            'metafold_secure_credentials';
-        localStorage.setItem(storageKey, JSON.stringify(this.secureCredentials));
-            localStorage.setItem('metafold_migration_status', JSON.stringify(this.migrationStatus));
-            console.log('🔐 Saved secure credentials store');
-        } catch (error) {
-            console.error('🔐 Error saving secure credentials:', error);
-        }
-    },
-
-    async setSecureCredential(key, value) {
-        if (!this.isSecureStorageReady) {
-            console.warn('🔐 Secure storage not ready, storing as plaintext');
-            return this.set(key, value);
-        }
-
-        if (!value || value.trim() === '') {
-            // Remove credential if empty
-            delete this.secureCredentials[key];
-            await this.saveSecureCredentials();
-            console.log(`🔐 Removed secure credential: ${key.replace(/password|key/gi, '***')}`);
-            return true;
-        }
-
-        try {
-            // 🔐 NEW: Get current user info for entropy
-            const currentUsername = window.userManager?.currentUser || 'Admin';
-            const currentPassword = this.getUserPasswordForEntropy(currentUsername);
-            
-            if (!currentPassword) {
-                console.error('🔐 ❌ CRITICAL: No password cached for user entropy!');
-                console.error('🔐 ❌ Cannot encrypt OMERO/eLab settings without user password!');
-                
-                if (window.app?.showError) {
-                    window.app.showError(
-                        'Security Error: Cannot save credentials without user password. ' +
-                        'Please log out and log in again with your password.'
-                    );
-                }
-                
-                return false;
-            }
-            
-            console.log(`🔐 Encrypting ${key} WITH user-specific entropy for: ${currentUsername}`);
-            
-            // Encrypt with user-specific entropy
-            const encrypted = await window.secureStorage.encryptData(value, {
-                type: 'user_credential',
-                key: key,
-                username: currentUsername,        // ✅ NEW
-                userPassword: currentPassword,    // ✅ NEW  
-                timestamp: new Date().toISOString(),
-                source: 'settings'
-            });
-
-            if (encrypted.success) {
-                this.secureCredentials[key] = {
-                    encrypted: encrypted.encrypted,
-                    method: encrypted.method,
-                    timestamp: encrypted.timestamp,
-                    metadata: encrypted.metadata
-                };
-                
-                await this.saveSecureCredentials();
-                
-                console.log(`🔐 ✅ Stored ${key} WITH user-specific entropy using ${encrypted.method}`);
-                return true;
+            const userKey = window.storage.getStorageKey('settings');
+            const stored = localStorage.getItem(userKey);
+            if (stored) {
+                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
+                console.log(`📂 User settings loaded from ${userKey}`);
             } else {
-                throw new Error('Encryption failed');
+                // Try migration
+                if (this.migrateGlobalSettingsToUser && this.migrateGlobalSettingsToUser()) {
+                    // Migration successful, settings are now in userKey (via migrate function)
+                    // But we need to reload them into this.settings
+                    const migrated = localStorage.getItem(userKey);
+                    this.settings = { ...this.defaultSettings, ...JSON.parse(migrated) };
+                } else {
+                    this.settings = { ...this.defaultSettings };
+                }
             }
-            
+            return true;
         } catch (error) {
-            console.error(`🔐 Failed to store secure credential ${key}:`, error);
-            
-            // Do NOT fall back to plaintext for OMERO/eLab!
-            console.error('🔐 ❌ Security-critical credential - refusing to store without encryption!');
-            
-            if (window.app?.showError) {
-                window.app.showError('Failed to securely store credential: ' + error.message);
-            }
-            
+            console.warn('Error loading user settings:', error);
             return false;
         }
     },
 
-    async getSecureCredential(key) {
-        // Check if credential is stored securely
-        if (this.secureCredentials[key]) {
-            try {
-                // 🔐 NEW: Get current user info for entropy verification
-                const currentUsername = window.userManager?.currentUser || 'Admin';
-                const currentPassword = this.getUserPasswordForEntropy(currentUsername);
-                
-                if (!currentPassword) {
-                    console.error('🔐 ❌ No password cached - cannot decrypt credential!');
-                    
-                    // Check if this is entropy-protected data
-                    const storedData = this.secureCredentials[key];
-                    if (storedData.metadata?.hasEntropy) {
-                        console.error('🔐 ❌ Credential requires user entropy - decryption blocked');
-                        
-                        if (window.app?.showWarning) {
-                            window.app.showWarning(
-                                'Cannot decrypt credential. Please log out and log in again.'
-                            );
-                        }
-                        
-                        return ''; // Return empty, do NOT expose data
-                    }
-                    
-                    // Legacy data without entropy - try to decrypt anyway
-                    console.warn('🔐 ⚠️ Legacy credential without entropy protection');
-                }
-                
-                console.log(`🔐 Decrypting ${key} WITH entropy verification for: ${currentUsername}`);
-                
-                // Decrypt with entropy verification
-                const decrypted = await window.secureStorage.decryptData(
-                    this.secureCredentials[key].encrypted,
-                    this.secureCredentials[key].method,
-                    {
-                        ...this.secureCredentials[key].metadata,
-                        username: currentUsername,       // ✅ NEW
-                        userPassword: currentPassword    // ✅ NEW
-                    }
-                );
-                
-                if (decrypted.success) {
-                    return decrypted.decrypted || '';
-                } else {
-                    throw new Error('Decryption failed');
-                }
-                
-            } catch (error) {
-                console.error(`🔐 Failed to decrypt credential ${key}:`, error);
-                
-                // Check if this was an entropy error
-                if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
-                    console.error('🔐 ❌ Cross-user access blocked by entropy protection');
-                    
-                    if (window.app?.showError) {
-                        window.app.showError(
-                            'Cannot access this credential - it belongs to another user.'
-                        );
-                    }
-                    
-                    return ''; // Return empty, do NOT expose data
-                }
-                
-                // Other error - return empty for safety
-                return '';
-            }
-        }
-        
-        // Fallback to regular settings (legacy)
-        const regularValue = this.settings[key] !== undefined ? this.settings[key] : this.defaultSettings[key];
-        return regularValue || '';
-    },
-
-    // =================== MIGRATION LOGIC ===================
-
-    async checkAndPerformMigration() {
-        if (this.migrationStatus.completed || !this.isSecureStorageReady) {
-            return;
-        }
-
-        console.log('🔄 Checking for credential migration...');
-        
-        const shouldAutoMigrate = this.get('security.auto_migrate');
-        let needsMigration = false;
-        const plaintextCredentials = {};
-
-        // Check for plaintext sensitive data
-        for (const key of this.sensitiveKeys) {
-            const value = this.settings[key];
-            if (value && typeof value === 'string' && value.trim() !== '') {
-                needsMigration = true;
-                plaintextCredentials[key] = value;
-            }
-        }
-
-        if (!needsMigration) {
-            console.log('🔄 No migration needed');
-            return;
-        }
-
-        if (shouldAutoMigrate) {
-            console.log('🔄 Auto-migrating credentials...');
-            await this.performMigration(plaintextCredentials);
-        }
-    },
-
-    async performMigration(plaintextCredentials) {
+    saveSettingsUserSpecific() {
+        if (!window.storage) return false;
         try {
-            console.log('🔄 Starting credential migration...');
+            const userKey = window.storage.getStorageKey('settings');
+            localStorage.setItem(userKey, JSON.stringify(this.settings));
+            return true;
+        } catch (error) {
+            console.error('Error saving user settings:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Save current category settings as group standard
+     * @param {string} groupname - Group name
+     * @returns {Promise<boolean>} - Success status
+     */
+    async saveAsGroupStandard(groupname) {
+        try {
+            // Extract current category settings
+            const categorySettings = {};
+
+            const categoryKeys = [
+                'templates.category1_name', 'templates.category1_icon', 'templates.category1_color',
+                'templates.category2_name', 'templates.category2_icon', 'templates.category2_color',
+                'templates.category3_name', 'templates.category3_icon', 'templates.category3_color',
+                'templates.category4_name', 'templates.category4_icon', 'templates.category4_color',
+                'templates.active_category'
+            ];
+
+            for (const key of categoryKeys) {
+                categorySettings[key] = await this.get(key);
+            }
+
+            // Save to group storage
+            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
+            localStorage.setItem(groupSettingsKey, JSON.stringify(categorySettings));
+
+            console.log(`✅ Category settings saved as group standard for: ${groupname}`);
+
+            if (window.app && window.app.showSuccess) {
+                window.app.showSuccess(`Category settings saved as standard for group "${groupname}"`);
+            }
+            return true;
+        } catch (error) {
+            console.error('Error saving group standard settings:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Load group standard category settings
+     * @param {string} groupname - Group name
+     * @returns {Object|null} - Category settings or null if not found
+     */
+    loadGroupCategorySettings(groupname) {
+        try {
+            const groupSettingsKey = `metafold_group_${groupname}_category_settings`;
+            const stored = localStorage.getItem(groupSettingsKey);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+            return null;
+        } catch (error) {
+            console.error('Error loading group category settings:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Check if current settings differ from group standard
+     * @param {string} groupname - Group name
+     * @returns {boolean} - True if custom settings exist
+     */
+    hasCustomCategorySettings(groupname) {
+        const groupSettings = this.loadGroupCategorySettings(groupname);
+        if (!groupSettings) return false;
+
+        // Compare current settings with group settings
+        for (const [key, value] of Object.entries(groupSettings)) {
+            // We compare with internal settings object directly for speed
+            // Note: This assumes settings are loaded
+            if (this.settings[key] !== value) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    /**
+     * Apply group standard settings to current user
+     * @param {string} groupname - Group name
+     * @returns {Promise<boolean>} - Success status
+     */
+    async applyGroupCategorySettings(groupname) {
+        const groupSettings = this.loadGroupCategorySettings(groupname);
+        if (!groupSettings) return false;
+
+        try {
+            console.log(`⬇️ Applying group standard settings for ${groupname}...`);
+
+            for (const [key, value] of Object.entries(groupSettings)) {
+                await this.set(key, value);
+            }
+
+            console.log('✅ Group standard settings applied');
+            return true;
+        } catch (error) {
+            console.error('Error applying group standard settings:', error);
+            return false;
+        }
+    },
+
+    async migrateSecureCredentials() {
+        try {
+            console.log('🔐 Migrating plaintext credentials to secure storage...');
+
+            const plaintextCredentials = {};
+            for (const key of this.sensitiveKeys) {
+                if (this.settings[key]) {
+                    plaintextCredentials[key] = this.settings[key];
+                }
+            }
+
+            if (Object.keys(plaintextCredentials).length === 0) {
+                console.log('✅ No plaintext credentials found to migrate');
+                return;
+            }
+
             const migrationLog = [];
 
             for (const [key, value] of Object.entries(plaintextCredentials)) {
                 try {
                     await this.setSecureCredential(key, value);
-                    
+
                     // Remove from plaintext settings
                     delete this.settings[key];
-                    
+
                     migrationLog.push({
                         key: key.replace(/password|key/gi, '***'),
                         success: true,
                         method: this.secureCredentials[key]?.method || 'unknown'
                     });
-                    
+
                     console.log(`🔄 Migrated: ${key.replace(/password|key/gi, '***')}`);
                 } catch (error) {
                     migrationLog.push({
@@ -1017,22 +528,21 @@ const settingsManager = {
             // Save both stores
             this.saveSettings();
             await this.saveSecureCredentials();
-            
+
             const successCount = migrationLog.filter(log => log.success).length;
             console.log(`✅ Migration completed: ${successCount}/${migrationLog.length} credentials migrated`);
-            
+
         } catch (error) {
             console.error('❌ Migration failed:', error);
         }
     },
-
     // =================== ELABFTW INTEGRATION - FIXED ===================
 
     // Test elabFTW connection
     async testElabFTWConnection() {
         const serverUrl = await this.get('elabftw.server_url');
         const apiKey = await this.get('elabftw.api_key');
-        
+
         if (!serverUrl || !apiKey) {
             return { success: false, message: 'Server URL and API key are required' };
         }
@@ -1049,42 +559,50 @@ const settingsManager = {
 
             if (response.ok) {
                 const data = await response.json();
-                return { 
-                    success: true, 
-                    message: `Connected successfully as ${data.fullname || 'Unknown User'}` 
+                return {
+                    success: true,
+                    message: `Connected successfully as ${data.fullname || 'Unknown User'}`
                 };
             } else {
-                return { 
-                    success: false, 
-                    message: `Connection failed: ${response.status} ${response.statusText}` 
+                return {
+                    success: false,
+                    message: `Connection failed: ${response.status} ${response.statusText}`
                 };
             }
         } catch (error) {
-            return { 
-                success: false, 
-                message: `Connection error: ${error.message}` 
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`
             };
         }
     },
 
     // Create elabFTW experiment
-    async createElabFTWExperiment(projectName, metadata, structure = '') {
+    async createElabFTWExperiment(projectName, metadata, structure = '', specificCategoryId = null) {
         const serverUrl = await this.getFormattedElabFTWUrl();
         const apiKey = await this.get('elabftw.api_key');
-        const categoryId = await this.get('elabftw.default_category');
-        
-        if (!serverUrl || !apiKey) {
-            return { success: false, message: 'elabFTW not configured' };
+
+        // Use specific category if provided, otherwise default
+        let categoryId = specificCategoryId;
+        if (!categoryId) {
+            categoryId = await this.get('elabftw.default_category');
+        }
+
+        if (!serverUrl) {
+            return { success: false, message: 'elabFTW Server URL not configured' };
+        }
+        if (!apiKey) {
+            return { success: false, message: 'elabFTW API Key not configured' };
         }
 
         try {
             console.log('🧪 FIXED: Creating new elabFTW experiment');
-            
+
             const cleanTitle = String(projectName).trim();
             if (!cleanTitle) {
                 throw new Error('Project name is empty or invalid');
             }
-            
+
             const experimentData = {
                 title: cleanTitle,
                 body: this.generateExperimentBody(cleanTitle, metadata, structure)
@@ -1094,7 +612,9 @@ const settingsManager = {
                 experimentData.category_id = parseInt(categoryId);
             }
 
-            const response = await fetch(`${serverUrl}api/v2/experiments`, {
+            console.log('🧪 elabFTW: Sending request with category_id:', experimentData.category_id || 'none');
+
+            let response = await fetch(`${serverUrl}api/v2/experiments`, {
                 method: 'POST',
                 headers: {
                     'Authorization': apiKey,
@@ -1103,12 +623,28 @@ const settingsManager = {
                 body: JSON.stringify(experimentData)
             });
 
+            // RETRY LOGIC: If 403 Forbidden and we used a category, try again WITHOUT category
+            if (response.status === 403 && experimentData.category_id) {
+                console.warn(`⚠️ elabFTW: Access forbidden to category ${experimentData.category_id}. Retrying without category...`);
+
+                delete experimentData.category_id;
+
+                response = await fetch(`${serverUrl}api/v2/experiments`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(experimentData)
+                });
+            }
+
             if (response.ok || response.status === 201) {
                 const location = response.headers.get('location');
                 const experimentId = location ? location.split('/').pop() : null;
-                
+
                 console.log('🧪 FIXED: Experiment created with ID:', experimentId);
-                
+
                 // CRITICAL: Override title immediately after creation (in case template overwrote it)
                 if (experimentId) {
                     try {
@@ -1123,7 +659,7 @@ const settingsManager = {
                                 title: cleanTitle
                             })
                         });
-                        
+
                         if (titleOverrideResponse.ok) {
                             console.log('✅ FIXED: Title successfully set to:', cleanTitle);
                         } else {
@@ -1134,13 +670,13 @@ const settingsManager = {
                         // Continue anyway - the experiment was created
                     }
                 }
-                
+
                 // Add metadata using the FIXED merge logic
                 if (metadata && Object.keys(metadata).length > 0 && experimentId) {
                     console.log('🧪 FIXED: Adding metadata using merge logic');
                     await this.updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata);
                 }
-                
+
                 return {
                     success: true,
                     message: 'Experiment created in elabFTW successfully!',
@@ -1163,277 +699,277 @@ const settingsManager = {
 
 
 
-	// Update existing elabFTW experiment - ENHANCED with Conflict Resolution
-	async updateExistingElabFTWExperiment(experimentId, metadata) {
-		const serverUrl = await this.getFormattedElabFTWUrl();
-		const apiKey = await this.get('elabftw.api_key');
-		
-		if (!serverUrl || !apiKey) {
-			return { success: false, message: 'elabFTW not configured' };
-		}
+    // Update existing elabFTW experiment - ENHANCED with Conflict Resolution
+    async updateExistingElabFTWExperiment(experimentId, metadata) {
+        const serverUrl = await this.getFormattedElabFTWUrl();
+        const apiKey = await this.get('elabftw.api_key');
 
-		try {
-			console.log('🧪 ENHANCED: Starting GET-MERGE-PATCH workflow with conflict resolution for experiment', experimentId);
-			
-			// STEP 1: GET existing experiment to load current metadata
-			const getResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
-				headers: {
-					'Authorization': apiKey,
-					'Content-Type': 'application/json'
-				}
-			});
+        if (!serverUrl || !apiKey) {
+            return { success: false, message: 'elabFTW not configured' };
+        }
 
-			if (!getResponse.ok) {
-				throw new Error(`Failed to fetch existing experiment: ${getResponse.status} ${getResponse.statusText}`);
-			}
+        try {
+            console.log('🧪 ENHANCED: Starting GET-MERGE-PATCH workflow with conflict resolution for experiment', experimentId);
 
-			const existingExperiment = await getResponse.json();
-			console.log('🧪 ENHANCED: Successfully loaded existing experiment data');
-			
-			// STEP 2: Parse existing metadata
-			let existingMetadata = {
-				elabftw: {
-					display_main_text: true
-				},
-				extra_fields: {}
-			};
-			
-			try {
-				if (existingExperiment.metadata) {
-					let parsedMetadata;
-					
-					if (typeof existingExperiment.metadata === 'string') {
-						parsedMetadata = JSON.parse(existingExperiment.metadata);
-					} else if (typeof existingExperiment.metadata === 'object') {
-						parsedMetadata = existingExperiment.metadata;
-					} else {
-						parsedMetadata = {};
-					}
-					
-					if (parsedMetadata.elabftw) {
-						existingMetadata.elabftw = { 
-							display_main_text: true, 
-							...parsedMetadata.elabftw 
-						};
-					}
-					
-					if (parsedMetadata.extra_fields && typeof parsedMetadata.extra_fields === 'object') {
-						existingMetadata.extra_fields = { ...parsedMetadata.extra_fields };
-					}
-					
-					const existingFieldNames = Object.keys(existingMetadata.extra_fields);
-					console.log('🧪 ENHANCED: Existing extra_fields:', existingFieldNames.length, 'fields');
-					console.log('🧪 ENHANCED: Existing field names:', existingFieldNames);
-					
-				} else {
-					console.log('🧪 ENHANCED: No existing metadata found, starting fresh');
-				}
-			} catch (parseError) {
-				console.warn('🧪 ENHANCED: Could not parse existing metadata, starting fresh:', parseError);
-				existingMetadata = {
-					elabftw: { display_main_text: true },
-					extra_fields: {}
-				};
-			}
+            // STEP 1: GET existing experiment to load current metadata
+            const getResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-			// STEP 3: Convert new MetaFold metadata to elabFTW format
-			const newElabftwFields = this.convertMetadataToElabFTW(metadata);
-			const newFieldNames = Object.keys(newElabftwFields);
-			console.log('🧪 ENHANCED: New metadata fields to add:', newFieldNames.length, 'fields');
-			console.log('🧪 ENHANCED: New field names:', newFieldNames);
+            if (!getResponse.ok) {
+                throw new Error(`Failed to fetch existing experiment: ${getResponse.status} ${getResponse.statusText}`);
+            }
 
-			// STEP 4: ENHANCED CONFLICT RESOLUTION
-			const { mergedFields, conflictLog } = await this.resolveFieldConflicts(
-				existingMetadata.extra_fields, 
-				newElabftwFields
-			);
+            const existingExperiment = await getResponse.json();
+            console.log('🧪 ENHANCED: Successfully loaded existing experiment data');
 
-			// STEP 5: Create final merged metadata
-			const mergedMetadata = {
-				elabftw: {
-					display_main_text: true,
-					...existingMetadata.elabftw
-				},
-				extra_fields: mergedFields
-			};
+            // STEP 2: Parse existing metadata
+            let existingMetadata = {
+                elabftw: {
+                    display_main_text: true
+                },
+                extra_fields: {}
+            };
 
-			// Preserve groups if they exist
-			if (existingMetadata.elabftw && existingMetadata.elabftw.extra_fields_groups) {
-				mergedMetadata.elabftw.extra_fields_groups = existingMetadata.elabftw.extra_fields_groups;
-			}
+            try {
+                if (existingExperiment.metadata) {
+                    let parsedMetadata;
 
-			// ENHANCED DEBUG: Show conflict resolution results
-			const existingFieldCount = Object.keys(existingMetadata.extra_fields).length;
-			const newFieldCount = Object.keys(newElabftwFields).length;
-			const totalFieldCount = Object.keys(mergedFields).length;
-			
-			console.log('🧪 ENHANCED: Conflict resolution results:');
-			console.log('  - Existing fields:', existingFieldCount, Object.keys(existingMetadata.extra_fields));
-			console.log('  - New fields:', newFieldCount, Object.keys(newElabftwFields));
-			console.log('  - Final merged fields:', totalFieldCount, Object.keys(mergedFields));
-			console.log('  - Conflicts resolved:', conflictLog.length);
-			
-			if (conflictLog.length > 0) {
-				console.log('🧪 ENHANCED: Conflict details:');
-				conflictLog.forEach(conflict => {
-					console.log(`    - ${conflict.action}: "${conflict.originalName}" → "${conflict.finalName}"`);
-				});
-			}
+                    if (typeof existingExperiment.metadata === 'string') {
+                        parsedMetadata = JSON.parse(existingExperiment.metadata);
+                    } else if (typeof existingExperiment.metadata === 'object') {
+                        parsedMetadata = existingExperiment.metadata;
+                    } else {
+                        parsedMetadata = {};
+                    }
 
-			// STEP 6: PATCH with merged metadata
-			const updateData = {
-				metadata: JSON.stringify(mergedMetadata)
-			};
+                    if (parsedMetadata.elabftw) {
+                        existingMetadata.elabftw = {
+                            display_main_text: true,
+                            ...parsedMetadata.elabftw
+                        };
+                    }
 
-			console.log('🧪 ENHANCED: Sending PATCH with conflict-resolved metadata...');
-			
-			const patchResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
-				method: 'PATCH',
-				headers: {
-					'Authorization': apiKey,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(updateData)
-			});
+                    if (parsedMetadata.extra_fields && typeof parsedMetadata.extra_fields === 'object') {
+                        existingMetadata.extra_fields = { ...parsedMetadata.extra_fields };
+                    }
 
-			if (patchResponse.ok) {
-				const experimentUrl = `${serverUrl}experiments.php?mode=view&id=${experimentId}`;
-				
-				console.log('✅ ENHANCED: Successfully updated experiment with conflict-resolved metadata');
-				console.log('🔗 ENHANCED: View experiment at:', experimentUrl);
-				
-				return {
-					success: true,
-					message: `Experiment ${experimentId} updated in elabFTW (${newFieldCount} new fields, ${conflictLog.length} conflicts resolved)`,
-					id: experimentId,
-					url: experimentUrl,
-					mergeInfo: {
-						existingFields: existingFieldCount,
-						newFields: newFieldCount,
-						totalFields: totalFieldCount,
-						conflictsResolved: conflictLog.length,
-						preservedFields: Object.keys(existingMetadata.extra_fields),
-						addedFields: Object.keys(newElabftwFields),
-						finalFields: Object.keys(mergedFields),
-						conflictLog: conflictLog
-					}
-				};
-			} else {
-				const errorText = await patchResponse.text();
-				console.error('❌ ENHANCED: PATCH failed:', patchResponse.status, errorText);
-				throw new Error(`PATCH failed: ${patchResponse.status} - ${errorText}`);
-			}
+                    const existingFieldNames = Object.keys(existingMetadata.extra_fields);
+                    console.log('🧪 ENHANCED: Existing extra_fields:', existingFieldNames.length, 'fields');
+                    console.log('🧪 ENHANCED: Existing field names:', existingFieldNames);
 
-		} catch (error) {
-			console.error('❌ ENHANCED: Error in updateExistingElabFTWExperiment:', error);
-			return {
-				success: false,
-				message: `Error updating elabFTW experiment: ${error.message}`
-			};
-		}
-	},
+                } else {
+                    console.log('🧪 ENHANCED: No existing metadata found, starting fresh');
+                }
+            } catch (parseError) {
+                console.warn('🧪 ENHANCED: Could not parse existing metadata, starting fresh:', parseError);
+                existingMetadata = {
+                    elabftw: { display_main_text: true },
+                    extra_fields: {}
+                };
+            }
 
-	// NEW METHOD: Resolve field conflicts based on user settings
-	async resolveFieldConflicts(existingFields, newFields) {
-		const overwriteEnabled = await this.get('elabftw.overwrite_enabled');
-		const versioningFormat = await this.get('elabftw.versioning_format');
-		
-		console.log('🧪 CONFLICT: Resolving conflicts with settings:', {
-			overwriteEnabled: overwriteEnabled,
-			versioningFormat: versioningFormat
-		});
-		
-		const mergedFields = { ...existingFields }; // Start with existing fields
-		const conflictLog = [];
-		
-		for (const [newFieldName, newFieldData] of Object.entries(newFields)) {
-			if (existingFields.hasOwnProperty(newFieldName)) {
-				// CONFLICT DETECTED!
-				console.log(`🧪 CONFLICT: Field "${newFieldName}" already exists`);
-				
-				if (overwriteEnabled) {
-					// OVERWRITE MODE: Replace existing field
-					mergedFields[newFieldName] = newFieldData;
-					conflictLog.push({
-						action: 'OVERWRITE',
-						originalName: newFieldName,
-						finalName: newFieldName,
-						reason: 'Overwrite mode enabled'
-					});
-					console.log(`🧪 CONFLICT: OVERWRITE "${newFieldName}"`);
-					
-				} else {
-					// VERSIONING MODE: Create versioned field name
-					const versionedName = this.generateVersionedFieldName(newFieldName, existingFields, versioningFormat);
-					mergedFields[versionedName] = newFieldData;
-					conflictLog.push({
-						action: 'VERSION',
-						originalName: newFieldName,
-						finalName: versionedName,
-						reason: `Versioning mode (${versioningFormat})`
-					});
-					console.log(`🧪 CONFLICT: VERSION "${newFieldName}" → "${versionedName}"`);
-				}
-			} else {
-				// NO CONFLICT: Add new field directly
-				mergedFields[newFieldName] = newFieldData;
-				console.log(`🧪 CONFLICT: ADD "${newFieldName}" (no conflict)`);
-			}
-		}
-		
-		return { mergedFields, conflictLog };
-	},
+            // STEP 3: Convert new MetaFold metadata to elabFTW format
+            const newElabftwFields = this.convertMetadataToElabFTW(metadata);
+            const newFieldNames = Object.keys(newElabftwFields);
+            console.log('🧪 ENHANCED: New metadata fields to add:', newFieldNames.length, 'fields');
+            console.log('🧪 ENHANCED: New field names:', newFieldNames);
 
-	// NEW METHOD: Generate versioned field names
-	generateVersionedFieldName(originalName, existingFields, versioningFormat) {
-		const now = new Date();
-		let versionedName;
-		
-		switch (versioningFormat) {
-			case 'timestamp':
-				const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-				versionedName = `${originalName}_${timestamp}`;
-				break;
-				
-			case 'date':
-				const date = now.toISOString().split('T')[0];
-				versionedName = `${originalName}_${date}`;
-				break;
-				
-			case 'counter':
-				let counter = 2;
-				versionedName = `${originalName}_v${counter}`;
-				while (existingFields.hasOwnProperty(versionedName)) {
-					counter++;
-					versionedName = `${originalName}_v${counter}`;
-				}
-				break;
-				
-			default:
-				// Fallback to date format
-				const fallbackDate = now.toISOString().split('T')[0];
-				versionedName = `${originalName}_${fallbackDate}`;
-		}
-		
-		// Ensure the versioned name is unique (safety check)
-		let finalName = versionedName;
-		let safetyCounter = 1;
-		while (existingFields.hasOwnProperty(finalName) && safetyCounter < 100) {
-			finalName = `${versionedName}_${safetyCounter}`;
-			safetyCounter++;
-		}
-		return finalName;
-	},
-	
-	
+            // STEP 4: ENHANCED CONFLICT RESOLUTION
+            const { mergedFields, conflictLog } = await this.resolveFieldConflicts(
+                existingMetadata.extra_fields,
+                newElabftwFields
+            );
+
+            // STEP 5: Create final merged metadata
+            const mergedMetadata = {
+                elabftw: {
+                    display_main_text: true,
+                    ...existingMetadata.elabftw
+                },
+                extra_fields: mergedFields
+            };
+
+            // Preserve groups if they exist
+            if (existingMetadata.elabftw && existingMetadata.elabftw.extra_fields_groups) {
+                mergedMetadata.elabftw.extra_fields_groups = existingMetadata.elabftw.extra_fields_groups;
+            }
+
+            // ENHANCED DEBUG: Show conflict resolution results
+            const existingFieldCount = Object.keys(existingMetadata.extra_fields).length;
+            const newFieldCount = Object.keys(newElabftwFields).length;
+            const totalFieldCount = Object.keys(mergedFields).length;
+
+            console.log('🧪 ENHANCED: Conflict resolution results:');
+            console.log('  - Existing fields:', existingFieldCount, Object.keys(existingMetadata.extra_fields));
+            console.log('  - New fields:', newFieldCount, Object.keys(newElabftwFields));
+            console.log('  - Final merged fields:', totalFieldCount, Object.keys(mergedFields));
+            console.log('  - Conflicts resolved:', conflictLog.length);
+
+            if (conflictLog.length > 0) {
+                console.log('🧪 ENHANCED: Conflict details:');
+                conflictLog.forEach(conflict => {
+                    console.log(`    - ${conflict.action}: "${conflict.originalName}" → "${conflict.finalName}"`);
+                });
+            }
+
+            // STEP 6: PATCH with merged metadata
+            const updateData = {
+                metadata: JSON.stringify(mergedMetadata)
+            };
+
+            console.log('🧪 ENHANCED: Sending PATCH with conflict-resolved metadata...');
+
+            const patchResponse = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (patchResponse.ok) {
+                const experimentUrl = `${serverUrl}experiments.php?mode=view&id=${experimentId}`;
+
+                console.log('✅ ENHANCED: Successfully updated experiment with conflict-resolved metadata');
+                console.log('🔗 ENHANCED: View experiment at:', experimentUrl);
+
+                return {
+                    success: true,
+                    message: `Experiment ${experimentId} updated in elabFTW (${newFieldCount} new fields, ${conflictLog.length} conflicts resolved)`,
+                    id: experimentId,
+                    url: experimentUrl,
+                    mergeInfo: {
+                        existingFields: existingFieldCount,
+                        newFields: newFieldCount,
+                        totalFields: totalFieldCount,
+                        conflictsResolved: conflictLog.length,
+                        preservedFields: Object.keys(existingMetadata.extra_fields),
+                        addedFields: Object.keys(newElabftwFields),
+                        finalFields: Object.keys(mergedFields),
+                        conflictLog: conflictLog
+                    }
+                };
+            } else {
+                const errorText = await patchResponse.text();
+                console.error('❌ ENHANCED: PATCH failed:', patchResponse.status, errorText);
+                throw new Error(`PATCH failed: ${patchResponse.status} - ${errorText}`);
+            }
+
+        } catch (error) {
+            console.error('❌ ENHANCED: Error in updateExistingElabFTWExperiment:', error);
+            return {
+                success: false,
+                message: `Error updating elabFTW experiment: ${error.message}`
+            };
+        }
+    },
+
+    // NEW METHOD: Resolve field conflicts based on user settings
+    async resolveFieldConflicts(existingFields, newFields) {
+        const overwriteEnabled = await this.get('elabftw.overwrite_enabled');
+        const versioningFormat = await this.get('elabftw.versioning_format');
+
+        console.log('🧪 CONFLICT: Resolving conflicts with settings:', {
+            overwriteEnabled: overwriteEnabled,
+            versioningFormat: versioningFormat
+        });
+
+        const mergedFields = { ...existingFields }; // Start with existing fields
+        const conflictLog = [];
+
+        for (const [newFieldName, newFieldData] of Object.entries(newFields)) {
+            if (existingFields.hasOwnProperty(newFieldName)) {
+                // CONFLICT DETECTED!
+                console.log(`🧪 CONFLICT: Field "${newFieldName}" already exists`);
+
+                if (overwriteEnabled) {
+                    // OVERWRITE MODE: Replace existing field
+                    mergedFields[newFieldName] = newFieldData;
+                    conflictLog.push({
+                        action: 'OVERWRITE',
+                        originalName: newFieldName,
+                        finalName: newFieldName,
+                        reason: 'Overwrite mode enabled'
+                    });
+                    console.log(`🧪 CONFLICT: OVERWRITE "${newFieldName}"`);
+
+                } else {
+                    // VERSIONING MODE: Create versioned field name
+                    const versionedName = this.generateVersionedFieldName(newFieldName, existingFields, versioningFormat);
+                    mergedFields[versionedName] = newFieldData;
+                    conflictLog.push({
+                        action: 'VERSION',
+                        originalName: newFieldName,
+                        finalName: versionedName,
+                        reason: `Versioning mode (${versioningFormat})`
+                    });
+                    console.log(`🧪 CONFLICT: VERSION "${newFieldName}" → "${versionedName}"`);
+                }
+            } else {
+                // NO CONFLICT: Add new field directly
+                mergedFields[newFieldName] = newFieldData;
+                console.log(`🧪 CONFLICT: ADD "${newFieldName}" (no conflict)`);
+            }
+        }
+
+        return { mergedFields, conflictLog };
+    },
+
+    // NEW METHOD: Generate versioned field names
+    generateVersionedFieldName(originalName, existingFields, versioningFormat) {
+        const now = new Date();
+        let versionedName;
+
+        switch (versioningFormat) {
+            case 'timestamp':
+                const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                versionedName = `${originalName}_${timestamp}`;
+                break;
+
+            case 'date':
+                const date = now.toISOString().split('T')[0];
+                versionedName = `${originalName}_${date}`;
+                break;
+
+            case 'counter':
+                let counter = 2;
+                versionedName = `${originalName}_v${counter}`;
+                while (existingFields.hasOwnProperty(versionedName)) {
+                    counter++;
+                    versionedName = `${originalName}_v${counter}`;
+                }
+                break;
+
+            default:
+                // Fallback to date format
+                const fallbackDate = now.toISOString().split('T')[0];
+                versionedName = `${originalName}_${fallbackDate}`;
+        }
+
+        // Ensure the versioned name is unique (safety check)
+        let finalName = versionedName;
+        let safetyCounter = 1;
+        while (existingFields.hasOwnProperty(finalName) && safetyCounter < 100) {
+            finalName = `${versionedName}_${safetyCounter}`;
+            safetyCounter++;
+        }
+        return finalName;
+    },
+
+
     // Update experiment with metadata using PATCH - FIXED
     async updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata) {
         try {
             console.log('🧪 FIXED: updateExperimentWithMetadata using merge logic');
-            
+
             // Use the same GET-MERGE-PATCH logic for consistency
             const result = await this.updateExistingElabFTWExperiment(experimentId, metadata);
-            
+
             if (result.success) {
                 console.log('✅ FIXED: Metadata successfully merged into experiment');
                 return true;
@@ -1441,7 +977,7 @@ const settingsManager = {
                 console.error('❌ FIXED: Failed to merge metadata into experiment:', result.message);
                 return false;
             }
-            
+
         } catch (error) {
             console.error('❌ FIXED: Error in updateExperimentWithMetadata:', error);
             return false;
@@ -1466,73 +1002,73 @@ const settingsManager = {
     },
 
     // Convert MetaFold metadata to elabFTW format - FIXED NULL CHECK
-	convertMetadataToElabFTW(metadata) {
-		console.log('🔧 convertMetadataToElabFTW called with:', typeof metadata, metadata);
-		
-		const elabftwFields = {};
-		
-		// ✅ FIX: Add null/undefined check
-		if (!metadata || typeof metadata !== 'object') {
-			console.warn('⚠️ convertMetadataToElabFTW: Invalid metadata provided:', metadata);
-			return elabftwFields; // Return empty object
-		}
-		
-		// ✅ FIX: Add check for empty object
-		if (Object.keys(metadata).length === 0) {
-			console.warn('⚠️ convertMetadataToElabFTW: Empty metadata object provided');
-			return elabftwFields;
-		}
-		
-		try {
-			Object.entries(metadata).forEach(([key, fieldInfo]) => {
-				// Skip if fieldInfo is not valid
-				if (!fieldInfo || typeof fieldInfo !== 'object') {
-					console.warn(`⚠️ Skipping invalid field: ${key}`, fieldInfo);
-					return;
-				}
-				
-				// Skip group headers
-				if (fieldInfo.type === 'group') return;
+    convertMetadataToElabFTW(metadata) {
+        console.log('🔧 convertMetadataToElabFTW called with:', typeof metadata, metadata);
 
-				const elabField = {
-					type: this.mapFieldTypeToElabFTW(fieldInfo.type),
-					value: this.formatValueForElabFTW(fieldInfo.value, fieldInfo.type)
-				};
+        const elabftwFields = {};
 
-				if (fieldInfo.description) {
-					elabField.description = fieldInfo.description;
-				}
+        // ✅ FIX: Add null/undefined check
+        if (!metadata || typeof metadata !== 'object') {
+            console.warn('⚠️ convertMetadataToElabFTW: Invalid metadata provided:', metadata);
+            return elabftwFields; // Return empty object
+        }
 
-				if (fieldInfo.required) {
-					elabField.required = true;
-				}
+        // ✅ FIX: Add check for empty object
+        if (Object.keys(metadata).length === 0) {
+            console.warn('⚠️ convertMetadataToElabFTW: Empty metadata object provided');
+            return elabftwFields;
+        }
 
-				if (fieldInfo.type === 'textarea') {
-					elabField.multiline = true;
-				}
+        try {
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                // Skip if fieldInfo is not valid
+                if (!fieldInfo || typeof fieldInfo !== 'object') {
+                    console.warn(`⚠️ Skipping invalid field: ${key}`, fieldInfo);
+                    return;
+                }
 
-				if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
-					elabField.options = fieldInfo.options.map(opt => String(opt));
-				}
+                // Skip group headers
+                if (fieldInfo.type === 'group') return;
 
-				if (fieldInfo.type === 'number') {
-					if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
-					if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
-				}
+                const elabField = {
+                    type: this.mapFieldTypeToElabFTW(fieldInfo.type),
+                    value: this.formatValueForElabFTW(fieldInfo.value, fieldInfo.type)
+                };
 
-				const fieldKey = fieldInfo.label || key;
-				elabftwFields[fieldKey] = elabField;
-			});
-			
-			console.log('✅ convertMetadataToElabFTW: Successfully converted', Object.keys(elabftwFields).length, 'fields');
-			
-		} catch (error) {
-			console.error('❌ convertMetadataToElabFTW: Error processing metadata:', error);
-			console.error('❌ Original metadata:', metadata);
-		}
+                if (fieldInfo.description) {
+                    elabField.description = fieldInfo.description;
+                }
 
-		return elabftwFields;
-	},
+                if (fieldInfo.required) {
+                    elabField.required = true;
+                }
+
+                if (fieldInfo.type === 'textarea') {
+                    elabField.multiline = true;
+                }
+
+                if (fieldInfo.type === 'dropdown' && fieldInfo.options) {
+                    elabField.options = fieldInfo.options.map(opt => String(opt));
+                }
+
+                if (fieldInfo.type === 'number') {
+                    if (fieldInfo.min !== undefined) elabField.min = fieldInfo.min;
+                    if (fieldInfo.max !== undefined) elabField.max = fieldInfo.max;
+                }
+
+                const fieldKey = fieldInfo.label || key;
+                elabftwFields[fieldKey] = elabField;
+            });
+
+            console.log('✅ convertMetadataToElabFTW: Successfully converted', Object.keys(elabftwFields).length, 'fields');
+
+        } catch (error) {
+            console.error('❌ convertMetadataToElabFTW: Error processing metadata:', error);
+            console.error('❌ Original metadata:', metadata);
+        }
+
+        return elabftwFields;
+    },
 
     // Map field types to elabFTW types
     mapFieldTypeToElabFTW(type) {
@@ -1544,7 +1080,7 @@ const settingsManager = {
             'dropdown': 'select',
             'checkbox': 'checkbox'
         };
-        
+
         return typeMap[type] || 'text';
     },
 
@@ -1564,23 +1100,23 @@ const settingsManager = {
 
     // Generate experiment body for elabFTW
     generateExperimentBody(projectName, metadata, structure = '') {
-        const date = new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const date = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-        
+
         let body = `<h1>${projectName}</h1>\n\n`;
         body += `<p><strong>Created:</strong> ${date}</p>\n\n`;
-        
+
         if (metadata && Object.keys(metadata).length > 0) {
             body += `<h2>Experiment Metadata</h2>\n<ul>\n`;
-            
+
             Object.entries(metadata).forEach(([key, fieldInfo]) => {
                 if (fieldInfo.type !== 'group') {
                     const value = fieldInfo.value || 'Not filled';
                     const label = fieldInfo.label || key;
-                    
+
                     if (fieldInfo.type === 'checkbox') {
                         const checkValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
                         body += `<li><strong>${label}:</strong> ${checkValue}</li>\n`;
@@ -1589,19 +1125,19 @@ const settingsManager = {
                     }
                 }
             });
-            
+
             body += `</ul>\n\n`;
         }
-        
+
         if (structure && structure.trim() !== '') {
             body += `<h2>Project Structure</h2>\n<pre>${structure}</pre>\n\n`;
         }
-        
+
         body += `<h2>Description</h2>\n<p><em>Add your project description here...</em></p>\n\n`;
         body += `<h2>Methodology</h2>\n<p><em>Describe your methodology here...</em></p>\n\n`;
         body += `<h2>Results</h2>\n<p><em>Document your results here...</em></p>\n\n`;
         body += `<h2>Notes</h2>\n<p><em>Add any additional notes here...</em></p>\n`;
-        
+
         return body;
     },
 
@@ -1611,25 +1147,62 @@ const settingsManager = {
         if (!window.omeroUIIntegration) {
             return { success: false, message: 'OMERO UI integration module not available' };
         }
-        
+
         try {
             return await window.omeroUIIntegration.testConnection();
         } catch (error) {
-            return { 
-                success: false, 
-                message: `OMERO connection test failed: ${error.message}` 
+            return {
+                success: false,
+                message: `OMERO connection test failed: ${error.message}`
             };
         }
+    },
+
+    // =================== OMERO PASSWORD SECURITY OPTIONS ===================
+
+    /**
+     * Get OMERO "Don't Save Password" setting
+     * @returns {boolean} - True if password should NOT be saved
+     */
+    async getDontSaveOmeroPassword() {
+        return await this.get('omero.dontSavePassword') || false;
+    },
+
+    /**
+     * Set OMERO "Don't Save Password" setting
+     * ✅ SECURITY FIX: Löscht DPAPI-Daten wenn aktiviert
+     * @param {boolean} value - True to NOT save password
+     * @returns {Promise<boolean>} - Success status
+     */
+    async setDontSaveOmeroPassword(value) {
+        console.log(`🔐 SECURITY: Setting don't save OMERO password to: ${value}`);
+
+        // ✅ KRITISCH: Wenn "Don't save" aktiviert wird, lösche alle OMERO-Credentials aus DPAPI
+        if (value === true) {
+            console.log('🔐 SECURITY: Don\'t save password enabled - removing OMERO credentials from DPAPI...');
+
+            // Lösche OMERO Password aus DPAPI
+            await this.setSecureCredential('omero.password', '');
+            console.log('✅ OMERO password removed from DPAPI storage');
+
+            // Lösche Username aus DPAPI (falls vorhanden)
+            await this.setSecureCredential('omero.username', '');
+            console.log('✅ OMERO username removed from DPAPI storage');
+
+            console.log('✅ SECURITY: All OMERO credentials removed from encrypted storage');
+        }
+
+        return await this.set('omero.dontSavePassword', value);
     },
 
     async createOMERODataset(projectName, metadata, options = {}) {
         if (!window.metaFoldOMEROIntegration) {
             return { success: false, message: 'MetaFold OMERO integration module not available' };
         }
-        
+
         try {
             console.log('🔬 settingsManager: Creating OMERO dataset with Phase 2 support...');
-            
+
             // Check if enhanced method is available
             if (window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced) {
                 console.log('🔬 settingsManager: Using enhanced integration method');
@@ -1638,7 +1211,7 @@ const settingsManager = {
                 console.log('🔬 settingsManager: Using standard integration method');
                 return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, options);
             }
-            
+
         } catch (error) {
             console.error('❌ settingsManager: Error in createOMERODataset:', error);
             return {
@@ -1662,7 +1235,7 @@ const settingsManager = {
 
         const storageStatus = window.secureStorage.getStatus();
         const encryptedCount = Object.keys(this.secureCredentials).length;
-        const plaintextCount = this.sensitiveKeys.filter(key => 
+        const plaintextCount = this.sensitiveKeys.filter(key =>
             this.settings[key] && typeof this.settings[key] === 'string'
         ).length;
 
@@ -1684,124 +1257,130 @@ const settingsManager = {
         }
     },
 
-	// FIXED handleSettingChange method for settingsManager.js
-	
-	handleSettingChange(key, value) {
-		console.log(`🔧 handleSettingChange called: ${key} = ${value}`);
-		
-		switch (key) {
-			case 'general.user_management_enabled':
-				// ASYNC SAFE: Don't call the handler immediately, defer it
-				console.log('🔧 Deferring user management toggle...');
-				setTimeout(async () => {
-					try {
-						await this.handleUserManagementToggle(value);
-					} catch (error) {
-						console.error('❌ Deferred user management toggle failed:', error);
-					}
-				}, 100);
-				break;
-				
-			case 'general.theme':
-				this.applyTheme(value);
-				break;
-				
-			case 'elabftw.enabled':
-			case 'elabftw.auto_sync':
-				if (window.updateElabFTWOptions) {
-					setTimeout(() => window.updateElabFTWOptions(), 50);
-				}
-				break;
-				
-			case 'omero.enabled':
-			case 'omero.auto_sync':
-				if (window.updateOMEROOptions) {
-					setTimeout(() => window.updateOMEROOptions(), 50);
-				}
-				break;
-				
-			default:
-				console.log(`🔧 No special handling for setting: ${key}`);
-		}
-	},
+    // FIXED handleSettingChange method for settingsManager.js
 
-	// ENHANCED: Immediate user management toggle with user selection  
-	async handleUserManagementToggle(enabled) {
-		console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
-		
-		if (enabled) {
-			// User management was just enabled
-			console.log('🚀 User management activated - showing user selection...');
-			
-			if (window.userManager && window.loginModal) {
-				try {
-					// Show user selection dialog immediately
-					const userInfo = await window.userManager.showUserSelection();
-					
-					if (userInfo) {
-						console.log('✅ User selected via immediate activation:', userInfo);
-						
-						// Show success message
-						if (window.app && window.app.showSuccess) {
-							window.app.showSuccess(`User management activated! Current user: ${userInfo.username} (${userInfo.groupname})`);
-						}
-					} else {
-						console.log('❌ User selection cancelled - disabling user management');
-						
-						// User cancelled - disable user management again
-						await this.set('general.user_management_enabled', false);
-						
-						if (window.app && window.app.showError) {
-							window.app.showError('User management cancelled. Staying in simple mode.');
-						}
-					}
-				} catch (error) {
-					console.error('❌ Error activating user management:', error);
-					
-					// Error occurred - disable user management again
-					await this.set('general.user_management_enabled', false);
-					
-					if (window.app && window.app.showError) {
-						window.app.showError('Error activating user management: ' + error.message);
-					}
-				}
-			} else {
-				console.warn('⚠️ userManager or loginModal not available');
-				if (window.app && window.app.showError) {
-					window.app.showError('User management modules not available');
-				}
-			}
-		} else {
-			// User management was disabled
-			console.log('📝 User management deactivated - switching to simple mode');
-			
-			if (window.userManager) {
-				// Switch to simple mode
-				window.userManager.initSimpleMode();
-				
-				// Reinitialize templates for simple mode
-				if (window.templateManager && window.templateManager.init) {
-					window.templateManager.init();
-				}
-				
-				if (window.app && window.app.showSuccess) {
-					window.app.showSuccess('Switched to simple mode (no user management)');
-				}
-			}
-		}
-	},
+    handleSettingChange(key, value) {
+        console.log(`🔧 handleSettingChange called: ${key} = ${value}`);
+
+        // Dispatch global event
+        window.dispatchEvent(new CustomEvent('settingsChanged', {
+            detail: { key, value }
+        }));
+
+        switch (key) {
+            case 'general.user_management_enabled':
+                // ASYNC SAFE: Don't call the handler immediately, defer it
+                console.log('🔧 Deferring user management toggle...');
+                setTimeout(async () => {
+                    try {
+                        await this.handleUserManagementToggle(value);
+                    } catch (error) {
+                        console.error('❌ Deferred user management toggle failed:', error);
+                    }
+                }, 100);
+                break;
+
+            case 'general.theme':
+                this.applyTheme(value);
+                break;
+
+            case 'elabftw.enabled':
+            case 'elabftw.auto_sync':
+                if (window.updateElabFTWOptions) {
+                    setTimeout(() => window.updateElabFTWOptions(), 50);
+                }
+                break;
+
+            case 'omero.enabled':
+            case 'omero.auto_sync':
+                if (window.updateOMEROOptions) {
+                    setTimeout(() => window.updateOMEROOptions(), 50);
+                }
+                break;
+
+            default:
+                console.log(`🔧 No special handling for setting: ${key}`);
+        }
+
+        // Notify listeners about the change
+        window.dispatchEvent(new CustomEvent('settingsChanged', { detail: { key, value } }));
+    },
+
+    // ENHANCED: Immediate user management toggle with user selection  
+    async handleUserManagementToggle(enabled) {
+        console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
+
+        if (enabled) {
+            // User management was just enabled
+            console.log('🚀 User management activated - showing user selection...');
+
+            if (window.userManager && window.loginModal) {
+                try {
+                    // Show user selection dialog immediately
+                    const userInfo = await window.userManager.showUserSelection();
+
+                    if (userInfo) {
+                        console.log('✅ User selected via immediate activation:', userInfo);
+
+                        // Show success message
+                        if (window.app && window.app.showSuccess) {
+                            window.app.showSuccess(`User management activated! Current user: ${userInfo.username} (${userInfo.groupname})`);
+                        }
+                    } else {
+                        console.log('❌ User selection cancelled - disabling user management');
+
+                        // User cancelled - disable user management again
+                        await this.set('general.user_management_enabled', false);
+
+                        if (window.app && window.app.showError) {
+                            window.app.showError('User management cancelled. Staying in simple mode.');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error activating user management:', error);
+
+                    // Error occurred - disable user management again
+                    await this.set('general.user_management_enabled', false);
+
+                    if (window.app && window.app.showError) {
+                        window.app.showError('Error activating user management: ' + error.message);
+                    }
+                }
+            } else {
+                console.warn('⚠️ userManager or loginModal not available');
+                if (window.app && window.app.showError) {
+                    window.app.showError('User management modules not available');
+                }
+            }
+        } else {
+            // User management was disabled
+            console.log('📝 User management deactivated - switching to simple mode');
+
+            if (window.userManager) {
+                // Switch to simple mode
+                window.userManager.initSimpleMode();
+
+                // Reinitialize templates for simple mode
+                if (window.templateManager && window.templateManager.init) {
+                    window.templateManager.init();
+                }
+
+                if (window.app && window.app.showSuccess) {
+                    window.app.showSuccess('Switched to simple mode (no user management)');
+                }
+            }
+        }
+    },
 
     applyTheme(theme) {
         console.log('🎨 Theme changed to:', theme);
     },
 
-    handleUserManagementToggle(enabled) {
-        console.log(`👥 User management ${enabled ? 'enabled' : 'disabled'}`);
-    },
+
 
     reset() {
         console.log('🔄 Resetting settings to defaults...');
-        
+
         if (Object.keys(this.secureCredentials).length > 0) {
             if (confirm('This will also remove all encrypted credentials. Continue?')) {
                 this.secureCredentials = {};
@@ -1810,7 +1389,7 @@ const settingsManager = {
                 return;
             }
         }
-        
+
         this.settings = { ...this.defaultSettings };
         this.saveSettings();
         this.applyInitialSettings();
@@ -1818,7 +1397,7 @@ const settingsManager = {
 
     export() {
         const securityStatus = this.getSecurityStatus();
-        
+
         return {
             settings: this.settings,
             securityStatus: securityStatus,
@@ -1834,11 +1413,11 @@ const settingsManager = {
             const imported = JSON.parse(settingsJson);
             this.settings = { ...this.defaultSettings, ...imported.settings || imported };
             const saved = this.saveSettings();
-            
+
             if (saved) {
                 this.applyInitialSettings();
             }
-            
+
             return saved;
         } catch (error) {
             console.error('Error importing settings:', error);
@@ -1847,18 +1426,18 @@ const settingsManager = {
     },
 
     // Enhanced isUserManagementEnabled function
-	isUserManagementEnabled() {
-		// Synchronous check for backward compatibility
-		if (!this.settings) return false;
-		return this.settings['general.user_management_enabled'] === true;
-	},
+    isUserManagementEnabled() {
+        // Synchronous check for backward compatibility
+        if (!this.settings) return false;
+        return this.settings['general.user_management_enabled'] === true;
+    },
 
     // NEUE FUNKTION: Prüfe ob userManager AKTIV ist (unabhängig vom Setting)
     isUserManagerActive() {
-        return !!(window.userManager && 
-                  window.userManager.isInitialized && 
-                  window.storage && 
-                  typeof window.storage.getStorageKey === 'function');
+        return !!(window.userManager &&
+            window.userManager.isInitialized &&
+            window.storage &&
+            typeof window.storage.getStorageKey === 'function');
     },
 
     // Phase 2: Get OMERO Export Options
@@ -1869,10 +1448,10 @@ const settingsManager = {
                 useTemplateGroupsAsNamespaces: await this.get('omero.use_template_groups_as_namespaces'),
                 integrationLinksAsKeyValue: await this.get('omero.integration_links_as_keyvalue')
             };
-            
+
             console.log('🔬 Retrieved OMERO export options:', options);
             return options;
-            
+
         } catch (error) {
             console.error('❌ Error getting OMERO export options:', error);
             // Return safe defaults
@@ -1883,25 +1462,25 @@ const settingsManager = {
             };
         }
     },
-    
+
     // Enhanced OMERO dataset creation with Phase 2 support
     async createOMERODatasetEnhanced(projectName, metadata, options = {}) {
         if (!window.metaFoldOMEROIntegration) {
             return { success: false, message: 'MetaFold OMERO integration module not available' };
         }
-        
+
         try {
             console.log('🔬 settingsManager: Using enhanced OMERO integration...');
-            
+
             // Get export options and merge with provided options
             const exportOptions = await this.getOMEROExportOptions();
             const enhancedOptions = {
                 ...options,
                 ...exportOptions
             };
-            
+
             console.log('🔬 settingsManager: Enhanced options:', enhancedOptions);
-            
+
             // Use enhanced method if available
             if (window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced) {
                 return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProjectEnhanced(projectName, metadata, enhancedOptions);
@@ -1910,7 +1489,7 @@ const settingsManager = {
                 console.warn('⚠️ Enhanced integration not available, using standard method');
                 return await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(projectName, metadata, enhancedOptions);
             }
-            
+
         } catch (error) {
             console.error('❌ settingsManager: Error in enhanced OMERO dataset creation:', error);
             return {
@@ -1945,7 +1524,7 @@ const settingsManager = {
     async updatePasswordSystemConfig(config) {
         try {
             const updates = {};
-            
+
             if (config.enabled !== undefined) {
                 updates['security.password_system_enabled'] = config.enabled;
             }
@@ -1964,15 +1543,15 @@ const settingsManager = {
             if (config.allowPasswordReset !== undefined) {
                 updates['security.allow_password_reset'] = config.allowPasswordReset;
             }
-            
+
             // Apply updates
             for (const [key, value] of Object.entries(updates)) {
                 await this.set(key, value);
             }
-            
+
             console.log('✅ Password system configuration updated');
             return true;
-            
+
         } catch (error) {
             console.error('❌ Password system configuration update failed:', error);
             return false;
@@ -1992,7 +1571,7 @@ const settingsManager = {
             showPasswordStrength: true,
             allowPasswordReset: true
         };
-        
+
         return await this.updatePasswordSystemConfig(defaultConfig);
     },
 
@@ -2003,19 +1582,19 @@ const settingsManager = {
     validatePasswordSystemSettings() {
         const config = this.getPasswordSystemConfig();
         const issues = [];
-        
+
         if (config.passwordMinLength < 1 || config.passwordMinLength > 50) {
             issues.push('Password minimum length must be between 1 and 50 characters');
         }
-        
+
         if (config.autoLogoutMinutes < 0 || config.autoLogoutMinutes > 1440) {
             issues.push('Auto-logout must be between 0 and 1440 minutes (24 hours)');
         }
-        
+
         if (config.enabled && !window.secureStorage) {
             issues.push('Password system enabled but secure storage is not available');
         }
-        
+
         return {
             valid: issues.length === 0,
             issues: issues,
@@ -2031,7 +1610,7 @@ const settingsManager = {
      */
     getPasswordSystemSettingsForUI() {
         const config = this.getPasswordSystemConfig();
-        
+
         return {
             title: '🔐 Password System',
             description: 'Configure user password requirements and security settings',
@@ -2124,14 +1703,14 @@ const settingsManager = {
                         return true;
                     }
                     break;
-                    
+
                 case 'resetPasswordSystemDefaults':
                     const success = await this.resetPasswordSystemToDefaults();
                     if (success && window.app?.showSuccess) {
                         window.app.showSuccess('Password system settings reset to defaults');
                     }
                     return success;
-                    
+
                 default:
                     console.warn('Unknown password system action:', action);
                     return false;
@@ -2140,7 +1719,7 @@ const settingsManager = {
             console.error('Password system action failed:', error);
             return false;
         }
-        
+
         return false;
     },
 
@@ -2153,17 +1732,17 @@ const settingsManager = {
     async migrateToPasswordSystemSettings() {
         try {
             console.log('🔄 Migrating settings to include password system...');
-            
+
             let migrationNeeded = false;
             const passwordKeys = [
                 'security.password_system_enabled',
-                'security.require_admin_password', 
+                'security.require_admin_password',
                 'security.password_min_length',
                 'security.auto_logout_minutes',
                 'security.show_password_strength',
                 'security.allow_password_reset'
             ];
-            
+
             // Check if any password system settings are missing
             for (const key of passwordKeys) {
                 if (this.settings[key] === undefined) {
@@ -2171,7 +1750,7 @@ const settingsManager = {
                     break;
                 }
             }
-            
+
             if (migrationNeeded) {
                 // Add default password system settings
                 const defaults = {
@@ -2182,23 +1761,23 @@ const settingsManager = {
                     'security.show_password_strength': true,
                     'security.allow_password_reset': true
                 };
-                
+
                 for (const [key, defaultValue] of Object.entries(defaults)) {
                     if (this.settings[key] === undefined) {
                         this.settings[key] = defaultValue;
                         console.log(`🔄 Added default setting: ${key} = ${defaultValue}`);
                     }
                 }
-                
+
                 // Save migrated settings
                 await this.save();
                 console.log('✅ Settings migration completed');
             } else {
                 console.log('ℹ️ No password system settings migration needed');
             }
-            
+
             return true;
-            
+
         } catch (error) {
             console.error('❌ Settings migration failed:', error);
             return false;
@@ -2214,20 +1793,20 @@ const settingsManager = {
     async initWithPasswordSupport() {
         try {
             console.log('🔧 Initializing settings manager with password support...');
-            
+
             // Call original initialization
             if (this.init && typeof this.init === 'function') {
                 await this.init();
             }
-            
+
             // Perform password system migration if needed
             await this.migrateToPasswordSystemSettings();
-            
+
             // Validate password system settings
             const validation = this.validatePasswordSystemSettings();
             if (!validation.valid) {
                 console.warn('⚠️ Password system validation issues:', validation.issues);
-                
+
                 // Auto-fix common issues
                 if (validation.issues.some(issue => issue.includes('minimum length'))) {
                     await this.set('security.password_min_length', 3);
@@ -2236,9 +1815,9 @@ const settingsManager = {
                     await this.set('security.auto_logout_minutes', 30);
                 }
             }
-            
+
             console.log('✅ Settings manager initialized with password support');
-            
+
         } catch (error) {
             console.error('❌ Settings manager password support initialization failed:', error);
         }
@@ -2254,7 +1833,7 @@ const settingsManager = {
         // Check for explicit user preference (vs first-time setup)
         const hasUserPreference = localStorage.getItem('metafold_password_system_user_choice');
         const currentSetting = this.get('security.password_system_enabled');
-        
+
         return hasUserPreference === 'false' || currentSetting === false;
     },
 
@@ -2272,10 +1851,78 @@ const settingsManager = {
      * Get comprehensive password system status for debugging
      * @returns {Object} - Complete status information
      */
+    /**
+     * 🔐 Get secure credential
+     * @param {string} key - Credential key
+     * @returns {Promise<string>} - Decrypted credential
+     */
+    async getSecureCredential(key) {
+        // If secure storage is available, use it
+        if (this.isSecureStorageReady && window.secureStorage) {
+            try {
+                return await window.secureStorage.getItem(key);
+            } catch (error) {
+                console.warn(`🔐 Failed to retrieve ${key} from secure storage:`, error);
+                // Fallback to local storage if available (legacy)
+                return this.secureCredentials[key] || '';
+            }
+        }
+
+        // Fallback to memory store
+        return this.secureCredentials[key] || '';
+    },
+
+    /**
+     * 🔐 Set secure credential
+     * @param {string} key - Credential key
+     * @param {string} value - Credential value
+     * @returns {Promise<boolean>} - Success status
+     */
+    async setSecureCredential(key, value) {
+        // If secure storage is available, use it
+        if (this.isSecureStorageReady && window.secureStorage) {
+            try {
+                await window.secureStorage.setItem(key, value);
+                return true;
+            } catch (error) {
+                console.error(`🔐 Failed to save ${key} to secure storage:`, error);
+                return false;
+            }
+        }
+
+        // Fallback to memory store
+        this.secureCredentials[key] = value;
+        return this.saveSecureCredentials();
+    },
+
+    /**
+     * 🔐 Save secure credentials to local storage (fallback)
+     */
+    saveSecureCredentials() {
+        try {
+            const storageKey = window.storage ?
+                window.storage.getStorageKey('secure_credentials') :
+                'metafold_secure_credentials';
+
+            localStorage.setItem(storageKey, JSON.stringify(this.secureCredentials));
+            return true;
+        } catch (error) {
+            console.error('Error saving secure credentials:', error);
+            return false;
+        }
+    },
+
+
+
+
+
+    /**
+     * Get password system debug info
+     */
     getPasswordSystemDebugInfo() {
         const config = this.getPasswordSystemConfig();
         const validation = this.validatePasswordSystemSettings();
-        
+
         return {
             timestamp: new Date().toISOString(),
             configuration: config,
@@ -2294,7 +1941,7 @@ const settingsManager = {
      */
     debugPasswordSystem() {
         const debugInfo = this.getPasswordSystemDebugInfo();
-        
+
         console.log('🔐 Password System Debug Information:');
         console.log('=====================================');
         console.table(debugInfo.configuration);
@@ -2307,7 +1954,7 @@ const settingsManager = {
             adminExists: debugInfo.adminExists,
             totalUsers: debugInfo.totalUsers
         });
-        
+
         return debugInfo;
     },
 
@@ -2357,7 +2004,7 @@ const settingsManager = {
             if (config.color !== undefined) {
                 await this.set(`templates.${categoryId}_color`, config.color);
             }
-            
+
             console.log(`✅ Category ${categoryId} updated:`, config);
             return true;
         } catch (error) {
@@ -2378,10 +2025,10 @@ const settingsManager = {
             category3: { name: 'Action', icon: '⚡', color: '#10b981' },
             category4: { name: 'Misc', icon: '📋', color: '#f59e0b' }
         };
-        
+
         const defaultConfig = defaults[categoryId];
         if (!defaultConfig) return false;
-        
+
         return await this.updateCategory(categoryId, defaultConfig);
     },
 
@@ -2403,7 +2050,7 @@ const settingsManager = {
             console.error('Invalid category ID:', categoryId);
             return false;
         }
-        
+
         return await this.set('templates.active_category', categoryId);
     }
 

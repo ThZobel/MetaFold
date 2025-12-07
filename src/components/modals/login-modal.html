@@ -1,0 +1,63 @@
+<div id="loginModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="login-header">
+            <h2>
+                🚀 Welcome to MetaFold
+                <span id="loginLockIcon" class="login-lock-icon hidden">🔒</span>
+            </h2>
+            <button onclick="loginModal.showUserManagement()" class="manage-users-btn">
+                👥 Manage Users
+            </button>
+        </div>
+        <p id="welcomeMessage" class="welcome-message">
+            Enter your details to get started:
+        </p>
+
+        <!-- Last User Section (Dynamic Content) -->
+        <div id="lastUserSection" class="hidden">
+            <!-- Content injected by JS -->
+        </div>
+
+        <!-- Username Input Section -->
+        <div class="input-section">
+            <label id="usernameLabel" class="input-label">
+                👤 Your Name:
+            </label>
+            <div class="input-wrapper">
+                <input type="text" id="usernameInput" class="login-input" placeholder="e.g. Dr. Jane Smith"
+                    autocomplete="username">
+                <div id="userSuggestions" class="suggestions-dropdown"></div>
+            </div>
+            <small class="input-help">
+                💡 Groups can be assigned in user management
+            </small>
+        </div>
+
+        <!-- Password Section -->
+        <div id="passwordSection" class="input-section hidden">
+            <label class="input-label">
+                🔒 Password:
+            </label>
+            <div class="input-wrapper">
+                <input type="password" id="passwordInput" class="login-input password-input"
+                    placeholder="Enter your password" autocomplete="current-password" tabindex="2">
+                <button type="button" id="passwordToggle" class="password-toggle" tabindex="-1">👁️</button>
+            </div>
+            <small class="input-help">
+                🔐 Password protection is enabled for this system
+            </small>
+        </div>
+
+        <div class="login-btn-container">
+            <button id="loginConfirm" class="login-btn">
+                🚀 Let's Go!
+            </button>
+        </div>
+
+        <div class="login-footer">
+            <small id="securityMessage">
+                Your data stays local in your browser 🔒
+            </small>
+        </div>
+    </div>
+</div>

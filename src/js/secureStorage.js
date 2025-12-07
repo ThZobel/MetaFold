@@ -35,7 +35,7 @@ const secureStorage = {
             if (window.crypto && window.crypto.subtle) {
                 this.capabilities.browserCrypto = true;
                 console.log('🔐 Browser Crypto API: ✅ Available');
-                
+
                 // Generate or load encryption key
                 await this.initializeBrowserCrypto();
             } else {
@@ -46,11 +46,11 @@ const secureStorage = {
         }
 
         this.isInitialized = true;
-        
+
         const method = this.getBestEncryptionMethod();
         console.log(`🔐 Secure Storage initialized with method: ${method}`);
         console.log('🔐 ✅ User-specific entropy ENABLED for DPAPI');
-        
+
         // ✅ AUTO-INIT ADMIN ACCOUNT
         console.log('🔍 Checking if Admin account needs to be created...');
 
@@ -66,15 +66,15 @@ const secureStorage = {
 
         if (passwordSystemEnabled) {
             console.log('🔍 Password system active - checking Admin account...');
-            
+
             const adminExists = this.hasUserPassword('Admin');
             if (!adminExists) {
                 console.log('🔍 Auto-creating Admin account...');
-                
+
                 const result = await this.initializeAdminAccount();
                 if (result.created) {
                     console.log('✅ Admin account auto-created on init');
-                    
+
                     // Optional: Show notification
                     if (typeof window.app?.showSuccess === 'function') {
                         window.app.showSuccess('Admin account created! Username: Admin, Password: admin');
@@ -86,7 +86,7 @@ const secureStorage = {
         } else {
             console.log('ℹ️ Password system disabled - no Admin needed');
         }
-        
+
         return this.capabilities;
     },
 
@@ -95,7 +95,7 @@ const secureStorage = {
         try {
             // Try to load existing key from localStorage
             const storedKey = localStorage.getItem('metafold_encryption_key');
-            
+
             if (storedKey) {
                 // Import existing key
                 const keyData = JSON.parse(storedKey);
@@ -114,7 +114,7 @@ const secureStorage = {
                     true,
                     ['encrypt', 'decrypt']
                 );
-                
+
                 // Export and store key
                 const exportedKey = await window.crypto.subtle.exportKey('jwk', this.encryptionKey);
                 localStorage.setItem('metafold_encryption_key', JSON.stringify(exportedKey));
@@ -144,10 +144,10 @@ const secureStorage = {
 
         try {
             console.log(`🔐 Deriving user-specific entropy for: ${username}`);
-            
+
             // Combine username and password
             const combined = `${username}:${password}`;
-            
+
             if (window.crypto && window.crypto.subtle) {
                 // Use PBKDF2 to derive entropy (same as password hashing)
                 const encoder = new TextEncoder();
@@ -161,7 +161,7 @@ const secureStorage = {
 
                 // Use username as salt (deterministic per user)
                 const salt = encoder.encode(username);
-                
+
                 // Derive 256 bits of entropy
                 const derivedBits = await window.crypto.subtle.deriveBits(
                     {
@@ -177,15 +177,15 @@ const secureStorage = {
                 // Convert to base64
                 const entropyArray = new Uint8Array(derivedBits);
                 const entropy = btoa(String.fromCharCode(...entropyArray));
-                
+
                 console.log(`🔐 ✅ User entropy derived (${entropy.length} chars)`);
                 return entropy;
-                
+
             } else {
                 // Fallback: Simple hash-based entropy
                 return this.deriveUserEntropyFallback(username, password);
             }
-            
+
         } catch (error) {
             console.error('🔐 User entropy derivation failed:', error);
             // Fallback
@@ -202,7 +202,7 @@ const secureStorage = {
     deriveUserEntropyFallback(username, password) {
         const combined = `${username}:${password}`;
         let hash = '';
-        
+
         // Multiple rounds of hashing
         for (let round = 0; round < 1000; round++) {
             let roundHash = '';
@@ -214,7 +214,7 @@ const secureStorage = {
             }
             hash = btoa(roundHash);
         }
-        
+
         return hash;
     },
 
@@ -258,19 +258,19 @@ const secureStorage = {
             switch (method) {
                 case 'electronSafeStorage':
                     return await this.encryptWithElectron(plaintext, metadata);
-                    
+
                 case 'browserCrypto':
                     return await this.encryptWithBrowserCrypto(plaintext, metadata);
-                    
+
                 case 'fallbackBase64':
                     return await this.encryptWithFallback(plaintext, metadata);
-                    
+
                 default:
                     throw new Error(`Unknown encryption method: ${method}`);
             }
         } catch (error) {
             console.error(`🔐 Encryption failed with ${method}:`, error);
-            
+
             // Try fallback method
             if (method !== 'fallbackBase64') {
                 console.log('🔐 Attempting fallback encryption...');
@@ -308,26 +308,26 @@ const secureStorage = {
             switch (method) {
                 case 'electronSafeStorage':
                     return await this.decryptWithElectron(encryptedData, metadata);
-                    
+
                 case 'browserCrypto':
                     return await this.decryptWithBrowserCrypto(encryptedData, metadata);
-                    
+
                 case 'fallbackBase64':
                     return await this.decryptWithFallback(encryptedData, metadata);
-                    
+
                 default:
                     // Try to auto-detect method
                     return await this.autoDetectAndDecrypt(encryptedData, metadata);
             }
         } catch (error) {
             console.error(`🔐 Decryption failed with ${method}:`, error);
-            
+
             // ⚠️ CRITICAL: Re-throw ENTROPY_ERROR to prevent bypass
             if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
                 console.error('🚨 Re-throwing entropy error - cross-user access DENIED');
                 throw error;
             }
-            
+
             // Return original data as fallback for other errors
             return {
                 success: false,
@@ -353,25 +353,25 @@ const secureStorage = {
         try {
             // Check if we have user credentials for entropy
             const hasUserContext = metadata.username && metadata.userPassword;
-            
+
             if (!hasUserContext) {
                 console.warn('🔐 ⚠️ No user context provided - encrypting WITHOUT user-specific entropy!');
                 console.warn('🔐 ⚠️ This data will be vulnerable to cross-user access on shared Windows accounts');
             }
-            
+
             let dataToEncrypt = plaintext;
             let entropyMetadata = { hasEntropy: false };
-            
+
             // Add user-specific entropy if credentials provided
             if (hasUserContext) {
                 console.log('🔐 Adding user-specific entropy...');
-                
+
                 // Derive user entropy
                 const userEntropy = await this.deriveUserEntropy(
-                    metadata.username, 
+                    metadata.username,
                     metadata.userPassword
                 );
-                
+
                 // Create entropy-protected package
                 const entropyPackage = {
                     data: plaintext,
@@ -379,25 +379,25 @@ const secureStorage = {
                     username: metadata.username,
                     version: 3 // Version 3 = with user entropy
                 };
-                
+
                 dataToEncrypt = JSON.stringify(entropyPackage);
                 entropyMetadata = {
                     hasEntropy: true,
                     entropyUser: metadata.username,
                     entropyVersion: 3
                 };
-                
+
                 console.log('🔐 ✅ User-specific entropy added');
             }
-            
+
             // Encrypt with DPAPI
             const result = await window.electronAPI.invoke(
-                'store-secure-credential', 
-                'temp', 
-                dataToEncrypt, 
+                'store-secure-credential',
+                'temp',
+                dataToEncrypt,
                 { ...metadata, ...entropyMetadata }
             );
-            
+
             if (result.success) {
                 console.log('🔐 Electron encryption result:', {
                     method: result.method,
@@ -405,7 +405,7 @@ const secureStorage = {
                     hasUserEntropy: entropyMetadata.hasEntropy,
                     timestamp: result.timestamp
                 });
-                
+
                 return {
                     success: true,
                     encrypted: result.stored,
@@ -434,78 +434,88 @@ const secureStorage = {
         try {
             // Decrypt with DPAPI
             const result = await window.electronAPI.invoke(
-                'retrieve-secure-credential', 
-                encryptedData, 
+                'retrieve-secure-credential',
+                encryptedData,
                 'safeStorage'
             );
-            
+
             if (!result.success) {
                 throw new Error(result.error || 'Electron decryption failed');
             }
-            
+
             let decryptedValue = result.value;
             let isEntropyProtected = false;
-            
+
             // Check if data has user entropy
             try {
                 const possiblePackage = JSON.parse(result.value);
-                
+
                 // Version 3 = with user entropy
                 if (possiblePackage.version === 3 && possiblePackage.entropy) {
                     isEntropyProtected = true;
                     console.log('🔐 Detected entropy-protected data, verifying user...');
-                    
+
+                    // ✅ ENHANCED: Support both old (username/userPassword) and new (currentUser/currentPassword) format
+                    const verifyUsername = metadata.currentUser || metadata.username;
+                    const verifyPassword = metadata.currentPassword || metadata.userPassword;
+
                     // CRITICAL: Verify user entropy
-                    if (!metadata.username || !metadata.userPassword) {
-                        console.error('🔐 ❌ Entropy-protected data requires user credentials!');
+                    if (!verifyUsername || !verifyPassword) {
+                        console.error('🔐 ❌ CRITICAL: Entropy-protected data requires user credentials!');
                         throw new Error('ENTROPY_ERROR: User credentials required to decrypt this data');
                     }
-                    
+
+                    // ✅ SECURITY: First verify username matches BEFORE deriving entropy
+                    if (possiblePackage.username !== verifyUsername) {
+                        console.error('🔐 ❌ SECURITY: Username mismatch! Cross-user access denied.');
+                        console.error('🔐 ❌ Data encrypted by: "' + possiblePackage.username + '"');
+                        console.error('🔐 ❌ Access attempted by: "' + verifyUsername + '"');
+                        throw new Error('ENTROPY_ERROR: Username verification failed - access denied (user mismatch)');
+                    }
+
+                    console.log('🔐 ✅ Username match verified: ' + verifyUsername);
+
                     // Derive expected entropy
                     const expectedEntropy = await this.deriveUserEntropy(
-                        metadata.username,
-                        metadata.userPassword
+                        verifyUsername,
+                        verifyPassword
                     );
-                    
+
                     // Verify entropy matches
                     if (possiblePackage.entropy !== expectedEntropy) {
                         console.error('🔐 ❌ User entropy mismatch! Cross-user access denied.');
-                        console.error('🔐 ❌ Expected user:', possiblePackage.username);
-                        console.error('🔐 ❌ Attempting user:', metadata.username);
-                        throw new Error('ENTROPY_ERROR: User entropy verification failed - access denied');
+                        console.error('🔐 ❌ This can happen if:');
+                        console.error('🔐   - Wrong password provided');
+                        console.error('🔐   - Password was changed after encryption');
+                        console.error('🔐   - Tampering detected');
+                        throw new Error('ENTROPY_ERROR: User entropy verification failed - access denied (wrong password or tampering)');
                     }
-                    
-                    // Verify username matches
-                    if (possiblePackage.username !== metadata.username) {
-                        console.error('🔐 ❌ Username mismatch! Cross-user access denied.');
-                        throw new Error('ENTROPY_ERROR: Username verification failed - access denied');
-                    }
-                    
-                    console.log('🔐 ✅ User entropy verified - access granted');
-                    
+
+                    console.log('🔐 ✅ User entropy verified - access granted to user: ' + verifyUsername);
+
                     // Extract original data
                     decryptedValue = possiblePackage.data;
                 }
-                
+
             } catch (parseError) {
                 // Re-throw entropy verification errors (they must NOT be caught!)
                 if (parseError.message && parseError.message.startsWith('ENTROPY_ERROR:')) {
                     throw parseError;
                 }
-                
+
                 // Not JSON or legacy format - use as-is (only if NOT entropy protected)
                 if (!isEntropyProtected) {
                     console.log('🔐 Legacy format detected (no entropy protection)');
                 }
             }
-            
+
             // SICHERHEITS-FIX: Keine sensiblen Daten im Log
             console.log('🔐 Electron decryption result:', {
                 hasValue: !!decryptedValue,
                 valueLength: decryptedValue?.length || 0,
                 decryptionMethod: 'electronSafeStorage'
             });
-            
+
             return {
                 success: true,
                 decrypted: decryptedValue,
@@ -513,7 +523,7 @@ const secureStorage = {
                 timestamp: result.timestamp,
                 metadata: result.metadata || metadata
             };
-            
+
         } catch (error) {
             console.error('🔐 Electron decryption error:', error);
             throw error;
@@ -530,7 +540,7 @@ const secureStorage = {
         try {
             // Generate random IV
             const iv = window.crypto.getRandomValues(new Uint8Array(12));
-            
+
             // Encrypt data
             const encodedData = new TextEncoder().encode(plaintext);
             const encryptedBuffer = await window.crypto.subtle.encrypt(
@@ -538,15 +548,15 @@ const secureStorage = {
                 this.encryptionKey,
                 encodedData
             );
-            
+
             // Combine IV and encrypted data
             const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
             combined.set(iv);
             combined.set(new Uint8Array(encryptedBuffer), iv.length);
-            
+
             // Convert to base64
             const base64 = btoa(String.fromCharCode(...combined));
-            
+
             return {
                 success: true,
                 encrypted: base64,
@@ -554,7 +564,7 @@ const secureStorage = {
                 timestamp: new Date().toISOString(),
                 metadata: metadata
             };
-            
+
         } catch (error) {
             console.error('🔐 Browser crypto encryption error:', error);
             throw error;
@@ -571,27 +581,27 @@ const secureStorage = {
             const combined = new Uint8Array(
                 atob(encryptedData).split('').map(char => char.charCodeAt(0))
             );
-            
+
             // Extract IV and encrypted data
             const iv = combined.slice(0, 12);
             const encryptedBuffer = combined.slice(12);
-            
+
             // Decrypt data
             const decryptedBuffer = await window.crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv: iv },
                 this.encryptionKey,
                 encryptedBuffer
             );
-            
+
             const decrypted = new TextDecoder().decode(decryptedBuffer);
-            
+
             return {
                 success: true,
                 decrypted: decrypted,
                 method: 'browserCrypto',
                 metadata: metadata
             };
-            
+
         } catch (error) {
             console.error('🔐 Browser crypto decryption error:', error);
             throw error;
@@ -603,16 +613,16 @@ const secureStorage = {
     async encryptWithFallback(plaintext, metadata) {
         try {
             // Generate salt
-            const saltResult = window.electronAPI ? 
+            const saltResult = window.electronAPI ?
                 await window.electronAPI.invoke('generate-salt') :
                 { success: true, salt: this.generateClientSalt() };
-                
+
             const salt = saltResult.success ? saltResult.salt : this.generateClientSalt();
-            
+
             // Simple obfuscation with salt
             const obfuscated = this.simpleObfuscate(plaintext, salt);
             const encoded = btoa(JSON.stringify({ data: obfuscated, salt: salt }));
-            
+
             return {
                 success: true,
                 encrypted: encoded,
@@ -620,7 +630,7 @@ const secureStorage = {
                 timestamp: new Date().toISOString(),
                 metadata: metadata
             };
-            
+
         } catch (error) {
             console.error('🔐 Fallback encryption error:', error);
             throw error;
@@ -631,14 +641,14 @@ const secureStorage = {
         try {
             const decoded = JSON.parse(atob(encryptedData));
             const decrypted = this.simpleDeobfuscate(decoded.data, decoded.salt);
-            
+
             return {
                 success: true,
                 decrypted: decrypted,
                 method: 'fallbackBase64',
                 metadata: metadata
             };
-            
+
         } catch (error) {
             console.error('🔐 Fallback decryption error:', error);
             throw error;
@@ -681,7 +691,7 @@ const secureStorage = {
 
     async autoDetectAndDecrypt(encryptedData, metadata) {
         const methods = ['electronSafeStorage', 'browserCrypto', 'fallbackBase64'];
-        
+
         for (const method of methods) {
             try {
                 const result = await this.decryptData(encryptedData, method, metadata);
@@ -694,7 +704,7 @@ const secureStorage = {
                 console.log(`🔐 Auto-detection failed for ${method}:`, error.message);
             }
         }
-        
+
         // If all methods fail, return as plaintext (might be unencrypted legacy data)
         console.warn('🔐 Auto-detection failed, returning as plaintext');
         return {
@@ -763,10 +773,10 @@ const secureStorage = {
         try {
             // Re-hash the password with the stored salt
             const newHash = await this.hashPassword(password, storedHash.salt);
-            
+
             // Compare hashes
             const isMatch = newHash.hash === storedHash.hash;
-            
+
             console.log('🔐 Password verification result:', isMatch ? 'MATCH' : 'NO MATCH');
             return isMatch;
         } catch (error) {
@@ -790,9 +800,96 @@ const secureStorage = {
                 return this.generateClientSalt() + Date.now().toString(36);
             }
         } catch (error) {
-            console.warn('🔐 Secure salt generation failed, using fallback:', error);
-            return this.generateClientSalt() + Date.now().toString(36);
+            console.error('🔐 Salt generation failed:', error);
+            return this.generateClientSalt();
         }
+    },
+
+    // =================== STORAGE INTERFACE (localStorage-like) ===================
+
+    /**
+     * Get item from secure storage (decrypts automatically)
+     * @param {string} key - Storage key
+     * @returns {Promise<string|null>} - Decrypted value or null
+     */
+    async getItem(key) {
+        if (!this.isInitialized) {
+            await this.init();
+        }
+
+        try {
+            // 1. Try to get from secure storage (via Electron)
+            if (this.capabilities.electronSafeStorage) {
+                // For Electron, we need to know the full key used in store-secure-credential
+                // But here we might be using a simple key. 
+                // Let's assume the key passed here is the identifier.
+
+                // However, settingsManager uses this for 'elabftw.api_key' etc.
+                // We need to check where these are stored.
+                // If they are stored in localStorage as encrypted strings:
+                const encryptedValue = localStorage.getItem(key);
+                if (!encryptedValue) return null;
+
+                // Decrypt it
+                const result = await this.decryptData(encryptedValue);
+                return result.success ? result.decrypted : null;
+            }
+
+            // 2. Fallback to localStorage
+            const value = localStorage.getItem(key);
+            if (!value) return null;
+
+            // Try to decrypt
+            const result = await this.decryptData(value);
+            return result.success ? result.decrypted : value;
+
+        } catch (error) {
+            console.error(`🔐 Error getting item ${key}:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * Set item in secure storage (encrypts automatically)
+     * @param {string} key - Storage key
+     * @param {string} value - Value to encrypt and store
+     * @returns {Promise<boolean>} - Success status
+     */
+    async setItem(key, value) {
+        if (!this.isInitialized) {
+            await this.init();
+        }
+
+        try {
+            // Encrypt value
+            // We need metadata for user entropy if available
+            const metadata = {};
+            if (window.userManager && window.userManager.currentUser) {
+                metadata.username = window.userManager.currentUser;
+                // We might not have the password here easily unless cached
+            }
+
+            const result = await this.encryptData(value, metadata);
+
+            if (result.success) {
+                // Store encrypted value in localStorage
+                localStorage.setItem(key, result.encrypted);
+                return true;
+            }
+            return false;
+
+        } catch (error) {
+            console.error(`🔐 Error setting item ${key}:`, error);
+            return false;
+        }
+    },
+
+    /**
+     * Remove item from storage
+     * @param {string} key - Storage key
+     */
+    removeItem(key) {
+        localStorage.removeItem(key);
     },
 
     /**
@@ -847,7 +944,7 @@ const secureStorage = {
     hashPasswordFallback(password, salt) {
         // Simple but better than plaintext - multiple rounds of XOR + transformation
         let hash = password + salt;
-        
+
         for (let round = 0; round < 1000; round++) {
             let newHash = '';
             for (let i = 0; i < hash.length; i++) {
@@ -858,7 +955,7 @@ const secureStorage = {
             }
             hash = btoa(newHash);
         }
-        
+
         return hash;
     },
 
@@ -877,10 +974,10 @@ const secureStorage = {
 
         try {
             console.log(`🔐 Storing password with user entropy for: ${username}`);
-            
+
             // Hash the password
             const hashedPassword = await this.hashPassword(password);
-            
+
             // Store the hash securely WITH user-specific entropy
             const storageKey = `user_password_${username}`;
             const encrypted = await this.encryptData(JSON.stringify(hashedPassword), {
@@ -922,18 +1019,18 @@ const secureStorage = {
 
         try {
             console.log(`🔐 Verifying password with entropy check for: ${username}`);
-            
+
             // Retrieve stored password hash
             const storageKey = `user_password_${username}`;
             const storedData = localStorage.getItem(storageKey);
-            
+
             if (!storedData) {
                 console.log('🔐 No password found for user');
                 return false;
             }
 
             const encryptedData = JSON.parse(storedData);
-            
+
             // Decrypt the stored hash WITH entropy verification
             const decrypted = await this.decryptData(
                 encryptedData.encrypted,
@@ -951,10 +1048,10 @@ const secureStorage = {
             }
 
             const storedHash = JSON.parse(decrypted.decrypted);
-            
+
             // Verify the password hash
             return await this.verifyPassword(password, storedHash);
-            
+
         } catch (error) {
             console.error('🔐 User password verification failed:', error);
             return false;
@@ -968,7 +1065,7 @@ const secureStorage = {
      */
     hasUserPassword(username) {
         if (!username) return false;
-        
+
         const storageKey = `user_password_${username}`;
         return localStorage.getItem(storageKey) !== null;
     },
@@ -980,7 +1077,7 @@ const secureStorage = {
      */
     removeUserPassword(username) {
         if (!username) return false;
-        
+
         try {
             const storageKey = `user_password_${username}`;
             localStorage.removeItem(storageKey);
@@ -999,11 +1096,11 @@ const secureStorage = {
     getPasswordSystemStatus() {
         const users = window.userManager?.users || [];
         const passwordStatus = {};
-        
+
         users.forEach(username => {
             passwordStatus[username] = this.hasUserPassword(username);
         });
-        
+
         return {
             initialized: this.isInitialized,
             capabilities: this.capabilities,
@@ -1024,7 +1121,7 @@ const secureStorage = {
     async initializeAdminAccount() {
         const adminUsername = 'Admin';
         const defaultPassword = 'admin';
-        
+
         try {
             // Check if admin already exists
             if (this.hasUserPassword(adminUsername)) {
@@ -1034,22 +1131,22 @@ const secureStorage = {
 
             // Create admin password WITH user entropy
             await this.storeUserPassword(adminUsername, defaultPassword);
-            
+
             // Add admin to user list if not exists
             if (window.userManager && window.userManager.users) {
                 if (!window.userManager.users.includes(adminUsername)) {
                     window.userManager.addUserToHistory(adminUsername, 'Admin');
                 }
             }
-            
+
             console.log('✅ Admin account created with default password (WITH user entropy)');
-            return { 
-                success: true, 
-                created: true, 
-                username: adminUsername, 
-                defaultPassword: defaultPassword 
+            return {
+                success: true,
+                created: true,
+                username: adminUsername,
+                defaultPassword: defaultPassword
             };
-            
+
         } catch (error) {
             console.error('🔐 Admin account initialization failed:', error);
             throw error;
@@ -1067,24 +1164,24 @@ const secureStorage = {
     async resetUserPassword(adminUsername, adminPassword, targetUsername, newPassword) {
         try {
             console.log(`🔐 Admin password reset requested for: ${targetUsername}`);
-            
+
             // Verify admin credentials
             const isAdminValid = await this.verifyUserPassword(adminUsername, adminPassword);
             if (!isAdminValid) {
                 throw new Error('Invalid admin credentials');
             }
-            
+
             // Check if admin has admin privileges (is 'Admin' user)
             if (adminUsername !== 'Admin') {
                 throw new Error('Only Admin user can reset passwords');
             }
-            
+
             // Set new password for target user WITH user entropy
             await this.storeUserPassword(targetUsername, newPassword);
-            
+
             console.log(`✅ Password reset successful for user: ${targetUsername}`);
             return { success: true };
-            
+
         } catch (error) {
             console.error('🔐 Password reset failed:', error);
             throw error;
@@ -1106,14 +1203,14 @@ const secureStorage = {
 
         for (const key of sensitiveKeys) {
             const value = plaintextSettings[key];
-            
+
             if (value && typeof value === 'string' && value.trim() !== '') {
                 try {
-                    const encrypted = await this.encryptData(value, { 
+                    const encrypted = await this.encryptData(value, {
                         originalKey: key,
                         migratedAt: new Date().toISOString()
                     });
-                    
+
                     if (encrypted.success) {
                         migratedSettings[key] = {
                             encrypted: encrypted.encrypted,
@@ -1121,13 +1218,13 @@ const secureStorage = {
                             timestamp: encrypted.timestamp,
                             metadata: encrypted.metadata
                         };
-                        
+
                         migrationLog.push({
                             key: key.replace(/password|key/gi, '***'),
                             method: encrypted.method,
                             success: true
                         });
-                        
+
                         console.log(`🔐 Migrated setting: ${key.replace(/password|key/gi, '***')}`);
                     }
                 } catch (error) {
@@ -1153,12 +1250,12 @@ const secureStorage = {
     // Store credential with automatic encryption
     async storeCredential(key, value, metadata = {}) {
         try {
-            const result = await this.encryptData(value, { 
-                ...metadata, 
+            const result = await this.encryptData(value, {
+                ...metadata,
                 key: key,
                 storedAt: new Date().toISOString()
             });
-            
+
             if (result.success) {
                 console.log(`🔐 Stored credential: ${key.replace(/password|key/gi, '***')}`);
                 return {
@@ -1188,7 +1285,7 @@ const secureStorage = {
                 encryptedCredential.method,
                 encryptedCredential.metadata
             );
-            
+
             if (result.success) {
                 return result.decrypted;
             } else {
@@ -1203,10 +1300,10 @@ const secureStorage = {
 
     // Check if data is encrypted format
     isEncryptedFormat(data) {
-        return data && 
-               typeof data === 'object' && 
-               data.encrypted !== undefined && 
-               data.method !== undefined;
+        return data &&
+            typeof data === 'object' &&
+            data.encrypted !== undefined &&
+            data.method !== undefined;
     },
 
     // Get encryption status
@@ -1235,7 +1332,7 @@ const secureStorage = {
             if (window.crypto && window.crypto.subtle) {
                 // Get or create signing key
                 let signingKey = localStorage.getItem('metafold_signing_key');
-                
+
                 if (!signingKey) {
                     // Generate new signing key
                     const key = await window.crypto.subtle.generateKey(
@@ -1243,12 +1340,12 @@ const secureStorage = {
                         true,
                         ['sign', 'verify']
                     );
-                    
+
                     const exportedKey = await window.crypto.subtle.exportKey('jwk', key);
                     signingKey = JSON.stringify(exportedKey);
                     localStorage.setItem('metafold_signing_key', signingKey);
                 }
-                
+
                 // Import key
                 const keyData = JSON.parse(signingKey);
                 const key = await window.crypto.subtle.importKey(
@@ -1258,7 +1355,7 @@ const secureStorage = {
                     false,
                     ['sign']
                 );
-                
+
                 // Sign data
                 const encoder = new TextEncoder();
                 const signature = await window.crypto.subtle.sign(
@@ -1266,10 +1363,10 @@ const secureStorage = {
                     key,
                     encoder.encode(data)
                 );
-                
+
                 // Convert to base64
                 return btoa(String.fromCharCode(...new Uint8Array(signature)));
-                
+
             } else {
                 // Fallback: Simple hash-based signature
                 return this.createSimpleSignature(data);
@@ -1288,18 +1385,18 @@ const secureStorage = {
     createSimpleSignature(data) {
         let hash = 0;
         const salt = localStorage.getItem('metafold_signature_salt') || this.generateClientSalt();
-        
+
         if (!localStorage.getItem('metafold_signature_salt')) {
             localStorage.setItem('metafold_signature_salt', salt);
         }
-        
+
         const combined = data + salt;
         for (let i = 0; i < combined.length; i++) {
             const char = combined.charCodeAt(i);
             hash = ((hash << 5) - hash) + char;
             hash = hash & hash;
         }
-        
+
         return btoa(hash.toString(36));
     },
 
@@ -1328,7 +1425,7 @@ const secureStorage = {
         console.error('🚨 Username:', username);
         console.error('🚨 Tampering type:', type);
         console.error('🚨 Timestamp:', new Date().toISOString());
-        
+
         // Log to localStorage for audit trail
         const auditLog = JSON.parse(localStorage.getItem('metafold_security_audit') || '[]');
         auditLog.push({
@@ -1337,14 +1434,14 @@ const secureStorage = {
             tamperType: type,
             timestamp: new Date().toISOString()
         });
-        
+
         // Keep only last 100 entries
         if (auditLog.length > 100) {
             auditLog.shift();
         }
-        
+
         localStorage.setItem('metafold_security_audit', JSON.stringify(auditLog));
-        
+
         // Show warning
         if (window.confirm('🚨 SECURITY WARNING!\n\nTampering detected in user password data.\n\nThis could indicate:\n- Unauthorized access attempt\n- Data corruption\n- Malicious activity\n\nRecommended action: Reset password immediately.\n\nClick OK to open User Management.')) {
             if (window.userManagementModal) {

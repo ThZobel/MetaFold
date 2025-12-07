@@ -286,6 +286,81 @@ const omeroAuth = {
 
     // =================== AUTHENTICATION METHODS ===================
 
+    /**
+     * NEW: Get OMERO password - either from storage or prompt
+     * ❌ SECURITY: NEVER use stored password if "Don't save" is enabled!
+     * @returns {Promise<string|null>}
+     */
+    async getPassword() {
+        try {
+            // ✅ CRITICAL: Check if "don't save password" is enabled
+            const dontSave = await window.settingsManager?.getDontSaveOmeroPassword?.() || false;
+            
+            console.log('🔐 Getting password - Don\'t save enabled:', dontSave);
+            
+            if (dontSave) {
+                console.log('🔐 Don\'t save password is enabled - using session or prompt');
+                
+                // Check session password first
+                if (window.omeroPasswordPrompt?.hasSessionPassword?.()) {
+                    console.log('🔐 Using session password');
+                    return window.omeroPasswordPrompt.getSessionPassword();
+                }
+                
+                // ❌ SECURITY: Do NOT check stored password - it should be deleted!
+                // Verify that stored password is actually empty
+                const storedPassword = await window.settingsManager.get('omero.password');
+                if (storedPassword && storedPassword.trim() !== '') {
+                    console.error('🚨 SECURITY ALERT: Stored password found despite "Don\'t save" being enabled!');
+                    console.error('🚨 This is a security bug - password should have been deleted!');
+                    console.error('🚨 Ignoring stored password for security...');
+                }
+                
+                // No session password - prompt user
+                console.log('🔐 No session password - prompting user');
+                const username = await window.settingsManager.get('omero.username') || 'unknown';
+                
+                try {
+                    const password = await window.omeroPasswordPrompt.show(
+                        username, 
+                        'Login'
+                    );
+                    return password;
+                } catch (error) {
+                    console.log('ℹ️ User cancelled password prompt');
+                    return null;
+                }
+            } else {
+                // "Don't save" is NOT enabled - use stored password
+                console.log('🔐 Using stored password (Don\'t save is disabled)');
+                const password = await window.settingsManager.get('omero.password');
+                
+                if (!password || password.trim() === '') {
+                    console.log('🔐 No stored password - prompting user');
+                    const username = await window.settingsManager.get('omero.username') || 'unknown';
+                    
+                    try {
+                        const password = await window.omeroPasswordPrompt.show(
+                            username, 
+                            'Login'
+                        );
+                        return password;
+                    } catch (error) {
+                        console.log('ℹ️ User cancelled password prompt');
+                        return null;
+                    }
+                }
+                
+                return password;
+            }
+        } catch (error) {
+            console.error('❌ Error getting password:', error);
+            return null;
+        }
+    },
+
+    // =================== AUTHENTICATION METHODS ===================
+
     // Enhanced Login with multi-university support - SIMPLIFIED
     async loginWithCredentials(username, password) {
         console.log('🔬 === OMERO MULTI-UNI LOGIN (CSRF FIXED) ===');
@@ -622,18 +697,27 @@ const omeroAuth = {
         console.log('🔬 Username:', username || 'not provided');
         console.log('🔬 Server:', this.baseUrl);
         
-        // Strategy 1: Try session cookie recovery first
-        try {
-            console.log('🔬 Strategy 1: Session cookie recovery...');
-            await this.establishSessionFromCookies();
-            console.log('✅ Session recovered from existing cookies');
-            return {
-                success: true,
-                session: this.session,
-                loginMethod: 'Cookie Recovery (Enhanced)'
-            };
-        } catch (cookieError) {
-            console.log('🔬 Cookie recovery failed:', cookieError.message);
+        // ✅ SECURITY FIX: Check if "Don't save password" is enabled FIRST!
+        const dontSave = await window.settingsManager?.getDontSaveOmeroPassword?.() || false;
+        console.log('🔐 Security check - Don\'t save password enabled:', dontSave);
+        
+        // Strategy 1: Try session cookie recovery first (ONLY if "Don't save" is NOT enabled)
+        if (!dontSave) {
+            try {
+                console.log('🔬 Strategy 1: Session cookie recovery...');
+                await this.establishSessionFromCookies();
+                console.log('✅ Session recovered from existing cookies');
+                return {
+                    success: true,
+                    session: this.session,
+                    loginMethod: 'Cookie Recovery (Enhanced)'
+                };
+            } catch (cookieError) {
+                console.log('🔬 Cookie recovery failed:', cookieError.message);
+            }
+        } else {
+            console.log('🔐 SECURITY: Skipping session cookie recovery (Don\'t save password enabled)');
+            console.log('🔐 User must provide credentials for every login');
         }
         
         // Strategy 2: Username/Password login
@@ -642,9 +726,51 @@ const omeroAuth = {
             return await this.loginWithCredentials(username, password);
         }
         
-        // Strategy 3: Public group fallback
-        console.log('🔬 Strategy 3: Public group fallback...');
-        return await this.loginPublicGroup();
+        // ✅ NEW: Strategy 2.5: Try to get password if not provided
+        if (username && !password) {
+            console.log('🔬 Strategy 2.5: Getting password (stored or prompt)...');
+            const retrievedPassword = await this.getPassword();
+            
+            if (retrievedPassword) {
+                console.log('🔬 Password obtained, attempting login...');
+                return await this.loginWithCredentials(username, retrievedPassword);
+            } else {
+                console.log('⚠️ No password available (user may have cancelled)');
+                // ❌ REMOVED: No fallback to public group!
+                throw new Error('Password required for OMERO login. Login cancelled by user.');
+            }
+        }
+        
+        // ✅ NEW: Strategy 2.75: No username provided - prompt for BOTH username and password
+        if (!username) {
+            console.log('🔬 Strategy 2.75: No username - prompting for credentials...');
+            
+            // Check if prompt supports username input
+            if (window.omeroPasswordPrompt?.showWithUsernamePrompt) {
+                try {
+                    const credentials = await window.omeroPasswordPrompt.showWithUsernamePrompt();
+                    
+                    if (credentials && credentials.username && credentials.password) {
+                        console.log('🔬 Credentials obtained via prompt, attempting login...');
+                        return await this.loginWithCredentials(credentials.username, credentials.password);
+                    }
+                } catch (promptError) {
+                    console.log('⚠️ Credential prompt cancelled or failed:', promptError.message);
+                    // ❌ REMOVED: No fallback to public group!
+                    throw new Error('Login cancelled by user. Please provide credentials to connect to OMERO.');
+                }
+            } else {
+                console.warn('⚠️ Password prompt does not support username input');
+                console.warn('🚨 Please configure OMERO username in settings first');
+                
+                throw new Error('OMERO username not configured. Please set it in Settings.');
+            }
+        }
+        
+        // ❌ SECURITY FIX: NO PUBLIC GROUP FALLBACK!
+        // If we reach here, login failed - do NOT connect!
+        console.error('🚨 SECURITY: Login failed - no credentials provided');
+        throw new Error('OMERO login failed: No valid credentials provided. Please configure username and password in Settings.');
     },
 
     // =================== SESSION MANAGEMENT ===================
@@ -694,6 +820,14 @@ const omeroAuth = {
         return sessionAge < this.options.sessionTimeout;
     },
 
+    /**
+     * NEW: Check if there is an active OMERO session
+     * @returns {boolean} True if session exists and is valid
+     */
+    hasActiveSession() {
+        return this.isSessionValid();
+    },
+
     async ensureSession(username, password) {
         if (!this.isSessionValid()) {
             await this.login(username, password);
@@ -702,6 +836,8 @@ const omeroAuth = {
     },
 
     async logout() {
+        console.log('🔬 Logging out from OMERO...');
+        
         if (this.session) {
             if (this.session.isAuthenticated && this.session.csrfToken) {
                 try {
@@ -720,6 +856,17 @@ const omeroAuth = {
             this.session = null;
             console.log('🔬 Session cleared');
         }
+        
+        // NEW: Clear session password
+        if (window.omeroPasswordPrompt?.clearSession) {
+            window.omeroPasswordPrompt.clearSession();
+            console.log('🔐 Session password cleared');
+        }
+        
+        return {
+            success: true,
+            message: 'Logged out successfully'
+        };
     },
 
     // =================== UTILITY METHODS ===================
@@ -742,6 +889,63 @@ const omeroAuth = {
             return {
                 success: false,
                 message: this.analyzeConnectionError(error)
+            };
+        }
+    },
+
+    /**
+     * NEW: Test connection with login (uses password prompt if needed)
+     * @param {string} username - OMERO username (optional, will get from settings)
+     * @returns {Promise<Object>} Connection test result
+     */
+    async testConnectionWithLogin(username = null) {
+        try {
+            console.log('🔬 Testing OMERO connection with login...');
+            
+            // Get username from settings if not provided
+            if (!username) {
+                username = await window.settingsManager.get('omero.username');
+                if (!username) {
+                    throw new Error('No username configured');
+                }
+            }
+            
+            // Get password (will prompt if needed)
+            const password = await this.getPassword();
+            if (!password) {
+                throw new Error('Password required for test connection');
+            }
+            
+            // Attempt login
+            const loginResult = await this.loginWithCredentials(username, password);
+            
+            if (loginResult.success) {
+                return {
+                    success: true,
+                    message: `Successfully connected as ${username}`,
+                    details: {
+                        username: username,
+                        loginMethod: loginResult.loginMethod,
+                        hasSession: !!this.session,
+                        projectCount: loginResult.projectCount || 0
+                    }
+                };
+            } else {
+                throw new Error('Login failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Test connection with login failed:', error);
+            
+            // Clear failed session password
+            if (window.omeroPasswordPrompt?.clearSession) {
+                window.omeroPasswordPrompt.clearSession();
+            }
+            
+            return {
+                success: false,
+                message: this.analyzeConnectionError(error),
+                error: error.message
             };
         }
     },

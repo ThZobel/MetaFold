@@ -6,7 +6,7 @@
 
 MetaFold simplifies laboratory data management through easy-to-use templates that create **reproducible metadata**.  
 It reduces manual steps by automatically generating folder structures and metadata files at multiple locations simultaneously.  
-Thanks to its **integration with OMERO and ELNs**, microscopy data can be automatically imported based on the existing metadata — saving researchers significant time and effort.
+Thanks to its **integration with OMERO, ELNs, and RSpace**, microscopy data can be automatically imported based on the existing metadata — saving researchers significant time and effort.
 
 - [⚠️ Development Status: PROTOTYPE](#️-development-status-prototype)
 - [✨ Key Features](#-key-features)
@@ -49,7 +49,7 @@ Thanks to its **integration with OMERO and ELNs**, microscopy data can be automa
 🗂️ **Template-Based Project Creation**
 - Create standardized folder structures and metadata forms from configurable templates
 - Create .json and .html metadata files.
-- Sent your metadata to different systems like electronical lan notebooks (elabFTW) and special Databases (OMERO).
+- Send your metadata to different systems like electronic lab notebooks (elabFTW, RSpace) and special Databases (OMERO).
 
 👥 **Multi-User Support**
 - Secure user and group management with credential storage
@@ -57,9 +57,10 @@ Thanks to its **integration with OMERO and ELNs**, microscopy data can be automa
 - Group-based access control
 
 🔗 **Laboratory Integrations**
-- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata sync 
+- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata based on templates
+- **[RSpace](https://www.researchspace.com/)**: Direct experiment creation with metadata based on templates
 - **[OMERO](https://www.openmicroscopy.org/index.html)**: Dataset creation with map annotations / metadata annotation
-- Directly linking off all intergrations 
+- Directly linking of all integrations 
 
 📊 **Project Discovery & Visualization**
 - Recursive scanning of existing projects
@@ -185,7 +186,7 @@ To manage users and their passwords, switch to the Admin user (the default passw
 Define reusable project structures with:
 - Custom folder hierarchies
 - Metadata schemas with validation
-- Integration settings for elabFTW/OMERO
+- Integration settings for elabFTW/RSpace/OMERO
 
 ### Projects
 Create standardized experiments with:

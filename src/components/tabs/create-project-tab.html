@@ -1,0 +1,473 @@
+<div id="templateDetails" style="display: none;">
+    <div class="project-setup enhanced-setup">
+        <div class="setup-header">
+            <h3>🎯 Project Configuration</h3>
+            <p>Configure your project location and details</p>
+        </div>
+
+        <!-- JavaScript für elabFTW Category Auto-Save -->
+        <script>
+            /**
+             * Save the current elabFTW category to the active template
+             */
+            async function saveElabFTWCategoryToTemplate() {
+                if (!window.templateManager?.currentTemplate?.isOwn) {
+                    console.log('ℹ️ Cannot save category to shared template');
+                    return;
+                }
+
+                try {
+                    const success = await window.templateManager?.saveCurrentTemplateWithElabFTWCategory?.();
+                    if (success) {
+                        // Show subtle success indicator
+                        const categoryInput = document.getElementById('elabftwProjectCategory');
+                        if (categoryInput) {
+                            const originalBorder = categoryInput.style.border;
+                            categoryInput.style.border = '2px solid #10b981';
+                            setTimeout(() => {
+                                categoryInput.style.border = originalBorder;
+                            }, 1000);
+                        }
+                        console.log('✅ elabFTW category saved to template');
+                    }
+                } catch (error) {
+                    console.error('❌ Error saving category to template:', error);
+                }
+            }
+
+            /**
+             * Debounced save for real-time input
+             */
+            let elabftwCategorySaveTimeout;
+            function debounceElabFTWCategorySave() {
+                clearTimeout(elabftwCategorySaveTimeout);
+                elabftwCategorySaveTimeout = setTimeout(saveElabFTWCategoryToTemplate, 1000);
+            }
+        </script>
+
+        <!-- Enhanced Path and Name Section -->
+        <div class="project-config-grid">
+            <div class="config-section primary-section">
+                <div class="section-header">
+                    <div class="section-icon">📂</div>
+                    <div class="section-title">
+                        <h4>Base Directory</h4>
+                        <span class="section-subtitle">Where to create your project</span>
+                    </div>
+                    <button class="browse-btn" onclick="projectManager.browsePath()" title="Browse for folder">
+                        <span>📁</span>
+                        Browse
+                    </button>
+                </div>
+                <div class="enhanced-input-wrapper">
+                    <input type="text" id="targetPath" class="enhanced-input path-input"
+                        placeholder="C:\Projects or /home/user/projects..."
+                        title="Enter or browse for the base directory">
+                    <div class="input-status" id="pathStatus"></div>
+                </div>
+                <div style="margin-top: 10px; display: flex; align-items: center; padding-left: 5px;">
+                    <input type="checkbox" id="onlyIntegrations" onchange="projectManager.toggleIntegrationsOnlyMode()"
+                        style="cursor: pointer; width: 16px; height: 16px; accent-color: #7c3aed;">
+                    <label for="onlyIntegrations"
+                        style="margin-left: 8px; font-size: 0.9em; color: #e0e0e0; cursor: pointer; user-select: none;">
+                        ☁️ Only send to integrations (skip local folder creation)
+                    </label>
+                </div>
+            </div>
+
+            <div class="config-section primary-section">
+                <div class="section-header">
+                    <div class="section-icon">🏷️</div>
+                    <div class="section-title">
+                        <h4>Project Name</h4>
+                        <span class="section-subtitle">Name for your experiment/project</span>
+                    </div>
+                </div>
+                <div class="enhanced-input-wrapper">
+                    <input type="text" id="projectName" class="enhanced-input project-input"
+                        placeholder="My_Experiment_2024..." title="Enter a name for your project">
+                    <div class="input-status" id="nameStatus"></div>
+                </div>
+            </div>
+
+
+        </div>
+
+        <!-- Path & Filename Preview moved to Right Sidebar -->
+    </div>
+
+    <!-- Integrations moved to Right Sidebar -->
+
+    <!-- JavaScript Functions for the Optimized OMERO UI -->
+    <script>
+        // Enhanced Connect to OMERO function with auto-select current group
+        async function connectToOMERO() {
+            const connectButton = document.getElementById('omeroConnectButton');
+            const connectIcon = document.getElementById('omeroConnectIcon');
+            const connectText = document.getElementById('omeroConnectText');
+            const statusText = document.getElementById('omeroStatusText');
+
+            // Set loading state
+            connectButton.style.background = 'linear-gradient(45deg, #6b7280, #4b5563)';
+            connectIcon.textContent = '⏳';
+            connectText.textContent = 'Connecting...';
+            statusText.textContent = 'Testing connection...';
+            statusText.style.color = '#6b7280';
+            connectButton.disabled = true;
+
+            try {
+                // Use existing OMERO test connection functionality
+                if (!window.omeroUIIntegration) {
+                    throw new Error('OMERO UI integration not available');
+                }
+
+                const result = await window.omeroUIIntegration.testConnection();
+
+                if (result.success) {
+                    // Success state - PERMANENT GREEN
+                    connectButton.style.background = 'linear-gradient(45deg, #059669, #047857)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(5, 150, 105, 0.3)';
+                    connectIcon.textContent = '✅';
+                    connectText.textContent = 'Connected';
+
+                    // Get username from settings - it must be correct if connection worked
+                    const username = await window.settingsManager.get('omero.username') || 'user';
+
+                    statusText.innerHTML = `✅ Connected as <strong>${username}</strong>`;
+                    statusText.style.color = '#059669';
+                    statusText.style.fontStyle = 'normal';
+                    statusText.style.fontWeight = '500';
+
+                    // Load groups after successful connection and auto-select current group
+                    console.log('🔬 Loading OMERO groups and auto-selecting current group...');
+                    setTimeout(async () => {
+                        if (window.omeroUIIntegration.loadGroupsForDropdown) {
+                            await window.omeroUIIntegration.loadGroupsForDropdown();
+
+                            // 🆕 NEW: Auto-select current group after loading
+                            setTimeout(() => {
+                                selectCurrentOMEROGroup();
+                            }, 1000);
+                        }
+                    }, 500);
+
+                } else {
+                    // Error state
+                    connectButton.style.background = 'linear-gradient(45deg, #dc2626, #b91c1c)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.3)';
+                    connectIcon.textContent = '❌';
+                    connectText.textContent = 'Connection Failed';
+                    statusText.textContent = '❌ Connection failed - check settings';
+                    statusText.style.color = '#dc2626';
+                    statusText.style.fontStyle = 'normal';
+                    statusText.style.fontWeight = '500';
+
+                    // Show error details in console
+                    console.error('OMERO Connection Failed:', result.message);
+
+                    // Reset button after 3 seconds for retry
+                    setTimeout(() => {
+                        connectIcon.textContent = '🔗';
+                        connectText.textContent = 'Connect to OMERO';
+                        connectButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
+                        connectButton.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.3)';
+                        statusText.textContent = 'Not connected';
+                        statusText.style.color = '#6b7280';
+                        statusText.style.fontStyle = 'italic';
+                        statusText.style.fontWeight = 'normal';
+                    }, 3000);
+                }
+            } catch (error) {
+                // Error state
+                connectButton.style.background = 'linear-gradient(45deg, #dc2626, #b91c1c)';
+                connectButton.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.3)';
+                connectIcon.textContent = '❌';
+                connectText.textContent = 'Error';
+                statusText.textContent = '❌ Connection error';
+                statusText.style.color = '#dc2626';
+                statusText.style.fontStyle = 'normal';
+                statusText.style.fontWeight = '500';
+
+                console.error('OMERO Connection Error:', error);
+
+                // Reset button after 3 seconds for retry
+                setTimeout(() => {
+                    connectIcon.textContent = '🔗';
+                    connectText.textContent = 'Connect to OMERO';
+                    connectButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
+                    connectButton.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.3)';
+                    statusText.textContent = 'Not connected';
+                    statusText.style.color = '#6b7280';
+                    statusText.style.fontStyle = 'italic';
+                    statusText.style.fontWeight = 'normal';
+                }, 3000);
+            } finally {
+                connectButton.disabled = false;
+            }
+        }
+
+        /**
+         * Auto-select current OMERO group
+         * Called after successful connection and group loading
+         */
+        function selectCurrentOMEROGroup() {
+            console.log('🆕 Auto-selecting current OMERO group...');
+
+            const groupSelect = document.getElementById('omeroGroupSelect');
+            if (!groupSelect) {
+                console.warn('⚠️ Group dropdown not found for auto-selection');
+                return;
+            }
+
+            // Look for option marked as "(current)"
+            const currentOption = Array.from(groupSelect.options).find(option =>
+                option.text.includes('(current)')
+            );
+
+            if (currentOption) {
+                console.log('✅ Found current group option:', currentOption.text);
+                groupSelect.value = currentOption.value;
+
+                // Trigger the change handler to load projects
+                handleOMEROGroupSelection();
+
+                console.log('✅ Auto-selected current OMERO group:', currentOption.value);
+            } else {
+                console.log('📝 No current group marked - user needs to select manually');
+            }
+        }
+
+        /**
+         * Logout from OMERO
+         * Called when user clicks the logout button
+         */
+        async function logoutFromOMERO() {
+            console.log('🚺 OMERO logout requested...');
+
+            try {
+                if (window.omeroUIIntegration && typeof window.omeroUIIntegration.logout === 'function') {
+                    const result = await window.omeroUIIntegration.logout();
+
+                    if (result.success) {
+                        console.log('✅ OMERO logout successful');
+
+                        // Clear group and project dropdowns
+                        const groupSelect = document.getElementById('omeroGroupSelect');
+                        const projectSelect = document.getElementById('omeroProjectSelect');
+
+                        if (groupSelect) {
+                            groupSelect.innerHTML = '<option value="">Connect to OMERO first</option>';
+                        }
+
+                        if (projectSelect) {
+                            projectSelect.innerHTML = '<option value="">Select group first</option>';
+                        }
+
+                        // Clear group status
+                        const statusElement = document.getElementById('omeroGroupStatus');
+                        if (statusElement) {
+                            statusElement.textContent = '';
+                        }
+
+                        // Hide any warnings
+                        if (window.projectManager && typeof window.projectManager.hideOMEROGroupWarning === 'function') {
+                            window.projectManager.hideOMEROGroupWarning();
+                        }
+
+                    } else {
+                        console.warn('⚠️ OMERO logout warning:', result.message);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ OMERO logout error:', error);
+            }
+        }
+
+        // Enhanced status update function
+        async function updateOMEROConnectionStatus(status, message, username = null) {
+            const statusText = document.getElementById('omeroStatusText');
+            const connectButton = document.getElementById('omeroConnectButton');
+            const connectIcon = document.getElementById('omeroConnectIcon');
+            const connectTextEl = document.getElementById('omeroConnectText');
+
+            if (!statusText) return;
+
+            switch (status) {
+                case 'connected':
+                    // Get username from settings - it must be correct if connection worked
+                    const user = username || await window.settingsManager.get('omero.username') || 'user';
+
+                    statusText.innerHTML = `✅ Connected as <strong>${user}</strong>`;
+                    statusText.style.color = '#059669';
+                    statusText.style.fontStyle = 'normal';
+                    statusText.style.fontWeight = '500';
+                    if (connectButton) {
+                        connectButton.style.background = 'linear-gradient(45deg, #059669, #047857)';
+                        connectButton.style.boxShadow = '0 2px 4px rgba(5, 150, 105, 0.3)';
+                        connectIcon.textContent = '✅';
+                        connectTextEl.textContent = 'Connected';
+                    }
+                    break;
+                case 'error':
+                    statusText.textContent = `❌ ${message || 'Connection error'}`;
+                    statusText.style.color = '#dc2626';
+                    statusText.style.fontStyle = 'normal';
+                    statusText.style.fontWeight = '500';
+                    break;
+                case 'testing':
+                    statusText.textContent = message || 'Testing connection...';
+                    statusText.style.color = '#6b7280';
+                    statusText.style.fontStyle = 'italic';
+                    statusText.style.fontWeight = 'normal';
+                    break;
+                default:
+                    statusText.textContent = message || 'Not connected';
+                    statusText.style.color = '#6b7280';
+                    statusText.style.fontStyle = 'italic';
+                    statusText.style.fontWeight = 'normal';
+                    break;
+            }
+        }
+
+        // =================== OMERO GROUP SELECTION HANDLERS ===================
+
+        /**
+         * Handle OMERO Group Selection Change
+         * Called when user changes the OMERO group dropdown
+         * Provides immediate feedback and validation ONLY when OMERO sync is enabled
+         */
+        function handleOMEROGroupSelection() {
+            const groupSelect = document.getElementById('omeroGroupSelect');
+            if (!groupSelect) return;
+
+            const selectedGroupId = groupSelect.value;
+
+            console.log('🔬 OMERO group selection changed:', selectedGroupId);
+
+            // Always hide existing warnings first
+            if (window.projectManager && typeof window.projectManager.hideOMEROGroupWarning === 'function') {
+                window.projectManager.hideOMEROGroupWarning();
+            }
+
+            // Handle special selections
+            if (selectedGroupId === 'refresh') {
+                // Refresh group list
+                console.log('🔄 Refreshing OMERO group list...');
+                if (window.omeroUIIntegration && typeof window.omeroUIIntegration.loadGroupsForDropdown === 'function') {
+                    window.omeroUIIntegration.loadGroupsForDropdown();
+                }
+                return;
+            }
+
+            // 🆕 NEW: Check if "Send to OMERO" is checked before showing warnings
+            const sendToOMERO = document.getElementById('sendToOMERO');
+            const omeroSyncRequested = sendToOMERO && sendToOMERO.checked;
+
+            // ⚠️ IMMEDIATE WARNING: Only show warning if OMERO sync is requested AND "All" is selected
+            if (false && omeroSyncRequested && (selectedGroupId === 'all' || selectedGroupId === 'All' || selectedGroupId === '')) {
+                console.warn('⚠️ Invalid OMERO group selected with sync enabled:', selectedGroupId);
+
+                // Show immediate warning (only when relevant)
+                if (window.projectManager && typeof window.projectManager.showOMEROGroupWarning === 'function') {
+                    window.projectManager.showOMEROGroupWarning(
+                        'Cannot create OMERO datasets in "All Groups"',
+                        'Please select a specific group where you have dataset creation permissions.'
+                    );
+                }
+
+                // Update group status to show error
+                const statusElement = document.getElementById('omeroGroupStatus');
+                if (statusElement) {
+                    statusElement.textContent = '⚠️ Invalid selection: Please choose a specific group';
+                    statusElement.style.color = '#dc2626';
+                    statusElement.style.fontWeight = '500';
+                }
+
+                // Clear projects dropdown since we can't load projects for "all"
+                const projectSelect = document.getElementById('omeroProjectSelect');
+                if (projectSelect) {
+                    projectSelect.innerHTML = '<option value="">-- Select a specific group first --</option>';
+                }
+
+                return;
+            }
+
+            // Valid group selected OR OMERO sync not requested - proceed with normal handling
+            if (selectedGroupId && selectedGroupId !== 'all' && selectedGroupId !== 'All') {
+                console.log('✅ Valid OMERO group selected:', selectedGroupId);
+
+                // Update group status to show success
+                const statusElement = document.getElementById('omeroGroupStatus');
+                if (statusElement) {
+                    const selectedOption = groupSelect.querySelector(`option[value="${selectedGroupId}"]`);
+                    const groupName = selectedOption?.textContent || 'Selected Group';
+
+                    // Show different status based on whether OMERO sync is requested
+                    if (omeroSyncRequested) {
+                        statusElement.textContent = `✅ Group: ${groupName} (ready for OMERO)`;
+                        statusElement.style.color = '#059669';
+                    } else {
+                        statusElement.textContent = `📁 Group: ${groupName} (OMERO sync not enabled)`;
+                        statusElement.style.color = '#6b7280';
+                    }
+                    statusElement.style.fontWeight = '500';
+                }
+
+                // Load projects for the selected group
+                if (window.omeroUIIntegration && typeof window.omeroUIIntegration.loadProjectsForGroup === 'function') {
+                    console.log('📁 Loading projects for group:', selectedGroupId);
+                    window.omeroUIIntegration.loadProjectsForGroup(selectedGroupId);
+                }
+            } else {
+                // No specific group selected
+                const statusElement = document.getElementById('omeroGroupStatus');
+                if (statusElement) {
+                    statusElement.textContent = omeroSyncRequested ?
+                        'Please select a group for OMERO sync' :
+                        'No group selected';
+                    statusElement.style.color = '#6b7280';
+                    statusElement.style.fontWeight = 'normal';
+                }
+            }
+        }
+
+        /**
+         * Handle OMERO Project Selection Change
+         * Called when user changes the OMERO project dropdown
+         */
+        function handleOMEROProjectSelection() {
+            if (window.omeroUIIntegration && typeof window.omeroUIIntegration.handleProjectSelection === 'function') {
+                window.omeroUIIntegration.handleProjectSelection();
+            }
+        }
+
+        /**
+         * Handle "Send to OMERO" checkbox change
+         * Re-validates group selection when OMERO sync is enabled/disabled
+         */
+        function handleSendToOMEROChange() {
+            console.log('🔬 Send to OMERO checkbox changed');
+
+            // Re-trigger group selection validation with new checkbox state
+            handleOMEROGroupSelection();
+
+            const sendToOMERO = document.getElementById('sendToOMERO');
+            const isChecked = sendToOMERO && sendToOMERO.checked;
+
+            console.log('🔬 OMERO sync now:', isChecked ? 'ENABLED' : 'DISABLED');
+        }
+    </script>
+
+    <div class="folder-structure">
+        <h3>📋 Structure Preview:</h3>
+        <div id="folderPreview" class="folder-tree"></div>
+    </div>
+
+    <!-- Metadata Form for Experiments - VEREINFACHT (Buttons entfernt) -->
+    <div id="experimentForm" class="metadata-editor" style="display: none;">
+        <h3 style="margin-bottom: 15px;">🧪 Fill Experiment Metadata:</h3>
+        <div id="experimentFields"></div>
+    </div>
+
+
+</div>

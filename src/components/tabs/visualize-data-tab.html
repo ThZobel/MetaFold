@@ -1,0 +1,62 @@
+<div class="visualization-container">
+    <div class="visualization-header">
+        <div>
+            <h3 style="margin: 0; color: #e0e0e0;">📊 Interactive Data Visualization</h3>
+            <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 14px;">Explore your
+                experiment
+                metadata with advanced visualization</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <!-- NEW: Visualization Type Selector -->
+            <div class="visualization-type-selector">
+                <button class="viz-type-btn active" onclick="visualizationManager.setVisualizationType('jsoncrack')"
+                    id="jsoncrackTypeBtn" title="JSONCrack Interactive Graph">
+                    🕸️ JSONCrack
+                </button>
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('d3graph')"
+                    id="d3graphTypeBtn" title="D3.js Force Graph">
+                    🌐 D3 Graph
+                </button>
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('tree')"
+                    id="treeTypeBtn" title="Collapsible Tree View">
+                    🌳 Tree
+                </button>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.2); margin: 0 10px;"></div>
+            <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromTemplate()"
+                title="Visualize current template metadata">
+                🧪 Template Data
+            </button>
+
+            <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromScannedProjects()"
+                title="Visualize discovered projects" id="visualizeScannedBtn" style="display: none;">
+                📁 Scanned Projects
+            </button>
+
+
+            <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromFile()"
+                title="Load JSON file for visualization">
+                📂 Load JSON
+            </button>
+            <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()"
+                title="Export current visualization">
+                💾 Export
+            </button>
+        </div>
+    </div>
+    <div class="visualization-content" id="visualizationContent">
+        <div class="visualization-placeholder">
+            <svg fill="currentColor" viewBox="0 0 24 24">
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 7.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+            </svg>
+            <h4>No Data Loaded</h4>
+            <p>Select a template or load a JSON file to start visualizing your data</p>
+            <div style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="visualizationManager.showSampleData()">
+                    🎯 Show Sample
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

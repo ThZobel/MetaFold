@@ -499,18 +499,22 @@ const userManagementModal = {
 
                 const isValid = await window.secureStorage.verifyUserPassword(username, password);
                 if (!isValid) {
-                    this.showError('Invalid password');
-                    return;
+                this.showError('Invalid password');
+                return;
                 }
 
                 console.log(`✅ Password verified for user switch: ${username}`);
                 
-                // 🔐 NEW: Cache password for settings encryption
+                // ✅ KRITISCH: Passwort für DPAPI+Entropy zwischenspeichern
+                const verifiedPassword = password;
+                
+                // ✅ Passwort für Settings-Verschlüsselung cachen (VOR dem Switch!)
                 if (window.settingsManager && window.settingsManager.setUserPasswordForEntropy) {
-                    window.settingsManager.setUserPasswordForEntropy(username, password);
-                    console.log('🔐 Password cached for secure settings (user management)');
-                }
+                        console.log('🔐 Caching password for DPAPI encryption entropy...');
+                window.settingsManager.setUserPasswordForEntropy(username, verifiedPassword);
+                console.log('✅ Password cached for secure DPAPI+Entropy encryption');
             }
+        }
 
             // Perform switch
             if (window.userManager?.switchUser) {

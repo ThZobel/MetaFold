@@ -1,0 +1,155 @@
+<div class="sidebar-header">
+    <h3>📋 Project Info</h3>
+</div>
+
+<div class="info-section">
+    <div class="info-group">
+        <label>Project Name</label>
+        <div id="rsProjectName" class="info-value" title="Project Name">-</div>
+    </div>
+    <div class="info-group">
+        <label>Full Path</label>
+        <div class="path-display">
+            <div id="fullPathPreview" class="path-text">Choose directory...</div>
+            <button class="copy-btn" onclick="openCurrentFolder()" title="Open Folder">📂</button>
+            <button class="copy-btn" onclick="copyPathToClipboard()" title="Copy Path">📋</button>
+        </div>
+    </div>
+    <div class="info-group">
+        <label>Filename Prefix</label>
+        <input type="text" id="filenamePrefix" placeholder="e.g., EXP_" oninput="experimentForm.updateFilenamePreview()"
+            style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #e0e0e0; margin-top: 5px;">
+    </div>
+    <div class="info-group">
+        <label>Suggested Filename</label>
+        <div class="path-display">
+            <div id="filenamePreview" class="path-text">Select fields...</div>
+            <button class="copy-btn" onclick="experimentForm.copyFilenameToClipboard()"
+                title="Copy Filename">📋</button>
+        </div>
+    </div>
+</div>
+
+<div class="sidebar-header" style="margin-top: 20px;">
+    <h3>🔗 Integrations</h3>
+</div>
+
+<div class="integrations-container">
+    <!-- elabFTW Integration -->
+    <div id="elabftwIntegration" class="integration-card" style="display: none;">
+        <div class="integration-header">
+            <div class="integration-title">
+                <span class="integration-icon">🧪</span>
+                <span>elabFTW</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="sendToElabFTW">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div class="integration-body" id="elabftwBody">
+            <div id="elabftwAutoInfo" class="auto-sync-info"
+                style="display:none; color: #059669; font-size: 0.8rem; margin-bottom: 8px;">
+                ✅ Auto-sync enabled
+            </div>
+            <div class="input-group">
+                <label>Category ID</label>
+                <input type="number" id="elabftwProjectCategory" placeholder="e.g. 1"
+                    onchange="saveElabFTWCategoryToTemplate()" oninput="debounceElabFTWCategorySave()">
+            </div>
+            <div class="input-group">
+                <label>Update Existing ID</label>
+                <input type="text" id="existingExperimentId" placeholder="Optional (e.g. 149)">
+            </div>
+        </div>
+    </div>
+
+    <!-- RSpace Integration -->
+    <div id="rspaceIntegration" class="integration-card" style="display: none;">
+        <div class="integration-header">
+            <div class="integration-title">
+                <span class="integration-icon">🧪</span>
+                <span>RSpace</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="sendToRSpace">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div class="integration-body" id="rspaceBody">
+            <div class="input-group">
+                <label>Parent Folder</label>
+                <select id="rspaceFolderSelect"
+                    style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #e0e0e0; margin-bottom: 5px;">
+                    <option value="">-- Root Folder --</option>
+                </select>
+                <small style="display: block; margin-bottom: 10px; color: #a855f7; cursor: pointer; font-size: 0.8rem;"
+                    onclick="loadRSpaceFolders()">🔄 Refresh Folders</small>
+            </div>
+            <div class="input-group">
+                <label>Document Name</label>
+                <input type="text" id="rspaceDocName" placeholder="Auto-generated from project" readonly
+                    class="readonly-input">
+            </div>
+            <div class="input-group">
+                <label>Tags (comma separated)</label>
+                <input type="text" id="rspaceTags" placeholder="e.g. experiment, data">
+            </div>
+        </div>
+    </div>
+
+    <!-- OMERO Integration -->
+    <div id="omeroIntegration" class="integration-card" style="display: none;">
+        <div class="integration-header">
+            <div class="integration-title">
+                <span class="integration-icon">🔬</span>
+                <span>OMERO</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="sendToOMERO" onchange="handleSendToOMEROChange()">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div class="integration-body" id="omeroBody">
+            <div id="omeroAutoInfo" class="auto-sync-info"
+                style="display:none; color: #059669; font-size: 0.8rem; margin-bottom: 8px;">
+                ✅ Auto-sync enabled
+            </div>
+
+            <div class="connection-status">
+                <button id="omeroConnectButton" onclick="connectToOMERO()" class="btn-connect">
+                    <span id="omeroConnectIcon">🔗</span> <span id="omeroConnectText">Connect</span>
+                </button>
+                <button id="omeroLogoutButton" onclick="logoutFromOMERO()" class="btn-logout" style="display:none;"
+                    title="Logout">
+                    🚪
+                </button>
+            </div>
+            <div id="omeroStatusText" class="status-text">Not connected</div>
+
+            <div id="omeroControls" style="margin-top: 10px;">
+                <div class="input-group">
+                    <label>Group</label>
+                    <select id="omeroGroupSelect" onchange="handleOMEROGroupSelection()">
+                        <option value="">Connect first</option>
+                    </select>
+                    <div id="omeroGroupStatus" style="font-size: 0.7rem; color: #6b7280;"></div>
+                </div>
+                <div class="input-group">
+                    <label>Project</label>
+                    <select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()">
+                        <option value="">Select group first</option>
+                    </select>
+                </div>
+                <label class="checkbox-label"
+                    style="margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                    <input type="checkbox" id="omeroUseJsonTriplets">
+                    <span>Detailed metadata format</span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>

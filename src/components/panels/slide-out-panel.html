@@ -1,0 +1,585 @@
+<div class="slide-out-overlay" id="slideOutOverlay" onclick="closeMoreMenu()"></div>
+<div class="slide-out-panel" id="slideOutPanel">
+    <div class="panel-header">
+        <h3>
+            <span>⚙️</span>
+            Template Actions
+        </h3>
+        <button class="panel-close" onclick="closeMoreMenu()" aria-label="Close">
+            ✕
+        </button>
+    </div>
+
+    <div class="panel-content">
+        <!-- Template Info Section -->
+        <div class="panel-template-info" id="panelTemplateInfo">
+            <h4 id="panelTemplateName">🧪 Select a template</h4>
+            <div class="template-meta" id="panelTemplateMeta">
+                Choose a template to see available actions
+            </div>
+            <div class="template-stats" id="panelTemplateStats">
+                <!-- Stats will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Progress Indicator for Multi-step Operations -->
+        <div class="panel-progress" id="panelProgress" style="display: none;">
+            <div class="progress-message">Processing...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="panel-actions">
+            <!-- Copy/Duplicate Action -->
+            <div class="panel-action copy" onclick="duplicateCurrentTemplate()" id="duplicateAction">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">📋</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Duplicate Template</div>
+                        <div class="panel-action-description">Create a copy of this template
+                            with a
+                            new name</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Export Action -->
+            <div class="panel-action export" onclick="exportCurrentTemplate()" id="exportAction">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">📤</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Export Template</div>
+                        <div class="panel-action-description">Save template as JSON file for
+                            backup
+                            or sharing</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- NEW: Import Action -->
+            <div class="panel-action import" onclick="importTemplatesFromFile()" id="importAction">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">📥</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Import Templates</div>
+                        <div class="panel-action-description">Load templates from JSON file
+                            (single
+                            template or bundle)</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Storage Action -->
+            <div class="panel-action storage" onclick="showStorageInfo()" id="storageAction">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">💾</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Storage Info</div>
+                        <div class="panel-action-description">View template storage details and
+                            migration options</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Delete Action -->
+            <div class="panel-action delete" onclick="deleteCurrentTemplate()" id="deleteActionPanel">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">🗑️</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Delete Template</div>
+                        <div class="panel-action-description">Permanently remove this template
+                            (cannot be undone)</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Storage Information Section -->
+        <div class="panel-storage-info" id="panelStorageInfo" style="display: none;">
+            <h4>📁 Storage Information</h4>
+            <div class="storage-details">
+                <div class="storage-stat">
+                    <span class="stat-label">Storage Mode:</span>
+                    <span class="stat-value" id="storageModeValue">Loading...</span>
+                </div>
+                <div class="storage-stat">
+                    <span class="stat-label">File Storage:</span>
+                    <span class="stat-value" id="fileStorageValue">Loading...</span>
+                </div>
+                <div class="storage-stat">
+                    <span class="stat-label">Templates in Files:</span>
+                    <span class="stat-value" id="fileTemplatesValue">Loading...</span>
+                </div>
+                <div class="storage-stat">
+                    <span class="stat-label">Templates in LocalStorage:</span>
+                    <span class="stat-value" id="localTemplatesValue">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Migration Options -->
+            <div class="migration-options" id="migrationOptions" style="display: none;">
+                <h5>🔄 Migration Options</h5>
+                <p style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 10px;">
+                    Migrate your templates from browser storage to files for better backup and
+                    sharing.
+                </p>
+                <button class="btn btn-secondary btn-small" onclick="performMigrationFromPanel()" id="migrateBtnPanel">
+                    📁 Migrate to Files
+                </button>
+            </div>
+
+            <!-- Storage Actions -->
+            <div class="storage-actions" style="margin-top: 15px;">
+                <button class="btn btn-secondary btn-small" onclick="refreshStorageInfo()" style="margin-right: 8px;">
+                    🔄 Refresh
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="openTemplatesDirectory()" id="openDirBtn">
+                    📂 Open Directory
+                </button>
+            </div>
+
+            <!-- Add this div after the existing storage stats in the storage info section -->
+            <div class="storage-stat" id="userPathStat" style="display: none;">
+                <span class="stat-label">👥 User Path:</span>
+                <span class="stat-value" id="userStoragePathValue"
+                    style="font-family: monospace; font-size: 0.9em;">Loading...</span>
+            </div>
+
+            <!-- Enhanced migration text container (replace existing migration text if present) -->
+            <div class="migration-options" id="migrationOptions" style="display: none;">
+                <h5>🔄 Migration Options</h5>
+                <div id="migrationText">
+                    <p style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 10px;">
+                        Migrate your templates from browser storage to files for better backup
+                        and
+                        sharing.
+                    </p>
+                </div>
+                <button onclick="performMigrationFromPanel()" id="migrateBtnPanel"
+                    style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                    📁 Migrate to Files
+                </button>
+            </div>
+
+            <!-- CSS for enhanced user path display -->
+            <style>
+                .user-path-indicator {
+                    background: rgba(59, 130, 246, 0.1);
+                    border: 1px solid rgba(59, 130, 246, 0.3);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    margin: 8px 0;
+                    font-family: monospace;
+                    font-size: 0.85em;
+                    color: #3b82f6;
+                }
+
+                .stat-value code {
+                    background: rgba(0, 0, 0, 0.2);
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-size: 0.9em;
+                    font-family: monospace;
+                }
+
+                #migrationText {
+                    line-height: 1.4;
+                }
+
+                #migrationText code {
+                    background: rgba(0, 0, 0, 0.2);
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-size: 0.8rem;
+                    font-family: monospace;
+                    color: #e5e7eb;
+                }
+            </style>
+
+        </div>
+
+        <!-- Additional Info -->
+        <div
+            style="margin-top: 30px; padding: 15px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border-left: 3px solid #7c3aed;">
+            <div style="font-size: 0.9rem; color: #9ca3af; line-height: 1.5;">
+                <strong style="color: #a855f7;">💡 Storage Tips:</strong>
+                <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 0.85rem;">
+                    <li>File storage provides better backup and sharing capabilities</li>
+                    <li>Templates are automatically saved when you create or edit them</li>
+                    <li>Export templates to share with colleagues or backup to other locations
+                    </li>
+                    <li>Import templates from other MetaFold installations or colleagues</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Enhanced Panel Styles */
+    .panel-progress {
+        margin: 15px 0;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border-left: 3px solid #3b82f6;
+    }
+
+    .progress-message {
+        font-size: 0.9rem;
+        color: #e0e0e0;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    /* Storage Info Styles */
+    .panel-storage-info {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .panel-storage-info h4 {
+        margin: 0 0 12px 0;
+        color: #e0e0e0;
+        font-size: 1rem;
+    }
+
+    .panel-storage-info h5 {
+        margin: 15px 0 8px 0;
+        color: #a855f7;
+        font-size: 0.9rem;
+    }
+
+    .storage-details {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .storage-stat {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .storage-stat:last-child {
+        border-bottom: none;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: #9ca3af;
+    }
+
+    .stat-value {
+        font-size: 0.9rem;
+        color: #e0e0e0;
+        font-weight: 500;
+    }
+
+    .migration-options {
+        margin-top: 15px;
+        padding: 12px;
+        background: rgba(34, 197, 94, 0.1);
+        border-radius: 6px;
+        border-left: 3px solid #22c55e;
+    }
+
+    .storage-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* Enhanced Panel Action Styles */
+    .panel-action.import .panel-action-button {
+        border-left: 3px solid #10b981;
+    }
+
+    .panel-action.import:hover .panel-action-button {
+        background: rgba(16, 185, 129, 0.1);
+    }
+
+    .panel-action.storage .panel-action-button {
+        border-left: 3px solid #6366f1;
+    }
+
+    .panel-action.storage:hover .panel-action-button {
+        background: rgba(99, 102, 241, 0.1);
+    }
+
+    /* Loading states */
+    .panel-action.loading .panel-action-button {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    .panel-action.loading .panel-action-icon::after {
+        content: "⏳";
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        font-size: 0.8rem;
+        animation: pulse 1.5s infinite;
+    }
+
+    /* Success/Error feedback */
+    .panel-action.success .panel-action-button {
+        border-left-color: #22c55e;
+        background: rgba(34, 197, 94, 0.1);
+    }
+
+    .panel-action.error .panel-action-button {
+        border-left-color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Storage indicator styles in template list */
+    .storage-indicator {
+        display: inline-block;
+        font-size: 0.8rem;
+        margin-left: 4px;
+        opacity: 0.7;
+    }
+
+    .storage-indicator.file {
+        color: #22c55e;
+        opacity: 1;
+    }
+
+    .storage-indicator.localStorage {
+        color: #f59e0b;
+        opacity: 0.8;
+    }
+
+    /* Migration notice animation */
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    /* Pulse animation for loading indicators */
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .storage-stat {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .storage-actions {
+            flex-direction: column;
+        }
+
+        .storage-actions button {
+            width: 100%;
+        }
+    }
+
+    /* Focus states for accessibility */
+    .panel-action-button:focus,
+    .migration-options button:focus,
+    .storage-actions button:focus {
+        outline: 2px solid #7c3aed;
+        outline-offset: 2px;
+    }
+
+    /* Smooth transitions */
+    .panel-action-button,
+    .storage-stat,
+    .migration-options {
+        transition: all 0.3s ease;
+    }
+
+    /* Enhanced hover effects */
+    .storage-actions button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+</style>
+
+<script>
+    // NEW: Enhanced Panel Functions for Storage Management
+
+    // Show storage information
+    window.showStorageInfo = async function () {
+        const storageInfoEl = document.getElementById('panelStorageInfo');
+        const storageActionEl = document.getElementById('storageAction');
+
+        if (!storageInfoEl) return;
+
+        // Toggle visibility
+        const isVisible = storageInfoEl.style.display !== 'none';
+        storageInfoEl.style.display = isVisible ? 'none' : 'block';
+
+        if (!isVisible) {
+            // Show loading state
+            enhancedActions.setActionLoading(storageActionEl, true);
+
+            try {
+                await refreshStorageInfo();
+            } catch (error) {
+                console.error('Error loading storage info:', error);
+            } finally {
+                enhancedActions.setActionLoading(storageActionEl, false);
+            }
+        }
+    };
+
+    // Refresh storage information
+    window.refreshStorageInfo = async function () {
+        if (!window.storage) return;
+
+        try {
+            // Get storage statistics
+            const stats = window.storage.getStorageStats();
+            const health = await window.storage.healthCheck();
+
+            // Update UI elements
+            document.getElementById('storageModeValue').textContent = stats.storageMode || 'Unknown';
+            document.getElementById('fileStorageValue').textContent = stats.fileStorageEnabled ? '✅ Available' : '❌ Not Available';
+            document.getElementById('fileTemplatesValue').textContent = stats.fileTemplates || '0';
+            document.getElementById('localTemplatesValue').textContent = stats.localStorageTemplates || '0';
+
+            // Show migration options if needed
+            const migrationOptions = document.getElementById('migrationOptions');
+            if (migrationOptions) {
+                if (stats.fileStorageEnabled && stats.localStorageTemplates > 0 && !stats.migrationCompleted) {
+                    migrationOptions.style.display = 'block';
+                } else {
+                    migrationOptions.style.display = 'none';
+                }
+            }
+
+            // Update open directory button
+            const openDirBtn = document.getElementById('openDirBtn');
+            if (openDirBtn) {
+                openDirBtn.disabled = !stats.fileStorageEnabled;
+                openDirBtn.style.opacity = stats.fileStorageEnabled ? '1' : '0.5';
+            }
+
+            console.log('📊 Storage info refreshed:', stats);
+        } catch (error) {
+            console.error('Error refreshing storage info:', error);
+        }
+    };
+
+    // Perform migration from panel
+    window.performMigrationFromPanel = async function () {
+        if (!window.templateManager || !window.templateManager.performMigration) return;
+
+        const migrateBtnPanel = document.getElementById('migrateBtnPanel');
+        if (migrateBtnPanel) {
+            migrateBtnPanel.disabled = true;
+            migrateBtnPanel.textContent = '🔄 Migrating...';
+        }
+
+        try {
+            await window.templateManager.performMigration();
+
+            // Refresh storage info after migration
+            setTimeout(() => {
+                refreshStorageInfo();
+            }, 1000);
+
+        } catch (error) {
+            console.error('Migration error:', error);
+        } finally {
+            if (migrateBtnPanel) {
+                migrateBtnPanel.disabled = false;
+                migrateBtnPanel.textContent = '📁 Migrate to Files';
+            }
+        }
+    };
+
+    // Open templates directory
+    window.openTemplatesDirectory = async function () {
+        if (!window.electronAPI || !window.electronAPI.getTemplatesDirectory) {
+            alert('Directory access not available in browser mode');
+            return;
+        }
+
+        try {
+            const result = await window.electronAPI.getTemplatesDirectory();
+            if (result.success) {
+                await window.electronAPI.openFolder(result.directory);
+            } else {
+                alert('Could not access templates directory: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error opening templates directory:', error);
+            alert('Error opening directory: ' + error.message);
+        }
+    };
+
+    // Auto-refresh storage info when panel opens
+    const originalOpenMoreMenu = window.enhancedActions ? window.enhancedActions.openMoreMenu : null;
+    if (originalOpenMoreMenu) {
+        window.enhancedActions.openMoreMenu = function () {
+            originalOpenMoreMenu.call(this);
+
+            // Auto-refresh storage info if panel is visible
+            setTimeout(() => {
+                const storageInfoEl = document.getElementById('panelStorageInfo');
+                if (storageInfoEl && storageInfoEl.style.display !== 'none') {
+                    refreshStorageInfo();
+                }
+            }, 500);
+        };
+    }
+
+    console.log('✅ Enhanced panel functions loaded');
+</script>

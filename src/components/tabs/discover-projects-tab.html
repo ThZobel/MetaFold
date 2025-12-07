@@ -1,0 +1,38 @@
+<div class="discovery-container">
+    <div class="discovery-header">
+        <div class="header-content">
+            <h2>📁 MetaFold Project Discovery</h2>
+            <p>Scan directories to discover and analyze your MetaFold projects</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn" onclick="metadataLoader.loadMetadataFile()" id="loadMetadataBtn">
+                📥 Load Metadata
+            </button>
+        </div>
+    </div>
+
+    <div id="discoveryQuickStart" class="quick-start-section">
+        <div class="quick-start-content">
+            <div class="quick-start-icon">🔍</div>
+            <h3>Discover Your MetaFold Projects</h3>
+            <p>Scan any directory to find all MetaFold projects with their metadata and get
+                insights
+                into your research data organization.</p>
+
+            <div class="quick-start-actions">
+                <button class="btn btn-primary" onclick="projectScanner.scanDirectory()">
+                    🔍 Start Scanning
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="projectScannerContainer" class="scanner-main-container">
+        <!-- Project scanner content will be rendered here -->
+    </div>
+
+    <!-- Metadata Viewer & Sender Section -->
+    <div id="metadataViewerContainer" class="metadata-viewer-container" style="display: none;">
+        <!-- Metadata viewer will be rendered here by metadataLoader.js -->
+    </div>
+</div>

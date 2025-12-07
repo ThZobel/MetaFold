@@ -1,12 +1,11 @@
-
-    const filteredTemplates = this.get// Template Manager with File Storage Integration and Cache Management
+// Template Manager with File Storage Integration and Cache Management
 
 const templateManager = {
     templates: [],
     currentTemplate: null,
     selectedIndex: -1,
     allTemplates: [],
-    
+
     // Search and filter state
     searchState: {
         query: '',
@@ -38,30 +37,30 @@ const templateManager = {
             if (window.storage) {
                 await window.storage.initFileStorage();
             }
-            
+
             // Load templates
             this.templates = await this.loadTemplates();
-            
+
             // Initialize search state
             this.initializeSearchState();
-            
+
             // Clear cache
             this.allTemplates = [];
-            
+
             // Render the list
             this.renderList();
             this.updateTemplateInfo();
-            
+
             // NO MIGRATION CHECK - removed!
             // this.checkMigrationNotice(); // <-- DIESE ZEILE ENTFERNEN
-            
+
             // Build search index after templates are loaded
             setTimeout(() => {
                 console.log('📊 Building initial search index...');
                 this.buildSearchIndex();
                 console.log(`✅ Initial search index built with ${this.searchState.searchIndex.size} entries`);
             }, 100);
-            
+
             console.log('✅ templateManager initialized with', this.templates.length, 'templates');
         } catch (error) {
             console.error('❌ Error in templateManager.init:', error);
@@ -90,11 +89,11 @@ const templateManager = {
             template.storageDisplay = 'Stored in browser';
             template.storageIcon = '💾';
         }
-        
+
         // Add user display info
         template.userDisplayName = template.createdBy || 'Unknown';
         template.groupDisplayName = template.createdByGroup || 'Unknown';
-        
+
         return template;
     },
 
@@ -124,9 +123,9 @@ const templateManager = {
     buildSearchIndex() {
         console.log('🔍 Building search index...');
         this.searchState.searchIndex.clear();
-        
+
         const allTemplates = this.getAllTemplates();
-        
+
         allTemplates.forEach((template, index) => {
             const searchableContent = this.extractSearchableContent(template);
             this.searchState.searchIndex.set(index, {
@@ -135,39 +134,39 @@ const templateManager = {
                 keywords: searchableContent
             });
         });
-        
+
         console.log(`✅ Search index built for ${allTemplates.length} templates`);
     },
 
     // Extract searchable content from template
     extractSearchableContent(template) {
         const content = [];
-        
+
         if (template.name) content.push(template.name);
         if (template.description) content.push(template.description);
         if (template.createdBy) content.push(template.createdBy);
         if (template.createdByGroup) content.push(template.createdByGroup);
-        
+
         content.push(template.type || 'folders');
-        
+
         if (template.metadata) {
             this.extractMetadataContent(template.metadata, content);
         }
-        
+
         return content;
     },
 
     // Extract metadata content
     extractMetadataContent(metadata, content) {
         if (!metadata || typeof metadata !== 'object') return;
-        
+
         for (const [key, value] of Object.entries(metadata)) {
             if (typeof value === 'object' && value !== null) {
                 if (value.label) content.push(value.label);
                 if (value.value) content.push(String(value.value));
                 if (value.description) content.push(value.description);
                 if (value.type) content.push(value.type);
-                
+
                 if (value.options && Array.isArray(value.options)) {
                     content.push(...value.options);
                 }
@@ -183,7 +182,7 @@ const templateManager = {
         if (!searchInput) return;
 
         const query = searchInput.value.trim();
-        
+
         if (this.searchState.debounceTimer) {
             clearTimeout(this.searchState.debounceTimer);
         }
@@ -199,71 +198,71 @@ const templateManager = {
             this.performSearch(query);
         }, this.performance.debounceDelay);
     },
-	
-	// Füge diese Funktionen zur templateManager.js hinzu
-	// Suche nach der Stelle wo die anderen Search-Funktionen sind (z.B. nach handleSearch)
 
-	// Show search suggestions dropdown
-	showSearchSuggestions() {
-		console.log('🔍 Showing search suggestions...');
-		
-		const suggestionsDiv = document.getElementById('searchSuggestions');
-		const searchInput = document.getElementById('templateSearchInput');
-		
-		if (!suggestionsDiv || !searchInput) {
-			console.warn('⚠️ Search suggestions elements not found');
-			return;
-		}
-		
-		const query = searchInput.value.trim().toLowerCase();
-		
-		// Don't show suggestions if query is empty or too short
-		if (query.length < 2) {
-			suggestionsDiv.style.display = 'none';
-			return;
-		}
-		
-		// Generate suggestions if we have them
-		if (this.searchState.suggestions.length > 0) {
-			this.renderSearchSuggestions();
-			suggestionsDiv.style.display = 'block';
-		} else {
-			// Generate suggestions for current query
-			this.generateSearchSuggestionsAsync(query);
-			// Show them after a short delay
-			setTimeout(() => {
-				if (this.searchState.suggestions.length > 0) {
-					this.renderSearchSuggestions();
-					suggestionsDiv.style.display = 'block';
-				}
-			}, 100);
-		}
-	},
+    // Füge diese Funktionen zur templateManager.js hinzu
+    // Suche nach der Stelle wo die anderen Search-Funktionen sind (z.B. nach handleSearch)
 
-	// Hide search suggestions dropdown
-	hideSearchSuggestions() {
-		console.log('🔍 Hiding search suggestions...');
-		
-		// Add a small delay to allow for suggestion clicks
-		setTimeout(() => {
-			const suggestionsDiv = document.getElementById('searchSuggestions');
-			if (suggestionsDiv) {
-				suggestionsDiv.style.display = 'none';
-			}
-		}, 150);
-	},
+    // Show search suggestions dropdown
+    showSearchSuggestions() {
+        console.log('🔍 Showing search suggestions...');
 
-	// Render search suggestions in dropdown
-	renderSearchSuggestions() {
-		const suggestionsDiv = document.getElementById('searchSuggestions');
-		if (!suggestionsDiv) return;
-		
-		if (this.searchState.suggestions.length === 0) {
-			suggestionsDiv.innerHTML = '<div style="padding: 12px; color: #9ca3af; text-align: center; font-size: 0.85rem;">No suggestions</div>';
-			return;
-		}
-		
-		const suggestionsHTML = this.searchState.suggestions.map(suggestion => `
+        const suggestionsDiv = document.getElementById('searchSuggestions');
+        const searchInput = document.getElementById('templateSearchInput');
+
+        if (!suggestionsDiv || !searchInput) {
+            console.warn('⚠️ Search suggestions elements not found');
+            return;
+        }
+
+        const query = searchInput.value.trim().toLowerCase();
+
+        // Don't show suggestions if query is empty or too short
+        if (query.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+
+        // Generate suggestions if we have them
+        if (this.searchState.suggestions.length > 0) {
+            this.renderSearchSuggestions();
+            suggestionsDiv.style.display = 'block';
+        } else {
+            // Generate suggestions for current query
+            this.generateSearchSuggestionsAsync(query);
+            // Show them after a short delay
+            setTimeout(() => {
+                if (this.searchState.suggestions.length > 0) {
+                    this.renderSearchSuggestions();
+                    suggestionsDiv.style.display = 'block';
+                }
+            }, 100);
+        }
+    },
+
+    // Hide search suggestions dropdown
+    hideSearchSuggestions() {
+        console.log('🔍 Hiding search suggestions...');
+
+        // Add a small delay to allow for suggestion clicks
+        setTimeout(() => {
+            const suggestionsDiv = document.getElementById('searchSuggestions');
+            if (suggestionsDiv) {
+                suggestionsDiv.style.display = 'none';
+            }
+        }, 150);
+    },
+
+    // Render search suggestions in dropdown
+    renderSearchSuggestions() {
+        const suggestionsDiv = document.getElementById('searchSuggestions');
+        if (!suggestionsDiv) return;
+
+        if (this.searchState.suggestions.length === 0) {
+            suggestionsDiv.innerHTML = '<div style="padding: 12px; color: #9ca3af; text-align: center; font-size: 0.85rem;">No suggestions</div>';
+            return;
+        }
+
+        const suggestionsHTML = this.searchState.suggestions.map(suggestion => `
 			<div class="search-suggestion-item" 
 				 onclick="templateManager.applySuggestion('${this.escapeHtml(suggestion)}')"
 				 style="
@@ -279,37 +278,37 @@ const templateManager = {
 				<span style="color: #a855f7;">🔍</span> ${this.escapeHtml(suggestion)}
 			</div>
 		`).join('');
-		
-		suggestionsDiv.innerHTML = suggestionsHTML;
-	},
 
-	// Apply suggestion to search input
-	applySuggestion(suggestion) {
-		console.log('🔍 Applying suggestion:', suggestion);
-		
-		const searchInput = document.getElementById('templateSearchInput');
-		if (searchInput) {
-			searchInput.value = suggestion;
-			
-			// Trigger search
-			this.handleSearch();
-			
-			// Hide suggestions
-			this.hideSearchSuggestions();
-			
-			// Focus back on input
-			searchInput.focus();
-		}
-	},
+        suggestionsDiv.innerHTML = suggestionsHTML;
+    },
 
-	// Helper function to escape HTML (if not already present)
-	escapeHtml(text) {
-		const div = document.createElement('div');
-		div.textContent = text || '';
-		return div.innerHTML;
-	},
-		
-		
+    // Apply suggestion to search input
+    applySuggestion(suggestion) {
+        console.log('🔍 Applying suggestion:', suggestion);
+
+        const searchInput = document.getElementById('templateSearchInput');
+        if (searchInput) {
+            searchInput.value = suggestion;
+
+            // Trigger search
+            this.handleSearch();
+
+            // Hide suggestions
+            this.hideSearchSuggestions();
+
+            // Focus back on input
+            searchInput.focus();
+        }
+    },
+
+    // Helper function to escape HTML (if not already present)
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    },
+
+
 
     // Show searching status
     showSearchingStatus() {
@@ -324,11 +323,11 @@ const templateManager = {
     // Perform search
     performSearch(query) {
         const startTime = performance.now();
-        
+
         try {
             this.searchState.query = query;
             this.searchState.isSearching = true;
-            
+
             const cacheKey = `${query}_${this.searchState.showSharedTemplates}`;
             if (this.searchState.searchCache.has(cacheKey)) {
                 console.log('🔍 Using cached search results for:', query);
@@ -340,7 +339,7 @@ const templateManager = {
 
             const queryLower = query.toLowerCase();
             const results = [];
-            
+
             for (const [index, entry] of this.searchState.searchIndex.entries()) {
                 if (this.matchesSearchQuery(entry, queryLower)) {
                     if (!this.searchState.showSharedTemplates && !entry.template.isOwn) {
@@ -349,23 +348,23 @@ const templateManager = {
                     results.push(entry.template);
                 }
             }
-            
+
             this.searchState.results = results;
-            
+
             if (this.searchState.searchCache.size >= this.performance.maxCacheSize) {
                 const firstKey = this.searchState.searchCache.keys().next().value;
                 this.searchState.searchCache.delete(firstKey);
             }
             this.searchState.searchCache.set(cacheKey, results);
-            
+
             this.generateSearchSuggestionsAsync(queryLower);
-            
+
             const endTime = performance.now();
             console.log(`🔍 Search for "${query}": ${results.length} results in ${(endTime - startTime).toFixed(1)}ms`);
-            
+
             this.renderList();
             this.updateSearchStatus();
-            
+
         } catch (error) {
             console.error('Search error:', error);
             this.searchState.isSearching = false;
@@ -388,10 +387,10 @@ const templateManager = {
         const generateSuggestions = () => {
             const suggestions = new Set();
             let count = 0;
-            
+
             for (const [index, entry] of this.searchState.searchIndex.entries()) {
                 if (count >= this.performance.maxSuggestions) break;
-                
+
                 for (const keyword of entry.keywords) {
                     const keywordLower = keyword.toLowerCase();
                     if (keywordLower.includes(query) && keywordLower !== query) {
@@ -401,9 +400,9 @@ const templateManager = {
                     }
                 }
             }
-            
+
             const suggestionArray = Array.from(suggestions).slice(0, this.performance.maxSuggestions);
-            
+
             this.searchState.suggestionCache.set(query, suggestionArray);
             this.searchState.suggestions = suggestionArray;
         };
@@ -432,7 +431,7 @@ const templateManager = {
         if (this.searchState.isSearching) {
             const resultCount = this.getFilteredTemplates().length;
             const totalCount = this.getAllTemplates().length;
-            
+
             if (resultCount === 0) {
                 statusDiv.textContent = `No templates found for "${this.searchState.query}"`;
                 statusDiv.className = 'no-results';
@@ -456,9 +455,9 @@ const templateManager = {
 
         const newValue = checkbox.checked;
         this.searchState.showSharedTemplates = newValue;
-        
+
         console.log('🤝 Shared templates toggle:', newValue);
-        
+
         // NEUE FUNKTION: Userspezifisch speichern
         try {
             if (window.settingsManager) {
@@ -468,7 +467,7 @@ const templateManager = {
         } catch (error) {
             console.error('❌ Error saving shared templates preference:', error);
         }
-        
+
         // Cache leeren und neu rendern
         this.searchState.searchCache.clear();
         this.renderList();
@@ -476,44 +475,44 @@ const templateManager = {
     },
 
     async loadSharedTemplatesPreference() {
-    try {
-        if (!window.settingsManager) {
-            console.warn('⚠️ Settings manager not available, using default');
-            return;
+        try {
+            if (!window.settingsManager) {
+                console.warn('⚠️ Settings manager not available, using default');
+                return;
+            }
+
+            // Standard: true (Shared Templates anzeigen)
+            const showShared = await window.settingsManager.get('general.show_shared_templates');
+            const finalValue = showShared !== undefined ? showShared : true;
+
+            console.log('📂 Loading shared templates preference for user:', finalValue);
+
+            // Checkbox Status setzen
+            const checkbox = document.getElementById('showSharedTemplates');
+            if (checkbox) {
+                checkbox.checked = finalValue;
+            }
+
+            // Internen Status setzen
+            this.searchState.showSharedTemplates = finalValue;
+
+            console.log('✅ Shared templates preference loaded:', finalValue);
+
+        } catch (error) {
+            console.error('❌ Error loading shared templates preference:', error);
+            // Fallback auf Standard-Wert
+            this.searchState.showSharedTemplates = true;
+            const checkbox = document.getElementById('showSharedTemplates');
+            if (checkbox) {
+                checkbox.checked = true;
+            }
         }
-        
-        // Standard: true (Shared Templates anzeigen)
-        const showShared = await window.settingsManager.get('general.show_shared_templates');
-        const finalValue = showShared !== undefined ? showShared : true;
-        
-        console.log('📂 Loading shared templates preference for user:', finalValue);
-        
-        // Checkbox Status setzen
-        const checkbox = document.getElementById('showSharedTemplates');
-        if (checkbox) {
-            checkbox.checked = finalValue;
-        }
-        
-        // Internen Status setzen
-        this.searchState.showSharedTemplates = finalValue;
-        
-        console.log('✅ Shared templates preference loaded:', finalValue);
-        
-    } catch (error) {
-        console.error('❌ Error loading shared templates preference:', error);
-        // Fallback auf Standard-Wert
-        this.searchState.showSharedTemplates = true;
-        const checkbox = document.getElementById('showSharedTemplates');
-        if (checkbox) {
-            checkbox.checked = true;
-        }
-    }
-},
+    },
 
     async refreshUserPreferences() {
         console.log('👥 Refreshing user-specific preferences...');
         await this.loadSharedTemplatesPreference();
-        
+
         // Liste neu rendern mit neuen Einstellungen
         this.renderList();
         this.updateSearchStatus();
@@ -527,7 +526,7 @@ const templateManager = {
             templates = this.searchState.results;
         } else {
             templates = this.getAllTemplates();
-            
+
             if (!this.searchState.showSharedTemplates) {
                 templates = templates.filter(t => t.isOwn);
             }
@@ -544,23 +543,23 @@ const templateManager = {
         return 'category1'; // Default fallback for 4-category system
     },
 
-    
+
     // Get all templates (ENHANCED for better Group Template Loading)
     getAllTemplates() {
         const currentType = this.getCurrentType();
-        
+
         if (this.allTemplates.length > 0) {
             const firstTemplate = this.allTemplates[0];
             const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
-                                    (currentType === 'experiments' && firstTemplate.type === 'experiment');
-            
+                (currentType === 'experiments' && firstTemplate.type === 'experiment');
+
             if (cacheValidForType) {
                 return this.allTemplates;
             } else {
                 this.allTemplates = [];
             }
         }
-        
+
         // 1. Get own templates first (ENHANCED: Filter by category)
         const ownTemplates = this.templates.filter(t => {
             // Templates without category field are treated as 'category1' for backward compatibility
@@ -575,18 +574,18 @@ const templateManager = {
             const currentUser = window.userManager?.currentUser;
             const currentGroup = window.userManager?.currentGroup;
             const userManagementEnabled = window.userManager?.isEnabled();
-            
+
             console.log(`👤 Group template context: ${currentUser} (${currentGroup}), Enabled: ${userManagementEnabled}`);
-            
-            if (userManagementEnabled && currentUser && currentUser !== 'Unknown' && currentUser !== 'User' && 
+
+            if (userManagementEnabled && currentUser && currentUser !== 'Unknown' && currentUser !== 'User' &&
                 currentGroup && currentGroup !== 'Unknown' && currentGroup !== 'Default') {
-                
+
                 console.log(`🤝 Loading group templates for group: ${currentGroup}`);
-                
+
                 // Load from storage with better error handling
                 if (window.storage && typeof window.storage.loadGroupTemplates === 'function') {
                     const rawGroupTemplates = window.storage.loadGroupTemplates(currentGroup);
-                    
+
                     // Filter out current user's templates and invalid templates
                     groupTemplates = rawGroupTemplates.filter(t => {
                         if (!t || !t.name || t.name === 'undefined') {
@@ -595,17 +594,17 @@ const templateManager = {
                         }
                         if (t.createdBy === currentUser || t.createdBy === 'System') {
                             return false;
-                            }
-                            
-                            // ENHANCED: Apply category filter
-                            const templateCategory = t.category || 'category1';
-                            if (templateCategory !== currentType) {
-                                return false;
-                            }
-                            
-                            return true;
+                        }
+
+                        // ENHANCED: Apply category filter
+                        const templateCategory = t.category || 'category1';
+                        if (templateCategory !== currentType) {
+                            return false;
+                        }
+
+                        return true;
                     });
-                    
+
                     console.log(`🤝 Loaded ${groupTemplates.length} group templates after filtering`);
                 } else {
                     console.warn('⚠️ loadGroupTemplates function not available');
@@ -619,18 +618,18 @@ const templateManager = {
         }
 
         // 3. Mark templates with ownership and enhance metadata
-        const ownTemplatesMarked = ownTemplates.map((t, i) => ({ 
-            ...t, 
-            isOwn: true, 
+        const ownTemplatesMarked = ownTemplates.map((t, i) => ({
+            ...t,
+            isOwn: true,
             originalIndex: i,
             userDisplayName: t.createdBy || window.userManager?.currentUser || 'Unknown',
             groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown',
             category: t.category || 'category1'  // Ensure category field exists
         }));
-        
-        const groupTemplatesMarked = groupTemplates.map(t => ({ 
-            ...t, 
-            isOwn: false, 
+
+        const groupTemplatesMarked = groupTemplates.map(t => ({
+            ...t,
+            isOwn: false,
             originalIndex: -1,
             isShared: true,
             userDisplayName: t.createdBy || 'Unknown',
@@ -640,12 +639,12 @@ const templateManager = {
 
         // 4. Combine and cache
         this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
-        
+
         console.log(`📂 Total templates loaded: ${this.allTemplates.length} (${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared)`);
-        
+
         // 5. Update UI elements
         this.updateSharedToggleVisibility();
-        
+
         return this.allTemplates;
     },
 
@@ -656,18 +655,18 @@ const templateManager = {
             if (window.templateTypeManager && window.templateTypeManager.currentType) {
                 return window.templateTypeManager.currentType;
             }
-            
+
             // Check active tab in UI
             const folderTab = document.getElementById('folderTemplatesTab');
             const experimentTab = document.getElementById('experimentTemplatesTab');
-            
+
             if (folderTab && folderTab.classList.contains('active')) {
                 return 'folders';
             }
             if (experimentTab && experimentTab.classList.contains('active')) {
                 return 'experiments';
             }
-            
+
             // Default fallback
             return 'experiments';
         } catch (error) {
@@ -680,7 +679,7 @@ const templateManager = {
     getCategoryBadge(template) {
         const category = template.category || 'category1';
         const categoryConfig = window.templateTypeManager.getCategoryConfig(category);
-        
+
         return `<span class="template-badge ${category}" style="background: ${categoryConfig.color};">
             ${categoryConfig.icon}
         </span>`;
@@ -692,7 +691,7 @@ const templateManager = {
         if (!toggleElement) return;
 
         const userManagementEnabled = window.userManager?.isEnabled() || false;
-        
+
         if (userManagementEnabled) {
             toggleElement.style.display = 'block';
         } else {
@@ -730,10 +729,10 @@ const templateManager = {
         const template = this.currentTemplate;
         const hasStructure = template.structure && template.structure.trim() !== '';
         const hasMetadata = template.metadata && Object.keys(template.metadata).length > 0;
-        
+
         let infoText = template.name;
         let infoClass = 'template-info success';
-        
+
         if (template.type === 'experiment') {
             if (!hasStructure && !hasMetadata) {
                 infoText += ' (No structure or metadata defined)';
@@ -757,7 +756,7 @@ const templateManager = {
                 infoClass = 'template-info success';
             }
         }
-        
+
         infoElement.textContent = infoText;
         infoElement.className = infoClass;
     },
@@ -772,16 +771,16 @@ const templateManager = {
 
         const filteredTemplates = this.getFilteredTemplates();
         const currentType = this.getCurrentType();
-        
+
         if (filteredTemplates.length === 0) {
             let emptyMessage = 'No templates available yet.';
-            
+
             if (this.searchState.isSearching) {
                 emptyMessage = `No templates found for "${this.searchState.query}".`;
             } else if (!this.searchState.showSharedTemplates) {
                 emptyMessage = 'No personal templates available yet.';
             }
-            
+
             const typeLabel = currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
             listContainer.innerHTML = `
                 <div class="empty-state">
@@ -798,22 +797,22 @@ const templateManager = {
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
             // ENHANCED: Use category badge instead of type badge
             const badge = this.getCategoryBadge(template);
-            
+
             const color = this.getUserColor(template.createdBy);
             const initials = this.getUserInitials(template.createdBy);
             const isSelected = this.selectedIndex === index;
-            
+
             const createdDate = new Date(template.createdAt).toLocaleDateString();
             const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
-            
-            const displayName = this.searchState.isSearching ? 
-                this.highlightSearchMatches(template.name, this.searchState.query) : 
+
+            const displayName = this.searchState.isSearching ?
+                this.highlightSearchMatches(template.name, this.searchState.query) :
                 this.escapeHtml(template.name);
-            
-            const displayDescription = this.searchState.isSearching && template.description ? 
-                this.highlightSearchMatches(template.description, this.searchState.query) : 
+
+            const displayDescription = this.searchState.isSearching && template.description ?
+                this.highlightSearchMatches(template.description, this.searchState.query) :
                 (template.description ? this.escapeHtml(template.description) : '');
-            
+
             // Storage indicator
             const storageIndicator = `
                 <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
@@ -821,18 +820,18 @@ const templateManager = {
                     <span class="storage-text">${template.storageDisplay}</span>
                 </div>
             `;
-            
+
             // Copy link for shared templates
-            const copyLink = !template.isOwn && template.isShared ? 
+            const copyLink = !template.isOwn && template.isShared ?
                 `<div style="margin-top: 8px;">
                     <span class="copy-link" data-template-index="${index}" 
                           style="color: #10b981; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
                         📋 Copy to my templates
                     </span>
                 </div>` : '';
-            
+
             const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
-            
+
             return `
                 <div class="template-item ${isSelected ? 'active' : ''} ${searchResultClass}" 
                      data-is-own="${template.isOwn}"
@@ -887,7 +886,7 @@ const templateManager = {
     // Highlight search matches
     highlightSearchMatches(text, query) {
         if (!query || !text) return text;
-        
+
         try {
             const regex = new RegExp(`(${this.escapeRegExp(query)})`, 'gi');
             return text.replace(regex, '<span class="search-highlight">$1</span>');
@@ -902,7 +901,7 @@ const templateManager = {
         if (!listContainer) return;
 
         listContainer.removeEventListener('click', this.handleTemplateClick);
-        
+
         this.handleTemplateClick = (event) => {
             const templateItem = event.target.closest('.template-item');
             if (!templateItem) return;
@@ -930,7 +929,7 @@ const templateManager = {
         try {
             const filteredTemplates = this.getFilteredTemplates();
             const template = filteredTemplates[index];
-            
+
             if (!template || template.isOwn) {
                 console.warn('Cannot copy template: invalid or already owned');
                 return;
@@ -957,23 +956,23 @@ const templateManager = {
             delete copiedTemplate._fileInfo; // Remove file info for new copy
 
             this.templates.push(copiedTemplate);
-            
+
             if (window.storage) {
                 window.storage.saveTemplates(this.templates);
             }
-            
+
             this.invalidateCache();
             this.buildSearchIndex();
-            
+
             this.renderList();
             this.updateTemplateInfo();
-            
+
             if (window.app && window.app.showSuccess) {
                 window.app.showSuccess(`Template "${template.name}" copied to your collection!`);
             }
-            
+
             console.log(`✅ Template "${template.name}" copied successfully`);
-            
+
         } catch (error) {
             console.error('Error copying template:', error);
             if (window.app && window.app.showError) {
@@ -986,11 +985,11 @@ const templateManager = {
     select(index) {
         const filteredTemplates = this.getFilteredTemplates();
         const template = filteredTemplates[index];
-        
+
         if (!template) return;
 
         console.log(`🔄 Selecting template: ${template.name}`);
-        
+
         // CRITICAL FIX: Reset form completely before switching templates
         if (window.experimentForm && window.experimentForm.resetFormForNewTemplate) {
             console.log('🧹 Resetting form before template switch...');
@@ -999,26 +998,32 @@ const templateManager = {
 
         this.selectedIndex = index;
         this.currentTemplate = template;
-        
+
         this.renderList();
         this.updateTemplateInfo();
-        
+
         const detailsElement = document.getElementById('templateDetails');
+        const placeholderElement = document.getElementById('templatePlaceholder');
+
         if (detailsElement) {
             detailsElement.style.display = 'block';
         }
-        
+
+        if (placeholderElement) {
+            placeholderElement.style.display = 'none';
+        }
+
         const preview = document.getElementById('folderPreview');
         if (preview) {
             const structure = this.currentTemplate.structure || 'No structure defined';
             preview.textContent = structure;
         }
-        
+
         const experimentFormDiv = document.getElementById('experimentForm');
         if (experimentFormDiv) {
             if (this.currentTemplate.type === 'experiment' && this.currentTemplate.metadata) {
                 experimentFormDiv.style.display = 'block';
-                
+
                 // Now render the new template with clean form
                 if (window.experimentForm && window.experimentForm.render) {
                     console.log(`📋 Rendering template: ${template.name}`);
@@ -1028,7 +1033,7 @@ const templateManager = {
                 experimentFormDiv.style.display = 'none';
             }
         }
-        
+
         // NEW: Load elabFTW category from template
         if (this.currentTemplate.integrations?.elabftw?.defaultCategory !== undefined) {
             console.log(`📂 Loading elabFTW category from template: ${this.currentTemplate.integrations.elabftw.defaultCategory}`);
@@ -1041,9 +1046,14 @@ const templateManager = {
             // Clear category field if template has no specific category
             this.setElabFTWCategoryInUI('');
         }
-        
+
         this.updateActionButtons();
-        
+
+        // NEW: Dispatch event for other modules (e.g. sidebarIntegration)
+        window.dispatchEvent(new CustomEvent('templateSelected', {
+            detail: { template: this.currentTemplate }
+        }));
+
         console.log('✅ Template selected:', template.name);
     },
 
@@ -1051,11 +1061,11 @@ const templateManager = {
     getElabFTWCategoryFromUI() {
         const categoryInput = document.getElementById('elabftwProjectCategory');
         const categoryValue = categoryInput?.value?.trim();
-        
+
         if (categoryValue && categoryValue !== '' && !isNaN(parseInt(categoryValue))) {
             return parseInt(categoryValue);
         }
-        
+
         return null; // No specific category set
     },
 
@@ -1079,13 +1089,13 @@ const templateManager = {
             console.log('ℹ️ Cannot save category to shared template');
             return false;
         }
-        
+
         const elabftwCategory = this.getElabFTWCategoryFromUI();
-        
+
         try {
             // Find the template index
-            const templateIndex = this.templates.findIndex(t => 
-                t.name === this.currentTemplate.name && 
+            const templateIndex = this.templates.findIndex(t =>
+                t.name === this.currentTemplate.name &&
                 t.createdBy === this.currentTemplate.createdBy &&
                 t.createdAt === this.currentTemplate.createdAt
             );
@@ -1099,26 +1109,26 @@ const templateManager = {
                 ...this.currentTemplate,
                 updatedAt: new Date().toISOString()
             };
-            
+
             // Initialize integrations structure if needed
             if (!updatedTemplate.integrations) {
                 updatedTemplate.integrations = {};
             }
-            
+
             if (!updatedTemplate.integrations.elabftw) {
                 updatedTemplate.integrations.elabftw = {};
             }
-            
+
             // Store category in template
             updatedTemplate.integrations.elabftw.defaultCategory = elabftwCategory;
-            
+
             // Update the template
             await this.update(templateIndex, updatedTemplate);
             this.currentTemplate = updatedTemplate;
-            
+
             console.log(`✅ elabFTW category ${elabftwCategory || 'cleared'} saved to template "${this.currentTemplate.name}"`);
             return true;
-            
+
         } catch (error) {
             console.error('❌ Error saving elabFTW category to template:', error);
             return false;
@@ -1129,31 +1139,31 @@ const templateManager = {
     updateActionButtons() {
         const editBtn = document.querySelector('.actions button[onclick*="editCurrentTemplate"]');
         const deleteBtn = document.querySelector('.actions button[onclick*="deleteCurrentTemplate"]');
-        
+
         if (editBtn && deleteBtn) {
             const canEdit = this.currentTemplate && this.currentTemplate.isOwn;
-            
+
             editBtn.disabled = !canEdit;
             deleteBtn.disabled = !canEdit;
-            
+
             editBtn.style.opacity = canEdit ? '1' : '0.5';
             deleteBtn.style.opacity = canEdit ? '1' : '0.5';
-            
+
             editBtn.title = canEdit ? 'Edit this template' : 'Can only edit your own templates';
             deleteBtn.title = canEdit ? 'Delete this template' : 'Can only delete your own templates';
         }
     },
 
-// UPDATED: Add new template with immediate file storage
+    // UPDATED: Add new template with immediate file storage
 
     async add(template) {
         console.log('➕ Adding template (fixed version):', template.name);
-        
+
         try {
             // Prepare template with user context AND category
-            const currentCategory = window.templateTypeManager ? 
+            const currentCategory = window.templateTypeManager ?
                 window.templateTypeManager.currentType : 'category1';
-            
+
             const enhancedTemplate = {
                 ...template,
                 id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1163,26 +1173,26 @@ const templateManager = {
                 updatedAt: new Date().toISOString(),
                 category: template.category || currentCategory  // NEW: Add category field
             };
-            
+
             // Check for duplicates before adding
-            const existing = this.templates.find(t => 
-                t.name === enhancedTemplate.name && 
+            const existing = this.templates.find(t =>
+                t.name === enhancedTemplate.name &&
                 t.createdBy === enhancedTemplate.createdBy &&
                 t.type === enhancedTemplate.type
             );
-            
+
             if (existing) {
                 console.warn(`⚠️ Template "${enhancedTemplate.name}" already exists for user ${enhancedTemplate.createdBy}`);
                 throw new Error(`Template "${enhancedTemplate.name}" already exists. Please choose a different name.`);
             }
-            
+
             // Add to memory first
             this.templates.push(enhancedTemplate);
-            
+
             // Save to file using the stable method
             if (window.storage && window.storage.saveTemplateToFileImmediately) {
                 const saveResult = await window.storage.saveTemplateToFileImmediately(enhancedTemplate);
-                
+
                 if (saveResult.success) {
                     // Update template with file info
                     enhancedTemplate._fileInfo = {
@@ -1205,16 +1215,16 @@ const templateManager = {
             } else {
                 console.warn('⚠️ File storage not available, template only in memory');
             }
-            
+
             // Update UI
             this.invalidateCache();
             this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
-            
+
             console.log(`✅ Template "${enhancedTemplate.name}" added successfully`);
             return enhancedTemplate;
-            
+
         } catch (error) {
             console.error('❌ Error adding template:', error);
             throw error;
@@ -1224,22 +1234,22 @@ const templateManager = {
     // UPDATED: Update template with immediate file storage (FIXED: Rename support)
     async update(index, updatedTemplate) {
         console.log('📝 Updating template (rename-aware version):', updatedTemplate.name);
-        
+
         try {
             if (index < 0 || index >= this.templates.length) {
                 throw new Error('Invalid template index');
             }
-            
+
             const existingTemplate = this.templates[index];
             const oldTemplateName = existingTemplate.name;
             const newTemplateName = updatedTemplate.name;
-            
+
             // ===== DETECT TEMPLATE RENAME =====
             const isRename = oldTemplateName !== newTemplateName;
             if (isRename) {
                 console.log(`🏷️ Template rename detected: "${oldTemplateName}" -> "${newTemplateName}"`);
             }
-            
+
             // Preserve original metadata but update content
             const finalTemplate = {
                 ...updatedTemplate,
@@ -1250,14 +1260,14 @@ const templateManager = {
                 updatedAt: new Date().toISOString(),        // Update modification time
                 _fileInfo: existingTemplate._fileInfo       // Preserve file info (will be updated by storage)
             };
-            
+
             // Update in memory first
             this.templates[index] = finalTemplate;
-            
+
             // Save to file using stable method (will handle rename automatically)
             if (window.storage && window.storage.saveTemplateToFileImmediately) {
                 const saveResult = await window.storage.saveTemplateToFileImmediately(finalTemplate);
-                
+
                 if (saveResult.success) {
                     // Update file info with new information from storage
                     finalTemplate._fileInfo = {
@@ -1268,7 +1278,7 @@ const templateManager = {
                         stable: true,
                         wasRenamed: saveResult.wasRenamed || false
                     };
-                    
+
                     if (saveResult.wasRenamed) {
                         console.log(`✅ Template renamed and saved: "${oldTemplateName}" -> "${newTemplateName}"`);
                     } else {
@@ -1283,35 +1293,35 @@ const templateManager = {
             } else {
                 console.warn('⚠️ File storage not available, template updated in memory only');
             }
-            
+
             // ===== UPDATE CURRENT TEMPLATE IF IT'S THE ONE BEING EDITED =====
-            if (this.currentTemplate && 
-                this.currentTemplate.name === oldTemplateName && 
+            if (this.currentTemplate &&
+                this.currentTemplate.name === oldTemplateName &&
                 this.currentTemplate.createdBy === finalTemplate.createdBy) {
                 // Update the current template reference with the new name
                 this.currentTemplate = finalTemplate;
                 console.log(`🔄 Updated current template reference for: "${newTemplateName}"`);
             }
-            
+
             // FORCE: Update selected index to point to the renamed template
             if (isRename && this.selectedIndex >= 0 && this.selectedIndex < this.templates.length) {
                 const selectedTemplate = this.templates[this.selectedIndex];
-                if (selectedTemplate && selectedTemplate.name === finalTemplate.name && 
+                if (selectedTemplate && selectedTemplate.name === finalTemplate.name &&
                     selectedTemplate.createdBy === finalTemplate.createdBy) {
                     // Keep the same selectedIndex - it's still the same template
                     console.log(`🎯 Maintaining selection on renamed template at index: ${this.selectedIndex}`);
                 }
             }
-            
+
             // Update UI
             this.invalidateCache();
             this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
-            
+
             console.log(`✅ Template update completed: "${finalTemplate.name}"`);
             return finalTemplate;
-            
+
         } catch (error) {
             console.error('❌ Error updating template:', error);
             throw error;
@@ -1335,8 +1345,8 @@ const templateManager = {
 
         try {
             // Find template index
-            const templateIndex = this.templates.findIndex(t => 
-                t.name === this.currentTemplate.name && 
+            const templateIndex = this.templates.findIndex(t =>
+                t.name === this.currentTemplate.name &&
                 t.createdBy === this.currentTemplate.createdBy &&
                 t.createdAt === this.currentTemplate.createdAt
             );
@@ -1347,15 +1357,15 @@ const templateManager = {
 
             // Create deep copy and clear all values
             const clearedTemplate = this.createDeepCopy(this.templates[templateIndex]);
-            
+
             // Clear values from metadata fields
             this.clearTemplateValues(clearedTemplate);
-            
+
             // Clear project defaults
             if (clearedTemplate.projectDefaults) {
                 clearedTemplate.projectDefaults = {};
             }
-            
+
             clearedTemplate.updatedAt = new Date().toISOString();
 
             // Update template
@@ -1396,7 +1406,7 @@ const templateManager = {
                         // Skip groups
                         return;
                     }
-                    
+
                     // Clear the value based on field type
                     switch (field.type) {
                         case 'checkbox':
@@ -1429,15 +1439,15 @@ const templateManager = {
         if (obj === null || typeof obj !== 'object') {
             return obj;
         }
-        
+
         if (obj instanceof Date) {
             return new Date(obj.getTime());
         }
-        
+
         if (Array.isArray(obj)) {
             return obj.map(item => this.createDeepCopy(item));
         }
-        
+
         if (typeof obj === 'object') {
             const copy = {};
             Object.keys(obj).forEach(key => {
@@ -1445,7 +1455,7 @@ const templateManager = {
             });
             return copy;
         }
-        
+
         return obj;
     },
 
@@ -1459,7 +1469,7 @@ const templateManager = {
         try {
             console.log('💾 Starting batch save of all templates to files...');
             const userTemplates = this.templates.filter(t => !window.storage.isDefaultTemplate(t));
-            
+
             let successCount = 0;
             for (const template of userTemplates) {
                 const success = await window.storage.saveTemplateToFileImmediately(template);
@@ -1501,13 +1511,13 @@ const templateManager = {
             }
             return;
         }
-        
+
         if (window.templateModal) {
-            const editingIndex = this.templates.findIndex(t => 
-                t.name === this.currentTemplate.name && 
+            const editingIndex = this.templates.findIndex(t =>
+                t.name === this.currentTemplate.name &&
                 t.createdBy === this.currentTemplate.createdBy
             );
-            
+
             if (editingIndex >= 0) {
                 window.templateModal.openForEdit(editingIndex, this.templates[editingIndex]);
             }
@@ -1525,8 +1535,8 @@ const templateManager = {
 
         try {
             // Find template index
-            const templateIndex = this.templates.findIndex(t => 
-                t.name === this.currentTemplate.name && 
+            const templateIndex = this.templates.findIndex(t =>
+                t.name === this.currentTemplate.name &&
                 t.createdBy === this.currentTemplate.createdBy &&
                 t.createdAt === this.currentTemplate.createdAt
             );
@@ -1536,7 +1546,7 @@ const templateManager = {
             }
 
             const templateToDelete = this.templates[templateIndex];
-            
+
             // ===== ENHANCED CONFIRMATION DIALOG =====
             const confirmMessage = `⚠️ Delete Template: "${templateToDelete.name}"?\n\n` +
                 `Type: ${templateToDelete.type === 'experiment' ? 'Experiment' : 'Folder'}\n` +
@@ -1545,7 +1555,7 @@ const templateManager = {
                 `Storage: ${templateToDelete._fileInfo ? 'File' : 'Auto-detect'}\n\n` +
                 `⚠️ This action cannot be undone!\n\n` +
                 `Continue with deletion?`;
-            
+
             if (!confirm(confirmMessage)) {
                 console.log('🚫 Template deletion cancelled by user');
                 return;
@@ -1557,14 +1567,14 @@ const templateManager = {
             let fileDeleteAttempted = false;
             let fileDeleteSuccessful = false;
             let deleteError = null;
-            
+
             // METHOD 1: Use existing _fileInfo if available
             if (templateToDelete._fileInfo && templateToDelete._fileInfo.filePath && window.electronAPI.deleteTemplateFile) {
                 try {
                     console.log(`🗂️ Method 1: Using existing _fileInfo: ${templateToDelete._fileInfo.filePath}`);
                     const deleteResult = await window.electronAPI.deleteTemplateFile(templateToDelete._fileInfo.filePath);
                     fileDeleteAttempted = true;
-                    
+
                     if (deleteResult.success) {
                         console.log(`✅ File deleted successfully via _fileInfo`);
                         fileDeleteSuccessful = true;
@@ -1577,30 +1587,30 @@ const templateManager = {
                     deleteError = error.message;
                 }
             }
-            
+
             // METHOD 2: Calculate expected file path and try to delete
             if (!fileDeleteSuccessful && window.storage && window.storage.generateStableTemplateFilename && window.electronAPI) {
                 try {
                     console.log('🗂️ Method 2: Calculating expected file path...');
                     const expectedFilename = window.storage.generateStableTemplateFilename(templateToDelete);
                     console.log(`📁 Expected filename: ${expectedFilename}`);
-                    
+
                     // Get templates directory and calculate full path
                     const userInfo = {
                         username: templateToDelete.createdBy,
                         groupname: templateToDelete.createdByGroup
                     };
-                    
+
                     const dirResult = await window.electronAPI.getTemplatesDirectory(userInfo);
                     if (dirResult.success) {
                         const separator = dirResult.directory.includes('\\') ? '\\' : '/';
                         const calculatedPath = dirResult.directory + separator + expectedFilename;
-                        
+
                         console.log(`🗂️ Attempting to delete calculated path: ${calculatedPath}`);
-                        
+
                         const deleteResult = await window.electronAPI.deleteTemplateFile(calculatedPath);
                         fileDeleteAttempted = true;
-                        
+
                         if (deleteResult.success) {
                             console.log(`✅ File deleted successfully via calculated path`);
                             fileDeleteSuccessful = true;
@@ -1617,7 +1627,7 @@ const templateManager = {
                     if (!deleteError) deleteError = error.message;
                 }
             }
-            
+
             // ===== HANDLE FILE DELETION RESULTS =====
             if (fileDeleteAttempted && !fileDeleteSuccessful && deleteError) {
                 // File deletion was attempted but failed
@@ -1627,12 +1637,12 @@ const templateManager = {
                     `or if there are permission issues.\n\n` +
                     `Do you want to remove the template from the list anyway?\n\n` +
                     `(You may need to delete the file manually later)`;
-                
+
                 if (!confirm(continueMessage)) {
                     console.log('🚫 Template deletion aborted due to file deletion failure');
                     return; // Cancel deletion if user doesn't want to continue
                 }
-                
+
                 console.log('⚠️ Continuing with template deletion despite file deletion failure');
             } else if (!fileDeleteAttempted) {
                 console.log('ℹ️ No file deletion attempted (template might be memory-only)');
@@ -1662,10 +1672,10 @@ const templateManager = {
             }
 
             // Success message
-            const successMessage = fileDeleteSuccessful ? 
+            const successMessage = fileDeleteSuccessful ?
                 `Template "${templateToDelete.name}" and its file deleted successfully!` :
                 `Template "${templateToDelete.name}" removed from list!`;
-                
+
             if (window.app && window.app.showSuccess) {
                 window.app.showSuccess(successMessage);
             }
@@ -1674,14 +1684,14 @@ const templateManager = {
 
         } catch (error) {
             console.error('❌ Error deleting template:', error);
-            
+
             // Enhanced error message for user
             let errorMessage = `Failed to delete template: ${error.message}`;
-            
+
             if (error.message.includes('file') || error.message.includes('path')) {
                 errorMessage += `\n\nThe template file may still exist on the filesystem.`;
             }
-            
+
             if (window.app && window.app.showError) {
                 window.app.showError(errorMessage);
             } else {
@@ -1696,31 +1706,31 @@ const templateManager = {
             console.warn(`⚠️ ${operation} prevented: No template provided`);
             return false;
         }
-        
+
         // NUR wirklich problematische Namen herausfiltern
         if (!template.name || template.name.trim() === '') {
             console.warn(`⚠️ ${operation} prevented: Empty template name`);
             return false;
         }
-        
+
         // NUR Templates mit 'undefined' am Anfang herausfiltern (aber nicht "(Copy)" erlauben)
         if (template.name === 'undefined' || template.name.startsWith('undefined ')) {
             console.warn(`⚠️ ${operation} prevented: Invalid template name:`, template.name);
             return false;
         }
-        
+
         // Templates mit 'Unknown' User sind OK wenn sie aus Dateien kommen
         // NUR komplett fehlende User-Info ist problematisch
         if (!template.createdBy) {
             console.warn(`⚠️ ${operation} prevented: Missing creator`);
             return false;
         }
-        
+
         if (!template.createdByGroup) {
             console.warn(`⚠️ ${operation} prevented: Missing group`);
             return false;
         }
-        
+
         // ALLES ANDERE IST OK - auch "Unknown" User sind erlaubt
         return true;
     },
@@ -1734,31 +1744,31 @@ const templateManager = {
 
         let filteredTemplates = this.getFilteredTemplates();
         const currentType = this.getCurrentType();
-        
+
         // SANFTE FILTERUNG: Nur wirklich problematische Templates herausfiltern
         const validTemplates = filteredTemplates.filter(template => {
             // Nur wirklich ungültige Templates herausfiltern
-            if (!template.name || 
-                template.name === 'undefined' || 
+            if (!template.name ||
+                template.name === 'undefined' ||
                 template.name.startsWith('undefined ')) {
                 console.warn('🗑️ Filtering out problematic template:', template.name);
                 return false;
             }
             return true; // ALLES ANDERE IST OK
         });
-        
+
         // Use validTemplates instead of filteredTemplates for the rest of the function
         filteredTemplates = validTemplates;
-        
+
         if (filteredTemplates.length === 0) {
             let emptyMessage = 'No templates available yet.';
-            
+
             if (this.searchState.isSearching) {
                 emptyMessage = `No templates found for "${this.searchState.query}".`;
             } else if (!this.searchState.showSharedTemplates) {
                 emptyMessage = 'No personal templates available yet.';
             }
-            
+
             const typeLabel = currentType === 'folders' ? 'Folder Templates' : 'Experiment Templates';
             listContainer.innerHTML = `
                 <div class="empty-state">
@@ -1779,28 +1789,28 @@ const templateManager = {
             this.updateTemplateInfo();
             return;
         }
-        
+
         // CONTINUE with original renderList logic...
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
-            const badge = template.type === 'experiment' ? 
-                '<span class="template-badge experiment">🧪</span>' : 
+            const badge = template.type === 'experiment' ?
+                '<span class="template-badge experiment">🧪</span>' :
                 '<span class="template-badge">📁</span>';
-            
+
             const color = this.getUserColor(template.createdBy);
             const initials = this.getUserInitials(template.createdBy);
             const isSelected = this.selectedIndex === index;
-            
+
             const createdDate = new Date(template.createdAt).toLocaleDateString();
             const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
-            
-            const displayName = this.searchState.isSearching ? 
-                this.highlightSearchMatches(template.name, this.searchState.query) : 
+
+            const displayName = this.searchState.isSearching ?
+                this.highlightSearchMatches(template.name, this.searchState.query) :
                 this.escapeHtml(template.name);
-            
-            const displayDescription = this.searchState.isSearching && template.description ? 
-                this.highlightSearchMatches(template.description, this.searchState.query) : 
+
+            const displayDescription = this.searchState.isSearching && template.description ?
+                this.highlightSearchMatches(template.description, this.searchState.query) :
                 (template.description ? this.escapeHtml(template.description) : '');
-            
+
             // Storage indicator
             const storageIndicator = `
                 <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
@@ -1808,18 +1818,18 @@ const templateManager = {
                     <span class="storage-text">${template.storageDisplay}</span>
                 </div>
             `;
-            
+
             // Copy link for shared templates
-            const copyLink = !template.isOwn && template.isShared ? 
+            const copyLink = !template.isOwn && template.isShared ?
                 `<div style="margin-top: 8px;">
                     <span class="copy-link" data-template-index="${index}" 
                         style="color: #10b981; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
                         📋 Copy to my templates
                     </span>
                 </div>` : '';
-            
+
             const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
-            
+
             return `
                 <div class="template-item ${isSelected ? 'active' : ''} ${searchResultClass}" 
                     data-is-own="${template.isOwn}"
@@ -1866,25 +1876,25 @@ const templateManager = {
         }
 
         const template = this.templates[index];
-        
+
         // VALIDATION: Check if template is valid before selecting
         if (!this.validateTemplateForOperation(template, 'selection')) {
             console.warn('⚠️ Template selection prevented: Invalid template');
-            
+
             // Show error message to user
             const templateInfo = document.getElementById('templateInfo');
             if (templateInfo) {
                 templateInfo.textContent = 'Invalid template - cannot select';
                 templateInfo.className = 'template-info error';
             }
-            
+
             return;
         }
 
         // Continue with original selectTemplate logic if validation passes...
         this.currentTemplate = template;
         this.selectedIndex = index;
-        
+
         // Rest of original selectTemplate function...
     },
 
@@ -1897,14 +1907,14 @@ const templateManager = {
 
         try {
             const templates = await window.storage.loadTemplates();
-            
+
             // NUR problematische Templates herausfiltern
             let filteredTemplates = templates;
             if (window.storage.storageMode === 'files') {
                 filteredTemplates = templates.filter(template => {
                     // Nur wirklich problematische Templates herausfiltern
-                    if (!template.name || 
-                        template.name === 'undefined' || 
+                    if (!template.name ||
+                        template.name === 'undefined' ||
                         template.name.startsWith('undefined ')) {
                         console.log(`🗑️ Filtering out problematic template: "${template.name}"`);
                         return false;
@@ -1912,12 +1922,12 @@ const templateManager = {
                     return true; // ALLES ANDERE IST OK
                 });
             }
-            
+
             // Enhance each template with display properties
             const enhancedTemplates = filteredTemplates.map(template => this.enhanceTemplateWithStatus(template));
-            
+
             console.log(`📂 Loaded ${enhancedTemplates.length} templates (filtered from ${templates.length})`);
-            
+
             return enhancedTemplates;
         } catch (error) {
             console.error('❌ Error loading templates:', error);
@@ -1928,55 +1938,55 @@ const templateManager = {
     // ENHANCED: Refresh function with error handling and UI updates (FIXED: Keep selection)
     async refresh() {
         console.log('🔄 Manually refreshing template manager...');
-        
+
         // Remember current template for re-selection
         const currentTemplateName = this.currentTemplate?.name;
         const currentTemplateCreator = this.currentTemplate?.createdBy;
-        
+
         try {
             // 1. Clear all caches
             this.invalidateCache();
-            
+
             // 2. Reload own templates from storage
             this.templates = await this.loadTemplates();
             console.log(`📂 Reloaded ${this.templates.length} own templates`);
-            
+
             // 3. Force update shared toggle visibility
             this.updateSharedToggleVisibility();
-            
+
             // 4. Rebuild search index with fresh data
             this.buildSearchIndex();
-            
+
             // 5. Re-render the list (will include group templates via getAllTemplates)
             this.renderList();
-            
+
             // 6. Try to re-select the previously selected template (FIXED: Better matching)
             if (currentTemplateName && currentTemplateCreator) {
                 const allTemplates = this.getAllTemplates();
-                
+
                 // Try multiple strategies to find the template
                 let templateIndex = -1;
-                
+
                 // Strategy 1: Exact name and creator match
-                templateIndex = allTemplates.findIndex(t => 
+                templateIndex = allTemplates.findIndex(t =>
                     t.name === currentTemplateName && t.createdBy === currentTemplateCreator
                 );
-                
+
                 // Strategy 2: If renamed, try with original name from memory
                 if (templateIndex < 0 && this.currentTemplate && this.currentTemplate.id) {
                     templateIndex = allTemplates.findIndex(t => t.id === this.currentTemplate.id);
                 }
-                
+
                 // Strategy 3: Fuzzy match by similar name (for renames)
                 if (templateIndex < 0) {
                     const nameLower = currentTemplateName.toLowerCase();
-                    templateIndex = allTemplates.findIndex(t => 
+                    templateIndex = allTemplates.findIndex(t =>
                         t.createdBy === currentTemplateCreator &&
                         (t.name.toLowerCase().includes(nameLower.substring(0, 10)) ||
-                         nameLower.includes(t.name.toLowerCase().substring(0, 10)))
+                            nameLower.includes(t.name.toLowerCase().substring(0, 10)))
                     );
                 }
-                
+
                 if (templateIndex >= 0) {
                     const foundTemplate = allTemplates[templateIndex];
                     console.log(`🎯 Re-selecting template: ${foundTemplate.name} (was: ${currentTemplateName})`);
@@ -1992,12 +2002,12 @@ const templateManager = {
                 // 7. Update template info if no template was selected
                 this.updateTemplateInfo();
             }
-            
+
             console.log('✅ Template manager refresh completed');
-            
+
         } catch (error) {
             console.error('❌ Error during template refresh:', error);
-            
+
             // Show error to user if possible
             if (window.app && window.app.showError) {
                 window.app.showError('Template refresh failed: ' + error.message);
@@ -2005,36 +2015,36 @@ const templateManager = {
         }
     },
 
-// FORCE REFRESH with Group Template Re-sharing (neue Funktion hinzufügen)
-async forceRefreshWithGroupSync() {
-    console.log('🔄 Force refreshing with group synchronization...');
-    
-    try {
-        // 1. Normal refresh first
-        await this.refresh();
-        
-        // 2. Force re-share current user templates to group storage
-        if (window.storage && typeof window.storage.saveToGroupStorage === 'function') {
-            const userTemplates = this.templates.filter(t => !window.storage.isDefaultTemplate?.(t));
-            if (userTemplates.length > 0) {
-                window.storage.saveToGroupStorage(userTemplates);
-                console.log(`🤝 Re-shared ${userTemplates.length} templates to group storage`);
+    // FORCE REFRESH with Group Template Re-sharing (neue Funktion hinzufügen)
+    async forceRefreshWithGroupSync() {
+        console.log('🔄 Force refreshing with group synchronization...');
+
+        try {
+            // 1. Normal refresh first
+            await this.refresh();
+
+            // 2. Force re-share current user templates to group storage
+            if (window.storage && typeof window.storage.saveToGroupStorage === 'function') {
+                const userTemplates = this.templates.filter(t => !window.storage.isDefaultTemplate?.(t));
+                if (userTemplates.length > 0) {
+                    window.storage.saveToGroupStorage(userTemplates);
+                    console.log(`🤝 Re-shared ${userTemplates.length} templates to group storage`);
+                }
             }
+
+            // 3. Clear cache again to force reload of group templates
+            this.invalidateCache();
+
+            // 4. Final render
+            this.renderList();
+            this.updateTemplateInfo();
+
+            console.log('✅ Force refresh with group sync completed');
+
+        } catch (error) {
+            console.error('❌ Error during force refresh:', error);
         }
-        
-        // 3. Clear cache again to force reload of group templates
-        this.invalidateCache();
-        
-        // 4. Final render
-        this.renderList();
-        this.updateTemplateInfo();
-        
-        console.log('✅ Force refresh with group sync completed');
-        
-    } catch (error) {
-        console.error('❌ Error during force refresh:', error);
-    }
-},
+    },
 
     // Add these new functions to templateManager.js
 
@@ -2042,10 +2052,10 @@ async forceRefreshWithGroupSync() {
     async forceCleanupAndReload() {
         try {
             console.log('🧹 Starting template cleanup and reload...');
-            
+
             // Show loading indicator
             this.showLoadingState();
-            
+
             // Use storage cleanup function
             if (window.storage && window.storage.forceCleanReload) {
                 this.templates = await window.storage.forceCleanReload();
@@ -2053,18 +2063,18 @@ async forceRefreshWithGroupSync() {
                 console.warn('⚠️ Storage cleanup not available');
                 this.templates = await this.loadTemplates();
             }
-            
+
             // Update UI
             this.invalidateCache();
             this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
-            
+
             console.log(`✅ Template cleanup completed. Now showing ${this.templates.length} templates.`);
-            
+
             // Show success message
             this.showCleanupSuccessMessage(this.templates.length);
-            
+
         } catch (error) {
             console.error('❌ Error during template cleanup:', error);
             this.showErrorMessage('Cleanup failed: ' + error.message);
@@ -2090,7 +2100,7 @@ async forceRefreshWithGroupSync() {
     // NEW: Show cleanup success message
     showCleanupSuccessMessage(templateCount) {
         const message = `✅ Templates cleaned! Now showing ${templateCount} file-based templates only.`;
-        
+
         // Try to use existing notification system
         if (window.showNotification) {
             window.showNotification(message, 'success');
@@ -2123,9 +2133,9 @@ async forceRefreshWithGroupSync() {
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         `;
         messageEl.textContent = message;
-        
+
         document.body.appendChild(messageEl);
-        
+
         // Remove after 5 seconds
         setTimeout(() => {
             if (messageEl.parentNode) {
@@ -2141,7 +2151,7 @@ async forceRefreshWithGroupSync() {
             if (!window.storage || window.storage.storageMode !== 'files') {
                 return false;
             }
-            
+
             // Check if localStorage contains any template data
             let hasLocalStorageTemplates = false;
             const keysToCheck = [
@@ -2149,13 +2159,13 @@ async forceRefreshWithGroupSync() {
                 'experimentTemplates',
                 window.storage.getStorageKey('templates')
             ];
-            
+
             keysToCheck.forEach(key => {
                 if (localStorage.getItem(key)) {
                     hasLocalStorageTemplates = true;
                 }
             });
-            
+
             // Also check for any metafold_ or group keys
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -2164,13 +2174,13 @@ async forceRefreshWithGroupSync() {
                     break;
                 }
             }
-            
+
             if (hasLocalStorageTemplates) {
                 console.log('⚠️ Found localStorage templates in files-only mode');
                 this.showCleanupPrompt();
                 return true;
             }
-            
+
             return false;
         } catch (error) {
             console.warn('Error checking localStorage templates:', error);
@@ -2210,7 +2220,7 @@ async forceRefreshWithGroupSync() {
                 </div>
             </div>
         `;
-        
+
         // Insert prompt at the top of templates container
         const container = document.getElementById('templatesContainer');
         if (container) {
@@ -2223,14 +2233,14 @@ async forceRefreshWithGroupSync() {
     // ENHANCED: Modified init function to check for cleanup needs
     async init() {
         console.log('🔄 Initializing template manager...');
-        
+
         try {
             // Load templates
             this.templates = await this.loadTemplates();
-            
+
             // Check for localStorage cleanup needs
             await this.checkForLocalStorageTemplates();
-            
+
             // Continue with normal initialization
             this.filteredTemplates = [...this.templates];
             this.initializeSearchState();
@@ -2238,7 +2248,7 @@ async forceRefreshWithGroupSync() {
             this.renderList();
             this.updateTemplateInfo();
             this.updateSharedToggleVisibility();
-            
+
             console.log(`✅ Template manager initialized with ${this.templates.length} templates`);
         } catch (error) {
             console.error('❌ Error initializing template manager:', error);
@@ -2247,12 +2257,12 @@ async forceRefreshWithGroupSync() {
     },
 
     // ENHANCED: Modified loadTemplates to filter out Unknown templates
-        async loadTemplates() {
+    async loadTemplates() {
         console.log('📂 Loading templates (fixed version)...');
-        
+
         try {
             let templates = [];
-            
+
             // Use the new file-only loading method
             if (window.storage && window.storage.loadTemplates) {
                 templates = await window.storage.loadTemplates();
@@ -2261,7 +2271,7 @@ async forceRefreshWithGroupSync() {
                 console.warn('⚠️ No storage method available');
                 return [];
             }
-            
+
             // Filter out problematic templates
             const validTemplates = templates.filter(template => {
                 // Basic validation
@@ -2269,16 +2279,16 @@ async forceRefreshWithGroupSync() {
                     console.log(`🗑️ Filtering out invalid template: ${template.name}`);
                     return false;
                 }
-                
+
                 return true;
             });
-            
+
             // Enhance templates with display properties
             const enhancedTemplates = validTemplates.map(template => this.enhanceTemplateWithStatus(template));
-            
+
             console.log(`📂 Loaded ${enhancedTemplates.length} valid templates (filtered from ${templates.length})`);
             return enhancedTemplates;
-            
+
         } catch (error) {
             console.error('❌ Error loading templates:', error);
             return [];
@@ -2294,13 +2304,13 @@ async forceRefreshWithGroupSync() {
      */
     async migrateOldTemplatesToCategories() {
         console.log('🔄 Migrating old templates to category system...');
-        
+
         let migratedCount = 0;
         let changed = false;
-        
+
         for (let i = 0; i < this.templates.length; i++) {
             const template = this.templates[i];
-            
+
             // Check if template has old 'type' field but no 'category' field
             if (!template.category && template.type) {
                 // Migrate based on old type
@@ -2309,7 +2319,7 @@ async forceRefreshWithGroupSync() {
                 } else {
                     template.category = 'category1'; // Main-Project
                 }
-                
+
                 migratedCount++;
                 changed = true;
                 console.log(`🔄 Migrated template "${template.name}" to category ${template.category}`);
@@ -2320,15 +2330,15 @@ async forceRefreshWithGroupSync() {
                 changed = true;
             }
         }
-        
+
         if (changed) {
             // Save migrated templates
             if (window.storage) {
                 await window.storage.saveTemplates(this.templates);
             }
-            
+
             console.log(`✅ Migration completed: ${migratedCount} templates migrated`);
-            
+
             // Refresh UI
             this.invalidateCache();
             this.buildSearchIndex();
@@ -2336,7 +2346,7 @@ async forceRefreshWithGroupSync() {
         } else {
             console.log('ℹ️ No migration needed - all templates have categories');
         }
-        
+
         return migratedCount;
     }
 
