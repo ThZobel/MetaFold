@@ -41,10 +41,10 @@
   "devDependencies": {
     "@babel/core": "^7.28.4",
     "@babel/preset-react": "^7.27.1",
-	"babel-loader": "^10.0.0",
+    "babel-loader": "^10.0.0",
     "css-loader": "^7.1.2",
     "electron": "^38.2.2",
-	"electron-builder": "^26.0.12",
+    "electron-builder": "^26.0.12",
     "style-loader": "^4.0.0",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1"
@@ -62,6 +62,7 @@
       "assets/**/*",
       "css/**/*",
       "js/**/*",
+      "components/**/*",
       "node_modules/jsoncrack/**/*",
       "node_modules/react/**/*",
       "node_modules/react-dom/**/*"
