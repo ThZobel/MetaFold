@@ -47,6 +47,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set Version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            raw_version="${{ github.event.inputs.version }}"
+          else
+            raw_version="${GITHUB_REF#refs/tags/}"
+          fi
+          version="${raw_version#v}"
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Update package.json version
+        working-directory: src
+        run: npm --no-git-tag-version version ${{ env.VERSION }}
+
       # Debug: Check file structure (Windows)
       - name: Debug - Check repository structure (Windows)
         if: matrix.platform == 'windows'
@@ -306,7 +322,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: MetaFold ${{ steps.version.outputs.version }}
