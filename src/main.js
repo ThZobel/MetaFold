@@ -186,10 +186,11 @@ function showAboutDialog() {
         message: 'MetaFold',
         detail: `Laboratory Data Management & Experiment Organization
 
-Version: 0.0.4
+Version: 0.0.1
 License: MIT
 
 Developed by: Dr. Thomas Zobel
+(with assistance from Claude AI)
 
 GitHub: https://github.com/ThZobel/MetaFold
 Documentation: https://metafold-docs.readthedocs.io/en/latest/
@@ -842,6 +843,19 @@ ipcMain.handle('select-folder', async () => {
 
     if (!result.canceled && result.filePaths.length > 0) {
         return result.filePaths[0];
+    }
+    return null;
+});
+
+// Multi-Folder Dialog
+ipcMain.handle('select-folders', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory', 'multiSelections'],
+        title: 'Select Target Folders'
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+        return result.filePaths;
     }
     return null;
 });
@@ -2602,6 +2616,79 @@ ipcMain.handle('get-storage-location-info', async (event) => {
         };
     }
 });
+
+ipcMain.handle('send-webhook', async (event, url, payload, headers, verifySsl) => {
+    return new Promise((resolve) => {
+        try {
+            const https = require('https');
+            const http = require('http');
+            const { URL } = require('url');
+
+            const urlObj = new URL(url);
+            const requestModule = urlObj.protocol === 'https:' ? https : http;
+
+            const bodyStr = payload
+                ? (typeof payload === 'string' ? payload : JSON.stringify(payload))
+                : '';
+
+            // Merge provided headers with Content-Type and Content-Length
+            const mergedHeaders = {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(bodyStr),
+                ...(headers || {})
+            };
+
+            const options = {
+                method: 'POST',
+                headers: mergedHeaders,
+                rejectUnauthorized: verifySsl !== false  // explicitly: false only when set to false
+            };
+
+            console.log(`🤖 [Webhook] POST ${url} | SSL verify: ${options.rejectUnauthorized}`);
+
+            const req = requestModule.request(url, options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => { data += chunk; });
+                res.on('end', () => {
+                    console.log(`🤖 [Webhook] Response: ${res.statusCode}`);
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve({ success: true, status: res.statusCode, data: data });
+                    } else {
+                        resolve({ success: false, status: res.statusCode, error: data });
+                    }
+                });
+            });
+
+            req.on('error', (e) => {
+                const isSslError = e.code && (
+                    e.code.includes('CERT') ||
+                    e.code.includes('SSL') ||
+                    e.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+                    e.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+                    e.code === 'DEPTH_ZERO_SELF_SIGNED_CERT'
+                );
+                if (isSslError) {
+                    console.error(`🔒 [Webhook] SSL certificate error (${e.code}): ${e.message}`);
+                    console.error('💡 Tip: Disable SSL verification in MetaFold Settings → n8n → "Verify SSL Certificate"');
+                } else {
+                    console.error('❌ [Webhook] Request error:', e);
+                }
+                resolve({ success: false, error: e.message, code: e.code });
+            });
+
+            if (bodyStr) {
+                req.write(bodyStr);
+            }
+            req.end();
+        } catch (error) {
+            console.error('❌ [Webhook] Request setup error:', error);
+            resolve({ success: false, error: error.message });
+        }
+    });
+});
+
+
+// =================== OMERO PROXY APIS ===================
 
 ipcMain.handle('start-omero-proxy', async (event, settings = {}) => {
     try {

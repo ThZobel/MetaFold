@@ -297,21 +297,42 @@ const experimentForm = {
                 const elabToggle = document.getElementById('sendToElabFTW');
                 const omeroToggle = document.getElementById('sendToOMERO');
                 const rspaceToggle = document.getElementById('sendToRSpace');
+                const n8nToggle = document.getElementById('sendToN8n');
 
-                if (elabToggle && ints.elabftw !== undefined) {
-                    elabToggle.checked = ints.elabftw;
-                    // Trigger change event to update UI dependent on this toggle
-                    elabToggle.dispatchEvent(new Event('change'));
+                if (elabToggle) {
+                    let elabVal = ints.elabftwEnabled !== undefined ? ints.elabftwEnabled : ints.elabftw;
+                    if (typeof elabVal === 'object' && elabVal !== null) elabVal = true;
+                    if (elabVal !== undefined && elabToggle.checked !== elabVal) {
+                        elabToggle.checked = elabVal;
+                        elabToggle.dispatchEvent(new Event('change'));
+                    }
                 }
 
-                if (omeroToggle && ints.omero !== undefined) {
-                    omeroToggle.checked = ints.omero;
-                    omeroToggle.dispatchEvent(new Event('change'));
+                if (omeroToggle) {
+                    let omeroVal = ints.omeroEnabled !== undefined ? ints.omeroEnabled : ints.omero;
+                    if (typeof omeroVal === 'object' && omeroVal !== null) omeroVal = true;
+                    if (omeroVal !== undefined && omeroToggle.checked !== omeroVal) {
+                        omeroToggle.checked = omeroVal;
+                        omeroToggle.dispatchEvent(new Event('change'));
+                    }
                 }
 
-                if (rspaceToggle && ints.rspace !== undefined) {
-                    rspaceToggle.checked = ints.rspace;
-                    rspaceToggle.dispatchEvent(new Event('change'));
+                if (rspaceToggle) {
+                    let rspaceVal = ints.rspaceEnabled !== undefined ? ints.rspaceEnabled : ints.rspace;
+                    if (typeof rspaceVal === 'object' && rspaceVal !== null) rspaceVal = true;
+                    if (rspaceVal !== undefined && rspaceToggle.checked !== rspaceVal) {
+                        rspaceToggle.checked = rspaceVal;
+                        rspaceToggle.dispatchEvent(new Event('change'));
+                    }
+                }
+
+                if (n8nToggle) {
+                    let n8nVal = ints.n8nEnabled !== undefined ? ints.n8nEnabled : ints.n8n;
+                    if (typeof n8nVal === 'object' && n8nVal !== null) n8nVal = true;
+                    if (n8nVal !== undefined && n8nToggle.checked !== n8nVal) {
+                        n8nToggle.checked = n8nVal;
+                        n8nToggle.dispatchEvent(new Event('change'));
+                    }
                 }
 
                 console.log('🔄 Restored integration states:', ints);
@@ -407,6 +428,37 @@ const experimentForm = {
                     <span style="font-size: 0.85rem; color: #e0e0e0;">Yes/No</span>
                 </label>`;
                 break;
+            case 'multicheckbox':
+                // savedValue may be an array from prior save or a stringified array
+                let mcSavedArr = [];
+                if (Array.isArray(savedValue)) {
+                    mcSavedArr = savedValue;
+                } else if (typeof savedValue === 'string' && savedValue.startsWith('[')) {
+                    try { mcSavedArr = JSON.parse(savedValue); } catch(e) { mcSavedArr = []; }
+                }
+                const mcOptions = fieldInfo.options || [];
+                const mcPills = mcOptions.map(opt => {
+                    const isSelected = mcSavedArr.includes(opt);
+                    return `<label class="multicheckbox-pill${isSelected ? ' selected' : ''}" title="${opt}">
+                        <input type="checkbox"
+                               class="mc-item"
+                               data-field-name="${fieldName}"
+                               data-option="${opt}"
+                               ${isSelected ? 'checked' : ''}
+                               onchange="experimentForm.handleMultiCheckboxChange('${fieldName}', this)">
+                        <svg class="mc-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <rect x="0.5" y="0.5" width="12" height="12" rx="3" stroke="currentColor"/>
+                            <path class="mc-check" d="M3 6.5L5.5 9L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        ${opt}
+                    </label>`;
+                }).join('');
+                // Hidden input to store the aggregated array value for collectFormValues
+                inputHtml = `<div class="multicheckbox-group" id="${safeFieldId}" data-field-name="${fieldName}">
+                    ${mcPills}
+                    ${mcOptions.length > 3 ? `<button type="button" class="mc-toggle-all" onclick="experimentForm.toggleAllMultiCheckbox('${safeFieldId}', '${fieldName}')" title="Toggle all">⊞</button>` : ''}
+                </div>`;
+                break;
         }
         valueCell.innerHTML = inputHtml;
         tr.appendChild(valueCell);
@@ -432,14 +484,27 @@ const experimentForm = {
         // Event listener for saving values
         const input = valueCell.querySelector(`#${safeFieldId}`);
         if (input) {
-            input.addEventListener('change', () => {
-                const realFieldName = input.getAttribute('data-field-name');
-                this.saveFieldValue(realFieldName, input.type === 'checkbox' ? input.checked : input.value);
+            if (input.classList.contains('multicheckbox-group')) {
+                // Multi-checkbox: listen on each pill checkbox
+                input.querySelectorAll('.mc-item').forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        const vals = this.getMultiCheckboxValues(fieldName);
+                        this.saveFieldValue(fieldName, vals);
+                        if (this.filenameState.selectedFields.includes(fieldName)) {
+                            this.updateFilenamePreview();
+                        }
+                    });
+                });
+            } else {
+                input.addEventListener('change', () => {
+                    const realFieldName = input.getAttribute('data-field-name');
+                    this.saveFieldValue(realFieldName, input.type === 'checkbox' ? input.checked : input.value);
 
-                if (this.filenameState.selectedFields.includes(realFieldName)) {
-                    this.updateFilenamePreview();
-                }
-            });
+                    if (this.filenameState.selectedFields.includes(realFieldName)) {
+                        this.updateFilenamePreview();
+                    }
+                });
+            }
         }
     },
 
@@ -810,10 +875,12 @@ const experimentForm = {
             const elabToggle = document.getElementById('sendToElabFTW');
             const omeroToggle = document.getElementById('sendToOMERO');
             const rspaceToggle = document.getElementById('sendToRSpace');
+            const n8nToggle = document.getElementById('sendToN8n');
 
-            if (elabToggle) updatedTemplate.integrations.elabftw = elabToggle.checked;
-            if (omeroToggle) updatedTemplate.integrations.omero = omeroToggle.checked;
-            if (rspaceToggle) updatedTemplate.integrations.rspace = rspaceToggle.checked;
+            if (elabToggle) updatedTemplate.integrations.elabftwEnabled = elabToggle.checked;
+            if (omeroToggle) updatedTemplate.integrations.omeroEnabled = omeroToggle.checked;
+            if (rspaceToggle) updatedTemplate.integrations.rspaceEnabled = rspaceToggle.checked;
+            if (n8nToggle) updatedTemplate.integrations.n8nEnabled = n8nToggle.checked;
 
             // NEW: Save project defaults (Project Name and Target Path)
             if (!updatedTemplate.projectDefaults) updatedTemplate.projectDefaults = {};
@@ -1025,6 +1092,13 @@ const experimentForm = {
             if (fieldInfo.type === 'group') return; // Skip groups
 
             const safeFieldId = 'field_' + this.createSafeId(fieldName);
+
+            // Multi-Checkbox: collect from grouped checkboxes
+            if (fieldInfo.type === 'multicheckbox') {
+                formValues[fieldName] = this.getMultiCheckboxValues(fieldName);
+                return;
+            }
+
             const input = document.getElementById(safeFieldId);
             if (!input) return;
 
@@ -1041,6 +1115,46 @@ const experimentForm = {
         });
 
         return formValues;
+    },
+
+    // Collect selected values from a multi-checkbox group
+    getMultiCheckboxValues(fieldName) {
+        const safeFieldId = 'field_' + this.createSafeId(fieldName);
+        const group = document.getElementById(safeFieldId);
+        if (!group) return [];
+        const checked = group.querySelectorAll('.mc-item:checked');
+        return Array.from(checked).map(cb => cb.getAttribute('data-option'));
+    },
+
+    // Handle individual pill toggle (update visual state)
+    handleMultiCheckboxChange(fieldName, checkbox) {
+        const pill = checkbox.closest('.multicheckbox-pill');
+        if (pill) {
+            pill.classList.toggle('selected', checkbox.checked);
+        }
+        const vals = this.getMultiCheckboxValues(fieldName);
+        this.saveFieldValue(fieldName, vals);
+        if (this.filenameState.selectedFields.includes(fieldName)) {
+            this.updateFilenamePreview();
+        }
+    },
+
+    // Toggle all checkboxes in a multi-checkbox group
+    toggleAllMultiCheckbox(groupId, fieldName) {
+        const group = document.getElementById(groupId);
+        if (!group) return;
+        const items = group.querySelectorAll('.mc-item');
+        const anyUnchecked = Array.from(items).some(cb => !cb.checked);
+        items.forEach(cb => {
+            cb.checked = anyUnchecked;
+            const pill = cb.closest('.multicheckbox-pill');
+            if (pill) pill.classList.toggle('selected', anyUnchecked);
+        });
+        const vals = this.getMultiCheckboxValues(fieldName);
+        this.saveFieldValue(fieldName, vals);
+        if (this.filenameState.selectedFields.includes(fieldName)) {
+            this.updateFilenamePreview();
+        }
     },
 
     // Show save message
@@ -1254,6 +1368,33 @@ const experimentForm = {
                 });
             }
 
+            const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+            const targetPathInput = document.getElementById('targetPath');
+            const projectNameInput = document.getElementById('projectName');
+            const categoryIdInput = document.getElementById('elabftwProjectCategory');
+
+            const projectDefaults = {};
+            if (targetPathInput && targetPathInput.value) projectDefaults.targetPath = targetPathInput.value;
+            if (projectNameInput && projectNameInput.value) projectDefaults.projectName = projectNameInput.value;
+
+            const elabftwIntegration = {};
+            if (fetchNextIdInput) elabftwIntegration.fetchNextId = fetchNextIdInput.checked;
+            if (categoryIdInput && categoryIdInput.value) elabftwIntegration.defaultCategory = parseInt(categoryIdInput.value);
+
+            // Collect integration toggles
+            const integrations = {
+                elabftw: elabftwIntegration
+            };
+            const elabToggle = document.getElementById('sendToElabFTW');
+            const omeroToggle = document.getElementById('sendToOMERO');
+            const rspaceToggle = document.getElementById('sendToRSpace');
+            const n8nToggle = document.getElementById('sendToN8n');
+
+            if (elabToggle) integrations.elabftwEnabled = elabToggle.checked;
+            if (omeroToggle) integrations.omeroEnabled = omeroToggle.checked;
+            if (rspaceToggle) integrations.rspaceEnabled = rspaceToggle.checked;
+            if (n8nToggle) integrations.n8nEnabled = n8nToggle.checked;
+
             // Create new template object with proper user info
             const newTemplate = {
                 id: this.generateTemplateId(templateName),
@@ -1264,7 +1405,9 @@ const experimentForm = {
                 createdBy: currentUser,
                 createdByGroup: currentGroup,
                 createdAt: new Date().toISOString(),
-                savedFormData: formData
+                savedFormData: formData,
+                projectDefaults: projectDefaults,
+                integrations: integrations
             };
 
             console.log('📝 Creating template:', {
@@ -1392,10 +1535,19 @@ const experimentForm = {
 
         this.filenameState.selectedFields.forEach(fieldName => {
             const safeFieldId = 'field_' + this.createSafeId(fieldName);
-            const input = document.getElementById(safeFieldId);
+            const group = document.getElementById(safeFieldId);
 
-            if (input && input.value) {
-                let value = input.type === 'checkbox' ? (input.checked ? 'Yes' : 'No') : input.value;
+            if (group && group.classList.contains('multicheckbox-group')) {
+                // Multi-checkbox: join selected options with '+'
+                const selected = this.getMultiCheckboxValues(fieldName);
+                if (selected.length > 0) {
+                    const value = selected
+                        .map(v => String(v).replace(/[^a-zA-Z0-9-_]/g, '_'))
+                        .join('+');
+                    parts.push(value);
+                }
+            } else if (group && group.value) {
+                let value = group.type === 'checkbox' ? (group.checked ? 'Yes' : 'No') : group.value;
                 if (value) {
                     // Sanitize value for filename
                     value = String(value).replace(/[^a-zA-Z0-9-_]/g, '_');
@@ -1403,6 +1555,7 @@ const experimentForm = {
                 }
             }
         });
+
 
         // Join with underscores
         const filename = parts.join('_');

@@ -2,10 +2,7 @@
 
 **A powerful desktop application for laboratory data management and experiment organization**
 
-MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks and image management systems.
-
-![MetaFold Interface](/assets/screenshots/metafold-main-interface.png)
-*Screenshot placeholder - Main MetaFold interface*
+MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks, image management systems, and workflow automation tools.
 
 ---
 
@@ -13,18 +10,21 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 
 🗂️ **Template-Based Project Creation**
 - Create standardized folder structures from configurable templates
-- Dynamic metadata forms with validation
+- Dynamic metadata forms with drag & drop field ordering
 - Support for both folder and experiment templates
 
 👥 **Multi-User Support**
 - Secure user management with credential storage
 - User-specific templates and settings
 - Group-based access control
+- Admin account with automatic initialization on first launch
 
 🔗 **Laboratory Integrations**
-- **elabFTW**: Direct experiment creation with metadata sync
-- **OMERO**: Dataset creation with map annotations
-- **Secure Authentication**: Multi-layer encryption for credentials
+- **elabFTW**: Direct experiment creation with metadata sync; select experiment templates via dropdown
+- **OMERO**: Project/Dataset creation with map annotations
+- **RSpace**: Electronic lab notebook integration
+- **n8n**: Workflow automation via webhooks – trigger custom workflows on project creation
+- **Secure Authentication**: Multi-layer encryption (DPAPI + user-specific entropy) for all credentials
 
 📊 **Project Discovery & Visualization**
 - Recursive scanning of existing projects
@@ -32,6 +32,7 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 - Project statistics and relationship analysis
 
 🎨 **Modern Interface**
+- **Light & Dark Mode** – toggle with a single click, preference is remembered
 - Responsive design for different screen sizes
 - Drag & drop functionality
 - Real-time validation and feedback
@@ -52,7 +53,7 @@ MetaFold simplifies the creation of standardized folder structures and metadata 
 3. Install the application:
    - **Windows**: Run the `.exe` installer and follow the setup wizard
    - **macOS**: Open the `.dmg` file and drag MetaFold to Applications
-   - **Linux**: 
+   - **Linux**:
      - For `.AppImage`: Make executable (`chmod +x`) and run directly
      - For `.deb`: Install with `sudo dpkg -i MetaFold-x.x.x.deb`
 4. Launch MetaFold from your applications menu
@@ -142,7 +143,7 @@ For comprehensive documentation, tutorials, and API references, visit:
 The documentation includes:
 - Detailed setup guides
 - Template creation tutorials
-- Integration configuration
+- Integration configuration (elabFTW, OMERO, RSpace, n8n)
 - Advanced features and workflows
 - Troubleshooting guides
 
@@ -154,7 +155,7 @@ The documentation includes:
 Define reusable project structures with:
 - Custom folder hierarchies
 - Metadata schemas with validation
-- Integration settings for elabFTW/OMERO
+- Integration settings for elabFTW / OMERO / RSpace / n8n
 
 ### Projects
 Create standardized experiments with:
@@ -167,6 +168,35 @@ Analyze existing projects with:
 - Recursive project scanning
 - Statistical analysis and visualization
 - Export capabilities for further analysis
+
+---
+
+## 🔗 Integrations Overview
+
+| Integration | Purpose | Key Feature |
+|---|---|---|
+| **elabFTW** | Electronic lab notebook | Experiment creation; template selection via dropdown |
+| **OMERO** | Image data management | Project/Dataset + map annotation creation |
+| **RSpace** | Electronic lab notebook | Document creation with folder targeting |
+| **n8n** | Workflow automation | Webhook trigger on project creation |
+
+### n8n Workflow Automation
+Connect MetaFold to your [n8n](https://n8n.io) automation server to trigger custom workflows whenever a new project is created. Configure in **Settings → 🤖 n8n**:
+- Enter your webhook URL
+- Choose authentication (None / Bearer Token / Basic Auth)
+- Optionally set an Instance ID for multi-machine setups
+- Enable the n8n toggle per project in the right sidebar
+
+### elabFTW Template Selection
+When elabFTW is enabled, the right sidebar shows a **Template** dropdown populated directly from your elabFTW server. Select the appropriate experiment template per MetaFold project template – the selection is saved and restored automatically.
+
+---
+
+## 🎨 Light & Dark Mode
+
+MetaFold supports both **dark mode** (default) and **light mode**:
+- Click the ☀️/🌙 button in the top-left sidebar header to toggle
+- Your preference is saved across sessions
 
 ---
 

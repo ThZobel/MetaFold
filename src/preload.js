@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // MetaFold v0.0.1 - Secure API for renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
     // =================== VERSION INFO ===================
-    version: '0.0.4',
+    version: '0.0.1',
     appName: 'MetaFold',
     author: 'Dr. Thomas Zobel',
     license: 'MIT',
@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
+    selectFolders: () => ipcRenderer.invoke('select-folders'),
 
     // Create project (Main API)
     createProject: (basePath, projectName, structure, metadata = null) =>
@@ -162,6 +163,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     testOMEROConnection: (serverUrl, username, password) =>
         ipcRenderer.invoke('test-omero-connection', serverUrl, username, password),
+
+    // =================== WEBHOOK APIS ===================
+    
+    sendWebhook: (url, payload, headers, verifySsl) =>
+        ipcRenderer.invoke('send-webhook', url, payload, headers, verifySsl),
 
     // =================== DIRECTORY CONFLICT RESOLUTION APIS ===================
 

@@ -1015,8 +1015,12 @@ const templateManager = {
 
         const preview = document.getElementById('folderPreview');
         if (preview) {
-            const structure = this.currentTemplate.structure || 'No structure defined';
-            preview.textContent = structure;
+            const structure = this.currentTemplate.structure || '';
+            if (structure.trim()) {
+                preview.innerHTML = this.parseAndRenderFolderTree(structure);
+            } else {
+                preview.textContent = 'No structure defined';
+            }
         }
 
         const experimentFormDiv = document.getElementById('experimentForm');
@@ -1034,17 +1038,89 @@ const templateManager = {
             }
         }
 
-        // NEW: Load elabFTW category from template
-        if (this.currentTemplate.integrations?.elabftw?.defaultCategory !== undefined) {
+        // Toggle UI for template options
+        const baseDirSection = document.getElementById('baseDirectorySection');
+        const multiFolderSection = document.getElementById('multiFolderSection');
+        const projectNameSection = document.getElementById('projectNameSection');
+        const btnCreateProject = document.getElementById('createProjectBtn');
+
+        const isMultiFolder = template.options?.multipleFolders;
+        const isWriteFilesOnly = template.options?.writeFilesOnly;
+
+        if (baseDirSection) baseDirSection.style.display = isMultiFolder ? 'none' : 'block';
+        if (multiFolderSection) multiFolderSection.style.display = isMultiFolder ? 'block' : 'none';
+        
+        // projectNameSection is ALWAYS visible, but its label changes
+        if (projectNameSection) {
+            projectNameSection.style.display = 'block';
+            const titleElement = projectNameSection.querySelector('h4');
+            const subtitleElement = projectNameSection.querySelector('.section-subtitle');
+            const inputElement = document.getElementById('projectName');
+            
+            if (isWriteFilesOnly || isMultiFolder) {
+                if (titleElement) titleElement.textContent = 'Filename';
+                if (subtitleElement) subtitleElement.textContent = 'Name of the file to write';
+                if (inputElement) {
+                    inputElement.placeholder = 'ReadyToImport.json';
+                    inputElement.title = 'Enter a filename';
+                    if (!inputElement.value || inputElement.value === 'My_Experiment_2024') {
+                        inputElement.value = 'ReadyToImport.json';
+                    }
+                }
+            } else {
+                if (titleElement) titleElement.textContent = 'Project Name';
+                if (subtitleElement) subtitleElement.textContent = 'Name for your experiment/project';
+                if (inputElement) {
+                    inputElement.placeholder = 'My_Experiment_2024...';
+                    inputElement.title = 'Enter a name for your project';
+                    if (inputElement.value === 'ReadyToImport.json') {
+                        inputElement.value = '';
+                    }
+                }
+            }
+        }
+        
+        if (btnCreateProject) {
+            btnCreateProject.innerHTML = (isWriteFilesOnly || isMultiFolder) ? '<span>📝</span> Write Files' : '<span>🚀</span> Create Project';
+        }
+
+        // NEW: Load elabFTW category and settings from template
+        if (this.currentTemplate.integrations?.elabftw) {
             console.log(`📂 Loading elabFTW category from template: ${this.currentTemplate.integrations.elabftw.defaultCategory}`);
             this.setElabFTWCategoryInUI(this.currentTemplate.integrations.elabftw.defaultCategory);
+            
+            const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+            if (fetchNextIdInput) {
+                fetchNextIdInput.checked = this.currentTemplate.integrations.elabftw.fetchNextId || false;
+            }
         } else if (this.currentTemplate.elabftwCategory !== undefined) {
             // Legacy support for direct property
             console.log(`📂 Loading legacy elabFTW category from template: ${this.currentTemplate.elabftwCategory}`);
             this.setElabFTWCategoryInUI(this.currentTemplate.elabftwCategory);
+            
+            const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+            if (fetchNextIdInput) fetchNextIdInput.checked = false;
         } else {
             // Clear category field if template has no specific category
             this.setElabFTWCategoryInUI('');
+            const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+            if (fetchNextIdInput) fetchNextIdInput.checked = false;
+        }
+
+        // NEW: Restore Project Defaults (Path & Name)
+        if (this.currentTemplate.projectDefaults) {
+            const targetPathEl = document.getElementById('targetPath');
+            const projectNameEl = document.getElementById('projectName');
+            
+            if (targetPathEl && this.currentTemplate.projectDefaults.targetPath) {
+                targetPathEl.value = this.currentTemplate.projectDefaults.targetPath;
+                // Dispatch input event to update previews
+                targetPathEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (projectNameEl && this.currentTemplate.projectDefaults.projectName) {
+                projectNameEl.value = this.currentTemplate.projectDefaults.projectName;
+                projectNameEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }
 
         this.updateActionButtons();
@@ -1055,6 +1131,65 @@ const templateManager = {
         }));
 
         console.log('✅ Template selected:', template.name);
+    },
+
+    // NEW: Parse and render folder structure into an HTML tree
+    parseAndRenderFolderTree(structure) {
+        if (!structure || structure.trim() === '') {
+            return '<div class="empty-state">No structure defined</div>';
+        }
+
+        const lines = structure.split('\n').filter(line => line.trim().length > 0);
+        
+        let html = '<ul>';
+        let currentIndent = -1;
+        let indentStack = [];
+        
+        lines.forEach(line => {
+            const spacesMatch = line.match(/^(\s*)/);
+            const spaces = spacesMatch ? spacesMatch[0].length : 0;
+            const name = line.trim();
+            
+            // Clean up trailing slashes
+            const cleanName = name.replace(/\/$/, '');
+            const isFile = cleanName.includes('.') && !cleanName.endsWith('/');
+            const icon = isFile ? '📄' : '📁';
+
+            if (currentIndent === -1) {
+                // First item
+                html += `<li><span class="folder-item"><span class="folder-icon">${icon}</span> ${this.escapeHtml(cleanName)}</span>`;
+                indentStack.push(spaces);
+                currentIndent = spaces;
+            } else if (spaces > currentIndent) {
+                // Child item
+                html += `<ul><li><span class="folder-item"><span class="folder-icon">${icon}</span> ${this.escapeHtml(cleanName)}</span>`;
+                indentStack.push(spaces);
+                currentIndent = spaces;
+            } else if (spaces === currentIndent) {
+                // Sibling item
+                html += `</li><li><span class="folder-item"><span class="folder-icon">${icon}</span> ${this.escapeHtml(cleanName)}</span>`;
+            } else {
+                // Ancestor item (dedent)
+                while (indentStack.length > 0 && indentStack[indentStack.length - 1] > spaces) {
+                    html += `</li></ul>`;
+                    indentStack.pop();
+                }
+                html += `</li><li><span class="folder-item"><span class="folder-icon">${icon}</span> ${this.escapeHtml(cleanName)}</span>`;
+                
+                // Keep stack synchronized
+                if (indentStack.length === 0 || indentStack[indentStack.length - 1] !== spaces) {
+                    indentStack.push(spaces);
+                }
+                currentIndent = spaces;
+            }
+        });
+        
+        while (indentStack.length > 0) {
+            html += `</li></ul>`;
+            indentStack.pop();
+        }
+        
+        return html;
     },
 
     // NEW: Get elabFTW Category from UI input
@@ -1073,12 +1208,22 @@ const templateManager = {
     setElabFTWCategoryInUI(category) {
         const categoryInput = document.getElementById('elabftwProjectCategory');
         if (categoryInput) {
-            categoryInput.value = category !== null && category !== undefined ? category : '';
+            const val = category !== null && category !== undefined ? String(category) : '';
+            if (categoryInput.tagName === 'SELECT' && val !== '') {
+                const exists = Array.from(categoryInput.options).some(opt => opt.value === val);
+                if (!exists) {
+                    const option = document.createElement('option');
+                    option.value = val;
+                    option.textContent = `Template ID ${val} (Loading...)`;
+                    categoryInput.appendChild(option);
+                }
+            }
+            categoryInput.value = val;
             console.log(`📂 elabFTW category field set to: ${category}`);
         }
     },
 
-    // NEW: Save current template with elabFTW category
+    // NEW: Save current template with elabFTW category and project defaults
     async saveCurrentTemplateWithElabFTWCategory() {
         if (!this.currentTemplate) {
             console.warn('⚠️ No current template to save category to');
@@ -1091,6 +1236,12 @@ const templateManager = {
         }
 
         const elabftwCategory = this.getElabFTWCategoryFromUI();
+        
+        const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+        const fetchNextId = fetchNextIdInput ? fetchNextIdInput.checked : false;
+
+        const targetPathInput = document.getElementById('targetPath');
+        const projectNameInput = document.getElementById('projectName');
 
         try {
             // Find the template index
@@ -1101,7 +1252,7 @@ const templateManager = {
             );
 
             if (templateIndex < 0) {
-                throw new Error('Template not found for elabFTW category save');
+                throw new Error('Template not found for saving defaults');
             }
 
             // Create updated template
@@ -1115,22 +1266,30 @@ const templateManager = {
                 updatedTemplate.integrations = {};
             }
 
-            if (!updatedTemplate.integrations.elabftw) {
+            if (!updatedTemplate.integrations.elabftw || typeof updatedTemplate.integrations.elabftw !== 'object') {
                 updatedTemplate.integrations.elabftw = {};
             }
 
-            // Store category in template
+            // Store category and fetchNextId in template
             updatedTemplate.integrations.elabftw.defaultCategory = elabftwCategory;
+            updatedTemplate.integrations.elabftw.fetchNextId = fetchNextId;
+
+            // Store project defaults
+            if (!updatedTemplate.projectDefaults) {
+                updatedTemplate.projectDefaults = {};
+            }
+            if (targetPathInput) updatedTemplate.projectDefaults.targetPath = targetPathInput.value;
+            if (projectNameInput) updatedTemplate.projectDefaults.projectName = projectNameInput.value;
 
             // Update the template
             await this.update(templateIndex, updatedTemplate);
             this.currentTemplate = updatedTemplate;
 
-            console.log(`✅ elabFTW category ${elabftwCategory || 'cleared'} saved to template "${this.currentTemplate.name}"`);
+            console.log(`✅ Template defaults saved to template "${this.currentTemplate.name}"`);
             return true;
 
         } catch (error) {
-            console.error('❌ Error saving elabFTW category to template:', error);
+            console.error('❌ Error saving defaults to template:', error);
             return false;
         }
     },

@@ -60,6 +60,7 @@ const metadataEditor = {
                         <option value="textarea" ${defaultType === 'textarea' ? 'selected' : ''}>Text Area</option>
                         <option value="dropdown" ${defaultType === 'dropdown' ? 'selected' : ''}>Dropdown</option>
                         <option value="checkbox" ${defaultType === 'checkbox' ? 'selected' : ''}>Checkbox</option>
+                        <option value="multicheckbox" ${defaultType === 'multicheckbox' ? 'selected' : ''}>Multi-Checkbox</option>
                         <option value="group" ${defaultType === 'group' ? 'selected' : ''}>Group</option>
                     </select>
                     <button class="btn btn-danger btn-small" onclick="metadataEditor.removeField(this)">×</button>
@@ -335,6 +336,25 @@ const metadataEditor = {
                     <input type="text" class="dropdown-options-input" placeholder="Options (comma-separated): Option1, Option2, Option3" 
                            draggable="false" onchange="metadataEditor.updateJsonPreview()" style="width: 100%;">
                 `;
+            } else if (type === 'multicheckbox') {
+                optionsDiv.innerHTML = `
+                    <div style="margin-bottom: 8px;">
+                        <input type="text" class="multicheckbox-options-input"
+                               placeholder="Options (comma-separated): 405 nm, 488 nm, 561 nm, 640 nm"
+                               draggable="false" onchange="metadataEditor.updateMultiCheckboxPreview(this); metadataEditor.updateJsonPreview()"
+                               oninput="metadataEditor.updateMultiCheckboxPreview(this)"
+                               style="width: 100%; margin-bottom: 8px;">
+                        <div class="multicheckbox-editor-preview" style="
+                            display: flex; flex-wrap: wrap; gap: 6px;
+                            padding: 8px; min-height: 36px;
+                            background: rgba(255,255,255,0.04);
+                            border: 1px dashed rgba(255,255,255,0.15);
+                            border-radius: 6px;
+                        ">
+                            <span style="color: #6b7280; font-size: 12px; align-self: center;">Preview appears here...</span>
+                        </div>
+                    </div>
+                `;
             } else if (type === 'number') {
                 optionsDiv.innerHTML = `
                     <div style="display: flex; gap: 10px;">
@@ -344,6 +364,31 @@ const metadataEditor = {
                 `;
             }
         }
+    },
+
+    // Live preview of pill-checkboxes in the editor while typing options
+    updateMultiCheckboxPreview(inputEl) {
+        const fieldDiv = inputEl.closest('.metadata-field');
+        if (!fieldDiv) return;
+        const previewDiv = fieldDiv.querySelector('.multicheckbox-editor-preview');
+        if (!previewDiv) return;
+
+        const raw = inputEl.value;
+        const options = raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+        if (options.length === 0) {
+            previewDiv.innerHTML = '<span style="color: #6b7280; font-size: 12px; align-self: center;">Preview appears here...</span>';
+            return;
+        }
+
+        previewDiv.innerHTML = options.map(opt => `
+            <span class="multicheckbox-pill">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0">
+                    <rect x="0.5" y="0.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-opacity="0.6"/>
+                </svg>
+                ${opt}
+            </span>
+        `).join('');
     },
 
     // Enhanced JSON preview with proper Group field support
@@ -409,6 +454,12 @@ const metadataEditor = {
                         if (optionsInput && optionsInput.value) {
                             fieldData.options = optionsInput.value.split(',').map(s => s.trim());
                         }
+                    } else if (fieldType === 'multicheckbox') {
+                        const optionsInput = field.querySelector('.multicheckbox-options-input');
+                        if (optionsInput && optionsInput.value) {
+                            fieldData.options = optionsInput.value.split(',').map(s => s.trim()).filter(s => s);
+                        }
+                        fieldData.value = []; // Default: nothing selected
                     } else if (fieldType === 'number') {
                         const minInput = field.querySelector('.number-min-input');
                         const maxInput = field.querySelector('.number-max-input');
@@ -440,6 +491,7 @@ const metadataEditor = {
         switch (type) {
             case 'number': return 0;
             case 'checkbox': return false;
+            case 'multicheckbox': return [];
             case 'date': return '';
             default: return '';
         }
@@ -773,6 +825,13 @@ const metadataEditor = {
                     if (optionsInput) {
                         optionsInput.value = fieldData.options.join(', ');
                     }
+                } else if (fieldData.type === 'multicheckbox' && fieldData.options) {
+                    const optionsInput = lastField.querySelector('.multicheckbox-options-input');
+                    if (optionsInput) {
+                        optionsInput.value = fieldData.options.join(', ');
+                        // Trigger live preview update
+                        this.updateMultiCheckboxPreview(optionsInput);
+                    }
                 } else if (fieldData.type === 'number') {
                     const minInput = lastField.querySelector('.number-min-input');
                     const maxInput = lastField.querySelector('.number-max-input');
@@ -869,6 +928,12 @@ const metadataEditor = {
                         if (optionsInput && optionsInput.value) {
                             fieldData.options = optionsInput.value.split(',').map(s => s.trim());
                         }
+                    } else if (fieldType === 'multicheckbox') {
+                        const optionsInput = field.querySelector('.multicheckbox-options-input');
+                        if (optionsInput && optionsInput.value) {
+                            fieldData.options = optionsInput.value.split(',').map(s => s.trim()).filter(s => s);
+                        }
+                        fieldData.value = []; // Default: nothing selected
                     } else if (fieldType === 'number') {
                         const minInput = field.querySelector('.number-min-input');
                         const maxInput = field.querySelector('.number-max-input');

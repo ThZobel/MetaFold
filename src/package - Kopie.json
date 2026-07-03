@@ -1,12 +1,8 @@
 {
   "name": "metafold",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "description": "MetaFold - Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronical lab notebooks like elabFTW and also OMERO. Built for life sciences research workflows.",
   "main": "main.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ThZobel/MetaFold.git"
-  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
@@ -39,14 +35,14 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.4",
+    "@babel/core": "^7.27.4",
     "@babel/preset-react": "^7.27.1",
-	"babel-loader": "^10.0.0",
+	"babel-loader": "^9.1.3",
     "css-loader": "^7.1.2",
-    "electron": "^38.2.2",
-	"electron-builder": "^26.0.12",
+    "electron": "^33.0.2",
+	"electron-builder": "^24.13.3",
     "style-loader": "^4.0.0",
-    "webpack": "^5.102.1",
+    "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1"
   },
   "build": {

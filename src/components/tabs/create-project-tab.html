@@ -46,8 +46,9 @@
         </script>
 
         <!-- Enhanced Path and Name Section -->
+        <!-- Enhanced Path and Name Section -->
         <div class="project-config-grid">
-            <div class="config-section primary-section">
+            <div class="config-section primary-section" id="baseDirectorySection">
                 <div class="section-header">
                     <div class="section-icon">📂</div>
                     <div class="section-title">
@@ -75,7 +76,30 @@
                 </div>
             </div>
 
-            <div class="config-section primary-section">
+            <!-- NEW: Multi Folder Section (Hidden by default) -->
+            <div class="config-section primary-section" id="multiFolderSection" style="display: none;">
+                <div class="section-header">
+                    <div class="section-icon">📁</div>
+                    <div class="section-title">
+                        <h4>Target Folders</h4>
+                        <span class="section-subtitle">Select existing folders to write to</span>
+                    </div>
+                    <button class="browse-btn" onclick="projectManager.addMultiFolder()" title="Add folder to list">
+                        <span>➕</span>
+                        Add Folder
+                    </button>
+                </div>
+                <div class="enhanced-input-wrapper multi-folder-container">
+                    <div id="multiFolderList" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Folders will be listed here -->
+                        <div class="multi-folder-empty">
+                            No folders selected. Click "Add Folder" to start.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section primary-section" id="projectNameSection">
                 <div class="section-header">
                     <div class="section-icon">🏷️</div>
                     <div class="section-title">

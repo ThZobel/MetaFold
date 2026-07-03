@@ -13,6 +13,15 @@ const omeroUIIntegration = {
 
         this.isInitialized = true;
         console.log('🔬 OMERO UI Integration initialized (ASYNC SECURE SETTINGS FIXED)');
+
+        // Add listener for dynamic project name changes
+        const projectNameInput = document.getElementById('projectName');
+        if (projectNameInput) {
+            projectNameInput.addEventListener('input', () => {
+                if (this.handleProjectSelection) this.handleProjectSelection();
+            });
+        }
+
         return true;
     },
 
@@ -981,7 +990,8 @@ const omeroUIIntegration = {
 
             const projects = await window.omeroProjects.getProjectsForGroupEnhanced(groupId);
 
-            projectSelect.innerHTML = '<option value="">-- Create standalone dataset --</option>';
+            projectSelect.innerHTML = '<option value="create_new_project">Create New OMERO Project</option>';
+            projectSelect.innerHTML += '<option value="">-- Create standalone dataset --</option>';
 
             if (projects.length === 0) {
                 projectSelect.innerHTML += '<option value="" disabled>No projects in this group</option>';
@@ -1007,6 +1017,11 @@ const omeroUIIntegration = {
             projectSelect.innerHTML += '<option value="refresh">🔄 Refresh project list</option>';
 
             console.log('✅ Projects loaded for group:', projects.length);
+            
+            // Trigger hint update now that options are loaded
+            if (typeof this.handleProjectSelection === 'function') {
+                this.handleProjectSelection();
+            }
 
         } catch (error) {
             console.error('❌ Error loading projects for group:', error);
@@ -1056,6 +1071,22 @@ const omeroUIIntegration = {
                     projectSelect.value = '';
                 }
             }, 100);
+            return;
+        }
+
+        // Update creation hint
+        const hintDiv = document.getElementById('omeroCreationHint');
+        if (hintDiv) {
+            const projectNameInput = document.getElementById('projectName');
+            const projectName = projectNameInput ? projectNameInput.value || 'New Project' : 'New Project';
+            
+            if (projectSelect.value === 'create_new_project') {
+                hintDiv.textContent = `Project "${projectName}" will be created`;
+            } else if (projectSelect.value !== '') {
+                hintDiv.textContent = `Dataset "${projectName}" will be created`;
+            } else {
+                hintDiv.textContent = `Dataset "${projectName}" will be created`; // Standalone dataset
+            }
         }
     },
 

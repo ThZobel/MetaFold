@@ -259,12 +259,70 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* GRAPHICAL FOLDER TREE STYLING */
 .folder-tree {
-    font-family: 'Courier New', monospace;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 14px;
     line-height: 1.6;
-    white-space: pre-line;
-    color: #d1d5db;
+    color: #e0e0e0;
+}
+
+.folder-tree ul {
+    list-style-type: none;
+    padding-left: 1.5em;
+    margin: 0;
+}
+
+.folder-tree > ul {
+    padding-left: 0;
+}
+
+.folder-tree li {
+    position: relative;
+    padding-left: 1.2em;
+    margin-bottom: 0.3em;
+    margin-top: 0.3em;
+}
+
+.folder-tree li::before {
+    content: '';
+    position: absolute;
+    top: -0.3em;
+    bottom: 0;
+    left: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.folder-tree li::after {
+    content: '';
+    position: absolute;
+    top: 0.8em;
+    left: 0;
+    width: 0.8em;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.folder-tree li:last-child::before {
+    bottom: calc(100% - 0.8em);
+}
+
+.folder-tree > ul > li::before,
+.folder-tree > ul > li::after {
+    display: none;
+}
+
+.folder-tree > ul > li {
+    padding-left: 0;
+}
+
+.folder-tree .folder-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.folder-tree .folder-icon {
+    font-size: 1.1em;
 }
 
 .actions {

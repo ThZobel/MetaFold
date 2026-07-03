@@ -512,10 +512,11 @@ const omeroAnnotations = {
     // =================== NEUE KEY-VALUE METHODEN (nach bestehenden Funktionen einfügen) ===================
 
     // Test multiple key-value pairs at once - NEW SIMPLE METHOD
-    async testCreateMultipleKeyValues(datasetId, keyValuePairs) {
+    async testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType = 'dataset') {
             try {
                 console.log('🧪 === OMERO Console Test: Create Multiple Key-Value Pairs ===');
-                console.log(`🧪 Dataset ID: ${datasetId}`);
+                console.log(`🧪 Object ID: ${datasetId}`);
+                console.log(`🧪 Object Type: ${objectType}`);
                 console.log(`🧪 Pairs count: ${keyValuePairs.length}`);
                 
                 // *** FIX: ROBUSTE SESSION VALIDATION ***
@@ -571,7 +572,7 @@ const omeroAnnotations = {
                 
                 const formData = new URLSearchParams();
                 formData.append('parents', 'true');
-                formData.append('dataset', datasetId);
+                formData.append(objectType, datasetId);
                 formData.append('mapAnnotation', mapAnnotation);
                 
                 // FIX: Verwende Proxy URL statt direkte Server URL
@@ -941,7 +942,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
             console.log('🚀 Generated key-value pairs:', keyValuePairs.length);
             
             // Use the tested working method
-            const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs);
+            const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs, objectType);
             
             if (result.success) {
                 console.log('✅ Enhanced Simple Map Annotation created successfully!');
@@ -1188,7 +1189,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                 for (const group of groupedData.groups) {
                     if (group.keyValuePairs.length > 0) {
                         console.log(`📁 Creating annotation for group: ${group.namespace}`);
-                        const result = await this.testCreateMultipleKeyValues(objectId, group.keyValuePairs);
+                        const result = await this.testCreateMultipleKeyValues(objectId, group.keyValuePairs, objectType);
                         
                         if (result.success) {
                             results.push({
@@ -1213,7 +1214,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                 // Handle ungrouped fields
                 if (groupedData.ungrouped.length > 0) {
                     console.log('📁 Creating annotation for ungrouped fields...');
-                    const result = await this.testCreateMultipleKeyValues(objectId, groupedData.ungrouped);
+                    const result = await this.testCreateMultipleKeyValues(objectId, groupedData.ungrouped, objectType);
                     
                     if (result.success) {
                         results.push({
@@ -1275,7 +1276,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                         this.convertMetadataToSimpleKeyValues(metadata);
                     
                     if (keyValuePairs.length > 0) {
-                        const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs);
+                        const result = await this.testCreateMultipleKeyValues(objectId, keyValuePairs, objectType);
                         
                         if (result.success) {
                             results.push({
@@ -1305,7 +1306,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                 const integrationPairs = this.convertIntegrationLinksToKeyValue(options.integrationData);
                 
                 if (integrationPairs.length > 0) {
-                    const result = await this.testCreateMultipleKeyValues(objectId, integrationPairs);
+                    const result = await this.testCreateMultipleKeyValues(objectId, integrationPairs, objectType);
                     
                     if (result.success) {
                         results.push({

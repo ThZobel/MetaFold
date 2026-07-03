@@ -683,3 +683,30 @@
                 align-self: flex-end;
             }
         }
+        
+        /* Multi-Folder List Styles */
+        .multi-folder-container {
+            padding: 10px;
+            background: #2d2d2d;
+            border-radius: 6px;
+            border: 1px solid #404040;
+            min-height: 80px;
+        }
+
+        .multi-folder-empty {
+            color: #6b7280;
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .multi-folder-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #3d3d3d;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #4a4a4a;
+            color: #e0e0e0;
+        }

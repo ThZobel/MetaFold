@@ -14,7 +14,9 @@ const settingsManager = {
     sensitiveKeys: [
         'elabftw.api_key',
         'omero.password',
-        'rspace.api_key'
+        'rspace.api_key',
+        'n8n.auth_token',
+        'n8n.basic_pass'
     ],
 
     // Default settings
@@ -45,6 +47,14 @@ const settingsManager = {
         'rspace.enabled': false,
         'rspace.server_url': '',
         'rspace.api_key': '',
+        'n8n.enabled': false,
+        'n8n.webhook_url': '',
+        'n8n.auth_type': 'none',
+        'n8n.auth_token': '',
+        'n8n.basic_user': '',
+        'n8n.basic_pass': '',
+        'n8n.instance_id': '',
+        'n8n.verify_ssl': true,
         'templates.active_category': 'category1',
         'templates.category1_name': 'Main-Project',
         'templates.category1_icon': '🎯',
@@ -596,23 +606,74 @@ const settingsManager = {
         }
 
         try {
-            console.log('🧪 FIXED: Creating new elabFTW experiment');
+            console.log('🧪 FIXED: Creating new elabFTW experiment from Template (if provided)');
 
             const cleanTitle = String(projectName).trim();
             if (!cleanTitle) {
                 throw new Error('Project name is empty or invalid');
             }
 
-            const experimentData = {
-                title: cleanTitle,
-                body: this.generateExperimentBody(cleanTitle, metadata, structure)
-            };
-
-            if (categoryId && categoryId !== '' && !isNaN(parseInt(categoryId))) {
-                experimentData.category_id = parseInt(categoryId);
+            let templateCategory = null;
+            let templateBody = '';
+            let templateTags = null;
+            let templateStatus = null;
+            let templateRating = null;
+            let templateSteps = null;
+            
+            // eLabFTW API v2 does not automatically apply templates on POST /experiments
+            // We must GET the template first and extract its category and body manually.
+            if (categoryId && categoryId !== '' && !isNaN(parseInt(categoryId)) && parseInt(categoryId) > 0) {
+                const templateId = parseInt(categoryId);
+                try {
+                    console.log(`🧪 elabFTW: Fetching template ID ${templateId}...`);
+                    const tplResponse = await fetch(`${serverUrl}api/v2/experiments_templates/${templateId}`, {
+                        headers: { 'Authorization': apiKey }
+                    });
+                    
+                    if (tplResponse.ok) {
+                        const tplData = await tplResponse.json();
+                        // Handle both possible field names just to be safe
+                        templateCategory = tplData.category_id || tplData.category;
+                        templateBody = tplData.body || '';
+                        templateTags = tplData.tags;
+                        templateStatus = tplData.status || tplData.state || tplData.status_id;
+                        templateRating = tplData.rating;
+                        templateSteps = tplData.steps;
+                        console.log(`✅ elabFTW: Fetched template! Extracting metadata (category, tags, status, rating, steps)`);
+                    } else {
+                        console.warn(`⚠️ elabFTW: Could not fetch template ${templateId}. Status: ${tplResponse.status}`);
+                    }
+                } catch (tplError) {
+                    console.warn('⚠️ elabFTW: Error fetching template:', tplError);
+                }
             }
 
-            console.log('🧪 elabFTW: Sending request with category_id:', experimentData.category_id || 'none');
+            const metafoldBody = this.generateExperimentBody(cleanTitle, metadata, structure);
+            
+            const experimentData = {
+                title: cleanTitle,
+                // Append MetaFold body below the template body (if template exists)
+                body: templateBody ? `${templateBody}<br><br>${metafoldBody}` : metafoldBody
+            };
+
+            // Apply the properties we extracted from the template
+            if (templateCategory) {
+                experimentData.category = parseInt(templateCategory);
+                console.log(`🧪 elabFTW: Applying template category ${experimentData.category} to new experiment`);
+            }
+            if (templateTags && Array.isArray(templateTags) && templateTags.length > 0) {
+                // For eLabFTW v2, tags is usually an array of strings
+                experimentData.tags = templateTags.map(t => typeof t === 'object' ? (t.tag || t.name || t.text) : t).filter(Boolean);
+            }
+            if (templateStatus) {
+                experimentData.status = templateStatus;
+            }
+            if (templateRating !== undefined && templateRating !== null) {
+                experimentData.rating = templateRating;
+            }
+            if (templateSteps && Array.isArray(templateSteps) && templateSteps.length > 0) {
+                experimentData.steps = templateSteps;
+            }
 
             let response = await fetch(`${serverUrl}api/v2/experiments`, {
                 method: 'POST',
@@ -623,12 +684,11 @@ const settingsManager = {
                 body: JSON.stringify(experimentData)
             });
 
-            // RETRY LOGIC: If 403 Forbidden and we used a category, try again WITHOUT category
-            if (response.status === 403 && experimentData.category_id) {
-                console.warn(`⚠️ elabFTW: Access forbidden to category ${experimentData.category_id}. Retrying without category...`);
-
-                delete experimentData.category_id;
-
+            // RETRY LOGIC: If 403 Forbidden and we used a category, try again WITHOUT it
+            if (response.status === 403 && experimentData.category) {
+                console.warn(`⚠️ elabFTW: Access forbidden to category ${experimentData.category}. Retrying without category...`);
+                delete experimentData.category;
+                
                 response = await fetch(`${serverUrl}api/v2/experiments`, {
                     method: 'POST',
                     headers: {
@@ -645,7 +705,8 @@ const settingsManager = {
 
                 console.log('🧪 FIXED: Experiment created with ID:', experimentId);
 
-                // CRITICAL: Override title immediately after creation (in case template overwrote it)
+                // Override title immediately after creation (in case template overwrote it).
+                // NOTE: template_id cannot be changed via PATCH - it is set at creation time only.
                 if (experimentId) {
                     try {
                         console.log('🧪 FIXED: Ensuring correct title via PATCH override');
@@ -655,9 +716,7 @@ const settingsManager = {
                                 'Authorization': apiKey,
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({
-                                title: cleanTitle
-                            })
+                            body: JSON.stringify({ title: cleanTitle })
                         });
 
                         if (titleOverrideResponse.ok) {
@@ -677,10 +736,29 @@ const settingsManager = {
                     await this.updateExperimentWithMetadata(serverUrl, apiKey, experimentId, metadata);
                 }
 
+                // Fetch the newly created experiment to get its custom_id
+                let customId = null;
+                if (experimentId) {
+                    try {
+                        console.log('🧪 elabFTW: Fetching newly created experiment to retrieve custom_id');
+                        const getExpRes = await fetch(`${serverUrl}api/v2/experiments/${experimentId}`, {
+                            headers: { 'Authorization': apiKey }
+                        });
+                        if (getExpRes.ok) {
+                            const expData = await getExpRes.json();
+                            customId = expData.custom_id;
+                            console.log(`✅ elabFTW: Retrieved custom_id: ${customId}`);
+                        }
+                    } catch (idError) {
+                        console.warn('⚠️ elabFTW: Could not retrieve custom_id:', idError.message);
+                    }
+                }
+
                 return {
                     success: true,
                     message: 'Experiment created in elabFTW successfully!',
                     id: experimentId,
+                    custom_id: customId,
                     url: `${serverUrl}experiments.php?mode=view&id=${experimentId}`,
                     metadataFields: metadata ? Object.keys(metadata).length : 0
                 };

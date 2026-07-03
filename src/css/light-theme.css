@@ -1,0 +1,566 @@
+/* =========================================================================
+   LIGHT MODE THEME OVERRIDES
+   Activates when the body has the .light-mode class.
+   ========================================================================= */
+
+/* Base Background and Text Colors */
+body.light-mode {
+    background: linear-gradient(135deg, #f9fafb, #f3f4f6) !important;
+    color: #1f2937 !important;
+}
+
+/* Sidebar Styling */
+.light-mode .sidebar {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-right: 1px solid #e5e7eb !important;
+}
+
+.light-mode #left-sidebar-container .header,
+.light-mode .sidebar .header {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.light-mode .sidebar .header h1,
+.light-mode .main-content .header h1 {
+    color: #7c3aed !important;
+    text-shadow: none !important;
+}
+
+/* Right Sidebar Styling & Fields */
+.light-mode .right-sidebar {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-left: 1px solid #e5e7eb !important;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-mode .right-sidebar-header {
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.light-mode .right-sidebar .info-item,
+.light-mode .right-sidebar .integration-status,
+.light-mode .right-sidebar .project-details,
+.light-mode .right-sidebar-section {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #1e293b !important;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.03) !important;
+}
+
+.light-mode .right-sidebar span,
+.light-mode .integration-card span,
+.light-mode .integration-info span {
+    color: #334155 !important;
+    font-weight: 500 !important;
+}
+
+.light-mode .right-sidebar-header h2,
+.light-mode .right-sidebar-header h3 {
+    color: #0f172a !important;
+}
+
+.light-mode .info-label {
+    color: #4b5563 !important;
+    font-weight: 600;
+}
+
+/* Main Content Wrapper and Headers */
+.light-mode .main-content .header {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+}
+
+.light-mode .main-content-footer {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-top: 1px solid #e5e7eb !important;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Tabs */
+.light-mode .tab,
+.light-mode .main-tab {
+    background: #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
+    color: #4b5563 !important;
+}
+
+.light-mode .tab.active,
+.light-mode .main-tab.active {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border-color: #7c3aed !important;
+    color: #7c3aed !important;
+    font-weight: 600 !important;
+}
+
+/* Template Categories (Left Sidebar) */
+.light-mode .template-type-btn {
+    background: #ffffff !important;
+    border: 1px solid #94a3b8 !important;
+    color: #0f172a !important;
+    font-weight: 500 !important;
+}
+.light-mode .template-type-btn.active {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border-color: #7c3aed !important;
+    color: #7c3aed !important;
+    font-weight: bold !important;
+    box-shadow: 0 4px 10px rgba(124, 58, 237, 0.15) !important;
+}
+.light-mode .template-type-btn:hover:not(.active) {
+    background: #e5e7eb !important;
+    color: #1f2937 !important;
+}
+
+/* Project Setup and Cards */
+.light-mode .project-setup,
+.light-mode .folder-structure,
+.light-mode .template-item,
+.light-mode .integration-card,
+.light-mode .settings-group,
+.light-mode .modal-content,
+.light-mode .metadata-field {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.light-mode .template-item:hover,
+.light-mode .metadata-field:hover {
+    background: #f9fafb !important;
+    border-color: #d1d5db !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+}
+
+.light-mode .template-item.active {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border-color: #7c3aed !important;
+}
+
+/* Metadata Fields / Names */
+.light-mode .metadata-field .field-name,
+.light-mode .metadata-field .field-label,
+.light-mode .drag-item span {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+}
+
+/* Discover Projects / Project Navigator */
+.light-mode .project-card,
+.light-mode .project-list-item,
+.light-mode .project-navigator,
+.light-mode .project-item,
+.light-mode .card,
+.light-mode .dashboard-card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+}
+
+.light-mode .project-card:hover,
+.light-mode .project-item:hover {
+    background: #f9fafb !important;
+    border-color: #d1d5db !important;
+}
+
+.light-mode .project-card-header,
+.light-mode .project-card-title,
+.light-mode .item-title {
+    color: #1f2937 !important;
+}
+
+.light-mode .project-card-meta,
+.light-mode .item-meta {
+    color: #4b5563 !important;
+}
+
+/* User Management Display */
+.light-mode #currentUserDisplay {
+    background: #f9fafb !important;
+    border-color: #e5e7eb !important;
+}
+.light-mode #currentUserName {
+    color: #1f2937 !important;
+}
+.light-mode #currentUserGroup {
+    color: #4b5563 !important;
+}
+
+/* Forms: Inputs, Selects, Textareas */
+.light-mode .form-group input, 
+.light-mode .form-group textarea, 
+.light-mode .form-group select,
+.light-mode select,
+.light-mode input[type="text"],
+.light-mode input[type="number"],
+.light-mode input[type="password"] {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #1f2937 !important;
+}
+
+.light-mode select option {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.light-mode select option:checked {
+    background: rgba(124, 58, 237, 0.1) !important;
+    color: #7c3aed !important;
+}
+
+.light-mode .form-group input:focus,
+.light-mode .form-group textarea:focus,
+.light-mode .form-group select:focus,
+.light-mode select:focus,
+.light-mode input:focus {
+    border-color: #7c3aed !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2) !important;
+    background: #ffffff !important;
+}
+
+.light-mode .form-group label,
+.light-mode label {
+    color: #374151 !important;
+    font-weight: 500 !important;
+}
+
+/* Typography and specific text colors */
+.light-mode .template-meta,
+.light-mode .template-description,
+.light-mode .empty-state,
+.light-mode .help-text,
+.light-mode .folder-tree {
+    color: #4b5563 !important;
+}
+
+.light-mode h1,
+.light-mode h2,
+.light-mode h3,
+.light-mode h4 {
+    color: #1f2937 !important;
+}
+
+.light-mode .folder-tree li::before,
+.light-mode .folder-tree li::after {
+    border-left-color: #94a3b8 !important;
+    border-top-color: #94a3b8 !important;
+}
+
+/* Generic Fallback for unstyled text */
+.light-mode span, .light-mode p, .light-mode div {
+    /* Don't force important here, otherwise we break colored buttons */
+}
+
+/* Search */
+.light-mode #templateSearchInput {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #1f2937 !important;
+}
+
+.light-mode #searchSuggestions {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+.light-mode .search-suggestion:hover {
+    background: #f3f4f6 !important;
+}
+
+.light-mode .search-suggestion-name {
+    color: #1f2937 !important;
+}
+
+/* Toggles & Switches */
+.light-mode .toggle-switch input:checked + .slider {
+    background: #10b981 !important; /* Green for success/on */
+}
+
+.light-mode .toggle-switch .slider {
+    background-color: #d1d5db !important;
+}
+
+/* Drag & Drop Headers / Sub-elements */
+.light-mode .metadata-field-header {
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Button overrides - keeping gradients but making them pop more on light bg */
+.light-mode .btn-secondary {
+    background: #f3f4f6 !important;
+    color: #374151 !important;
+    border: 1px solid #d1d5db !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+}
+
+.light-mode .btn-secondary:hover {
+    background: #e5e7eb !important;
+    border-color: #9ca3af !important;
+    color: #1f2937 !important;
+}
+
+/* Custom Checkboxes */
+.light-mode input[type="checkbox"] {
+    accent-color: #7c3aed !important;
+}
+
+/* Scrollbars */
+.light-mode ::-webkit-scrollbar-track {
+    background: #f3f4f6 !important;
+}
+
+.light-mode ::-webkit-scrollbar-thumb {
+    background: #d1d5db !important;
+}
+
+.light-mode ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important;
+}
+
+/* JSON Preview */
+.light-mode #jsonPreview {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    color: #374151 !important;
+}
+
+/* Storage Indicators */
+.light-mode .storage-indicator {
+    background: #f3f4f6 !important;
+    border-color: #e5e7eb !important;
+    color: #4b5563 !important;
+}
+
+/* =========================================
+   LOGIN MODAL
+   ========================================= */
+.light-mode #loginModal .modal-content {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.light-mode .login-input {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #1f2937 !important;
+}
+
+.light-mode .login-input:focus {
+    border-color: #7c3aed !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2) !important;
+}
+
+.light-mode .last-user-section.password-required {
+    background: rgba(16, 185, 129, 0.1) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+
+.light-mode .last-user-section.no-password {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border: 1px solid rgba(124, 58, 237, 0.3) !important;
+}
+
+.light-mode .password-toggle {
+    color: #6b7280 !important;
+}
+
+.light-mode .password-toggle:hover {
+    color: #1f2937 !important;
+}
+
+.light-mode .suggestions-dropdown {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+.light-mode .welcome-message {
+    color: #4b5563 !important;
+}
+
+/* =========================================
+   DISCOVER PROJECTS TAB (Scanner)
+   ========================================= */
+.light-mode .discovery-container,
+.light-mode .scanner-main-container,
+.light-mode .project-scanner-scanning {
+    background: transparent !important;
+    border-color: #e5e7eb !important;
+}
+
+.light-mode .scanner-main-container {
+    background: #ffffff !important;
+}
+
+.light-mode .quick-start-section {
+    background: rgba(124, 58, 237, 0.05) !important;
+    border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+.light-mode .quick-start-content h3 {
+    color: #1f2937 !important;
+}
+
+.light-mode .quick-start-content p {
+    color: #4b5563 !important;
+}
+
+.light-mode .feature-item {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.light-mode .feature-item strong {
+    color: #1f2937 !important;
+}
+
+.light-mode .scanner-header,
+.light-mode .scanner-controls,
+.light-mode .scanner-statistics {
+    background: #f9fafb !important;
+    border-color: #e5e7eb !important;
+}
+
+.light-mode .scanner-header .header-info h3 {
+    color: #1f2937 !important;
+}
+
+.light-mode .search-controls input,
+.light-mode .view-controls select {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    color: #1f2937 !important;
+}
+
+.light-mode .project-name {
+    color: #1f2937 !important;
+}
+
+.light-mode .view-toggle {
+    background: #e5e7eb !important;
+}
+
+/* =========================================
+   TABLES & METADATA VIEWER
+   ========================================= */
+.light-mode .metadata-table,
+.light-mode table {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+}
+
+.light-mode .metadata-table thead,
+.light-mode table thead,
+.light-mode .metadata-table th,
+.light-mode table th {
+    background: #f3f4f6 !important;
+    color: #1f2937 !important;
+    border-bottom: 2px solid #d1d5db !important;
+}
+
+.light-mode .metadata-table td,
+.light-mode table td {
+    color: #0f172a !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+    font-weight: 600 !important;
+}
+
+.light-mode .metadata-table td span,
+.light-mode table td span {
+    border-bottom: none !important;
+    border-left: none !important;
+    padding-left: 0 !important;
+    margin-left: 8px !important;
+    color: #475569 !important;
+    font-weight: 400 !important;
+}
+
+.light-mode .field-name {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+.light-mode .field-desc {
+    color: #475569 !important;
+    font-weight: 400 !important;
+    display: inline-block;
+    border-left: none !important;
+}
+
+.light-mode .metadata-table td strong,
+.light-mode table td strong {
+    color: #000000 !important;
+    font-weight: 700 !important;
+}
+
+.light-mode .field-type-badge {
+    background: rgba(124, 58, 237, 0.1) !important;
+    color: #7c3aed !important;
+    border: 1px solid rgba(124, 58, 237, 0.3) !important;
+    font-weight: 600 !important;
+}
+
+.light-mode .metadata-table tr:hover,
+.light-mode .metadata-table tr:hover td {
+    background: #f9fafb !important;
+}
+
+.light-mode .metadata-viewer-container {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+}
+
+.light-mode .viewer-header {
+    background: #f9fafb !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.light-mode .viewer-header .header-content h2 {
+    color: #1f2937 !important;
+}
+
+.light-mode .metadata-table-container h3 {
+    color: #1f2937 !important;
+}
+
+/* =========================================
+   MAIN CONTENT FOOTER
+   ========================================= */
+.light-mode .main-content-footer,
+.light-mode .footer-actions-container,
+.light-mode .footer-messages-container {
+    background: #ffffff !important;
+    border-top-color: #e5e7eb !important;
+}
+
+.light-mode .main-content-footer {
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* =========================================
+   MULTI-FOLDER BATCH LIST
+   ========================================= */
+.light-mode .multi-folder-container {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+}
+
+.light-mode .multi-folder-empty {
+    color: #6b7280 !important;
+}
+
+.light-mode .multi-folder-item {
+    background: #f3f4f6 !important;
+    border-color: #e5e7eb !important;
+    color: #1f2937 !important;
+}

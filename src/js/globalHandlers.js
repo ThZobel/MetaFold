@@ -570,6 +570,41 @@ window.loadSettingsIntoModal = async function () {
             rspaceConfigEl.style.display = rspaceEnabled ? 'block' : 'none';
         }
 
+        // n8n settings
+        const n8nEnabled = await sm.get('n8n.enabled');
+        const n8nEnabledEl = document.getElementById('n8nEnabled');
+        const n8nWebhookEl = document.getElementById('n8nWebhookUrl');
+        const n8nAuthTypeEl = document.getElementById('n8nAuthType');
+        const n8nAuthEl = document.getElementById('n8nAuthToken');
+        const n8nBasicUserEl = document.getElementById('n8nBasicUser');
+        const n8nBasicPassEl = document.getElementById('n8nBasicPass');
+        const n8nInstanceIdEl = document.getElementById('n8nInstanceId');
+        const n8nConfigEl = document.getElementById('n8nConfig');
+
+        const n8nVerifySslEl = document.getElementById('n8nVerifySsl');
+
+        if (n8nEnabledEl) n8nEnabledEl.checked = n8nEnabled;
+        if (n8nWebhookEl) n8nWebhookEl.value = await sm.get('n8n.webhook_url');
+        if (n8nInstanceIdEl) n8nInstanceIdEl.value = await sm.get('n8n.instance_id');
+        
+        const authType = await sm.get('n8n.auth_type');
+        if (n8nAuthTypeEl) n8nAuthTypeEl.value = authType;
+        if (n8nAuthEl) n8nAuthEl.value = await sm.get('n8n.auth_token');
+        if (n8nBasicUserEl) n8nBasicUserEl.value = await sm.get('n8n.basic_user');
+        if (n8nBasicPassEl) n8nBasicPassEl.value = await sm.get('n8n.basic_pass');
+        
+        // Use true as default fallback if not explicitly false
+        if (n8nVerifySslEl) n8nVerifySslEl.checked = (await sm.get('n8n.verify_ssl')) !== false;
+
+        if (n8nConfigEl) {
+            n8nConfigEl.style.display = n8nEnabled ? 'block' : 'none';
+        }
+        
+        // Ensure UI toggles match the loaded auth type
+        if (typeof updaten8nAuthTypeUI === 'function') {
+            updaten8nAuthTypeUI(authType);
+        }
+
         console.log('✅ All settings loaded into modal successfully');
 
     } catch (error) {
@@ -1231,8 +1266,91 @@ window.testRSpaceConnection = async function () {
     }
 };
 
+// =================== N8N SETTINGS FUNCTIONS ===================
 
-// =================== SETTINGS UTILITY FUNCTIONS ===================
+window.updaten8nSetting = async function () {
+    try {
+        const enabled = document.getElementById('n8nEnabled').checked;
+        await window.settingsManager.set('n8n.enabled', enabled);
+        const configEl = document.getElementById('n8nConfig');
+        if (configEl) {
+            configEl.style.display = enabled ? 'block' : 'none';
+        }
+    } catch (error) {
+        console.error('Error updating n8n setting:', error);
+    }
+};
+
+window.updaten8nWebhookUrl = async function () {
+    try {
+        const url = document.getElementById('n8nWebhookUrl').value;
+        await window.settingsManager.set('n8n.webhook_url', url);
+    } catch (error) {
+        console.error('Error updating n8n URL:', error);
+    }
+};
+
+window.updaten8nInstanceId = async function () {
+    try {
+        const val = document.getElementById('n8nInstanceId').value;
+        await window.settingsManager.set('n8n.instance_id', val);
+    } catch (error) {
+        console.error('Error updating n8n instance id:', error);
+    }
+};
+
+window.updaten8nAuthTypeUI = function(authType) {
+    const bearerGroup = document.getElementById('n8nBearerAuthGroup');
+    const basicGroup = document.getElementById('n8nBasicAuthGroup');
+    if (bearerGroup) bearerGroup.style.display = authType === 'bearer' ? 'block' : 'none';
+    if (basicGroup) basicGroup.style.display = authType === 'basic' ? 'block' : 'none';
+};
+
+window.updaten8nAuthType = async function () {
+    try {
+        const type = document.getElementById('n8nAuthType').value;
+        await window.settingsManager.set('n8n.auth_type', type);
+        updaten8nAuthTypeUI(type);
+    } catch (error) {
+        console.error('Error updating n8n auth type:', error);
+    }
+};
+
+window.updaten8nBasicAuth = async function () {
+    try {
+        const user = document.getElementById('n8nBasicUser').value;
+        const pass = document.getElementById('n8nBasicPass').value;
+        await window.settingsManager.set('n8n.basic_user', user);
+        await window.settingsManager.set('n8n.basic_pass', pass);
+    } catch (error) {
+        console.error('Error updating n8n basic auth:', error);
+    }
+};
+
+window.updaten8nAuthToken = async function () {
+    try {
+        const token = document.getElementById('n8nAuthToken').value;
+        await window.settingsManager.set('n8n.auth_token', token);
+    } catch (error) {
+        console.error('Error updating n8n Auth Token:', error);
+    }
+};
+
+window.updaten8nVerifySsl = async function () {
+    try {
+        const checkbox = document.getElementById('n8nVerifySsl');
+        const verifySsl = checkbox ? checkbox.checked : true;
+        await window.settingsManager.set('n8n.verify_ssl', verifySsl);
+        console.log(`🤖 n8n SSL verification set to: ${verifySsl}`);
+        if (!verifySsl) {
+            console.warn('⚠️ n8n SSL verification disabled — self-signed certificates will be accepted.');
+        }
+    } catch (error) {
+        console.error('Error updating n8n SSL verify setting:', error);
+    }
+};
+
+
 
 window.resetSettings = function () {
     if (confirm('Reset all settings to defaults? This cannot be undone.')) {

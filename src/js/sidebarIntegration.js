@@ -34,10 +34,12 @@ const sidebarIntegration = {
         const elabCard = document.getElementById('elabftwIntegration');
         const omeroCard = document.getElementById('omeroIntegration');
         const rspaceCard = document.getElementById('rspaceIntegration');
+        const n8nCard = document.getElementById('n8nIntegration');
 
         const elabToggle = document.getElementById('sendToElabFTW');
         const omeroToggle = document.getElementById('sendToOMERO');
         const rspaceToggle = document.getElementById('sendToRSpace');
+        const n8nToggle = document.getElementById('sendToN8n');
 
         // Retry mechanism if settingsManager is not ready
         if (!window.settingsManager) {
@@ -46,6 +48,7 @@ const sidebarIntegration = {
             if (elabCard) elabCard.style.display = 'none';
             if (omeroCard) omeroCard.style.display = 'none';
             if (rspaceCard) rspaceCard.style.display = 'none';
+            if (n8nCard) n8nCard.style.display = 'none';
 
             setTimeout(() => this.updateSidebarVisibilityFromSettings(), 500);
             return;
@@ -56,31 +59,36 @@ const sidebarIntegration = {
             const elabRaw = await window.settingsManager.get('elabftw.enabled');
             const omeroRaw = await window.settingsManager.get('omero.enabled');
             const rspaceRaw = await window.settingsManager.get('rspace.enabled');
+            const n8nRaw = await window.settingsManager.get('n8n.enabled');
 
-            console.log('📋 Sidebar Settings Raw:', { elab: elabRaw, omero: omeroRaw, rspace: rspaceRaw });
+            console.log('📋 Sidebar Settings Raw:', { elab: elabRaw, omero: omeroRaw, rspace: rspaceRaw, n8n: n8nRaw });
 
             const elabEnabled = !!elabRaw;
             const omeroEnabled = !!omeroRaw;
             const rspaceEnabled = !!rspaceRaw;
+            const n8nEnabled = !!n8nRaw;
 
             // 2. Apply Visibility to UI (Global Settings ONLY)
             if (elabCard) elabCard.style.display = elabEnabled ? 'block' : 'none';
             if (omeroCard) omeroCard.style.display = omeroEnabled ? 'block' : 'none';
             if (rspaceCard) rspaceCard.style.display = rspaceEnabled ? 'block' : 'none';
+            if (n8nCard) n8nCard.style.display = n8nEnabled ? 'block' : 'none';
 
             // 3. Get Template Preferences (Toggle Switch State)
             let templateElab = true; // Default to enabled if template doesn't specify
             let templateOmero = true;
             let templateRSpace = true;
+            let templateN8n = true;
 
             if (window.templateManager && window.templateManager.currentTemplate) {
                 const t = window.templateManager.currentTemplate;
 
                 // Check if template has specific integration requirements
                 if (t.integrations) {
-                    if (t.integrations.elabftw === false) templateElab = false;
-                    if (t.integrations.omero === false) templateOmero = false;
-                    if (t.integrations.rspace === false) templateRSpace = false;
+                    if (t.integrations.elabftw === false || t.integrations.elabftwEnabled === false) templateElab = false;
+                    if (t.integrations.omero === false || t.integrations.omeroEnabled === false) templateOmero = false;
+                    if (t.integrations.rspace === false || t.integrations.rspaceEnabled === false) templateRSpace = false;
+                    if (t.integrations.n8n === false || t.integrations.n8nEnabled === false) templateN8n = false;
                 }
             }
 
@@ -89,6 +97,9 @@ const sidebarIntegration = {
             if (elabToggle && elabEnabled) {
                 elabToggle.checked = templateElab;
                 this.toggleSection('elabftwBody', templateElab);
+                if (templateElab && window.loadElabFTWTemplates) {
+                    window.loadElabFTWTemplates();
+                }
             }
 
             if (omeroToggle && omeroEnabled) {
@@ -101,9 +112,14 @@ const sidebarIntegration = {
                 this.toggleSection('rspaceBody', templateRSpace);
             }
 
-            console.log('📋 Sidebar State Updated:', {
-                Visibility: { elab: elabEnabled, omero: omeroEnabled, rspace: rspaceEnabled },
-                Toggles: { elab: templateElab, omero: templateOmero, rspace: templateRSpace }
+            if (n8nToggle && n8nEnabled) {
+                n8nToggle.checked = templateN8n;
+                this.toggleSection('n8nBody', templateN8n);
+            }
+
+            console.log('📋 Sidebar Settings applied successfully', {
+                Visibility: { elab: elabEnabled, omero: omeroEnabled, rspace: rspaceEnabled, n8n: n8nEnabled },
+                Toggles: { elab: templateElab, omero: templateOmero, rspace: templateRSpace, n8n: templateN8n }
             });
 
         } catch (error) {
@@ -120,6 +136,9 @@ const sidebarIntegration = {
 
             elabToggle.addEventListener('change', () => {
                 this.toggleSection('elabftwBody', elabToggle.checked);
+                if (elabToggle.checked && window.loadElabFTWTemplates) {
+                    window.loadElabFTWTemplates();
+                }
                 // Trigger any existing logic if needed
                 if (typeof window.handleElabFTWChange === 'function') {
                     window.handleElabFTWChange();
@@ -331,6 +350,27 @@ window.saveElabFTWCategoryToTemplate = function () {
     }
 };
 
+window.saveElabFTWFetchNextIdToTemplate = function () {
+    const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
+    if (!fetchNextIdInput) return;
+
+    const fetchNextId = fetchNextIdInput.checked;
+
+    // Update current template in memory if available
+    if (window.templateManager && window.templateManager.currentTemplate) {
+        if (!window.templateManager.currentTemplate.elabftw) {
+            window.templateManager.currentTemplate.elabftw = {};
+        }
+        window.templateManager.currentTemplate.elabftw.fetchNextId = fetchNextId;
+        console.log('🧪 Saved elabFTW fetchNextId to template state:', fetchNextId);
+        
+        // Actually save to disk using the central save method
+        if (typeof window.templateManager.saveCurrentTemplateWithElabFTWCategory === 'function') {
+            window.templateManager.saveCurrentTemplateWithElabFTWCategory();
+        }
+    }
+};
+
 window.debounceElabFTWCategorySave = function () {
     clearTimeout(elabFTWCategoryDebounceTimer);
     elabFTWCategoryDebounceTimer = setTimeout(() => {
@@ -420,6 +460,73 @@ window.loadRSpaceFolders = async function () {
         folderSelect.innerHTML = '<option value="">Error loading folders</option>';
     } finally {
         folderSelect.disabled = false;
+    }
+};
+
+window.loadElabFTWTemplates = async function () {
+    console.log('🧪 Loading elabFTW templates...');
+    const templateSelect = document.getElementById('elabftwProjectCategory');
+    if (!templateSelect) return;
+
+    if (!window.settingsManager) {
+        console.error('❌ SettingsManager not loaded');
+        return;
+    }
+
+    try {
+        const serverUrl = await window.settingsManager.getFormattedElabFTWUrl();
+        const apiKey = await window.settingsManager.get('elabftw.api_key');
+
+        if (!serverUrl || !apiKey) {
+             templateSelect.innerHTML = '<option value="">elabFTW not configured</option>';
+             return;
+        }
+
+        const originalValue = templateSelect.value;
+        templateSelect.innerHTML = '<option value="">Loading...</option>';
+        templateSelect.disabled = true;
+
+        const response = await fetch(`${serverUrl}api/v2/experiments_templates`, {
+            headers: { 'Authorization': apiKey }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}`);
+        }
+
+        const templates = await response.json();
+
+        templateSelect.innerHTML = '<option value="">-- Default Template --</option>';
+
+        if (Array.isArray(templates)) {
+            // Sort templates alphabetically
+            templates.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            templates.forEach(tpl => {
+                const option = document.createElement('option');
+                option.value = tpl.id; 
+                option.textContent = tpl.title; 
+                templateSelect.appendChild(option);
+            });
+        }
+
+        if (originalValue) {
+            const exists = Array.from(templateSelect.options).some(opt => opt.value === originalValue);
+            if (exists) {
+                templateSelect.value = originalValue;
+            } else if (originalValue !== "") {
+                const option = document.createElement('option');
+                option.value = originalValue;
+                option.textContent = `Template ID ${originalValue} (Unknown)`;
+                templateSelect.appendChild(option);
+                templateSelect.value = originalValue;
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Error loading elabFTW templates:', error);
+        templateSelect.innerHTML = '<option value="">Error loading templates</option>';
+    } finally {
+        templateSelect.disabled = false;
     }
 };
 

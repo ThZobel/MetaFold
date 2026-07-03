@@ -562,8 +562,7 @@
 /* ===== DROPDOWN STYLE FIX - Passend zu anderen Form-Elementen ===== */
 
 /* Dropdown/Select Styling - passend zu anderen Form-Elementen */
-#experimentFields select,
-.form-group select {
+select {
     width: 100%;
     padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -576,15 +575,13 @@
 }
 
 /* Hover State */
-#experimentFields select:hover,
-.form-group select:hover {
+select:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Focus State - gleicher Style wie andere Felder */
-#experimentFields select:focus,
-.form-group select:focus {
+select:focus {
     outline: none;
     border-color: #7c3aed;
     box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
@@ -592,36 +589,31 @@
 }
 
 /* Dropdown Options - Dunklerer Hintergrund für bessere Lesbarkeit */
-#experimentFields select option,
-.form-group select option {
+select option {
     background: #1a1a2e; /* Dunkler Hintergrund beim Ausklappen */
     color: #e0e0e0; /* Weiße Schrift */
     padding: 8px;
 }
 
 /* Ausgewählte Option im ausgeklappten Dropdown */
-#experimentFields select option:checked,
-.form-group select option:checked {
+select option:checked {
     background: #7c3aed; /* Lila Highlight für ausgewählte Option */
     color: white;
 }
 
 /* Hover auf Options (funktioniert in manchen Browsers) */
-#experimentFields select option:hover,
-.form-group select option:hover {
+select option:hover {
     background: rgba(124, 58, 237, 0.3);
 }
 
 /* Placeholder/Unausgewählter Zustand */
-#experimentFields select option[value=""],
-.form-group select option[value=""] {
+select option[value=""] {
     color: #9ca3af; /* Grau für "-- Select --" */
     font-style: italic;
 }
 
 /* Disabled State */
-#experimentFields select:disabled,
-.form-group select:disabled {
+select:disabled {
     background: rgba(255, 255, 255, 0.02);
     color: #6b7280;
     border-color: rgba(255, 255, 255, 0.1);
@@ -631,14 +623,12 @@
 
 /* Firefox-spezifische Anpassungen */
 @-moz-document url-prefix() {
-    #experimentFields select,
-    .form-group select {
+    select {
         color: #e0e0e0;
         background-color: rgba(255, 255, 255, 0.05);
     }
     
-    #experimentFields select option,
-    .form-group select option {
+    select option {
         background-color: #1a1a2e;
         color: #e0e0e0;
     }

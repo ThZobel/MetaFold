@@ -13,6 +13,9 @@
             <button class="settings-tab" onclick="switchSettingsTab('omero')" id="omeroTab">
                 🔬 OMERO
             </button>
+            <button class="settings-tab" onclick="switchSettingsTab('n8n')" id="n8nTab">
+                🤖 n8n
+            </button>
         </div>
 
         <!-- General Settings Tab -->
@@ -589,10 +592,10 @@
 
 
                     <div class="form-group">
-                        <label for="elabftwDefaultCategory">📂 Default Category ID:</label>
+                        <label for="elabftwDefaultCategory">📂 Default Template ID:</label>
                         <input type="number" id="elabftwDefaultCategory" value="0" min="0"
                             onchange="updateElabFTWDefaultCategory()">
-                        <small><strong>Hint:</strong> Use <code>0</code> if you don't know the correct category ID.
+                        <small><strong>Hint:</strong> Use <code>0</code> to use the default template. The ID is the number of the <em>Experimentvorlage</em> in eLabFTW.
                             Other
                             valid IDs
                             will also work.</small>
@@ -798,6 +801,84 @@
                     </div>
                 </div>
             </div> <!-- End integration-settings-container -->
+        </div>
+
+        <!-- n8n Settings Tab -->
+        <div id="n8nSettings" class="settings-tab-content">
+            <div class="integration-settings-container">
+                <div class="integration-header">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="n8nEnabled" onchange="updaten8nSetting()">
+                        <span>🤖 Enable n8n Integration</span>
+                    </label>
+                    <small>Connect MetaFold with your n8n automation server.</small>
+                </div>
+
+                <div id="n8nConfig" class="integration-body" style="display: none;">
+                    <div class="form-group">
+                        <label for="n8nInstanceId">🖥️ Instance ID (Optional):</label>
+                        <input type="text" id="n8nInstanceId" placeholder="e.g. Lab-PC-1"
+                            onchange="updaten8nInstanceId()">
+                        <small>Identifies which MetaFold installation sent the request</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="n8nWebhookUrl">🌐 Global Webhook URL:</label>
+                        <input type="url" id="n8nWebhookUrl" placeholder="https://n8n.your-server.com/webhook/..."
+                            onchange="updaten8nWebhookUrl()">
+                        <small>The webhook URL that MetaFold will call when creating a project</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="n8nAuthType">🛡️ Authentication Type:</label>
+                        <select id="n8nAuthType" onchange="updaten8nAuthType()">
+                            <option value="none">None</option>
+                            <option value="bearer">Bearer Token</option>
+                            <option value="basic">Basic Auth</option>
+                        </select>
+                    </div>
+
+                    <div id="n8nBearerAuthGroup" class="form-group" style="display: none;">
+                        <label for="n8nAuthToken">🔑 Bearer Token:</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="n8nAuthToken" placeholder="Your token"
+                                onchange="updaten8nAuthToken()">
+                            <button type="button" class="toggle-password"
+                                onclick="togglePasswordVisibility('n8nAuthToken')">👁️</button>
+                        </div>
+                    </div>
+
+                    <div id="n8nBasicAuthGroup" style="display: none;">
+                        <div class="form-group">
+                            <label for="n8nBasicUser">👤 Username:</label>
+                            <input type="text" id="n8nBasicUser" placeholder="Username"
+                                onchange="updaten8nBasicAuth()">
+                        </div>
+                        <div class="form-group">
+                            <label for="n8nBasicPass">🔑 Password:</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="n8nBasicPass" placeholder="Password"
+                                    onchange="updaten8nBasicAuth()">
+                                <button type="button" class="toggle-password"
+                                    onclick="togglePasswordVisibility('n8nBasicPass')">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr style="margin: 15px 0;">
+                    
+                    <div class="form-group checkbox-group" style="margin-top: 15px;">
+                        <input type="checkbox" id="n8nVerifySsl" onchange="updaten8nVerifySsl()">
+                        <label for="n8nVerifySsl" style="font-weight: normal; margin-left: 5px;">
+                            🔒 Verify SSL Certificate
+                        </label>
+                        <small style="display: block; margin-left: 25px; margin-top: -5px; margin-bottom: 5px; color: #aaa;">
+                            Disable if your n8n instance uses a self-signed certificate.
+                        </small>
+                    </div>
+
+                </div>
+            </div>
         </div>
 
         <!-- Settings Actions -->

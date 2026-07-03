@@ -11,13 +11,21 @@
 ">
             <h1 style="margin: 0; font-size: 1.5rem;">MetaFold</h1>
         </div>
-
-        <!-- Settings Button als Zahnradsymbol -->
-        <button class="btn btn-secondary" onclick="showSettingsModal()"
-            style="padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;"
-            title="Settings">
-            ⚙️
-        </button>
+        <div style="display: flex; gap: 8px;">
+            <!-- Theme Toggle -->
+            <button class="btn btn-secondary" onclick="window.toggleTheme()"
+                style="padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;"
+                title="Toggle Light/Dark Mode">
+                <span id="themeToggleIcon">☀️</span>
+            </button>
+            
+            <!-- Settings Button als Zahnradsymbol -->
+            <button class="btn btn-secondary" onclick="showSettingsModal()"
+                style="padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;"
+                title="Settings">
+                ⚙️
+            </button>
+        </div>
     </div>
 
     <!-- Current User Display mit integriertem Switch User Button -->

@@ -56,6 +56,70 @@ const projectManager = {
         }
     },
 
+    // NEW: Multi-Folder Target Array
+    multiFolderTargetPaths: [],
+
+    // NEW: Add a folder to the multi-folder list
+    async addMultiFolder() {
+        if (window.electronAPI && window.electronAPI.selectFolders) {
+            try {
+                const selectedPaths = await window.electronAPI.selectFolders();
+                if (selectedPaths && selectedPaths.length > 0) {
+                    let added = false;
+                    for (const path of selectedPaths) {
+                        if (!this.multiFolderTargetPaths.includes(path)) {
+                            this.multiFolderTargetPaths.push(path);
+                            added = true;
+                        }
+                    }
+                    if (added) {
+                        this.renderMultiFolderList();
+                    } else {
+                        this.showInfo('Selected folders are already in the list.');
+                    }
+                }
+            } catch (error) {
+                this.showError('Error selecting folders: ' + error.message);
+            }
+        }
+    },
+
+    // NEW: Remove a folder from the list
+    removeMultiFolder(index) {
+        if (index >= 0 && index < this.multiFolderTargetPaths.length) {
+            this.multiFolderTargetPaths.splice(index, 1);
+            this.renderMultiFolderList();
+        }
+    },
+
+    // NEW: Render the multi-folder list
+    renderMultiFolderList() {
+        const listDiv = document.getElementById('multiFolderList');
+        if (!listDiv) return;
+
+        if (this.multiFolderTargetPaths.length === 0) {
+            listDiv.innerHTML = `<div class="multi-folder-empty">
+                No folders selected. Click "Add Folder" to start.
+            </div>`;
+            return;
+        }
+
+        listDiv.innerHTML = this.multiFolderTargetPaths.map((path, index) => `
+            <div class="multi-folder-item">
+                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                    <span style="font-size: 1.1em;">📁</span>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace;" title="${path}">
+                        ${path}
+                    </span>
+                </div>
+                <button onclick="projectManager.removeMultiFolder(${index})" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Remove">
+                    <span style="font-size: 1.2em;">×</span>
+                </button>
+            </div>
+        `).join('');
+    },
+
+
     // Update path preview
     updatePathPreview() {
         const basePath = document.getElementById('targetPath').value.trim();
@@ -76,6 +140,15 @@ const projectManager = {
             } else {
                 preview.textContent = 'Choose directory and project name';
             }
+        }
+        
+        // Auto-save project defaults to the current template if active
+        if (window.templateManager && typeof window.templateManager.saveCurrentTemplateWithElabFTWCategory === 'function') {
+            // Debounce to prevent too many saves while typing
+            clearTimeout(window._projectDefaultsSaveTimeout);
+            window._projectDefaultsSaveTimeout = setTimeout(() => {
+                window.templateManager.saveCurrentTemplateWithElabFTWCategory();
+            }, 800);
         }
     },
 
@@ -132,9 +205,96 @@ const projectManager = {
         }
     },
 
-    // Create project with directory conflict checking - ERWEITERTE VERSION
+    // NEW: Execute batch file write logic
+    async executeBatchFileWrite(template) {
+        let targetPaths = [];
+
+        if (template.options?.multipleFolders) {
+            targetPaths = [...this.multiFolderTargetPaths];
+            if (targetPaths.length === 0) {
+                this.showError('Please select at least one folder!');
+                return;
+            }
+        } else {
+            // Only writeFilesOnly is true
+            const basePath = document.getElementById('targetPath').value.trim();
+            if (!basePath) {
+                this.showError('Please choose a base directory!');
+                return;
+            }
+            targetPaths = [basePath];
+        }
+
+        // Get metadata
+        const hasMetadata = template.type === 'experiment' &&
+            template.metadata &&
+            Object.keys(template.metadata).length > 0;
+
+        let experimentMetadata = null;
+        if (hasMetadata && window.experimentForm && window.experimentForm.collectData) {
+            const validationResult = window.experimentForm.validate ? window.experimentForm.validate() : { valid: true };
+            if (!validationResult.valid) {
+                this.showError(validationResult.message);
+                return;
+            }
+            experimentMetadata = window.experimentForm.collectData();
+        }
+
+        if (!experimentMetadata) {
+            this.showError('No metadata available to write!');
+            return;
+        }
+
+        const metadataStr = JSON.stringify(experimentMetadata, null, 2);
+
+        if (!window.electronAPI || !window.electronAPI.writeFile) {
+            this.showError('File writing is not available in browser mode.');
+            return;
+        }
+
+        let successCount = 0;
+        let errors = [];
+
+        // Use custom filename if provided, otherwise default to ReadyToImport.json
+        let customFileName = document.getElementById('projectName').value.trim();
+        if (!customFileName) {
+            customFileName = 'ReadyToImport.json';
+        } else if (!customFileName.toLowerCase().endsWith('.json')) {
+            customFileName += '.json';
+        }
+
+        for (const targetPath of targetPaths) {
+            try {
+                const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
+                await window.electronAPI.writeFile(filePath, metadataStr);
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to write to ${targetPath}:`, err);
+                errors.push(err.message);
+            }
+        }
+
+        if (errors.length > 0) {
+            this.showError(`Failed to write to ${errors.length} folder(s). First error: ${errors[0]}`);
+        } else {
+            this.showSuccess(`Successfully wrote metadata to ${successCount} folder(s)!`);
+            
+            // Clear selections if it was multiple folders
+            if (template.options?.multipleFolders) {
+                this.multiFolderTargetPaths = [];
+                this.renderMultiFolderList();
+            }
+        }
+    },
     async createProject() {
         if (!templateManager.currentTemplate) return;
+
+        const template = templateManager.currentTemplate;
+        
+        // NEW: Batch file writer mode
+        if (template.options?.multipleFolders || template.options?.writeFilesOnly) {
+            return this.executeBatchFileWrite(template);
+        }
 
         const onlyIntegrations = document.getElementById('onlyIntegrations')?.checked || false;
 
@@ -253,6 +413,43 @@ const projectManager = {
             console.log('📋 experimentMetadata:', experimentMetadata);
             console.log('📋 hasMetadata:', hasMetadata);
 
+            // PRE-FLIGHT: If "Fetch Next ID" is enabled, we MUST create the eLabFTW experiment first
+            let elabFTWResult = null;
+            let elabFTWProcessed = false;
+            const fetchNextIdCheckbox = document.getElementById('elabftwFetchNextId');
+            const shouldFetchNextId = fetchNextIdCheckbox ? fetchNextIdCheckbox.checked : false;
+            const existingExpIdElement = document.getElementById('existingExperimentId');
+            const existingExpId = existingExpIdElement?.value?.trim();
+
+            if (shouldFetchNextId && !existingExpId && await settingsManager.get('elabftw.enabled') && await this.shouldSyncToElabFTW()) {
+                console.log('🧪 eLabFTW: "Fetch Next ID" is enabled. Creating experiment FIRST to get ID...');
+                
+                const categoryIdElement = document.getElementById('elabftwProjectCategory');
+                const specificCategoryId = categoryIdElement?.value?.trim();
+
+                try {
+                    elabFTWResult = await settingsManager.createElabFTWExperiment(
+                        finalProjectName,
+                        experimentMetadata || {},
+                        templateStructure,
+                        specificCategoryId
+                    );
+                    elabFTWProcessed = true;
+
+                    if (elabFTWResult && elabFTWResult.success && elabFTWResult.custom_id) {
+                        console.log(`✅ eLabFTW Custom ID retrieved: ${elabFTWResult.custom_id}`);
+                        finalProjectName = `${elabFTWResult.custom_id}_${finalProjectName}`;
+                        console.log(`📁 Project name updated to: ${finalProjectName}`);
+                    } else {
+                        console.warn('⚠️ eLabFTW: Could not fetch custom_id, proceeding with original project name.');
+                    }
+                } catch (elabFTWError) {
+                    console.error('❌ eLabFTW pre-flight failed:', elabFTWError);
+                    // If eLabFTW fails but fetchNextId was required, stop the process
+                    throw new Error(`Failed to create eLabFTW experiment for Next ID: ${elabFTWError.message}`);
+                }
+            }
+
             // Create project with final (possibly changed) name
             // Create project locally OR skip if integrations only
             let result = { success: true, message: 'Project data processed successfully', projectPath: '' };
@@ -285,63 +482,67 @@ const projectManager = {
                 } else if (conflictResolution.overwrite) {
                     successMessage += ` (Overwrote existing directory)`;
                 }
-                let elabFTWResult = null;
+                
                 let omeroResult = null;
 
                 // elabFTW Integration
-                if (template.type === 'experiment' && hasMetadata && await settingsManager.get('elabftw.enabled')) {
+                if (await settingsManager.get('elabftw.enabled')) {
                     console.log('🧪 Starting elabFTW integration...');
 
                     const shouldSyncToElabFTW = await this.shouldSyncToElabFTW();
 
                     if (shouldSyncToElabFTW) {
-                        try {
-                            const existingExpIdElement = document.getElementById('existingExperimentId');
-                            const existingExpId = existingExpIdElement?.value?.trim();
-
-                            console.log('🔧 DEBUG: Experiment ID check:', {
-                                element: !!existingExpIdElement,
-                                rawValue: existingExpIdElement?.value,
-                                trimmedValue: existingExpId,
-                                isEmpty: !existingExpId,
-                                length: existingExpId?.length || 0
-                            });
-
-                            if (existingExpId && existingExpId.length > 0) {
-                                // Update existing experiment
-                                console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
-                                elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
-                                    existingExpId,
-                                    experimentMetadata
-                                );
-                            } else {
-                                // Create new experiment with final project name
-                                console.log('🧪 Creating new elabFTW experiment');
-
-                                // Get specific category ID if set
-                                const categoryIdElement = document.getElementById('elabftwProjectCategory');
-                                const specificCategoryId = categoryIdElement?.value?.trim();
-
-                                elabFTWResult = await settingsManager.createElabFTWExperiment(
-                                    finalProjectName,
-                                    experimentMetadata,
-                                    templateStructure,
-                                    specificCategoryId
-                                );
-                            }
-
-                            console.log('🧪 elabFTW result:', elabFTWResult);
-
+                        if (elabFTWProcessed) {
+                            console.log('🧪 eLabFTW already processed during pre-flight. Skipping duplicate creation.');
                             if (elabFTWResult && elabFTWResult.success) {
-                                successMessage += ' (Synced to elabFTW)';
+                                successMessage += ' (Synced to elabFTW with Custom ID)';
                             }
+                        } else {
+                            try {
+                                console.log('🔧 DEBUG: Experiment ID check:', {
+                                    element: !!existingExpIdElement,
+                                    rawValue: existingExpIdElement?.value,
+                                    trimmedValue: existingExpId,
+                                    isEmpty: !existingExpId,
+                                    length: existingExpId?.length || 0
+                                });
 
-                        } catch (elabFTWError) {
-                            console.error('❌ elabFTW integration failed:', elabFTWError);
-                            elabFTWResult = {
-                                success: false,
-                                message: elabFTWError.message || 'Unknown elabFTW error'
-                            };
+                                if (existingExpId && existingExpId.length > 0) {
+                                    // Update existing experiment
+                                    console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
+                                    elabFTWResult = await settingsManager.updateExistingElabFTWExperiment(
+                                        existingExpId,
+                                        experimentMetadata || {}
+                                    );
+                                } else {
+                                    // Create new experiment with final project name
+                                    console.log('🧪 Creating new elabFTW experiment');
+
+                                    // Get specific category ID if set
+                                    const categoryIdElement = document.getElementById('elabftwProjectCategory');
+                                    const specificCategoryId = categoryIdElement?.value?.trim();
+
+                                    elabFTWResult = await settingsManager.createElabFTWExperiment(
+                                        finalProjectName,
+                                        experimentMetadata || {},
+                                        templateStructure,
+                                        specificCategoryId
+                                    );
+                                }
+
+                                console.log('🧪 elabFTW result:', elabFTWResult);
+
+                                if (elabFTWResult && elabFTWResult.success) {
+                                    successMessage += ' (Synced to elabFTW)';
+                                }
+
+                            } catch (elabFTWError) {
+                                console.error('❌ elabFTW integration failed:', elabFTWError);
+                                elabFTWResult = {
+                                    success: false,
+                                    message: elabFTWError.message || 'Unknown elabFTW error'
+                                };
+                            }
                         }
                     } else {
                         console.log('🧪 elabFTW sync skipped');
@@ -349,7 +550,8 @@ const projectManager = {
                 }
 
                 // OMERO Integration - NOW WITH VALIDATED GROUP
-                if (template.type === 'experiment' && hasMetadata && await settingsManager.get('omero.enabled')) {
+                // NOTE: hasMetadata guard removed - consistent with elabFTW. User controls via sidebar toggle.
+                if (await settingsManager.get('omero.enabled')) {
                     // Re-check validation result (should pass since we checked earlier)
                     const omeroValidation = await this.shouldSyncToOMEROWithValidation();
 
@@ -366,7 +568,7 @@ const projectManager = {
 
                             omeroResult = await window.metaFoldOMEROIntegration.createDatasetForMetaFoldProject(
                                 finalProjectName,
-                                experimentMetadata,
+                                experimentMetadata || {},
                                 omeroOptions
                             );
 
@@ -386,7 +588,8 @@ const projectManager = {
 
                 // RSpace Integration
                 let rspaceResult = null;
-                if (template.type === 'experiment' && hasMetadata && await settingsManager.get('rspace.enabled')) {
+                // NOTE: hasMetadata guard removed - consistent with elabFTW. User controls via sidebar toggle.
+                if (await settingsManager.get('rspace.enabled')) {
                     const shouldSyncToRSpace = await this.shouldSyncToRSpace();
 
                     if (shouldSyncToRSpace) {
@@ -405,7 +608,7 @@ const projectManager = {
                             contentHtml += '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
                             contentHtml += '<thead><tr style="background-color: #f2f2f2;"><th>Field</th><th>Value</th></tr></thead><tbody>';
 
-                            for (const [key, value] of Object.entries(experimentMetadata)) {
+                            for (const [key, value] of Object.entries(experimentMetadata || {})) {
                                 if (['projectName', 'templateInfo', 'metafold_integration'].includes(key)) continue;
                                 const displayValue = (typeof value === 'object' && value !== null && value.value !== undefined) ? value.value : value;
                                 contentHtml += `<tr><td><strong>${key}</strong></td><td>${displayValue}</td></tr>`;
@@ -447,12 +650,141 @@ const projectManager = {
                     }
                 }
 
+                // n8n Integration
+                let n8nResult = null;
+                if (await settingsManager.get('n8n.enabled')) {
+                    const shouldSyncToN8n = await this.shouldSyncToN8n();
+
+                    if (shouldSyncToN8n) {
+                        console.log('🤖 Starting n8n integration...');
+                        try {
+                            const webhookUrl = await settingsManager.get('n8n.webhook_url');
+                            const authType = await settingsManager.get('n8n.auth_type') || 'none';
+                            const authToken = await settingsManager.get('n8n.auth_token');
+                            const basicUser = await settingsManager.get('n8n.basic_user');
+                            const basicPass = await settingsManager.get('n8n.basic_pass');
+                            const instanceId = await settingsManager.get('n8n.instance_id');
+
+                            if (!webhookUrl) {
+                                throw new Error('n8n Webhook URL is not configured.');
+                            }
+
+                            // Build payload
+                            const payload = {
+                                event: 'project_created',
+                                metafold_instance: instanceId || 'Unknown',
+                                timestamp: new Date().toISOString(),
+                                project: {
+                                    name: finalProjectName,
+                                    targetPath: result.projectPath,
+                                    templateName: template.name,
+                                    metadata: experimentMetadata || {}
+                                }
+                            };
+
+                            // Add user context
+                            if (window.userManager) {
+                                const currentUser = window.userManager.getCurrentUser();
+                                if (currentUser) {
+                                    payload.user = currentUser.username;
+                                }
+                            }
+
+                            // Prepare headers
+                            const headers = {
+                                'Content-Type': 'application/json'
+                            };
+
+                            if (authType === 'bearer' && authToken) {
+                                headers['Authorization'] = `Bearer ${authToken}`;
+                            } else if (authType === 'basic' && basicUser && basicPass) {
+                                headers['Authorization'] = 'Basic ' + btoa(`${basicUser}:${basicPass}`);
+                            }
+
+                            // Send webhook request
+                            const verifySsl = await settingsManager.get('n8n.verify_ssl'); // true by default
+                            const sslVerificationEnabled = verifySsl !== false; // default: true
+                            let responseData = {};
+                            let isSuccess = false;
+
+                            if (window.electronAPI && window.electronAPI.sendWebhook) {
+                                // IPC path: runs in Main Process, supports rejectUnauthorized for self-signed certs
+                                console.log(`🤖 Sending webhook via IPC (Main Process) | SSL verify: ${sslVerificationEnabled}`);
+                                const response = await window.electronAPI.sendWebhook(webhookUrl, payload, headers, sslVerificationEnabled);
+                                
+                                if (!response.success) {
+                                    // Provide a helpful error message for SSL issues
+                                    const errMsg = response.error || String(response.status);
+                                    if (errMsg.includes('CERT') || errMsg.includes('certificate') || errMsg.includes('SSL') || errMsg.includes('self-signed')) {
+                                        throw new Error(
+                                            `SSL certificate error connecting to n8n: "${errMsg}". ` +
+                                            `Your n8n server uses a self-signed or untrusted certificate. ` +
+                                            `Solution: In MetaFold Settings → n8n, disable "Verify SSL Certificate".`
+                                        );
+                                    }
+                                    throw new Error(`n8n Webhook request failed: ${errMsg}`);
+                                }
+                                
+                                try {
+                                    responseData = JSON.parse(response.data);
+                                } catch (e) {
+                                    responseData.text = response.data;
+                                }
+                                isSuccess = true;
+                            } else {
+                                // Fallback: native fetch() in the Renderer Process
+                                // ⚠️ This path CANNOT bypass SSL certificate errors (ERR_CERT_AUTHORITY_INVALID).
+                                // If you see SSL errors, make sure MetaFold is running as an Electron app (not in a browser).
+                                console.warn('⚠️ electronAPI.sendWebhook not available — falling back to native fetch(). SSL certificate bypass is NOT supported in this mode.');
+                                if (!sslVerificationEnabled) {
+                                    console.warn('⚠️ SSL verification is disabled in settings, but native fetch() cannot honor this — SSL errors may still occur. Run MetaFold as the Electron app to fix this.');
+                                }
+                                const response = await fetch(webhookUrl, {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: JSON.stringify(payload)
+                                });
+
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+
+                                const contentType = response.headers.get("content-type");
+                                if (contentType && contentType.indexOf("application/json") !== -1) {
+                                    responseData = await response.json();
+                                } else {
+                                    responseData.text = await response.text();
+                                }
+                                isSuccess = true;
+                            }
+
+                            n8nResult = {
+                                success: isSuccess,
+                                data: responseData
+                            };
+
+                            console.log('🤖 n8n result:', n8nResult);
+                            successMessage += ' (Triggered n8n)';
+
+                        } catch (n8nError) {
+                            console.error('❌ n8n integration failed:', n8nError);
+                            n8nResult = {
+                                success: false,
+                                message: n8nError.message || 'Unknown n8n error'
+                            };
+                        }
+                    } else {
+                        console.log('🤖 n8n sync skipped');
+                    }
+                }
+
                 // Process integration links
                 try {
                     const uploadResults = {
                         elabftw: elabFTWResult,
                         omero: omeroResult,
-                        rspace: rspaceResult
+                        rspace: rspaceResult,
+                        n8n: n8nResult
                     };
 
                     const projectData = {
@@ -468,7 +800,7 @@ const projectManager = {
                 }
 
                 // Build links and show success
-                const links = await this.buildLinksFromResults({ elabftw: elabFTWResult, omero: omeroResult, rspace: rspaceResult });
+                const links = await this.buildLinksFromResults({ elabftw: elabFTWResult, omero: omeroResult, rspace: rspaceResult, n8n: n8nResult });
                 this.showEnhancedSuccess(successMessage, result.projectPath, links);
 
             } else {
@@ -531,6 +863,18 @@ const projectManager = {
         }
 
         console.log('🧪 RSpace sync not requested');
+        return false;
+    },
+
+    // Check if should sync to n8n
+    async shouldSyncToN8n() {
+        const sendToN8n = document.getElementById('sendToN8n');
+        if (sendToN8n && sendToN8n.checked) {
+            console.log('🤖 n8n manual sync checkbox is checked');
+            return true;
+        }
+
+        console.log('🤖 n8n sync not requested');
         return false;
     },
 
@@ -1223,11 +1567,15 @@ const projectManager = {
         }
 
         // Upload to OMERO if successful
-        if (uploadResults.omero && uploadResults.omero.success && uploadResults.omero.dataset?.id) {
-            console.log('🔬 projectManager: Adding integration fields to OMERO dataset');
+        const omeroDatasetId = uploadResults.omero?.integration?.datasetId || uploadResults.omero?.dataset?.datasetId || uploadResults.omero?.dataset?.id;
+        if (uploadResults.omero && uploadResults.omero.success && omeroDatasetId) {
+            console.log('🔬 projectManager: Adding integration fields to OMERO dataset/project');
 
             try {
-                await this.addIntegrationFieldsToOMERO(uploadResults.omero.dataset.id, integrationFields);
+                // Determine if it is a project or dataset from the URL
+                const isProject = uploadResults.omero.integration?.url?.includes('show=project') || uploadResults.omero.dataset?.omeroWebUrl?.includes('show=project');
+                const objectType = isProject ? 'project' : 'dataset';
+                await this.addIntegrationFieldsToOMERO(omeroDatasetId, integrationFields, objectType);
                 console.log('✅ projectManager: Integration fields added to OMERO successfully');
             } catch (error) {
                 console.error('❌ projectManager: Error adding integration fields to OMERO:', error);
@@ -1261,7 +1609,7 @@ const projectManager = {
         }
     },
 
-    async addIntegrationFieldsToOMERO(datasetId, integrationFields) {
+    async addIntegrationFieldsToOMERO(datasetId, integrationFields, objectType = 'dataset') {
         console.log(`🔬 projectManager: Adding enhanced integration fields to OMERO dataset ${datasetId}`);
 
         // FIX: Check format of integrationFields
@@ -1317,7 +1665,7 @@ const projectManager = {
 
             if (keyValuePairs.length > 0) {
                 // Create annotation using Phase 2 method
-                const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs);
+                const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType);
 
                 if (result.success) {
                     console.log('✅ projectManager: Enhanced integration fields successfully added to OMERO');
@@ -1457,7 +1805,8 @@ const projectManager = {
                         if (insertResult.success) {
                             console.log('✅ projectManager: Integration links inserted into README successfully');
                         } else {
-                            console.warn('⚠️ projectManager: Failed to insert links into README:', insertResult.message);
+                            // Not an error - folder-only templates have no README, that's expected
+                            console.log('📄 projectManager: No README to update (folder-only template or README not yet created):', insertResult.message);
                         }
                     } else {
                         console.log('📄 projectManager: No integration links to insert');

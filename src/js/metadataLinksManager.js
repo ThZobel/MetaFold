@@ -81,15 +81,17 @@ const metadataLinksManager = {
         console.log('🔬 OMERO username resolved:', omeroUsername);
         
         // Get OMERO URL - handle both direct URL and generated URL
-        let omeroUrl = omeroResult.url;
-        if (!omeroUrl && omeroResult.dataset?.id) {
+        let omeroUrl = omeroResult.url || omeroResult.integration?.url || omeroResult.dataset?.omeroWebUrl;
+        const omeroId = omeroResult.integration?.datasetId || omeroResult.dataset?.datasetId || omeroResult.dataset?.id;
+        if (!omeroUrl && omeroId) {
+            const objectType = omeroResult.dataset?.projectId === omeroId ? 'project' : 'dataset';
             // Use await since generateOMEROUrl is now async
-            omeroUrl = await this.generateOMEROUrl(omeroResult.dataset.id);
+            omeroUrl = await this.generateOMEROUrl(omeroId, null, objectType);
         }
         
         enhancedMetadata.metafold_integration.external_links.omero = {
             url: omeroUrl,
-            dataset_id: omeroResult.dataset?.id?.toString(),
+            dataset_id: omeroId?.toString(),
             user_name: omeroUsername || 'Unknown',
             uploaded_at: new Date().toISOString(),
             status: 'uploaded'

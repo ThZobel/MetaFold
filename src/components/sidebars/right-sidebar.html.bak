@@ -150,7 +150,6 @@
                     <select id="omeroProjectSelect" onchange="handleOMEROProjectSelection()">
                         <option value="">Select group first</option>
                     </select>
-                    <div id="omeroCreationHint" style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;"></div>
                 </div>
                 <label class="checkbox-label"
                     style="margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">

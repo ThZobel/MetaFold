@@ -20,6 +20,30 @@
         </div>
 
         <div id="structureContent" class="tab-content active">
+            <!-- NEW: Project behavior toggles -->
+            <div class="form-group" style="padding: 15px; background: #2d2d2d; border-radius: 8px; margin-bottom: 15px; border: 1px solid #404040;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div>
+                        <strong style="display: block; margin-bottom: 4px;">Write files only</strong>
+                        <span style="font-size: 0.85em; color: #9ca3af;">Do not create a new project folder, just write metadata/files</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="templateWriteFilesOnly">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong style="display: block; margin-bottom: 4px;">Multiple folders (Batch mode)</strong>
+                        <span style="font-size: 0.85em; color: #9ca3af;">Select existing folders to write to (disables Project Name)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="templateMultipleFolders">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="experimentStructure">Folder Structure (optional):</label>
                 <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):

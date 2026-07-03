@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Entropy Test - MetaFold</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            padding: 20px; 
+            background: #1e1e1e; 
+            color: #d4d4d4;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .pass { background: #1e3a1e; color: #4ec94e; }
+        .fail { background: #3a1e1e; color: #e94e4e; }
+        .info { background: #1e2a3a; color: #4e9fe9; }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover { background: #005a9e; }
+        pre { 
+            background: #2d2d2d; 
+            padding: 10px; 
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 User Entropy Security Test</h1>
+    <button onclick="runTests()">▶️ Run Tests</button>
+    <button onclick="clearResults()">🗑️ Clear Results</button>
+    <button onclick="cleanupTestUsers()">🧹 Cleanup Test Users</button>
+    
+    <div id="results"></div>
+
+    <!-- Load secureStorage -->
+    <script src="js/secureStorage.js"></script>
+    
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            resultsDiv.appendChild(div);
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+
+        function cleanupTestUsers() {
+            localStorage.removeItem('user_password_TestUserA');
+            localStorage.removeItem('user_password_TestUserB');
+            log('✅ Test users cleaned up', 'info');
+        }
+
+        async function runTests() {
+            clearResults();
+            log('🚀 Starting Entropy Security Tests...', 'info');
+            
+            try {
+                // Initialize
+                await window.secureStorage.init();
+                log('✅ SecureStorage initialized', 'pass');
+
+                // Check entropy enabled
+                const status = window.secureStorage.getStatus();
+                if (status.userEntropyEnabled) {
+                    log('✅ TEST 1 PASSED: User Entropy is enabled', 'pass');
+                } else {
+                    log('❌ TEST 1 FAILED: User Entropy is NOT enabled', 'fail');
+                    return;
+                }
+
+                // Cleanup old test users
+                cleanupTestUsers();
+
+                // Create test users
+                log('\n📝 Creating test users...', 'info');
+                await window.secureStorage.storeUserPassword('TestUserA', 'passwordA');
+                await window.secureStorage.storeUserPassword('TestUserB', 'passwordB');
+                log('✅ TEST 2 PASSED: Test users created', 'pass');
+
+                // Test correct passwords
+                log('\n🔑 Testing correct passwords...', 'info');
+                const verifyA = await window.secureStorage.verifyUserPassword('TestUserA', 'passwordA');
+                const verifyB = await window.secureStorage.verifyUserPassword('TestUserB', 'passwordB');
+                
+                if (verifyA && verifyB) {
+                    log('✅ TEST 3 PASSED: Correct passwords work', 'pass');
+                } else {
+                    log('❌ TEST 3 FAILED: Correct passwords rejected', 'fail');
+                }
+
+                // Test wrong passwords
+                log('\n🚫 Testing wrong passwords...', 'info');
+                const wrongA = await window.secureStorage.verifyUserPassword('TestUserA', 'WRONG');
+                const wrongB = await window.secureStorage.verifyUserPassword('TestUserB', 'WRONG');
+                
+                if (!wrongA && !wrongB) {
+                    log('✅ TEST 4 PASSED: Wrong passwords rejected', 'pass');
+                } else {
+                    log('❌ TEST 4 FAILED: Wrong passwords accepted', 'fail');
+                }
+
+                // 🔥 CRITICAL TEST: Cross-user access
+                log('\n🔥 CRITICAL TEST: Cross-User Access Protection...', 'info');
+                log('   Attempting to decrypt UserB data with UserA credentials...', 'info');
+                
+                const userBData = JSON.parse(localStorage.getItem('user_password_TestUserB'));
+                
+                try {
+                    const result = await window.secureStorage.decryptData(
+                        userBData.encrypted,
+                        userBData.method,
+                        {
+                            ...userBData.metadata,
+                            username: 'TestUserA',  // Wrong user!
+                            userPassword: 'passwordA'  // Wrong password!
+                        }
+                    );
+                    
+                    // If we reach here, decryption succeeded - BAD!
+                    log('❌ TEST 5 FAILED: Cross-user access was ALLOWED!', 'fail');
+                    log('   🚨 SECURITY BREACH: User entropy protection NOT working!', 'fail');
+                    
+                } catch (error) {
+                    // Decryption should throw error - GOOD!
+                    if (error.message && error.message.startsWith('ENTROPY_ERROR:')) {
+                        log('✅ TEST 5 PASSED: Cross-user access BLOCKED by entropy!', 'pass');
+                        log(`   Error: ${error.message}`, 'info');
+                    } else {
+                        log('⚠️ TEST 5 PARTIAL: Decryption failed, but not due to entropy', 'fail');
+                        log(`   Error: ${error.message}`, 'info');
+                    }
+                }
+
+                // Check metadata
+                log('\n📊 Checking Entropy Metadata...', 'info');
+                const dataA = JSON.parse(localStorage.getItem('user_password_TestUserA'));
+                const hasEntropyA = dataA.metadata?.hasEntropy;
+                const hasEntropyB = userBData.metadata?.hasEntropy;
+                
+                if (hasEntropyA && hasEntropyB) {
+                    log('✅ TEST 6 PASSED: Entropy metadata present', 'pass');
+                    log(`   UserA: version ${dataA.metadata?.entropyVersion}, user ${dataA.metadata?.entropyUser}`, 'info');
+                    log(`   UserB: version ${userBData.metadata?.entropyVersion}, user ${userBData.metadata?.entropyUser}`, 'info');
+                } else {
+                    log('❌ TEST 6 FAILED: Entropy metadata missing', 'fail');
+                }
+
+                // Summary
+                log('\n' + '='.repeat(50), 'info');
+                log('🎉 ALL TESTS COMPLETED!', 'pass');
+                log('='.repeat(50), 'info');
+
+            } catch (error) {
+                log(`❌ TEST SUITE ERROR: ${error.message}`, 'fail');
+                console.error(error);
+            } finally {
+                // Cleanup
+                log('\n🧹 Cleaning up test users...', 'info');
+                cleanupTestUsers();
+            }
+        }
+    </script>
+</body>
+</html>

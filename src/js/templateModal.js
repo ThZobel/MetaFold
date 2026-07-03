@@ -85,6 +85,10 @@ const templateModal = {
         // REMOVED: document.getElementById('folderStructure').value = '';
         document.getElementById('experimentStructure').value = '';
         
+        // Clear toggles
+        document.getElementById('templateWriteFilesOnly').checked = false;
+        document.getElementById('templateMultipleFolders').checked = false;
+        
         // Clear metadata fields
         if (window.metadataEditor && window.metadataEditor.clearFields) {
             window.metadataEditor.clearFields();
@@ -102,6 +106,10 @@ const templateModal = {
         
         // GEÄNDERT: Immer experimentStructure verwenden, unabhängig vom Template-Typ
         document.getElementById('experimentStructure').value = template.structure || '';
+        
+        // Load toggles
+        document.getElementById('templateWriteFilesOnly').checked = template.options?.writeFilesOnly || false;
+        document.getElementById('templateMultipleFolders').checked = template.options?.multipleFolders || false;
         
         // Load metadata into editor if it's an experiment template
         const isExperiment = template.type === 'experiment' || (template.metadata && Object.keys(template.metadata).length > 0);
@@ -312,6 +320,19 @@ const templateModal = {
 
         const category = this.getSelectedCategory(); // NEW: Get category
         
+        let existingIntegrations = null;
+        let existingProjectDefaults = null;
+        if (this.editingIndex >= 0 && window.templateManager && window.templateManager.templates) {
+            const existingTemplate = window.templateManager.templates[this.editingIndex];
+            if (existingTemplate) {
+                existingIntegrations = existingTemplate.integrations;
+                existingProjectDefaults = existingTemplate.projectDefaults;
+            }
+        } else if (window.templateManager && window.templateManager.currentTemplate) {
+            existingIntegrations = window.templateManager.currentTemplate.integrations;
+            existingProjectDefaults = window.templateManager.currentTemplate.projectDefaults;
+        }
+        
         const template = {
             name: name,
             description: description,
@@ -320,8 +341,19 @@ const templateModal = {
             structure: structure,
             createdBy: window.userManager?.currentUser || 'Unknown',
             createdByGroup: window.userManager?.currentGroup || 'Unknown',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            options: {
+                writeFilesOnly: document.getElementById('templateWriteFilesOnly').checked,
+                multipleFolders: document.getElementById('templateMultipleFolders').checked
+            }
         };
+
+        if (existingIntegrations) {
+            template.integrations = JSON.parse(JSON.stringify(existingIntegrations));
+        }
+        if (existingProjectDefaults) {
+            template.projectDefaults = JSON.parse(JSON.stringify(existingProjectDefaults));
+        }
 
         // FIXED: Add metadata for experiments
         if (type === 'experiment' && window.metadataEditor && window.metadataEditor.collectMetadata) {
@@ -681,7 +713,15 @@ const templateModal = {
                 }
             }
             
-            // === STEP 4: Create new template object ===
+            // === STEP 4: Preserve existing integrations and project defaults ===
+            let existingIntegrations = null;
+            let existingProjectDefaults = null;
+            if (window.templateManager && window.templateManager.currentTemplate) {
+                existingIntegrations = window.templateManager.currentTemplate.integrations;
+                existingProjectDefaults = window.templateManager.currentTemplate.projectDefaults;
+            }
+
+            // === STEP 5: Create new template object ===
             const newTemplate = {
                 name: name + ' (Copy)', // Automatically add "(Copy)" to name
                 description: description || '',
@@ -694,6 +734,13 @@ const templateModal = {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
+
+            if (existingIntegrations) {
+                newTemplate.integrations = JSON.parse(JSON.stringify(existingIntegrations));
+            }
+            if (existingProjectDefaults) {
+                newTemplate.projectDefaults = JSON.parse(JSON.stringify(existingProjectDefaults));
+            }
             
             // === STEP 5: Handle duplicate names ===
             // Check if a template with this name already exists

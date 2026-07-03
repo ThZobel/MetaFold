@@ -53,7 +53,7 @@ const elabftwCategoryManager = {
                 template.integrations = {};
             }
             
-            if (!template.integrations.elabftw) {
+            if (!template.integrations.elabftw || typeof template.integrations.elabftw !== 'object') {
                 template.integrations.elabftw = {};
             }
             
@@ -239,22 +239,16 @@ function patchSettingsManagerForCategory() {
     const originalCreateExperiment = window.settingsManager.createElabFTWExperiment;
     if (!originalCreateExperiment) return;
     
-    window.settingsManager.createElabFTWExperiment = async function(projectName, metadata, structure = '') {
-        // Get the best category to use
-        const categoryId = await elabftwCategoryManager.getCategoryForExperiment();
+    // FIX: Include specificCategoryId parameter - without it, the 4th argument
+    // passed from projectManager.js was silently dropped, so the category was lost.
+    window.settingsManager.createElabFTWExperiment = async function(projectName, metadata, structure = '', specificCategoryId = null) {
+        // If a specificCategoryId was already provided (from projectManager), use it directly.
+        // Only fall back to the category manager if no explicit ID was given.
+        const categoryId = specificCategoryId || await elabftwCategoryManager.getCategoryForExperiment();
         
-        // Temporarily override the settings category
-        const originalCategory = await this.get('elabftw.default_category');
-        await this.set('elabftw.default_category', categoryId);
-        
-        try {
-            // Call original function
-            const result = await originalCreateExperiment.call(this, projectName, metadata, structure);
-            return result;
-        } finally {
-            // Restore original settings category
-            await this.set('elabftw.default_category', originalCategory);
-        }
+        // Call original function with all 4 parameters
+        const result = await originalCreateExperiment.call(this, projectName, metadata, structure, categoryId);
+        return result;
     };
     
     console.log('✅ SettingsManager patched for elabFTW category support');
