@@ -16,6 +16,16 @@ const userManager = {
     async init() {
         console.log('🔧 Initializing userManager...');
 
+        // Initialize profileManager early
+        if (window.profileManager && !window.profileManager.isInitialized) {
+            try {
+                await window.profileManager.init();
+                console.log('✅ profileManager initialized during userManager.init()');
+            } catch (error) {
+                console.warn('⚠️ profileManager initialization failed:', error);
+            }
+        }
+
         // Wait for settingsManager
         let attempts = 0;
         const maxAttempts = 10;
@@ -369,6 +379,16 @@ const userManager = {
     async initWithSettingsSupport() {
         console.log('🔧 Initializing userManager with settings support...');
 
+        // Initialize profileManager early (this was missing here!)
+        if (window.profileManager && !window.profileManager.isInitialized) {
+            try {
+                await window.profileManager.init();
+                console.log('✅ profileManager initialized during userManager.initWithSettingsSupport()');
+            } catch (error) {
+                console.warn('⚠️ profileManager initialization failed:', error);
+            }
+        }
+
         // Wait for settingsManager
         let attempts = 0;
         const maxAttempts = 10;
@@ -602,11 +622,29 @@ const userManager = {
                 console.warn('Could not save user history:', error);
             }
         }
+
+        // Also create/update user profile in profileManager
+        if (window.profileManager && window.profileManager.isInitialized) {
+            window.profileManager.createOrUpdateUser({
+                username: username,
+                groupName: groupname
+            }).catch(error => {
+                console.warn('⚠️ Could not sync user to profileManager:', error);
+            });
+        }
     },
 
     // Get user's group
     getUserGroup(username) {
-        // Try to get from stored mapping
+        // Try profileManager first (has richer data)
+        if (window.profileManager && window.profileManager.isInitialized) {
+            const groupName = window.profileManager.getUserPrimaryGroupName(username);
+            if (groupName && groupName !== 'Default') {
+                return groupName;
+            }
+        }
+
+        // Fallback: Try to get from stored mapping
         try {
             const groupMappingKey = 'metafold_user_group_mapping';
             const stored = localStorage.getItem(groupMappingKey);

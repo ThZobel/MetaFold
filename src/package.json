@@ -11,12 +11,10 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    "build-visualization": "webpack --mode=production",
-    "dev-visualization": "webpack --mode=development --watch",
-    "dist": "npm run build-visualization && electron-builder --publish=never",
-    "build-win": "npm run build-visualization && electron-builder --win",
-    "build-mac": "npm run build-visualization && electron-builder --mac",
-    "build-linux": "npm run build-visualization && electron-builder --linux"
+    "dist": "electron-builder --publish=never",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac",
+    "build-linux": "electron-builder --linux"
   },
   "keywords": [
     "electron",
@@ -28,26 +26,14 @@
     "experiments",
     "metafold",
     "visualization",
-    "jsoncrack",
     "data-analysis"
   ],
   "author": "Dr. Thomas Zobel",
   "license": "MIT",
-  "dependencies": {
-    "jsongraph-react": "^0.0.12",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "@babel/core": "^7.28.4",
-    "@babel/preset-react": "^7.27.1",
-	"babel-loader": "^10.0.0",
-    "css-loader": "^7.1.2",
     "electron": "^38.2.2",
-	"electron-builder": "^26.0.12",
-    "style-loader": "^4.0.0",
-    "webpack": "^5.102.1",
-    "webpack-cli": "^6.0.1"
+    "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "com.thzobel.metafold",
@@ -64,9 +50,7 @@
       "js/**/*",
       "components/**/*",
       "docs/**/*",
-      "node_modules/jsoncrack/**/*",
-      "node_modules/react/**/*",
-      "node_modules/react-dom/**/*"
+      "build/**/*"
     ],
     "win": {
       "target": "nsis",

@@ -1,0 +1,271 @@
+{
+  "name": "Zeiss Lsm980 Rdm4mic Import Test",
+  "description": "Professional microscopy experiment template with comprehensive metadata fields",
+  "type": "experiment",
+  "category": "category3",
+  "structure": "",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2025-06-12T12:38:25.751Z",
+  "options": {
+    "writeFilesOnly": false,
+    "multipleFolders": false
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0,
+      "fetchNextId": false
+    },
+    "elabftwEnabled": false,
+    "omeroEnabled": true,
+    "rspaceEnabled": false,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "basePath": "D:\\Projects",
+    "projectName": "AutoUpload_Test_02",
+    "targetPath": "D:\\Projects"
+  },
+  "metadata": {
+    "fields": {
+      "Test": {
+        "type": "text",
+        "label": "test für namespace",
+        "value": "",
+        "required": false,
+        "position": 1,
+        "defaultValue": ""
+      },
+      "Microscopy_group": {
+        "type": "group",
+        "label": "Microscopy",
+        "position": 2
+      },
+      "mode": {
+        "type": "dropdown",
+        "label": "Mode",
+        "value": "",
+        "required": true,
+        "position": 3,
+        "description": "Microscopy acquisition mode",
+        "options": [
+          "Airyscan SR",
+          "Airyscan Fast",
+          "LSM Plus (DCV)",
+          "MPLX (Multiplex)",
+          "jDCV",
+          "Linear Unmixing (34Ch)"
+        ],
+        "defaultValue": "Airyscan SR",
+        "useForFilename": true
+      },
+      "laser_lines": {
+        "type": "multicheckbox",
+        "label": "Laser Lines (nm)",
+        "value": [],
+        "required": false,
+        "position": 4,
+        "description": "Used laser wavelengths (multiple values separated by comma)",
+        "options": [
+          "405nm",
+          "488nm",
+          "561nm",
+          "635nm"
+        ],
+        "defaultValue": [
+          "488nm",
+          "561nm"
+        ],
+        "useForFilename": false
+      },
+      "Biological Sample_group": {
+        "type": "group",
+        "label": "Biological Sample",
+        "position": 5
+      },
+      "dyes": {
+        "type": "text",
+        "label": "Dyes",
+        "value": "",
+        "required": false,
+        "position": 6,
+        "description": "Used fluorescent dyes (multiple values separated by comma)",
+        "defaultValue": ""
+      },
+      "fluorescent_proteins": {
+        "type": "text",
+        "label": "Fluorescent Proteins",
+        "value": "",
+        "required": false,
+        "position": 7,
+        "description": "Used fluorescent proteins (multiple values separated by comma)",
+        "defaultValue": ""
+      },
+      "organism": {
+        "type": "dropdown",
+        "label": "Organism",
+        "value": "",
+        "required": false,
+        "position": 8,
+        "description": "Source organism",
+        "options": [
+          "Homo sapiens",
+          "Mus musculus",
+          "Rattus norvegicus",
+          "Danio rerio",
+          "Drosophila melanogaster",
+          "Arabidopsis thaliana",
+          "Other"
+        ],
+        "defaultValue": "Mus musculus",
+        "useForFilename": false
+      },
+      "Strain": {
+        "type": "text",
+        "label": "Strain",
+        "value": "",
+        "required": false,
+        "position": 9,
+        "description": "Strain ID",
+        "defaultValue": "",
+        "useForFilename": true
+      },
+      "Strain URL": {
+        "type": "url",
+        "label": "Strain URL",
+        "value": "",
+        "required": false,
+        "position": 10,
+        "description": "URLto your Strain",
+        "defaultValue": ""
+      },
+      "cell_type": {
+        "type": "text",
+        "label": "Cell Type",
+        "value": "",
+        "required": false,
+        "position": 11,
+        "description": "Type of cells being imaged",
+        "defaultValue": ""
+      },
+      "organism_part": {
+        "type": "text",
+        "label": "Organism Part",
+        "value": "",
+        "required": false,
+        "position": 12,
+        "description": "Specific part of organism",
+        "defaultValue": ""
+      },
+      "fixation": {
+        "type": "dropdown",
+        "label": "Fixation",
+        "value": "",
+        "required": true,
+        "position": 13,
+        "description": "Sample fixation status",
+        "options": [
+          "Fixed",
+          "Live"
+        ],
+        "defaultValue": "Fixed"
+      },
+      "sample_type": {
+        "type": "dropdown",
+        "label": "Sample Type",
+        "value": "",
+        "required": false,
+        "position": 14,
+        "description": "Type of sample preparation",
+        "options": [
+          "Cell Culture",
+          "Tissue Sample",
+          "Tissue Section",
+          "Embryo",
+          "Preparation",
+          "Primary Cells",
+          "Other"
+        ],
+        "defaultValue": ""
+      },
+      "sample_description": {
+        "type": "textarea",
+        "label": "Sample Description",
+        "value": "",
+        "required": false,
+        "position": 15,
+        "description": "Detailed description of the sample",
+        "defaultValue": ""
+      },
+      "imaging_purpose": {
+        "type": "textarea",
+        "label": "Imaging Purpose",
+        "value": "",
+        "required": false,
+        "position": 16,
+        "description": "Purpose and goals of the imaging experiment",
+        "defaultValue": ""
+      },
+      "qwer_ID": {
+        "type": "id_anchor",
+        "label": "qwer ID",
+        "value": "",
+        "required": false,
+        "position": 17,
+        "description": "Creates an anchor point for the Knowledge Graph.",
+        "defaultValue": ""
+      },
+      "derived_from": {
+        "type": "derived_from",
+        "label": "Derived From (IDs)",
+        "value": "",
+        "required": false,
+        "position": 18,
+        "description": "Link this experiment to previous IDs (e.g. Parent Sample, Protocol).",
+        "defaultValue": []
+      }
+    },
+    "fieldOrder": [
+      "Test",
+      "Microscopy_group",
+      "mode",
+      "laser_lines",
+      "Biological Sample_group",
+      "dyes",
+      "fluorescent_proteins",
+      "organism",
+      "Strain",
+      "Strain URL",
+      "cell_type",
+      "organism_part",
+      "fixation",
+      "sample_type",
+      "sample_description",
+      "imaging_purpose",
+      "qwer_ID",
+      "derived_from"
+    ],
+    "totalFields": 18
+  },
+  "id": "template_1752607858111_3jgszxznc",
+  "updatedAt": "2026-08-07T10:47:28.331Z",
+  "_fileInfo": {
+    "filename": "zeiss_lsm980_rdm4mic_import_test.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\zeiss_lsm980_rdm4mic_import_test.json",
+    "savedAt": "2026-08-07T10:47:28.331Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Zeiss Lsm980 Rdm4mic Import Test",
+  "sourceFilename": "zeiss_lsm980_rdm4mic_import_test.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2026-08-07T10:47:13.021Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

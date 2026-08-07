@@ -18,6 +18,64 @@ async function getConfiguredOMEROServerUrl() {
 }
 
 const projectManager = {
+    // NEW Helper: Process dynamic folder variables
+    processDynamicFolderStructure(templateStructure, experimentMetadata, template) {
+        if (!templateStructure || !experimentMetadata) return templateStructure;
+        
+        console.log('🔄 Processing dynamic folder structure variables...');
+        let lines = templateStructure.split('\n');
+        let processedLines = [];
+        
+        // Helper to find field value even if it's nested in a group
+        const getFieldValue = (fieldName) => {
+            if (experimentMetadata[fieldName] !== undefined) return experimentMetadata[fieldName];
+            for (const key in experimentMetadata) {
+                if (typeof experimentMetadata[key] === 'object' && experimentMetadata[key] !== null && !Array.isArray(experimentMetadata[key])) {
+                    if (experimentMetadata[key][fieldName] !== undefined) {
+                        return experimentMetadata[key][fieldName];
+                    }
+                }
+            }
+            return null;
+        };
+
+        for (let line of lines) {
+            let skipLine = false;
+            
+            let processedLine = line.replace(/\[([^\]]+)\]/g, (match, fieldName) => {
+                // Check if this is an actual field in the template
+                const isField = template && template.metadata && template.metadata.fields && template.metadata.fields[fieldName];
+                
+                if (!isField) {
+                    return match; // Not a field, leave as is
+                }
+                
+                let val = getFieldValue(fieldName);
+                
+                // If value is empty or not found, mark to skip this folder line
+                if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
+                    skipLine = true;
+                    return ""; 
+                }
+                
+                if (typeof val === 'object' && !Array.isArray(val) && val.value !== undefined) {
+                    val = val.value;
+                } else if (Array.isArray(val)) {
+                    val = val.join('-'); 
+                }
+                
+                return String(val).replace(/[<>:"/\\|?*]/g, '_');
+            });
+            
+            if (!skipLine) {
+                processedLines.push(processedLine);
+            } else {
+                console.log(`⚠️ Skipping folder creation for line due to missing/empty variable: ${line}`);
+            }
+        }
+        return processedLines.join('\n');
+    },
+
     // Initialize project manager
     init() {
         this.updatePathPreview();
@@ -152,47 +210,66 @@ const projectManager = {
         }
     },
 
-    // Toggle Integrations Only Mode
+    // Toggle Skip Project Folder Creation Mode
     toggleIntegrationsOnlyMode() {
         const checkbox = document.getElementById('onlyIntegrations');
         const targetPath = document.getElementById('targetPath');
-        const browseBtn = document.querySelector('.browse-btn');
         const pathPreview = document.getElementById('fullPathPreview');
         const pathStatus = document.getElementById('pathStatus');
+        const projectNameSection = document.getElementById('projectNameSection');
 
         if (!checkbox || !targetPath) return;
 
         if (checkbox.checked) {
-            // Enable mode: Disable path input
-            targetPath.disabled = true;
-            targetPath.style.opacity = '0.5';
-            targetPath.style.cursor = 'not-allowed';
+            // Enable "Skip Folder" mode:
+            // Base Directory stays ACTIVE (user picks target folder for JSON)
+            // Project Name becomes "Metadata Filename"
 
-            if (browseBtn) {
-                browseBtn.disabled = true;
-                browseBtn.style.opacity = '0.5';
-                browseBtn.style.cursor = 'not-allowed';
+            // Update Project Name section labels
+            if (projectNameSection) {
+                const titleElement = projectNameSection.querySelector('h4');
+                const subtitleElement = projectNameSection.querySelector('.section-subtitle');
+                const inputElement = document.getElementById('projectName');
+
+                if (titleElement) titleElement.textContent = 'Metadata Filename';
+                if (subtitleElement) subtitleElement.textContent = 'Name for the metadata JSON file (saved as {name}-metadata.json)';
+                if (inputElement) {
+                    inputElement.placeholder = 'Experiment_Feedback';
+                    inputElement.title = 'Enter a name for the metadata file';
+                }
             }
 
+            // Update path preview to show JSON file path
             if (pathPreview) {
-                pathPreview.textContent = '(Integrations only - no local folder)';
+                const basePath = targetPath.value.trim();
+                const fileName = document.getElementById('projectName')?.value?.trim() || 'Experiment_Feedback';
+                const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : '/';
+                if (basePath) {
+                    pathPreview.textContent = `${basePath}${sep}${fileName}-metadata.json`;
+                } else {
+                    pathPreview.textContent = '(Select a folder and enter a filename)';
+                }
                 pathPreview.style.fontStyle = 'italic';
                 pathPreview.style.color = '#a855f7';
             }
 
             if (pathStatus) pathStatus.textContent = '';
 
-            console.log('☁️ Integrations Only Mode ENABLED');
+            console.log('📄 Skip Project Folder Mode ENABLED');
         } else {
-            // Disable mode: Enable path input
-            targetPath.disabled = false;
-            targetPath.style.opacity = '1';
-            targetPath.style.cursor = 'text';
+            // Disable mode: Restore normal Project Name labels
 
-            if (browseBtn) {
-                browseBtn.disabled = false;
-                browseBtn.style.opacity = '1';
-                browseBtn.style.cursor = 'pointer';
+            if (projectNameSection) {
+                const titleElement = projectNameSection.querySelector('h4');
+                const subtitleElement = projectNameSection.querySelector('.section-subtitle');
+                const inputElement = document.getElementById('projectName');
+
+                if (titleElement) titleElement.textContent = 'Project Name';
+                if (subtitleElement) subtitleElement.textContent = 'Name for your experiment/project';
+                if (inputElement) {
+                    inputElement.placeholder = 'My_Experiment_2024...';
+                    inputElement.title = 'Enter a name for your project';
+                }
             }
 
             if (pathPreview) {
@@ -201,7 +278,7 @@ const projectManager = {
                 pathPreview.style.color = '';
             }
 
-            console.log('☁️ Integrations Only Mode DISABLED');
+            console.log('📄 Skip Project Folder Mode DISABLED');
         }
     },
 
@@ -245,6 +322,15 @@ const projectManager = {
             return;
         }
 
+        // Inject provenance block (creator, group, ISA-compatible metadata)
+        if (window.profileManager && window.profileManager.isInitialized) {
+            const currentUsername = window.userManager ? window.userManager.getCurrentUser() : null;
+            if (currentUsername) {
+                experimentMetadata.provenance = window.profileManager.getProvenanceBlock(currentUsername);
+                console.log('📋 Provenance block injected into batch metadata');
+            }
+        }
+
         const metadataStr = JSON.stringify(experimentMetadata, null, 2);
 
         if (!window.electronAPI || !window.electronAPI.writeFile) {
@@ -255,21 +341,43 @@ const projectManager = {
         let successCount = 0;
         let errors = [];
 
-        // Use custom filename if provided, otherwise default to ReadyToImport.json
         let customFileName = document.getElementById('projectName').value.trim();
-        if (!customFileName) {
+        
+        // Get and process folder structure
+        let templateStructure = template.folderStructure || template.structure || '';
+        if (Array.isArray(templateStructure)) {
+            templateStructure = templateStructure.join('\n');
+        }
+        templateStructure = String(templateStructure || '');
+        
+        if (templateStructure && experimentMetadata) {
+            templateStructure = this.processDynamicFolderStructure(templateStructure, experimentMetadata, template);
+        }
+
+        // If no filename is provided but we have a folder structure, we ONLY create folders
+        const shouldOnlyCreateFolders = !customFileName && templateStructure.trim().length > 0;
+
+        if (!customFileName && !shouldOnlyCreateFolders) {
             customFileName = 'ReadyToImport.json';
-        } else if (!customFileName.toLowerCase().endsWith('.json')) {
-            customFileName += '.json';
         }
 
         for (const targetPath of targetPaths) {
             try {
-                const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
-                await window.electronAPI.writeFile(filePath, metadataStr);
+                if (shouldOnlyCreateFolders) {
+                    console.log(`📁 Creating dynamic folders in ${targetPath}...`);
+                    if (window.electronAPI && window.electronAPI.createFolders) {
+                        await window.electronAPI.createFolders(targetPath, templateStructure);
+                    } else {
+                        throw new Error('Folder creation not available in browser mode.');
+                    }
+                } else {
+                    console.log(`📄 Writing metadata JSON to ${targetPath}...`);
+                    const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
+                    await window.electronAPI.writeFile(filePath, metadataStr);
+                }
                 successCount++;
             } catch (err) {
-                console.error(`Failed to write to ${targetPath}:`, err);
+                console.error(`Failed to process ${targetPath}:`, err);
                 errors.push(err.message);
             }
         }
@@ -330,10 +438,13 @@ const projectManager = {
             const createBtn = document.getElementById('createProjectBtn'); // Assuming ID, adjust if different
             // Better: use a modal or global loading indicator if available, but for now we proceed
 
-            // *** ONLY CHECK CONFLICTS IF CREATING LOCAL FOLDER ***
-            if (!onlyIntegrations) {
+            // *** ONLY CHECK CONFLICTS IF CREATING LOCAL FOLDER OR SKIPPING FOLDER IN BASE PATH ***
+            const isCloudOnly = onlyIntegrations && !basePath;
+            const skipFolder = onlyIntegrations && !!basePath;
+
+            if (!isCloudOnly) {
                 // *** NEUE KONFLIKT-PRÜFUNG ***
-                conflictResolution = await this.checkDirectoryAndResolveConflicts(basePath, originalProjectName);
+                conflictResolution = await this.checkDirectoryAndResolveConflicts(basePath, originalProjectName, skipFolder);
 
                 if (!conflictResolution.proceed) {
                     // User cancelled or error occurred
@@ -344,7 +455,7 @@ const projectManager = {
                 finalProjectName = conflictResolution.projectName;
                 finalProjectPath = conflictResolution.projectPath;
             } else {
-                console.log('☁️ Skipping directory conflict check (Integrations Only Mode)');
+                console.log('☁️ Skipping directory conflict check (Cloud Only Mode)');
                 finalProjectPath = 'cloud-only'; // dummy path for logic
             }
 
@@ -368,16 +479,42 @@ const projectManager = {
             console.log('📋 templateStructure length:', templateStructure.length);
 
             // Check if metadata exists
-            const hasMetadata = template.type === 'experiment' &&
+            let hasMetadata = template.type === 'experiment' &&
                 template.metadata &&
                 Object.keys(template.metadata).length > 0;
 
             // Get experiment metadata
-            const experimentMetadata = window.experimentForm && window.experimentForm.collectData ?
+            let experimentMetadata = window.experimentForm && window.experimentForm.collectData ?
                 window.experimentForm.collectData() : null;
 
+            // Ensure experimentMetadata exists so provenance is always saved
+            if (!experimentMetadata) {
+                experimentMetadata = {};
+            }
+
+            // Inject provenance block (creator, group, ISA-compatible metadata)
+            if (window.profileManager && window.profileManager.isInitialized) {
+                const currentUsername = window.userManager ? window.userManager.currentUser : null;
+                if (currentUsername) {
+                    experimentMetadata.provenance = window.profileManager.getProvenanceBlock(currentUsername);
+                    console.log('📋 Provenance block injected into metadata (always-on)');
+                }
+            }
+
+            // Update hasMetadata so the JSON is actually written later on
+            hasMetadata = Object.keys(experimentMetadata).length > 0;
+
+            // --- NEW: Dynamic Folder Structure Replacement ---
+            if (templateStructure && experimentMetadata) {
+                templateStructure = this.processDynamicFolderStructure(templateStructure, experimentMetadata, template);
+                console.log('📋 templateStructure (post-variables):', templateStructure);
+            }
+            // -----------------------------------------------
+
             // VALIDATION: Check required fields before creating project
-            if (hasMetadata && window.experimentForm && window.experimentForm.validate) {
+            // Only validate if it's an experiment template with actual metadata fields (not just provenance)
+            const isExperimentTemplate = template.type === 'experiment' && template.metadata && Object.keys(template.metadata).length > 0;
+            if (isExperimentTemplate && window.experimentForm && window.experimentForm.validate) {
                 console.log('🔍 Validating required fields...');
 
                 const validationResult = window.experimentForm.validate();
@@ -454,13 +591,27 @@ const projectManager = {
             // Create project locally OR skip if integrations only
             let result = { success: true, message: 'Project data processed successfully', projectPath: '' };
 
-            if (!onlyIntegrations) {
-                console.log('🚀 Creating local project folder...');
+            if (!isCloudOnly) {
+                console.log(skipFolder ? '📄 Creating local project file (Skipping Folder)...' : '🚀 Creating local project folder...');
+                
+                const userInfo = window.userManager ? { username: window.userManager.currentUser, groupname: window.userManager.currentGroup } : null;
+                const options = {
+                    extend: conflictResolution.extend || false,
+                    skipFolder: skipFolder,
+                    userInfo: userInfo,
+                    templateName: template ? template.name : 'Unknown Template'
+                };
+
+                const projectNameToUse = (conflictResolution.extend && conflictResolution.existingProjectName) 
+                    ? conflictResolution.existingProjectName 
+                    : finalProjectName;
+
                 result = await window.electronAPI.createProject(
                     basePath,
-                    finalProjectName,
+                    projectNameToUse,
                     templateStructure,
-                    experimentMetadata
+                    experimentMetadata,
+                    options
                 );
             } else {
                 console.log('☁️ Skipping local project creation (Integrations Only)');
@@ -474,6 +625,21 @@ const projectManager = {
             console.log('✅ Project creation result:', result);
 
             if (result && result.success) {
+                // NEW: Harvest IDs from the new project metadata
+                if (window.electronAPI && window.electronAPI.saveIdValues && experimentMetadata) {
+                    try {
+                        const harvestResult = await window.electronAPI.saveIdValues(
+                            experimentMetadata, 
+                            window.userManager?.getCurrentUserInfo() || { username: 'default' }
+                        );
+                        if (harvestResult && harvestResult.success && harvestResult.newCount > 0) {
+                            console.log(`🧠 Harvester: Added ${harvestResult.newCount} new IDs to dictionary`);
+                        }
+                    } catch (e) {
+                        console.error('Error saving ID values:', e);
+                    }
+                }
+
                 let successMessage = result.message;
 
                 // Add information about name change if applicable
@@ -481,6 +647,8 @@ const projectManager = {
                     successMessage += ` (Renamed from "${originalProjectName}" to avoid conflicts)`;
                 } else if (conflictResolution.overwrite) {
                     successMessage += ` (Overwrote existing directory)`;
+                } else if (conflictResolution.extend) {
+                    successMessage += ` (Extended existing metadata)`;
                 }
                 
                 let omeroResult = null;
@@ -1664,8 +1832,8 @@ const projectManager = {
             const keyValuePairs = window.omeroAnnotations.convertIntegrationLinksToKeyValue(integrationData);
 
             if (keyValuePairs.length > 0) {
-                // Create annotation using Phase 2 method
-                const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType);
+                // Create annotation using Phase 2 method with System Metadata namespace
+                const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType, 'System Metadata by MetaFold');
 
                 if (result.success) {
                     console.log('✅ projectManager: Enhanced integration fields successfully added to OMERO');
@@ -1997,22 +2165,23 @@ const projectManager = {
      * Check if project directory exists and handle conflicts
      * Returns: { proceed: boolean, projectName: string, projectPath: string }
      */
-    async checkDirectoryAndResolveConflicts(basePath, originalProjectName) {
-        console.log('🔍 Checking for directory conflicts...');
-
+    async checkDirectoryAndResolveConflicts(basePath, originalProjectName, skipFolder = false) {
         try {
-            const originalPath = window.utils && window.utils.buildFullPath ?
-                window.utils.buildFullPath(basePath, originalProjectName) :
-                basePath + (basePath.endsWith('/') || basePath.endsWith('\\') ? '' : '/') + originalProjectName;
+            const originalPath = skipFolder 
+                ? basePath 
+                : (window.utils && window.utils.buildFullPath 
+                    ? window.utils.buildFullPath(basePath, originalProjectName) 
+                    : basePath + (basePath.endsWith('/') || basePath.endsWith('\\') ? '' : '/') + originalProjectName);
 
             console.log(`📁 Checking path: ${originalPath}`);
 
             // Check if directory exists
             const dirCheck = await window.electronAPI.checkDirectoryExists(originalPath);
 
-            if (!dirCheck.exists) {
+            // If we are skipping folder, and it doesn't have metadata, we can just proceed (or if directory doesn't exist at all).
+            if (!dirCheck.exists || (skipFolder && !dirCheck.hasMetafoldData)) {
                 // Directory doesn't exist - safe to proceed
-                console.log('✅ Directory does not exist, proceeding with creation');
+                console.log('✅ Path is safe to proceed');
                 return {
                     proceed: true,
                     projectName: originalProjectName,
@@ -2020,7 +2189,7 @@ const projectManager = {
                 };
             }
 
-            console.log(`⚠️ Directory exists: ${dirCheck.itemCount} items, empty: ${dirCheck.isEmpty}`);
+            console.log(`⚠️ Directory exists: ${dirCheck.itemCount} items, empty: ${dirCheck.isEmpty}, MetaFoldData: ${dirCheck.hasMetafoldData}`);
 
             // Directory exists - get alternatives and show dialog
             const alternatives = await window.electronAPI.generateAlternativeNames(basePath, originalProjectName);
@@ -2043,7 +2212,7 @@ const projectManager = {
                 return { proceed: false };
             }
 
-            return await this.handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives.alternatives);
+            return await this.handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives.alternatives, dirCheck);
 
         } catch (error) {
             console.error('❌ Error in directory conflict resolution:', error);
@@ -2055,34 +2224,40 @@ const projectManager = {
     /**
      * Handle user's choice from directory conflict dialog
      */
-    async handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives) {
+    async handleUserDirectoryChoice(userChoice, originalProjectName, originalPath, basePath, alternatives, dirCheck = null) {
         const { choice, choiceName } = userChoice;
 
         console.log(`🤔 Processing user choice: ${choiceName} (${choice})`);
 
-        switch (choice) {
-            case 0: // Cancel
-                console.log('❌ User cancelled project creation due to directory conflict');
-                this.showInfo('Project creation cancelled');
-                return { proceed: false };
-
-            case 1: // Overwrite
-                console.log('⚠️ User chose to overwrite existing directory');
-                this.showWarning(`Overwriting existing directory: ${originalProjectName}`);
-                return {
-                    proceed: true,
-                    projectName: originalProjectName,
-                    projectPath: originalPath,
-                    overwrite: true
-                };
-
-            case 2: // Use Different Name
-                console.log('🔄 User chose to use different name');
-                return await this.handleAlternativeNameSelection(basePath, alternatives);
-
-            default:
-                console.warn('⚠️ Unknown user choice, defaulting to cancel');
-                return { proceed: false };
+        if (choiceName === 'Cancel' || choice === 0) {
+            console.log('❌ User cancelled project creation due to directory conflict');
+            this.showInfo('Project creation cancelled');
+            return { proceed: false };
+        } else if (choiceName === 'Overwrite') {
+            console.log('⚠️ User chose to overwrite existing directory');
+            this.showWarning(`Overwriting existing directory: ${originalProjectName}`);
+            return {
+                proceed: true,
+                projectName: originalProjectName,
+                projectPath: originalPath,
+                overwrite: true
+            };
+        } else if (choiceName === 'Extend Metadata') {
+            console.log('➕ User chose to extend existing metadata');
+            this.showInfo(`Extending existing metadata in: ${originalProjectName}`);
+            return {
+                proceed: true,
+                projectName: originalProjectName,
+                projectPath: originalPath,
+                extend: true,
+                existingProjectName: dirCheck?.existingProjectName || null
+            };
+        } else if (choiceName === 'Use Different Name') {
+            console.log('🔄 User chose to use different name');
+            return await this.handleAlternativeNameSelection(basePath, alternatives);
+        } else {
+            console.warn('⚠️ Unknown user choice, defaulting to cancel');
+            return { proceed: false };
         }
     },
 

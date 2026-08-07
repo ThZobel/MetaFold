@@ -1,0 +1,81 @@
+{
+  "name": "Retrospective Copy",
+  "description": "",
+  "structure": "",
+  "metadata": {
+    "fields": {
+      "Comments": {
+        "type": "text",
+        "label": "Comments",
+        "value": "",
+        "required": false,
+        "position": 1,
+        "useForFilename": false
+      },
+      "success": {
+        "type": "text",
+        "label": "Was the experiment successful?",
+        "value": "",
+        "required": false,
+        "position": 2,
+        "useForFilename": true
+      },
+      "Rating": {
+        "type": "rating",
+        "label": "Rating",
+        "value": 0,
+        "required": false,
+        "position": 3,
+        "description": "Stars",
+        "useForFilename": true
+      }
+    },
+    "fieldOrder": [
+      "Comments",
+      "success",
+      "Rating"
+    ],
+    "totalFields": 3
+  },
+  "type": "experiment",
+  "category": "category4",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2026-08-04T10:19:47.867Z",
+  "updatedAt": "2026-08-07T10:55:49.892Z",
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 5,
+      "fetchNextId": false
+    },
+    "elabftwEnabled": false,
+    "omeroEnabled": false,
+    "rspaceEnabled": true,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "targetPath": "D:\\Projects\\980_1",
+    "projectName": "retrospektive",
+    "basePath": "D:\\Projects\\neu_user2"
+  },
+  "id": "template_1785838787868_dq4fwpo34",
+  "_fileInfo": {
+    "filename": "retrospective_copy.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\retrospective_copy.json",
+    "savedAt": "2026-08-07T10:55:49.892Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Retrospective Copy",
+  "sourceFilename": "retrospective_copy.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2026-08-07T10:47:13.019Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

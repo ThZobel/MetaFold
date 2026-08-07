@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Load Settings Modal
         await window.componentLoader.load('settings-modal-container', 'components/modals/settings-modal.html');
 
+        // Load Facet Search Modal
+        await window.componentLoader.load('facet-search-modal-container', 'components/modals/facet-search-modal.html');
+        if (window.facetSearch && window.facetSearch.init) {
+            window.facetSearch.init();
+        }
+
         // Load Left Sidebar
         await window.componentLoader.load('left-sidebar-container', 'components/sidebars/left-sidebar.html');
 
@@ -17,6 +23,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Load Discover Projects Tab
         await window.componentLoader.load('discoverTabContent', 'components/tabs/discover-projects-tab.html');
+        if (window.fileScanner && window.fileScanner._applyVisibility) {
+            window.fileScanner._applyVisibility();
+        }
 
         // Load Visualize Data Tab
         await window.componentLoader.load('visualizeTabContent', 'components/tabs/visualize-data-tab.html');

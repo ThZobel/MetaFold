@@ -1050,6 +1050,11 @@ const templateManager = {
         if (baseDirSection) baseDirSection.style.display = isMultiFolder ? 'none' : 'block';
         if (multiFolderSection) multiFolderSection.style.display = isMultiFolder ? 'block' : 'none';
         
+        const onlyIntegrationsContainer = document.getElementById('onlyIntegrationsContainer');
+        if (onlyIntegrationsContainer) {
+            onlyIntegrationsContainer.style.display = isWriteFilesOnly ? 'none' : 'flex';
+        }
+        
         // projectNameSection is ALWAYS visible, but its label changes
         if (projectNameSection) {
             projectNameSection.style.display = 'block';
@@ -1112,12 +1117,12 @@ const templateManager = {
             const targetPathEl = document.getElementById('targetPath');
             const projectNameEl = document.getElementById('projectName');
             
-            if (targetPathEl && this.currentTemplate.projectDefaults.targetPath) {
+            if (targetPathEl && this.currentTemplate.projectDefaults.targetPath !== undefined) {
                 targetPathEl.value = this.currentTemplate.projectDefaults.targetPath;
                 // Dispatch input event to update previews
                 targetPathEl.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            if (projectNameEl && this.currentTemplate.projectDefaults.projectName) {
+            if (projectNameEl && this.currentTemplate.projectDefaults.projectName !== undefined) {
                 projectNameEl.value = this.currentTemplate.projectDefaults.projectName;
                 projectNameEl.dispatchEvent(new Event('input', { bubbles: true }));
             }

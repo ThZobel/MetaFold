@@ -521,8 +521,8 @@ const omeroAuth = {
             this.session = {
                 ...this.session,
                 loginTime: Date.now(),
-                username: loginResult.username || 'authenticated_user',
-                userId: loginResult.eventContext?.userId || 'authenticated_user',
+                username: loginResult.username || loginResult.eventContext?.userName || null,
+                userId: loginResult.eventContext?.userId || null,
                 groupId: loginResult.eventContext?.groupId || null,
                 groupName: loginResult.eventContext?.groupName || 'private',
                 serverUrl: this.baseUrl,

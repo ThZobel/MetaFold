@@ -1,0 +1,910 @@
+/* MetaFold Facet Search & Discovery Tiles CSS */
+
+/* =================== TABULATOR.JS THEME OVERRIDES =================== */
+/* Overrides for tabulator_midnight.min.css to match MetaFold's purple/navy palette */
+
+.tabulator {
+    background: transparent !important;
+    border: none !important;
+    font-size: 0.88rem;
+    font-family: inherit;
+}
+
+/* Header */
+.tabulator .tabulator-header {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(168, 85, 247, 0.12)) !important;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.4) !important;
+}
+
+.tabulator .tabulator-header .tabulator-col {
+    background: transparent !important;
+    border-right: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+    color: #c4b5fd !important;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 8px;
+}
+
+/* Sort arrows – use purple accent */
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable .tabulator-col-title {
+    padding-right: 20px;
+}
+.tabulator-col-sorter .tabulator-arrow {
+    border-bottom-color: rgba(168, 85, 247, 0.5) !important;
+}
+.tabulator .tabulator-header .tabulator-col.tabulator-col-sorter-element:hover {
+    background: rgba(139, 92, 246, 0.12) !important;
+}
+
+/* Tableholder and table body – explicit dark color, NOT transparent
+   (transparent bleeds gray from Tabulator midnight theme's own backgrounds) */
+.tabulator .tabulator-tableholder {
+    background-color: #16213e !important;
+}
+.tabulator .tabulator-tableholder .tabulator-table {
+    background-color: #16213e !important;
+}
+
+/* Rows */
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd {
+    background-color: #16213e !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    color: #d1d5db;
+}
+
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even {
+    background-color: #1a2042 !important;
+}
+
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row:hover,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd:hover,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even:hover {
+    background-color: rgba(139, 92, 246, 0.18) !important;
+    color: #e9d5ff;
+}
+
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell {
+    border-right: 1px solid rgba(255,255,255,0.04) !important;
+    padding: 9px 10px !important;
+    vertical-align: middle;
+}
+
+/* Frozen column separator */
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell.tabulator-frozen-left {
+    border-right: 2px solid rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Scrollbar styling */
+.tabulator .tabulator-tableholder::-webkit-scrollbar { width: 6px; height: 6px; }
+.tabulator .tabulator-tableholder::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.4); border-radius: 3px; }
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.6); }
+
+/* Column resize handle */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-resize-handle {
+    border-right: 2px solid rgba(139, 92, 246, 0.2) !important;
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-col-resize-handle:hover {
+    border-right-color: #7c3aed !important;
+}
+
+/* Placeholder text */
+.tabulator .tabulator-placeholder span {
+    color: #6b7280 !important;
+}
+
+/* Light mode overrides for Tabulator */
+body.light-mode .tabulator .tabulator-header {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(168, 85, 247, 0.05)) !important;
+    border-bottom-color: rgba(124, 58, 237, 0.2) !important;
+}
+body.light-mode .tabulator .tabulator-header .tabulator-col .tabulator-col-title { color: #6d28d9 !important; }
+body.light-mode .tabulator .tabulator-tableholder { background-color: #f8f9fc !important; }
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table { background-color: #f8f9fc !important; }
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd {
+    background-color: #f8f9fc !important; color: #374151 !important; border-bottom-color: rgba(0,0,0,0.07) !important;
+}
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even { background-color: #eef0f7 !important; }
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row:hover,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd:hover,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even:hover {
+    background-color: rgba(124, 58, 237, 0.07) !important; color: #1f1235 !important;
+}
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell { border-right-color: rgba(0,0,0,0.05) !important; }
+
+
+/* Discovery Tiles Grid */
+.discovery-tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    padding: 32px;
+    margin-top: 20px;
+}
+
+.discovery-tile {
+    background: var(--surface-color, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.discovery-tile:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary-color, #4a90e2);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+}
+
+.tile-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.tile-content h3 {
+    margin: 0 0 12px 0;
+    color: var(--text-color, #fff);
+    font-size: 1.2rem;
+}
+
+.tile-content p {
+    margin: 0;
+    color: var(--text-secondary, #aaa);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Scan tile: hover only on the clickable top area, not on the whole card */
+.discovery-tile--scan:hover {
+    transform: none;
+    border-color: var(--border-color, #333);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tile-clickable-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    border-radius: 8px;
+    padding: 4px;
+    transition: all 0.2s ease;
+}
+
+.tile-clickable-area:hover {
+    background: rgba(139, 92, 246, 0.08);
+    transform: translateY(-2px);
+}
+
+/* ISA option inside the scan tile */
+.discovery-tile-option {
+    width: 100%;
+    text-align: left;
+}
+
+.discovery-tile-option label strong {
+    color: var(--text-color, #fff);
+}
+
+/* Light mode */
+body.light-mode .discovery-tile-option label {
+    color: var(--text-secondary, #555);
+}
+body.light-mode .discovery-tile-option label strong {
+    color: var(--text-color, #111);
+}
+
+/* Facet Search Layout */
+.facet-search-container {
+    display: flex;
+    height: calc(100vh - 120px);
+    background: var(--bg-color, #121212);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 16px;
+}
+
+/* Sidebar */
+.facet-sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: var(--surface-color, #1e1e1e);
+    border-right: 1px solid var(--border-color, #333);
+    display: flex;
+    flex-direction: column;
+}
+
+.facet-sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color, #333);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.facet-sidebar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.facet-groups-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Facet Groups & Chips */
+.facet-group {
+    margin-bottom: 24px;
+}
+
+.facet-group-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-secondary, #ccc);
+    text-transform: capitalize;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.facet-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.facet-chip {
+    background: var(--bg-color, #2d2d2d);
+    border: 1px solid var(--border-color, #444);
+    color: var(--text-color, #fff);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.facet-chip:hover {
+    background: var(--hover-bg, #3a3a3a);
+}
+
+.facet-chip.active {
+    background: var(--primary-color, #4a90e2);
+    border-color: var(--primary-color, #4a90e2);
+    color: #fff;
+}
+
+.facet-chip .count {
+    opacity: 0.7;
+    font-size: 0.8rem;
+}
+
+/* Main Results Area */
+.facet-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.facet-main-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color, #333);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface-color, #1e1e1e);
+}
+
+.facet-main-header h3 {
+    margin: 0;
+}
+
+.facet-results-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    align-content: start;
+}
+
+/* Result Cards */
+.facet-card {
+    background: var(--surface-color, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: transform 0.2s;
+}
+
+.facet-card:hover {
+    border-color: var(--primary-color, #4a90e2);
+}
+
+.facet-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.facet-card-icon {
+    font-size: 24px;
+}
+
+.facet-card-title {
+    margin: 0;
+    font-size: 1.1rem;
+    word-break: break-all;
+}
+
+.facet-card-path {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #aaa);
+    margin: 4px 0 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.facet-card-body {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-color, #ddd);
+}
+
+.facet-card-meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: 0.85rem;
+}
+
+.meta-key {
+    color: var(--text-secondary, #aaa);
+}
+
+.meta-val {
+    font-weight: 500;
+}
+
+.facet-card-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #333);
+}
+
+/* Links */
+.integration-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--primary-color, #4a90e2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(74, 144, 226, 0.1);
+    transition: background 0.2s;
+}
+
+.integration-link:hover {
+    background: rgba(74, 144, 226, 0.2);
+}
+
+/* Table Results */
+.facet-results-table-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.facet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.facet-table th, .facet-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color, #333);
+    text-align: left;
+}
+
+.facet-table th {
+    background: var(--surface-color, #1e1e1e);
+    font-weight: 600;
+    color: var(--text-color, #fff);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.path-cell {
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #aaa);
+}
+
+.actions-cell {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.integration-icon-link {
+    text-decoration: none;
+    font-size: 1.2rem;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.integration-icon-link:hover {
+    transform: scale(1.15);
+}
+
+/* =================== COLUMN SELECTOR DROPDOWN =================== */
+
+/* Base (dark mode) styles for the column selector dropdown */
+.column-selector-dropdown {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    color: #e5e7eb;
+}
+
+.column-selector-dropdown label {
+    color: #d1d5db;
+}
+
+.column-selector-dropdown > div {
+    color: #c4b5fd;
+    border-bottom-color: #444;
+}
+
+/* =================== FACET SEARCH MODAL =================== */
+
+
+.facet-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: facetModalFadeIn 0.2s ease;
+}
+
+@keyframes facetModalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.facet-modal-window {
+    display: flex;
+    flex-direction: column;
+    width: 92vw;
+    height: 88vh;
+    max-width: 1600px;
+    background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05) inset;
+    overflow: hidden;
+    animation: facetModalSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes facetModalSlideIn {
+    from { transform: scale(0.94) translateY(20px); opacity: 0; }
+    to   { transform: scale(1) translateY(0);       opacity: 1; }
+}
+
+/* Modal Header */
+.facet-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 24px;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(168, 85, 247, 0.08));
+    border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+    flex-shrink: 0;
+}
+
+.facet-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.facet-modal-icon {
+    font-size: 1.8rem;
+    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.5));
+}
+
+.facet-modal-title h2 {
+    margin: 0 0 2px 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #e2d9f3;
+    letter-spacing: -0.01em;
+}
+
+.facet-modal-title p {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #9ca3af;
+}
+
+.facet-modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.facet-modal-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: #9ca3af;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+    padding: 0;
+}
+
+.facet-modal-close-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    transform: scale(1.1);
+}
+
+/* Modal Body */
+.facet-modal-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Modal Filter Sidebar */
+.facet-modal-sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: rgba(255, 255, 255, 0.02);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.facet-modal-sidebar-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.facet-modal-sidebar-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #c4b5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.facet-active-badge {
+    background: #7c3aed;
+    color: #fff;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Modal Main Results Panel */
+.facet-modal-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: rgba(0,0,0,0.1);
+}
+
+.facet-modal-results-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.facet-modal-results-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #e2d9f3;
+}
+
+/* Tabulator container within modal – no padding, Tabulator handles its own layout */
+.facet-modal-main .facet-results-table-container {
+    flex: 1;
+    min-height: 0;      /* critical for flex: allows item to shrink below content size */
+    overflow: auto;     /* scrolls both x and y if table overflows */
+    padding: 0;         /* Tabulator manages its own internal spacing */
+}
+
+/* Tabulator fills container width */
+.facet-modal-main .facet-results-table-container .tabulator {
+    width: 100% !important;
+}
+
+/* Make table header stick within the scrollable container */
+.facet-modal-main .facet-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #1a1a2e;
+}
+
+/* Light mode overrides for the modal */
+body.light-mode .facet-modal-window {
+    background: linear-gradient(160deg, #f8f9fc 0%, #eef0f7 100%);
+    border-color: rgba(124, 58, 237, 0.25);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.2);
+}
+
+body.light-mode .facet-modal-header {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(168, 85, 247, 0.04));
+    border-bottom-color: rgba(124, 58, 237, 0.15);
+}
+
+body.light-mode .facet-modal-title h2 { color: #2d1b69; }
+body.light-mode .facet-modal-title p { color: #6b7280; }
+body.light-mode .facet-modal-sidebar { background: rgba(0,0,0,0.02); border-right-color: rgba(0,0,0,0.08); }
+body.light-mode .facet-modal-sidebar-header { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .facet-modal-sidebar-header h3 { color: #6d28d9; }
+body.light-mode .facet-modal-results-header { background: rgba(0,0,0,0.02); border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .facet-modal-results-header h3 { color: #1f1235; }
+body.light-mode .facet-modal-main .facet-table th { background: #eef0f7; }
+
+/* Light mode: facet chips */
+body.light-mode .facet-chip {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    color: #374151;
+}
+body.light-mode .facet-chip:hover {
+    background: #d1d5db;
+    border-color: #9ca3af;
+}
+body.light-mode .facet-chip.active {
+    background: #7c3aed;
+    border-color: #7c3aed;
+    color: #fff;
+}
+body.light-mode .facet-chip .count {
+    color: #6b7280;
+}
+
+/* Light mode: facet group titles */
+body.light-mode .facet-group-title {
+    color: #4b5563;
+}
+
+/* Light mode: facet sidebar scroll area */
+body.light-mode .facet-groups-container {
+    background: transparent;
+}
+
+/* Light mode: column selector dropdown (overrides inline dark style in HTML) */
+body.light-mode .column-selector-dropdown {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+    color: #374151;
+}
+body.light-mode .column-selector-dropdown label {
+    color: #374151;
+}
+body.light-mode .column-selector-dropdown div[style] {
+    color: #1f2937;
+    border-bottom-color: #e5e7eb !important;
+}
+
+/* Light mode: close button */
+body.light-mode .facet-modal-close-btn {
+    border-color: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.04);
+    color: #6b7280;
+}
+body.light-mode .facet-modal-close-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+}
+
+/* Light mode: active filter badge */
+body.light-mode .facet-active-badge {
+    background: #7c3aed;
+    color: #fff;
+}
+
+/* ============================================================
+   FACET CATEGORY SECTIONS (SIDEBAR & DROPDOWN)
+   ============================================================ */
+.facet-category-section {
+    margin-bottom: 12px;
+    border: 1px solid rgba(139, 92, 246, 0.22);
+    border-radius: 8px;
+    background: rgba(22, 33, 62, 0.35);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.facet-category-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(139, 92, 246, 0.12);
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #e9d5ff;
+    transition: background 0.15s ease;
+}
+
+.facet-category-header:hover {
+    background: rgba(139, 92, 246, 0.22);
+}
+
+.facet-category-toggle-icon {
+    font-size: 0.7rem;
+    color: #a78bfa;
+    width: 12px;
+    text-align: center;
+}
+
+.facet-category-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.facet-category-active-badge {
+    font-size: 0.7rem;
+    background: #7c3aed;
+    color: #ffffff;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.facet-category-body {
+    padding: 8px 10px 4px 10px;
+}
+
+/* Light mode overrides for facet category sections */
+body.light-mode .facet-category-section {
+    border-color: rgba(124, 58, 237, 0.18);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.light-mode .facet-category-header {
+    background: rgba(124, 58, 237, 0.08);
+    color: #4c1d95;
+}
+
+body.light-mode .facet-category-header:hover {
+    background: rgba(124, 58, 237, 0.16);
+}
+
+body.light-mode .facet-category-toggle-icon {
+    color: #7c3aed;
+}
+
+body.light-mode .facet-category-active-badge {
+    background: #7c3aed;
+    color: #ffffff;
+}
+
+/* =================== CONTEXT MENU AND CLEAR BUTTON =================== */
+
+/* Context Menu for Facet Groups */
+.facet-context-menu {
+    position: fixed;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    padding: 6px 0;
+    z-index: 2000;
+    min-width: 150px;
+    font-size: 0.85rem;
+    color: #e5e7eb;
+}
+
+.facet-context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.facet-context-menu-item:hover {
+    background: rgba(139, 92, 246, 0.2);
+    color: #e9d5ff;
+}
+
+/* Category Clear Button */
+.facet-category-clear {
+    font-size: 0.8rem;
+    cursor: pointer;
+    opacity: 0.6;
+    margin-left: auto;
+    transition: opacity 0.2s, color 0.2s;
+    padding: 2px;
+}
+
+.facet-category-clear:hover {
+    opacity: 1;
+    color: #ef4444;
+}
+
+/* Light mode overrides for Context Menu */
+body.light-mode .facet-context-menu {
+    background: #ffffff;
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    color: #374151;
+}
+
+body.light-mode .facet-context-menu-item:hover {
+    background: rgba(124, 58, 237, 0.1);
+    color: #4c1d95;
+}
+
+body.light-mode .facet-category-clear:hover {
+    color: #dc2626;
+}

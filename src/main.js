@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu, clipboard } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
 const OMEROProxyServer = require('./js/proxyManager.js');
@@ -186,16 +186,16 @@ function showAboutDialog() {
         message: 'MetaFold',
         detail: `Laboratory Data Management & Experiment Organization
 
-Version: 0.0.1
+Version: ${app.getVersion()}
 License: MIT
 
 Developed by: Dr. Thomas Zobel
-(with assistance from Claude AI)
+(with assistance from AI)
 
 GitHub: https://github.com/ThZobel/MetaFold
 Documentation: https://metafold-docs.readthedocs.io/en/latest/
 
-Built for NFDI4BioImage and life sciences research.`,
+Built for life sciences research workflows.`,
         buttons: ['OK'],
         defaultId: 0,
         noLink: false
@@ -240,6 +240,12 @@ async function createWindow() {
         const isAdmin = username === 'Admin';
         console.log(`🔐 User "${username}" is ${isAdmin ? 'ADMIN' : 'NOT admin'}`);
         return { isAdmin };
+    });
+
+    // IPC Handler: Clipboard
+    ipcMain.handle('write-to-clipboard', (event, text) => {
+        clipboard.writeText(text);
+        return { success: true };
     });
 
     // IPC Handler: Request to open DevTools (Admin only)
@@ -860,20 +866,38 @@ ipcMain.handle('select-folders', async () => {
     return null;
 });
 
+// Show Save Dialog
+ipcMain.handle('show-save-dialog', async (event, options) => {
+    const result = await dialog.showSaveDialog(mainWindow, options);
+    if (!result.canceled && result.filePath) {
+        return result.filePath;
+    }
+    return null;
+});
+
+ipcMain.handle('show-message-box', async (event, options) => {
+    const result = await dialog.showMessageBox(mainWindow, options);
+    return result;
+});
+
 // Create Project (Main API) - EXTENDED for optional folder structure
-ipcMain.handle('create-project', async (event, basePath, projectName, structure, metadata = null) => {
+ipcMain.handle('create-project', async (event, basePath, projectName, structure, metadata = null, options = {}) => {
     try {
         // Construct path correctly - path.join normalizes automatically
-        const projectPath = path.join(basePath, projectName);
+        const projectPath = options.skipFolder ? basePath : path.join(basePath, projectName);
 
-        console.log(`📁 Creating project: ${projectPath}`);
+        console.log(`📁 Target directory: ${projectPath}`);
 
-        // Create main project folder
-        await fs.mkdir(projectPath, { recursive: true });
-        console.log(`📁 Project folder created: ${projectPath}`);
+        // Only create main project folder if not skipping
+        if (!options.skipFolder) {
+            await fs.mkdir(projectPath, { recursive: true });
+            console.log(`📁 Project folder created: ${projectPath}`);
+        } else {
+            console.log(`📄 Skipping project folder creation, writing files to: ${projectPath}`);
+        }
 
-        // Only create folder structure if present
-        if (structure && structure.trim() !== '') {
+        // Only create folder structure if present and we are not skipping folders entirely
+        if (structure && structure.trim() !== '' && !options.skipFolder) {
             await createFolderStructure(projectPath, structure);
         } else {
             console.log(`📋 No folder structure defined - skipping structure creation`);
@@ -881,17 +905,167 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
         // ✅ FIX: Metadaten-JSON erstellen mit korrektem Dateinamen UND projectName
         if (metadata && Object.keys(metadata).length > 0) {
-            // ✅ CRITICAL: Add projectName to metadata before saving
-            const enhancedMetadata = {
-                ...metadata,
-                projectName: projectName  // Add project name for later loading
-            };
-
-            // Erstelle Metadaten-JSON mit ${projectName}-metadata.json
             const metadataFilename = `${projectName}-metadata.json`;
             const metadataPath = path.join(projectPath, metadataFilename);
+            
+            let enhancedMetadata = { ...metadata, projectName: projectName };
+            let isExtending = false;
+
+            if (options.extend) {
+                try {
+                    const existingContent = await fs.readFile(metadataPath, 'utf8');
+                    const existingMetadata = JSON.parse(existingContent);
+                    const currentUser = options.userInfo?.username || 'Unknown';
+                    const currentDate = new Date().toISOString();
+
+                    // Track updates and intelligently merge fields
+                    const mergedMetadata = { ...existingMetadata };
+                    
+                    Object.keys(enhancedMetadata).forEach(key => {
+                        if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key.startsWith('System.')) return;
+                        
+                        const newField = enhancedMetadata[key];
+                        const oldField = existingMetadata[key];
+                        
+                        // Check if newField has a meaningful value
+                        const hasNewValue = newField && typeof newField === 'object' && 
+                                            newField.value !== undefined && newField.value !== null && 
+                                            (Array.isArray(newField.value) ? newField.value.length > 0 : newField.value !== '');
+                        
+                        if (!hasNewValue) {
+                            // If user left this field blank, keep the old one
+                            return; 
+                        }
+                        
+                        let isUpdated = false;
+                        let isModified = false;
+                        let mergedValue = newField.value;
+                        
+                        if (!oldField) {
+                            isUpdated = true;
+                            mergedMetadata[key] = { ...newField };
+                        } else {
+                            // Both exist, and new has value
+                            const oldValue = oldField.value;
+                            
+                            // Array merge
+                            if (Array.isArray(oldValue)) {
+                                const newArray = Array.isArray(mergedValue) ? mergedValue : [mergedValue];
+                                const mergedArray = [...new Set([...oldValue, ...newArray])];
+                                
+                                // Check if array changed
+                                if (mergedArray.length !== oldValue.length || !mergedArray.every(v => oldValue.includes(v))) {
+                                    isUpdated = true;
+                                    isModified = true;
+                                    mergedValue = mergedArray;
+                                }
+                            } else {
+                                // String/Primitive merge (overwrite)
+                                if (mergedValue !== oldValue) {
+                                    isUpdated = true;
+                                    isModified = true;
+                                }
+                            }
+                            
+                            if (isUpdated) {
+                                mergedMetadata[key] = { 
+                                    ...oldField, 
+                                    ...newField, 
+                                    value: mergedValue 
+                                };
+                            }
+                        }
+                        
+                        if (isUpdated) {
+                            mergedMetadata[key].lastUpdatedBy = currentUser;
+                            mergedMetadata[key].lastUpdatedAt = currentDate;
+                            if (isModified) {
+                                mergedMetadata[key].isModified = true;
+                            }
+                            if (options.templateName) {
+                                mergedMetadata[key].templateName = options.templateName;
+                            }
+                        }
+                    });
+
+                    // Keep system keys updated
+                    if (enhancedMetadata.provenance) mergedMetadata.provenance = enhancedMetadata.provenance;
+                    if (enhancedMetadata.projectName) mergedMetadata.projectName = enhancedMetadata.projectName;
+                    
+                    enhancedMetadata = mergedMetadata;
+                    // Preserve original project ID if it exists
+                    if (existingMetadata.metafold_project_id) {
+                        enhancedMetadata.metafold_project_id = existingMetadata.metafold_project_id;
+                    }
+                    isExtending = true;
+                    console.log(`✅ Extending existing metadata for ${projectName}`);
+                } catch (err) {
+                    console.warn(`⚠️ Could not read existing metadata for extension, creating new: ${err.message}`);
+                }
+            }
+
+            if (!enhancedMetadata.metafold_project_id) {
+                enhancedMetadata.metafold_project_id = require('crypto').randomUUID();
+            }
+
+            // Inject paths
+            enhancedMetadata['System.ProjectAbsolutePath'] = {
+                label: 'Project Absolute Path',
+                type: 'text',
+                value: projectPath,
+                position: 900
+            };
+            enhancedMetadata['System.ProjectRelativePath'] = {
+                label: 'Project Relative Path',
+                type: 'text',
+                value: path.relative(basePath, projectPath) || '.',
+                position: 901
+            };
+
+            // Inject update history if extending
+            if (isExtending && options.userInfo) {
+                if (!enhancedMetadata['System.UpdateHistory']) {
+                    enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
+                }
+                
+                const historyArray = Array.isArray(enhancedMetadata['System.UpdateHistory'].value) 
+                    ? enhancedMetadata['System.UpdateHistory'].value 
+                    : [];
+
+                const updateEntry = {
+                    date: new Date().toISOString(),
+                    user: options.userInfo.username || 'Unknown',
+                    group: options.userInfo.groupname || 'Unknown',
+                    action: 'Metadata Extended'
+                };
+                
+                historyArray.push(updateEntry);
+                enhancedMetadata['System.UpdateHistory'] = { value: historyArray, type: 'history' };
+                enhancedMetadata['System.LastUpdatedBy'] = { value: updateEntry.user, type: 'user' };
+                enhancedMetadata['System.LastUpdatedAt'] = { value: updateEntry.date, type: 'date' };
+            }
+
+            // Clean empty fields and ensure templateName from metadata before saving
+            Object.keys(enhancedMetadata).forEach(key => {
+                // Keep special internal fields
+                if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
+                    return;
+                }
+                const field = enhancedMetadata[key];
+                if (field && typeof field === 'object' && 'value' in field) {
+                    const val = field.value;
+                    if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
+                        delete enhancedMetadata[key];
+                    } else if (!field.templateName && options.templateName) {
+                        // Tag base template fields with their template name
+                        field.templateName = options.templateName;
+                    }
+                }
+            });
+
+            // Erstelle Metadaten-JSON mit ${projectName}-metadata.json
             await fs.writeFile(metadataPath, JSON.stringify(enhancedMetadata, null, 2), 'utf8');
-            console.log(`✅ Metadata file created with projectName: ${metadataFilename}`);
+            console.log(`✅ Metadata file ${isExtending ? 'updated' : 'created'} with projectName: ${metadataFilename}`);
 
             // Erstelle README.html mit enhanced Metadaten
             const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName);
@@ -1107,6 +1281,19 @@ ipcMain.handle('open-external', async (event, url) => {
     }
 });
 
+// File reading
+ipcMain.handle('readFile', async (event, filePath) => {
+    try {
+        const content = await fs.readFile(filePath, 'utf8');
+        return content;
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            console.error('Error reading file:', error);
+        }
+        return null;
+    }
+});
+
 // File writing for export
 ipcMain.handle('writeFile', async (event, filePath, content) => {
     try {
@@ -1126,6 +1313,56 @@ ipcMain.handle('joinPath', async (event, ...pathParts) => {
 ipcMain.handle('copyFile', async (event, srcPath, destPath) => {
     try {
         await fs.copyFile(srcPath, destPath);
+        return { success: true };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Get top-level subfolders for given project paths
+ipcMain.handle('get-subfolders', async (event, projectPaths) => {
+    try {
+        const results = {};
+        for (const p of projectPaths) {
+            if (require('fs').existsSync(p)) {
+                const entries = await fs.readdir(p, { withFileTypes: true });
+                results[p] = entries
+                    .filter(dirent => dirent.isDirectory())
+                    .map(dirent => dirent.name);
+            } else {
+                results[p] = [];
+            }
+        }
+        return { success: true, subfolders: results };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Harvest projects with selected subfolders
+ipcMain.handle('harvest-projects', async (event, exportPath, projectsData) => {
+    try {
+        await fs.mkdir(exportPath, { recursive: true });
+        for (const proj of projectsData) {
+            const destDir = path.join(exportPath, proj.name);
+            await fs.mkdir(destDir, { recursive: true });
+            
+            if (require('fs').existsSync(proj.path)) {
+                const entries = await fs.readdir(proj.path, { withFileTypes: true });
+                for (const entry of entries) {
+                    const src = path.join(proj.path, entry.name);
+                    const dest = path.join(destDir, entry.name);
+                    
+                    if (entry.isFile()) {
+                        await fs.copyFile(src, dest);
+                    } else if (entry.isDirectory()) {
+                        if (proj.selectedFolders && proj.selectedFolders.includes(entry.name)) {
+                            await fs.cp(src, dest, { recursive: true });
+                        }
+                    }
+                }
+            }
+        }
         return { success: true };
     } catch (error) {
         return { success: false, message: error.message };
@@ -1814,6 +2051,24 @@ ipcMain.handle('get-templates-directory', async (event, userInfo = null) => {
     }
 });
 
+// Get base MetaFold directory path
+ipcMain.handle('get-metafold-directory', async (event) => {
+    try {
+        const homePath = app.getPath('home');
+        const metafoldDir = path.join(homePath, 'MetaFold');
+        await fs.mkdir(metafoldDir, { recursive: true });
+        return {
+            success: true,
+            directory: metafoldDir
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
 // Export templates to location - ERWEITERT um defaultPath Support
 ipcMain.handle('export-templates-to-location', async (event, templates, exportType = 'single', defaultPath = null) => {
     try {
@@ -2052,15 +2307,81 @@ ipcMain.handle('bulk-import-templates', async (event, options = {}) => {
 // These functions must be added BEFORE the "PROJECT SCANNER API" section
 
 /**
+ * Recursively collect .metafold-sidecar.json files under a project directory.
+ * Extracts ONLY file-specific fields (file info + OME-XML metadata) —
+ * inherited project_metadata is deliberately excluded to avoid duplication
+ * (the project's own metadata already exists as a separate entry).
+ *
+ * @param {string} projectPath - Root path of the project to search
+ * @returns {Array} Array of slim sidecar objects
+ */
+async function collectFileSidecars(projectPath) {
+    const sidecars = [];
+
+    async function walk(dir) {
+        let entries;
+        try {
+            entries = await fs.readdir(dir, { withFileTypes: true });
+        } catch (_) {
+            return; // skip inaccessible folders
+        }
+
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+
+            if (entry.isDirectory()) {
+                // Skip common non-data directories
+                const skipDirs = ['node_modules', '.git', '.vscode', 'dist', 'build', '__pycache__'];
+                if (!skipDirs.includes(entry.name)) {
+                    await walk(fullPath);
+                }
+            } else if (entry.isFile() && entry.name.endsWith('.metafold-sidecar.json')) {
+                try {
+                    const content = await fs.readFile(fullPath, 'utf8');
+                    const sidecar = JSON.parse(content);
+
+                    // Build a slim representation — only file-own data, NO project metadata
+                    const slim = {
+                        sidecar_id: sidecar.sidecar_id || null,
+                        sidecarPath: fullPath,
+                        generated_at: sidecar.generated_at || null,
+                        // File information
+                        file: sidecar.file || {
+                            name: entry.name.replace('.metafold-sidecar.json', ''),
+                            path: fullPath
+                        },
+                        // OME-XML metadata (the file-specific value-add)
+                        ome_metadata: sidecar.ome_metadata || null,
+                        // Reference back to project (by ID, not by copying metadata)
+                        nearest_project_id: sidecar.nearest_project_id || null
+                    };
+
+                    sidecars.push(slim);
+                } catch (parseErr) {
+                    console.warn(`⚠️ Could not parse sidecar ${fullPath}: ${parseErr.message}`);
+                }
+            }
+        }
+    }
+
+    await walk(projectPath);
+    return sidecars;
+}
+
+/**
  * Recursively scan directory for MetaFold projects
  * A MetaFold project is identified by *-metadata.json files
  * @param {string} basePath - Root directory to start scanning
- * @param {number} maxDepth - Maximum recursion depth (default: 5)
+ * @param {Object} options - Scan options (inheritMetadata, maxDepth, includeFileSidecars)
  * @param {number} currentDepth - Current recursion level (internal)
+ * @param {Object} parentMetadata - Metadata inherited from parent project (internal)
  * @returns {Array} Array of project objects
  */
-async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0) {
+async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0, parentMetadata = {}) {
     const projects = [];
+    const maxDepth = options.maxDepth || 5;
+    const inheritMetadata = options.inheritMetadata || false;
+    const includeFileSidecars = options.includeFileSidecars || false;
 
     // Stop if max depth reached
     if (currentDepth > maxDepth) {
@@ -2076,13 +2397,48 @@ async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0)
             entry.isFile() && entry.name.endsWith('-metadata.json')
         );
 
+        // Metadata to pass down to children (accumulated from this level)
+        let currentLevelMetadata = { ...parentMetadata };
+
         // If metadata files found, this is a project directory
         for (const metadataFile of metadataFiles) {
             console.log(`📁 Found project in: ${basePath}`);
 
             const project = await parseMetaFoldProject(basePath, metadataFile.name);
             if (project) {
+                // Always assign System.Level based on nesting depth
+                project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
+
+                if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
+                    // Merge: parent metadata as base, child metadata overrides
+                    const mergedMetadata = { ...parentMetadata };
+                    for (const [key, val] of Object.entries(project.metadata)) {
+                        mergedMetadata[key] = val; // Child wins
+                    }
+                    project.metadata = mergedMetadata;
+                    project.metadataFieldCount = Object.keys(project.metadata).length;
+                    console.log(`🔗 Inherited ${Object.keys(parentMetadata).length} metadata fields from parent into: ${project.name}`);
+                }
+
+                // Collect file sidecars if option is enabled
+                if (includeFileSidecars) {
+                    const sidecars = await collectFileSidecars(basePath);
+                    project.fileSidecars = sidecars;
+                    if (sidecars.length > 0) {
+                        console.log(`📄 Found ${sidecars.length} file sidecar(s) in: ${project.name}`);
+                    }
+                }
+
                 projects.push(project);
+
+                // Build metadata to pass to children (own clean metadata, excluding System fields)
+                if (inheritMetadata) {
+                    for (const [key, val] of Object.entries(project.metadata)) {
+                        if (!key.startsWith('System.')) {
+                            currentLevelMetadata[key] = val;
+                        }
+                    }
+                }
             }
         }
 
@@ -2099,7 +2455,7 @@ async function scanForMetaFoldProjects(basePath, maxDepth = 5, currentDepth = 0)
             }
 
             try {
-                const subProjects = await scanForMetaFoldProjects(subdirPath, maxDepth, currentDepth + 1);
+                const subProjects = await scanForMetaFoldProjects(subdirPath, options, currentDepth + 1, currentLevelMetadata);
                 projects.push(...subProjects);
             } catch (error) {
                 // Skip directories that can't be accessed
@@ -2272,14 +2628,289 @@ function analyzeProjectStatistics(projects) {
     };
 }
 
+// =================== ID DICTIONARY / HARVESTER API ===================
+
+function getUserIdRegistryPath(userInfo) {
+    const fsSync = require('fs');
+    let username = 'default';
+    if (typeof userInfo === 'string') {
+        username = userInfo;
+        userInfo = { username: userInfo }; // fallback for compatibility
+    } else if (userInfo && userInfo.username) {
+        username = userInfo.username;
+    }
+    const safeUsername = username.replace(/[^a-zA-Z0-9_\-]/g, '_').toLowerCase();
+    
+    // Determine the template directory which already includes the user's folder
+    const registryDir = getTemplatesDirectory(userInfo);
+    
+    if (!fsSync.existsSync(registryDir)) {
+        fsSync.mkdirSync(registryDir, { recursive: true });
+    }
+    return path.join(registryDir, `id_dictionary_${safeUsername}.json`);
+}
+
+function extractIdValues(obj, result = []) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const [key, val] of Object.entries(obj || {})) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey === 'metafold_project_id') continue;
+        const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
+        const isProjectName = lowerKey === 'projectname';
+        
+        if (isIdField) {
+            let idVal = '';
+            if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
+                idVal = val.value.trim();
+            } else if (typeof val === 'string') {
+                idVal = val.trim();
+            }
+            if (idVal && !uuidRegex.test(idVal) && !result.some(item => (item.id || item) === idVal)) {
+                result.push({ id: idVal, type: 'id_anchor' });
+            }
+        }
+        
+        if (isProjectName) {
+            let projVal = '';
+            if (typeof val === 'string') {
+                projVal = val.trim();
+            }
+            if (projVal && !result.some(item => (item.id || item) === projVal)) {
+                result.push({ id: projVal, type: 'project' });
+            }
+        }
+        
+        if (val && typeof val === 'object' && !Array.isArray(val)) {
+            extractIdValues(val, result);
+        }
+    }
+    return result;
+}
+
+ipcMain.handle('load-id-dictionary', async (event, userInfo) => {
+    try {
+        const fsSync = require('fs');
+        const filePath = getUserIdRegistryPath(userInfo);
+        if (fsSync.existsSync(filePath)) {
+            const data = fsSync.readFileSync(filePath, 'utf8');
+            return { success: true, ids: JSON.parse(data) };
+        }
+        return { success: true, ids: [] };
+    } catch (err) {
+        console.error('Error loading ID dictionary:', err);
+        return { success: false, ids: [], error: err.message };
+    }
+});
+
+ipcMain.handle('save-id-values', async (event, metadata, userInfo) => {
+    try {
+        const fsSync = require('fs');
+        if (!metadata) return { success: false, newCount: 0 };
+        
+        const extractedIds = extractIdValues(metadata);
+        if (extractedIds.length === 0) return { success: true, newCount: 0 };
+        
+        const filePath = getUserIdRegistryPath(userInfo);
+        let currentIds = [];
+        if (fsSync.existsSync(filePath)) {
+            try {
+                currentIds = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
+                // Backward compatibility: map strings to objects
+                currentIds = currentIds.map(item => typeof item === 'string' ? { id: item, type: 'id_anchor' } : item);
+            } catch (e) {
+                console.error('Error reading ID dictionary for merge:', e);
+            }
+        }
+        
+        const initialCount = currentIds.length;
+        
+        const idMap = new Map();
+        currentIds.forEach(item => idMap.set(item.id, item));
+        
+        extractedIds.forEach(item => {
+            if (item.type === 'id_anchor' || !idMap.has(item.id)) {
+                idMap.set(item.id, item);
+            }
+        });
+        
+        const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+        
+        fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
+        return { success: true, newCount: newArray.length - initialCount, total: newArray.length };
+    } catch (err) {
+        console.error('Error saving ID values:', err);
+        return { success: false, error: err.message };
+    }
+});
+
+ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, userInfo) => {
+    try {
+        const fsSync = require('fs');
+        let totalExtracted = [];
+        let debugInfo = {
+            scannedFiles: [],
+            errors: [],
+            directoriesScanned: 0
+        };
+        
+        function scanDir(currentPath) {
+            try {
+                debugInfo.directoriesScanned++;
+                const entries = fsSync.readdirSync(currentPath, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(currentPath, entry.name);
+                    
+                    if (entry.isDirectory() && recursive) {
+                        scanDir(fullPath);
+                    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+                        debugInfo.scannedFiles.push(fullPath);
+                        console.log(`[harvestIdsFromFolder] Found JSON file: ${fullPath}`);
+                        try {
+                            const content = fsSync.readFileSync(fullPath, 'utf8');
+                            const json = JSON.parse(content);
+                            console.log(`[harvestIdsFromFolder] Successfully parsed JSON: ${fullPath}`);
+                            extractIdValues(json, totalExtracted);
+                        } catch (e) {
+                            debugInfo.errors.push(`Parse error in ${fullPath}: ${e.message}`);
+                            console.error(`[harvestIdsFromFolder] Error parsing JSON ${fullPath}:`, e);
+                        }
+                    }
+                }
+            } catch (e) {
+                debugInfo.errors.push(`Dir error at ${currentPath}: ${e.message}`);
+                console.error(`[harvestIdsFromFolder] Directory error at ${currentPath}:`, e);
+            }
+        }
+        
+        scanDir(dirPath);
+        
+        if (totalExtracted.length > 0) {
+            const filePath = getUserIdRegistryPath(userInfo);
+            let currentIds = [];
+            if (fsSync.existsSync(filePath)) {
+                try {
+                    currentIds = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
+                    currentIds = currentIds.map(item => typeof item === 'string' ? { id: item, type: 'id_anchor' } : item);
+                } catch (e) {}
+            }
+            
+            const initialCount = currentIds.length;
+            
+            const idMap = new Map();
+            currentIds.forEach(item => idMap.set(item.id, item));
+            
+            totalExtracted.forEach(item => {
+                if (item.type === 'id_anchor' || !idMap.has(item.id)) {
+                    idMap.set(item.id, item);
+                }
+            });
+            
+            const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+            
+            fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
+            return { success: true, newCount: newArray.length - initialCount, total: newArray.length, foundCount: totalExtracted.length, debugInfo };
+        }
+        
+        return { success: true, newCount: 0, total: 0, foundCount: 0, debugInfo };
+    } catch (err) {
+        console.error('Error harvesting IDs:', err);
+        return { success: false, error: err.message };
+    }
+});
+
 // =================== PROJECT SCANNER API ===================
 
 // Scan directory recursively for MetaFold projects
-ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5) => {
+ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, options = {}) => {
     try {
-        console.log(`🔍 Scanning for MetaFold projects in: ${basePath}`);
+        // Merge maxDepth into options for backward compatibility
+        const scanOptions = { maxDepth, ...options };
+        console.log(`🔍 Scanning for MetaFold projects in: ${basePath} (inherit: ${scanOptions.inheritMetadata || false})`);
 
-        const projects = await scanForMetaFoldProjects(basePath, maxDepth);
+        const projects = await scanForMetaFoldProjects(basePath, scanOptions);
+
+        // --- PHASE 3: Two-Pass Scanner Logic (Lineage Linking) ---
+        // Pass 1: Build ID Registry from all scanned projects
+        const idRegistry = new Map();
+        
+        projects.forEach(project => {
+            project.lineage = {
+                provides_ids: [],
+                derived_from_ids: [],
+                lineage_links: []
+            };
+            
+            // Auto-register the project's own name as a valid ID
+            if (project.name) {
+                project.lineage.provides_ids.push(project.name);
+                idRegistry.set(project.name, project.path);
+            }
+            
+            function extractLineage(obj) {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                for (const [key, val] of Object.entries(obj || {})) {
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey === 'metafold_project_id') continue;
+                    
+                    const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
+                    
+                    if (isIdField) {
+                        let idVal = '';
+                        if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
+                            idVal = val.value.trim();
+                        } else if (typeof val === 'string') {
+                            idVal = val.trim();
+                        }
+                        if (idVal && !uuidRegex.test(idVal)) {
+                            project.lineage.provides_ids.push(idVal);
+                            idRegistry.set(idVal, project.path);
+                        }
+                    }
+                    
+                    if (lowerKey === 'derived_from' || (val && val.type === 'derived_from')) {
+                        if (val && typeof val === 'object' && Array.isArray(val.value)) {
+                            project.lineage.derived_from_ids.push(
+                                ...val.value.filter(v => typeof v === 'string').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
+                            );
+                        } else if (val && typeof val === 'object' && typeof val.value === 'string') {
+                            project.lineage.derived_from_ids.push(
+                                ...val.value.split(',').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
+                            );
+                        } else if (typeof val === 'string') {
+                            project.lineage.derived_from_ids.push(
+                                ...val.split(',').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
+                            );
+                        } else if (Array.isArray(val)) {
+                            project.lineage.derived_from_ids.push(
+                                ...val.map(v => typeof v === 'string' ? v.trim() : String(v)).filter(v => v && !uuidRegex.test(v))
+                            );
+                        }
+                    } else if (val && typeof val === 'object' && !Array.isArray(val) && key !== 'provenance') {
+                        extractLineage(val);
+                    }
+                }
+            }
+            
+            if (project.metadata) {
+                extractLineage(project.metadata);
+            }
+        });
+
+        // Pass 2: Resolve Lineage Links
+        projects.forEach(project => {
+            project.lineage.derived_from_ids.forEach(derivedId => {
+                const sourcePath = idRegistry.get(derivedId);
+                console.log(`[Lineage] Resolving derivedId "${derivedId}" for project "${project.path}" -> sourcePath: ${sourcePath}`);
+                if (sourcePath && sourcePath !== project.path) {
+                    console.log(`[Lineage] ESTABLISHED LINK: ${sourcePath} -> ${project.path}`);
+                    project.lineage.lineage_links.push({
+                        id: derivedId,
+                        source_path: sourcePath
+                    });
+                }
+            });
+        });
+        // --------------------------------------------------------
 
         console.log(`✅ Found ${projects.length} MetaFold projects`);
         return {
@@ -2336,6 +2967,416 @@ ipcMain.handle('get-projects-statistics', async (event, projects) => {
     }
 });
 
+// =================== BIOFORMATS FILE SCANNER API ===================
+
+/**
+ * Recursively list files with given extensions under a directory.
+ * Returns an array of absolute file paths.
+ */
+ipcMain.handle('list-files-recursive', async (event, dirPath, extensions) => {
+    try {
+        const results = [];
+        const exts = (extensions || []).map(e => e.toLowerCase());
+
+        async function walk(dir) {
+            let entries;
+            try {
+                entries = await fs.readdir(dir, { withFileTypes: true });
+            } catch (err) {
+                // skip inaccessible folders silently
+                return;
+            }
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    await walk(fullPath);
+                } else if (entry.isFile()) {
+                    const ext = path.extname(entry.name).toLowerCase();
+                    // Handle compound extensions like .ome.tif
+                    const nameLC = entry.name.toLowerCase();
+                    const matchesCompound = exts.some(e => nameLC.endsWith(e));
+                    if (matchesCompound) {
+                        const stat = await fs.stat(fullPath);
+                        results.push({
+                            path: fullPath,
+                            name: entry.name,
+                            extension: ext,
+                            size_bytes: stat.size,
+                            modified: stat.mtime.toISOString()
+                        });
+                    }
+                }
+            }
+        }
+
+        await walk(dirPath);
+        console.log(`🔬 File scan found ${results.length} microscopy files in ${dirPath}`);
+        return { success: true, files: results };
+    } catch (error) {
+        console.error('❌ list-files-recursive error:', error);
+        return { success: false, message: error.message, files: [] };
+    }
+});
+
+/**
+ * Auto-detect BioFormats CLI (showinf / showinf.bat).
+ * Searches customPath, PATH, and common install locations.
+ */
+ipcMain.handle('bioformats-detect', async (event, customPath) => {
+    const { spawn } = require('child_process');
+    const isWin = process.platform === 'win32';
+    const executable = isWin ? 'showinf.bat' : 'showinf';
+
+    // Candidate locations to search
+    const candidates = [];
+    if (customPath) {
+        const cleanCustom = customPath.trim().replace(/^"+|"+$/g, '');
+        candidates.push(cleanCustom);
+        if (!cleanCustom.endsWith(executable)) {
+            candidates.push(path.join(cleanCustom, executable));
+        }
+    }
+
+    // Common install dirs on Windows
+    if (isWin) {
+        const pf = process.env['ProgramFiles'] || 'C:\\Program Files';
+        const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+        const userProfile = process.env.USERPROFILE || 'C:\\Users\\Default';
+        const localAppData = process.env.LOCALAPPDATA || path.join(userProfile, 'AppData\\Local');
+
+        // Daybook 3 embedded BioFormats
+        candidates.push(path.join(pf, 'Daybook 3\\Daybook-Data-Manager\\resources\\app\\dist\\electron\\static\\bftools', executable));
+        candidates.push(path.join(pf86, 'Daybook 3\\Daybook-Data-Manager\\resources\\app\\dist\\electron\\static\\bftools', executable));
+
+        // Standard BioFormats / bftools dirs
+        candidates.push(path.join(pf, 'BioFormats', executable));
+        candidates.push(path.join(pf86, 'BioFormats', executable));
+        candidates.push(path.join(pf, 'bftools', executable));
+        candidates.push(path.join(pf86, 'bftools', executable));
+        candidates.push(path.join(userProfile, 'Downloads\\bftools', executable));
+        candidates.push(path.join(localAppData, 'bftools', executable));
+        candidates.push(`C:\\bftools\\${executable}`);
+    }
+    // Common on Linux/macOS
+    candidates.push(path.join(process.env.HOME || '~', 'bin', executable));
+    candidates.push('/usr/local/bin/' + executable);
+    candidates.push('/opt/bioformats/' + executable);
+    candidates.push(executable); // try PATH
+
+    for (const candidate of candidates) {
+        try {
+            const cleanCand = candidate.trim().replace(/^"+|"+$/g, '');
+            // Skip non-existent files if absolute path
+            if (path.isAbsolute(cleanCand) && !fs.existsSync(cleanCand)) {
+                continue;
+            }
+
+            // Properly quote command if it contains spaces on Windows when shell: true
+            const execCmd = isWin && cleanCand.includes(' ') && !cleanCand.startsWith('"') ? `"${cleanCand}"` : cleanCand;
+
+            const version = await new Promise((resolve, reject) => {
+                const proc = spawn(execCmd, ['-version'], {
+                    timeout: 10000,
+                    windowsHide: true,
+                    shell: isWin
+                });
+                let out = '';
+                let err = '';
+                proc.stdout.on('data', d => { out += d.toString(); });
+                proc.stderr.on('data', d => { err += d.toString(); });
+                proc.on('close', (code) => {
+                    // BioFormats often prints version to stderr
+                    const combined = (out + err).trim();
+                    if (combined.length > 0) resolve(combined.split('\n')[0]);
+                    else if (code === 0) resolve('unknown version');
+                    else reject(new Error(`exit ${code}`));
+                });
+                proc.on('error', reject);
+            });
+
+            console.log(`✅ BioFormats found at: ${cleanCand} (${version})`);
+            return { success: true, found: true, path: cleanCand, version };
+        } catch (_) {
+            // try next candidate
+        }
+    }
+
+    console.log('⚠️ BioFormats (showinf) not found');
+    return {
+        success: true,
+        found: false,
+        message: 'BioFormats CLI not found. Please install BioFormats Command Line Tools and Java 8+.'
+    };
+});
+
+/**
+ * Read OME-XML metadata from a microscopy file using BioFormats showinf.
+ * Returns parsed JSON of the OME-XML structure.
+ */
+ipcMain.handle('bioformats-read-omexml', async (event, filePath, showiNFPath) => {
+    const { spawn } = require('child_process');
+    const fs = require('fs');
+
+    const cleanFile = (filePath || '').trim().replace(/^"+|"+$/g, '');
+    const rawPath = (showiNFPath || '').trim().replace(/^"+|"+$/g, '');
+    const executable = rawPath || (process.platform === 'win32' ? 'showinf.bat' : 'showinf');
+
+    console.log(`🔬 Reading OME-XML from: ${cleanFile}`);
+
+    try {
+        const isWin = process.platform === 'win32';
+        let cp = '';
+        let bfDir = '';
+
+        if (rawPath) {
+            try {
+                const stat = fs.statSync(rawPath);
+                if (stat.isDirectory()) {
+                    bfDir = rawPath;
+                } else {
+                    bfDir = path.dirname(rawPath);
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        if (bfDir) {
+            const pkgJar = path.join(bfDir, 'bioformats_package.jar');
+            const gplJar = path.join(bfDir, 'formats-gpl.jar');
+            const toolsJar = path.join(bfDir, 'bio-formats-tools.jar');
+
+            if (fs.existsSync(pkgJar)) {
+                cp = isWin ? `${bfDir};${pkgJar}` : `${bfDir}:${pkgJar}`;
+            } else if (fs.existsSync(gplJar) && fs.existsSync(toolsJar)) {
+                cp = isWin ? `${bfDir};${gplJar};${toolsJar}` : `${bfDir}:${gplJar}:${toolsJar}`;
+            }
+        }
+
+        // Try direct java execution first to avoid batch quoting bugs on paths with spaces
+        if (cp) {
+            try {
+                console.log(`🚀 Spawning java directly for BioFormats (CP: ${cp})`);
+                const xmlString = await new Promise((resolve, reject) => {
+                    const proc = spawn('java', [
+                        '-Xmx512m',
+                        '-Dbioformats_can_do_upgrade_check=false',
+                        '-cp', cp,
+                        'loci.formats.tools.ImageInfo',
+                        '-omexml',      // Output OME-XML
+                        '-nopix',       // Don't read pixel data
+                        '-no-upgrade',  // Don't check for upgrades (faster)
+                        cleanFile
+                    ], {
+                        timeout: 60000, // 60s timeout per file
+                        windowsHide: true,
+                        shell: false    // No shell needed when spawning java.exe directly
+                    });
+
+                    let stdout = '';
+                    let stderr = '';
+
+                    proc.stdout.on('data', d => { stdout += d.toString(); });
+                    proc.stderr.on('data', d => { stderr += d.toString(); });
+
+                    proc.on('close', (code) => {
+                        if (code === 0 && stdout.includes('<?xml')) {
+                            const xmlStart = stdout.indexOf('<?xml');
+                            resolve(stdout.substring(xmlStart));
+                        } else if (stdout.includes('<?xml')) {
+                            resolve(stdout.substring(stdout.indexOf('<?xml')));
+                        } else {
+                            reject(new Error(`java ImageInfo exited with code ${code}. stderr: ${stderr.substring(0, 500)}`));
+                        }
+                    });
+
+                    proc.on('error', (err) => {
+                        reject(err);
+                    });
+                });
+
+                const omeJson = parseOmeXmlToJson(xmlString);
+                return { success: true, omeJson, rawXml: xmlString };
+
+            } catch (javaError) {
+                console.warn(`⚠️ Direct Java execution failed, falling back to batch file: ${javaError.message}`);
+            }
+        }
+
+        // Fallback: original batch file / shell execution (with Windows path & file argument quoting fix)
+        const cleanExec = executable.trim().replace(/^"+|"+$/g, '');
+        const execCmd = isWin && cleanExec.includes(' ') && !cleanExec.startsWith('"') ? `"${cleanExec}"` : cleanExec;
+        const fileArg = isWin && cleanFile.includes(' ') && !cleanFile.startsWith('"') ? `"${cleanFile}"` : cleanFile;
+
+        const xmlString = await new Promise((resolve, reject) => {
+            const proc = spawn(execCmd, [
+                '-omexml',      // Output OME-XML
+                '-nopix',       // Don't read pixel data
+                '-no-upgrade',  // Don't check for upgrades (faster)
+                fileArg
+            ], {
+                timeout: 60000, // 60s timeout per file
+                windowsHide: true,
+                shell: isWin
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', d => { stdout += d.toString(); });
+            proc.stderr.on('data', d => { stderr += d.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0 && stdout.includes('<?xml')) {
+                    // Extract the XML portion from stdout
+                    const xmlStart = stdout.indexOf('<?xml');
+                    resolve(stdout.substring(xmlStart));
+                } else if (stdout.includes('<?xml')) {
+                    resolve(stdout.substring(stdout.indexOf('<?xml')));
+                } else {
+                    reject(new Error(`showinf exited with code ${code}. stderr: ${stderr.substring(0, 500)}`));
+                }
+            });
+
+            proc.on('error', (err) => {
+                reject(new Error(`Failed to start showinf: ${err.message}. Make sure Java and BioFormats CLI are installed.`));
+            });
+        });
+
+        // Parse the OME-XML into a JSON object
+        const omeJson = parseOmeXmlToJson(xmlString);
+
+        return { success: true, omeJson, rawXml: xmlString };
+
+    } catch (error) {
+        console.error(`❌ BioFormats error for ${path.basename(filePath)}:`, error.message);
+        return {
+            success: false,
+            message: error.message,
+            omeJson: null
+        };
+    }
+});
+
+/**
+ * Parse OME-XML string into a structured JSON object.
+ * Extracts the most relevant fields: Image, Pixels, Channels, Instrument.
+ */
+function parseOmeXmlToJson(xmlString) {
+    try {
+        // Simple regex-based extraction (no XML library dependency)
+        const extract = (tag, attr, xml) => {
+            const patterns = [
+                new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, 'i'),
+                new RegExp(`<${tag}[^>]*/?>([^<]*)`, 'i')
+            ];
+            for (const p of patterns) {
+                const m = xml.match(p);
+                if (m) return m[1].trim();
+            }
+            return null;
+        };
+
+        const extractAttr = (tag, attrs, xml) => {
+            const tagMatch = xml.match(new RegExp(`<${tag}([^>]*)>?`, 'i'));
+            if (!tagMatch) return {};
+            const attrStr = tagMatch[1];
+            const result = {};
+            for (const attr of attrs) {
+                const m = attrStr.match(new RegExp(`\\s${attr}="([^"]*)"`, 'i'));
+                if (m) result[attr] = m[1];
+            }
+            return result;
+        };
+
+        const extractAll = (tag, attrs, xml) => {
+            const regex = new RegExp(`<${tag}([^>]*)>?`, 'gi');
+            const results = [];
+            let m;
+            while ((m = regex.exec(xml)) !== null) {
+                const attrStr = m[1];
+                const obj = {};
+                for (const attr of attrs) {
+                    const am = attrStr.match(new RegExp(`\\s${attr}="([^"]*)"`, 'i'));
+                    if (am) obj[attr] = am[1];
+                }
+                if (Object.keys(obj).length > 0) results.push(obj);
+            }
+            return results;
+        };
+
+        const ome = {
+            _source: 'BioFormats / showinf',
+            Image: extractAttr('Image', ['Name', 'ID', 'AcquisitionDate'], xmlString),
+            Pixels: extractAttr('Pixels', [
+                'SizeX', 'SizeY', 'SizeZ', 'SizeT', 'SizeC',
+                'PhysicalSizeX', 'PhysicalSizeXUnit',
+                'PhysicalSizeY', 'PhysicalSizeYUnit',
+                'PhysicalSizeZ', 'PhysicalSizeZUnit',
+                'Type', 'DimensionOrder', 'ID'
+            ], xmlString),
+            Channels: extractAll('Channel', [
+                'Name', 'ID', 'SamplesPerPixel', 'IlluminationType',
+                'PinholeSize', 'AcquisitionMode', 'ContrastMethod',
+                'ExcitationWavelength', 'EmissionWavelength', 'Fluor', 'Color'
+            ], xmlString),
+            Instrument: {
+                Microscope: extractAttr('Microscope', [
+                    'Manufacturer', 'Model', 'SerialNumber', 'Type'
+                ], xmlString),
+                Objective: extractAttr('Objective', [
+                    'ID', 'Manufacturer', 'Model', 'SerialNumber',
+                    'NominalMagnification', 'CalibratedMagnification', 'LensNA',
+                    'Immersion', 'Correction', 'WorkingDistance'
+                ], xmlString),
+                Detector: extractAttr('Detector', [
+                    'ID', 'Manufacturer', 'Model', 'Type', 'Gain', 'Offset'
+                ], xmlString)
+            },
+            // Preserve acquisition timestamp if present
+            AcquisitionDate: extract('AcquisitionDate', null, xmlString)
+                            || extractAttr('Image', ['AcquisitionDate'], xmlString).AcquisitionDate
+        };
+
+        // Clean up empty objects
+        if (!Object.values(ome.Instrument.Microscope).some(v => v)) delete ome.Instrument.Microscope;
+        if (!Object.values(ome.Instrument.Objective).some(v => v)) delete ome.Instrument.Objective;
+        if (!Object.values(ome.Instrument.Detector).some(v => v)) delete ome.Instrument.Detector;
+        if (!Object.keys(ome.Instrument).length) delete ome.Instrument;
+
+        return ome;
+    } catch (err) {
+        console.warn('⚠️ OME-XML parse error:', err.message);
+        return { _source: 'BioFormats / showinf', _parseError: err.message };
+    }
+}
+
+// =================== FILE SCANNER HELPER APIS ===================
+
+// List files (non-recursive) in a directory – used for finding *-metadata.json
+ipcMain.handle('list-dir-files', async (event, dirPath) => {
+    try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        const files = entries
+            .filter(e => e.isFile())
+            .map(e => e.name);
+        return { success: true, files };
+    } catch (err) {
+        return { success: false, files: [], message: err.message };
+    }
+});
+
+// Load and parse a JSON file from an absolute path (no dialog)
+ipcMain.handle('load-json-path', async (event, filePath) => {
+    try {
+        const content = await fs.readFile(filePath, 'utf8');
+        const data = JSON.parse(content);
+        return { success: true, data };
+    } catch (err) {
+        return { success: false, message: err.message };
+    }
+});
+
 // =================== NEUE ORDNER-EXISTENZ-PRÜFUNG ===================
 
 // Check if directory exists and get info
@@ -2350,13 +3391,23 @@ ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
                 // Directory exists - get contents
                 const contents = await fs.readdir(directoryPath);
 
-                console.log(`📁 Directory exists with ${contents.length} items`);
+                // Check for existing metadata
+                const metafoldFiles = contents.filter(file => file.endsWith('-metadata.json'));
+                const hasMetafoldData = metafoldFiles.length > 0;
+                let existingProjectName = null;
+                if (hasMetafoldData) {
+                    existingProjectName = metafoldFiles[0].replace('-metadata.json', '');
+                }
+
+                console.log(`📁 Directory exists with ${contents.length} items. Has MetaFold data: ${hasMetafoldData}, Project: ${existingProjectName}`);
 
                 return {
                     exists: true,
                     isEmpty: contents.length === 0,
                     itemCount: contents.length,
                     isDirectory: true,
+                    hasMetafoldData: hasMetafoldData,
+                    existingProjectName: existingProjectName,
                     created: stats.birthtime || stats.ctime,
                     modified: stats.mtime
                 };
@@ -2498,6 +3549,13 @@ ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
         message += '\n\nWhat would you like to do?';
 
         const buttons = ['Cancel', 'Overwrite', 'Use Different Name'];
+        let defaultId = 2; // "Use Different Name" as default
+
+        if (directoryInfo.hasMetafoldData) {
+            buttons.splice(2, 0, 'Extend Metadata');
+            defaultId = 3;
+            message += '\n\nNote: This directory contains existing MetaFold metadata. You can choose to extend it instead of overwriting.';
+        }
 
         const result = await dialog.showMessageBox(mainWindow, {
             type: 'warning',
@@ -2505,7 +3563,7 @@ ipcMain.handle('show-directory-confirmation-dialog', async (event, options) => {
             message: 'Project Directory Conflict',
             detail: message,
             buttons: buttons,
-            defaultId: 2, // "Use Different Name" as default
+            defaultId: defaultId,
             cancelId: 0,  // "Cancel" 
             icon: path.join(__dirname, 'assets', 'icon.png')
         });
@@ -3008,26 +4066,41 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
             }
 
             .metadata-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                gap: 15px;
+                display: flex;
+                flex-direction: column;
                 margin-top: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                overflow: hidden;
             }
 
             .metadata-item {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 15px;
-                border-radius: 10px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                display: flex;
+                flex-direction: row;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .metadata-item:last-child {
+                border-bottom: none;
             }
 
             .metadata-label {
                 font-weight: 600;
                 color: #a855f7;
                 font-size: 0.9rem;
-                margin-bottom: 5px;
+                margin-bottom: 0;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
+                flex: 0 0 250px;
+                padding-right: 15px;
+            }
+            
+            .metadata-content {
+                flex: 1;
+                border-left: 1px solid rgba(255, 255, 255, 0.1);
+                padding-left: 15px;
             }
 
             .metadata-value {
@@ -3050,24 +4123,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                 padding: 20px;
             }
 
-            .editable-section {
-                background: linear-gradient(135deg, rgba(234, 88, 12, 0.1), rgba(220, 38, 38, 0.05));
-                border: 1px solid rgba(234, 88, 12, 0.2);
-                border-left: 4px solid #ea580c;
-            }
 
-            .edit-placeholder {
-                color: #9ca3af;
-                font-style: italic;
-                background: rgba(0, 0, 0, 0.2);
-                padding: 15px;
-                border-radius: 8px;
-                border: 1px dashed rgba(255, 255, 255, 0.2);
-                min-height: 60px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
 
             .footer {
                 background: rgba(0, 0, 0, 0.3);
@@ -3118,8 +4174,19 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                     padding: 20px;
                 }
                 
-                .metadata-grid {
-                    grid-template-columns: 1fr;
+                .metadata-item {
+                    flex-direction: column;
+                }
+                
+                .metadata-label {
+                    flex: none;
+                    margin-bottom: 10px;
+                    padding-right: 0;
+                }
+                
+                .metadata-content {
+                    border-left: none;
+                    padding-left: 0;
                 }
             }
         </style>
@@ -3135,93 +4202,210 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
     // Metadata section
     if (metadata && Object.keys(metadata).length > 0) {
-        htmlContent += `
+        let hasMetadata = false;
+
+        // Group fields by templateName
+        const fieldsByTemplate = {};
+
+        Object.entries(metadata).forEach(([key, fieldInfo]) => {
+            // Skip special internal fields from being rendered as normal fields
+            if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
+                return;
+            }
+            if (fieldInfo && typeof fieldInfo === 'object') {
+                if (!fieldInfo.type) {
+                    // It's a nested group
+                    const groupKey = key;
+                    // Try to guess a template name from its children
+                    let tplName = 'Experiment Metadata';
+                    const children = Object.values(fieldInfo);
+                    if (children.length > 0 && children[0].templateName) {
+                        tplName = children[0].templateName;
+                    }
+                    
+                    if (!fieldsByTemplate[tplName]) {
+                        fieldsByTemplate[tplName] = { normal: [] };
+                    }
+                    // Add the group itself
+                    fieldsByTemplate[tplName].normal.push([groupKey, { type: 'group', label: groupKey }]);
+                    
+                    // Add all children
+                    Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
+                        fieldsByTemplate[tplName].normal.push([subKey, subFieldInfo]);
+                    });
+                } else {
+                    const tplName = fieldInfo.templateName || 'Experiment Metadata';
+                    if (!fieldsByTemplate[tplName]) {
+                        fieldsByTemplate[tplName] = { normal: [] };
+                    }
+                    fieldsByTemplate[tplName].normal.push([key, fieldInfo]);
+                }
+            }
+        });
+
+        const templateNames = Object.keys(fieldsByTemplate);
+
+        if (templateNames.length === 0) {
+            htmlContent += `
                 <section class="section">
                     <h2 class="section-title">
                         <span class="section-icon">📊</span>
                         Experiment Metadata
                     </h2>
+                    <div class="no-metadata">No metadata fields have been filled out yet.</div>
+                </section>`;
+        } else {
+            templateNames.forEach(tplName => {
+                const fields = fieldsByTemplate[tplName];
+                
+                // Filter out empty normal fields
+                const validNormalFields = fields.normal.filter(([key, fieldInfo]) => {
+                    if (fieldInfo.type === 'group') return true;
+                    let value = fieldInfo.value;
+                    return !(value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0));
+                });
+
+                // Remove empty groups (groups that have no valid normal fields following them before the next group)
+                const finalFields = [];
+                for (let i = 0; i < validNormalFields.length; i++) {
+                    const item = validNormalFields[i];
+                    if (item[1].type === 'group') {
+                        // Check if there are any normal fields before the next group
+                        let hasData = false;
+                        for (let j = i + 1; j < validNormalFields.length; j++) {
+                            if (validNormalFields[j][1].type === 'group') break;
+                            hasData = true;
+                            break;
+                        }
+                        if (hasData) {
+                            finalFields.push(item);
+                        }
+                    } else {
+                        finalFields.push(item);
+                    }
+                }
+
+                if (finalFields.length > 0) {
+                    hasMetadata = true;
+                    
+                    let sectionUpdater = null;
+                    let sectionUpdateDate = null;
+                    
+                    // Find latest updater for the entire template section
+                    finalFields.forEach(([key, fieldInfo]) => {
+                        if (fieldInfo.lastUpdatedBy) {
+                            if (!sectionUpdateDate || new Date(fieldInfo.lastUpdatedAt) > new Date(sectionUpdateDate)) {
+                                sectionUpdater = fieldInfo.lastUpdatedBy;
+                                sectionUpdateDate = fieldInfo.lastUpdatedAt;
+                            }
+                        }
+                    });
+
+                    let headerExtra = '';
+                    if (sectionUpdater) {
+                        headerExtra = `
+                        <div style="font-size: 0.8rem; font-weight: normal; color: #9ca3af; margin-top: 6px; display: flex; align-items: center; gap: 5px;">
+                            <span style="background: rgba(168, 85, 247, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc;">👤 Extended by ${sectionUpdater}</span>
+                            <span>on ${new Date(sectionUpdateDate).toLocaleString()}</span>
+                        </div>`;
+                    }
+                    
+                    htmlContent += `
+                <section class="section">
+                    <h2 class="section-title" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <div><span class="section-icon">📊</span>${tplName}</div>
+                        ${headerExtra}
+                    </h2>
                     <div class="metadata-grid">`;
 
-        let hasMetadata = false;
+                    finalFields.forEach(([key, fieldInfo]) => {
+                        if (fieldInfo.type === 'group') {
+                            htmlContent += `
+                        <div class="metadata-item" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.1)); flex-direction: column; align-items: flex-start; gap: 5px;">
+                            <div class="metadata-label" style="font-size: 1rem; color: #c084fc; flex: none; width: 100%; border: none; padding: 0;">${fieldInfo.label}</div>`;
+                            if (fieldInfo.description) {
+                                htmlContent += `<div class="metadata-description" style="margin-top: 0;">${fieldInfo.description}</div>`;
+                            }
+                            htmlContent += `</div>`;
+                            return;
+                        }
+                        
+                        const label = fieldInfo.label || key;
+                        let value = fieldInfo.value;
 
-        // Group fields by type for better organization
-        const groupFields = [];
-        const normalFields = [];
-
-        Object.entries(metadata).forEach(([key, fieldInfo]) => {
-            if (fieldInfo && typeof fieldInfo === 'object') {
-                if (fieldInfo.type === 'group') {
-                    groupFields.push([key, fieldInfo]);
-                } else {
-                    normalFields.push([key, fieldInfo]);
-                }
-            }
-        });
-
-        // Process normal fields first
-        normalFields.forEach(([key, fieldInfo]) => {
-            if (fieldInfo.type !== 'group') {
-                hasMetadata = true;
-                const label = fieldInfo.label || key;
-                let value = fieldInfo.value;
-
-                // Format value based on type
-                let formattedValue;
-                if (fieldInfo.type === 'checkbox') {
-                    formattedValue = value ? '✅ Yes' : '❌ No';
-                } else if (fieldInfo.type === 'date' && value) {
-                    try {
-                        const dateObj = new Date(value);
-                        if (!isNaN(dateObj.getTime())) {
-                            formattedValue = dateObj.toLocaleDateString('en-US');
+                        // Format value based on type
+                        let formattedValue;
+                        if (fieldInfo.type === 'checkbox') {
+                            formattedValue = value ? '✅ Yes' : '❌ No';
+                        } else if (fieldInfo.type === 'date' && value) {
+                            try {
+                                const dateObj = new Date(value);
+                                if (!isNaN(dateObj.getTime())) {
+                                    formattedValue = dateObj.toLocaleDateString('en-US');
+                                } else {
+                                    formattedValue = value || '<em>Not filled</em>';
+                                }
+                            } catch (e) {
+                                formattedValue = value || '<em>Not filled</em>';
+                            }
+                        } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
+                            formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+                        } else if (fieldInfo.type === 'rating') {
+                            const val = parseInt(value) || 0;
+                            let starsHtml = '';
+                            for (let i = 1; i <= 5; i++) {
+                                const isFilled = i <= val;
+                                starsHtml += `<svg width="20" height="20" viewBox="0 0 24 24" fill="${isFilled ? '#a855f7' : 'none'}" stroke="${isFilled ? '#a855f7' : '#9ca3af'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px; vertical-align: middle;">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>`;
+                            }
+                            formattedValue = `<div style="display: flex; align-items: center;">${starsHtml} <span style="margin-left: 8px;">(${val}/5)</span></div>`;
+                        } else if (fieldInfo.type === 'url' || (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://')))) {
+                            formattedValue = `<a href="${value}" target="_blank" style="color: #a855f7; text-decoration: underline;">${value}</a>`;
                         } else {
                             formattedValue = value || '<em>Not filled</em>';
                         }
-                    } catch (e) {
-                        formattedValue = value || '<em>Not filled</em>';
-                    }
-                } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
-                    // For long text, use blockquote format
-                    formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
-                } else {
-                    formattedValue = value || '<em>Not filled</em>';
-                }
 
-                htmlContent += `
+                        htmlContent += `
                         <div class="metadata-item">
                             <div class="metadata-label">${label}</div>
-                            <div class="metadata-value">${formattedValue}</div>`;
+                            <div class="metadata-content">
+                                <div class="metadata-value">${formattedValue}</div>`;
 
-                if (fieldInfo.description) {
-                    htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
+                        if (fieldInfo.description) {
+                            htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
+                        }
+
+                        htmlContent += `</div>`; // Close metadata-content
+
+                        // Show modification info as a third column
+                        if (fieldInfo.isModified && fieldInfo.lastUpdatedBy && fieldInfo.lastUpdatedAt) {
+                            htmlContent += `
+                            <div style="flex: 0 0 250px; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 15px; margin-left: 15px; display: flex; flex-direction: column; justify-content: center; font-size: 0.85rem; color: #9ca3af;">
+                                <div style="color: #c084fc; margin-bottom: 2px;">🔄 Modified by ${fieldInfo.lastUpdatedBy}</div>
+                                <div>on ${new Date(fieldInfo.lastUpdatedAt).toLocaleString()}</div>
+                            </div>`;
+                        }
+
+                        htmlContent += `</div>`; // Close metadata-item
+                    });
+
+                    htmlContent += `</div></section>`;
                 }
-
-                htmlContent += `</div>`;
-            }
-        });
-
-        // Add group headers as visual separators if any exist
-        if (groupFields.length > 0) {
-            groupFields.forEach(([key, fieldInfo]) => {
-                htmlContent += `
-                        <div class="metadata-item" style="grid-column: 1 / -1; background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(124, 58, 237, 0.3);">
-                            <div class="metadata-label" style="font-size: 1rem; color: #c084fc;">${fieldInfo.label}</div>`;
-                if (fieldInfo.description) {
-                    htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
-                }
-                htmlContent += `</div>`;
             });
+            
+            if (!hasMetadata) {
+                htmlContent += `
+                <section class="section">
+                    <h2 class="section-title">
+                        <span class="section-icon">📊</span>
+                        Experiment Metadata
+                    </h2>
+                    <div class="no-metadata">No metadata fields have been filled out yet.</div>
+                </section>`;
+            }
         }
-
-        htmlContent += `</div>`;
-
-        if (!hasMetadata) {
-            htmlContent += `<div class="no-metadata">No metadata fields have been filled out yet.</div>`;
-        }
-
-        htmlContent += `</section>`;
-    } else {
+    } else if (metadata && !metadata.provenance) {
         htmlContent += `
                 <section class="section">
                     <h2 class="section-title">
@@ -3232,47 +4416,99 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                 </section>`;
     }
 
-    // Editable sections for user content
+    // NEW: Provenance section (User and Group data)
+    if (metadata && metadata.provenance) {
+        const prov = metadata.provenance;
+        const creator = prov.creator || {};
+        const group = prov.group || {};
+        
+        let creatorDetails = [];
+        if (creator.firstName || creator.lastName) creatorDetails.push(`${creator.firstName || ''} ${creator.lastName || ''}`.trim());
+        if (creator.email) creatorDetails.push(`Email: ${creator.email}`);
+        if (creator.orcid) creatorDetails.push(`ORCID: ${creator.orcid}`);
+        
+        let groupDetails = [];
+        if (group.name) groupDetails.push(group.name);
+        if (group.principalInvestigator) groupDetails.push(`PI: ${group.principalInvestigator}`);
+        if (group.institution) groupDetails.push(group.institution);
+
+        htmlContent += `
+                <section class="section">
+                    <h2 class="section-title">
+                        <span class="section-icon">👥</span>
+                        Provenance & Authorship
+                    </h2>
+                    <div class="metadata-grid">
+                        <div class="metadata-item">
+                            <div class="metadata-label">Creator</div>
+                            <div class="metadata-content">
+                                <div class="metadata-value"><strong>${creator.username || 'Unknown'}</strong></div>
+                                ${creatorDetails.length > 0 ? `<div class="metadata-description">${creatorDetails.join('<br>')}</div>` : ''}
+                            </div>
+                        </div>`;
+                        
+        if (Object.keys(group).length > 0 && group.name) {
+            htmlContent += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">Research Group</div>
+                            <div class="metadata-content">
+                                <div class="metadata-value"><strong>${groupDetails[0]}</strong></div>
+                                ${groupDetails.length > 1 ? `<div class="metadata-description">${groupDetails.slice(1).join('<br>')}</div>` : ''}
+                            </div>
+                        </div>`;
+        }
+        
+        if (prov.createdAt) {
+            htmlContent += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">Created At</div>
+                            <div class="metadata-content">
+                                <div class="metadata-value">${new Date(prov.createdAt).toLocaleString()}</div>
+                            </div>
+                        </div>`;
+        }
+        
+        htmlContent += `
+                    </div>
+                </section>`;
+    }
+
+    // NEW: System Information Section
+    if (metadata && (metadata['System.ProjectAbsolutePath'] || metadata['System.ProjectRelativePath'])) {
+        htmlContent += `
+                <section class="section">
+                    <h2 class="section-title">
+                        <span class="section-icon">⚙️</span>
+                        System Information
+                    </h2>
+                    <div class="metadata-grid">`;
+                    
+        if (metadata['System.ProjectAbsolutePath']) {
+            htmlContent += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${metadata['System.ProjectAbsolutePath'].label || 'Absolute Path'}</div>
+                            <div class="metadata-content">
+                                <div class="metadata-value" style="font-family: monospace; word-break: break-all;">${metadata['System.ProjectAbsolutePath'].value}</div>
+                            </div>
+                        </div>`;
+        }
+        
+        if (metadata['System.ProjectRelativePath']) {
+            htmlContent += `
+                        <div class="metadata-item">
+                            <div class="metadata-label">${metadata['System.ProjectRelativePath'].label || 'Relative Path'}</div>
+                            <div class="metadata-content">
+                                <div class="metadata-value" style="font-family: monospace; word-break: break-all;">${metadata['System.ProjectRelativePath'].value}</div>
+                            </div>
+                        </div>`;
+        }
+
+        htmlContent += `
+                    </div>
+                </section>`;
+    }
+
     htmlContent += `
-                <section class="section editable-section">
-                    <h2 class="section-title">
-                        <span class="section-icon">📝</span>
-                        Project Description
-                    </h2>
-                    <div class="edit-placeholder">
-                        Click here to add your project description. Describe the purpose, methodology, expected outcomes, and any important notes about this experiment.
-                    </div>
-                </section>
-
-                <section class="section editable-section">
-                    <h2 class="section-title">
-                        <span class="section-icon">🔬</span>
-                        Methodology
-                    </h2>
-                    <div class="edit-placeholder">
-                        Add your experimental methodology, procedures, and protocols here.
-                    </div>
-                </section>
-
-                <section class="section editable-section">
-                    <h2 class="section-title">
-                        <span class="section-icon">📈</span>
-                        Results
-                    </h2>
-                    <div class="edit-placeholder">
-                        Document your findings, observations, and results here.
-                    </div>
-                </section>
-
-                <section class="section editable-section">
-                    <h2 class="section-title">
-                        <span class="section-icon">💭</span>
-                        Notes
-                    </h2>
-                    <div class="edit-placeholder">
-                        Add any additional notes, observations, or important information here.
-                    </div>
-                </section>
             </main>
 
             <footer class="footer">
@@ -3354,6 +4590,9 @@ async function createMetadataFiles(projectPath, metadata, projectName = null) {
     const metadataFilename = `${sanitizedProjectName}-metadata.json`;
     const metadataPath = path.join(projectPath, metadataFilename);
     const metadataContent = convertToElabFTWFormat(metadata);
+    // Same provenance UUID as the primary create-project path, added as a
+    // sibling of extra_fields (see parseMetaFoldProject's lookup for this format).
+    metadataContent.metafold_project_id = require('crypto').randomUUID();
 
     await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2), 'utf8');
     console.log(`📄 Metadata file created: ${metadataPath}`);
@@ -3646,14 +4885,44 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         // Extract project name from directory path
         const projectName = path.basename(projectPath);
 
-        // Count metadata fields
-        const metadataFieldCount = metadata.extra_fields ?
-            Object.keys(metadata.extra_fields).length : 0;
+        // Extract metadata: support both old 'extra_fields' format and new flat format
+        const projectMetadata = metadata.extra_fields ? metadata.extra_fields : metadata;
+        
+        // Create a clean copy without internal system fields
+        const cleanMetadata = { ...projectMetadata };
+        // Extract integrations safely before deletion
+        const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || null;
+        
+        // Extract template category before deletion (for ISA / facet search)
+        const templateCategory = cleanMetadata.templateInfo?.category || null;
+
+        // Extract stable project UUID before deletion (provenance anchor for the
+        // File Sidecar Scanner; may be null for projects created before this field
+        // existed — no retroactive ID is assigned during a scan/read operation).
+        // Checked in both the flat format (top-level == projectMetadata) and the
+        // elabFTW-enveloped format ({ extra_fields, elabftw, metafold_project_id }),
+        // where the ID sits as a sibling of extra_fields, not inside it.
+        const projectId = cleanMetadata.metafold_project_id || metadata.metafold_project_id || null;
+        
+        delete cleanMetadata.projectName;
+        delete cleanMetadata.templateInfo;
+        delete cleanMetadata.metafold_integration;
+        delete cleanMetadata.integrations;
+        delete cleanMetadata.metafold_project_id;
+
+        // Add template category as system field if available
+        if (templateCategory) {
+            cleanMetadata['System.TemplateCategory'] = { value: templateCategory, type: 'system' };
+        }
+
+        const metadataFieldCount = Object.keys(cleanMetadata).length;
 
         return {
             name: projectName,
             path: projectPath,
-            metadata: metadata.extra_fields || {},
+            projectId: projectId,  // NEW: stable UUID, null for legacy projects without one
+            metadata: cleanMetadata,
+            integrations: integrations,
             metadataFieldCount: metadataFieldCount,
             created: created.toISOString(),
             modified: modified.toISOString(),

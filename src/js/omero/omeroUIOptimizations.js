@@ -139,8 +139,8 @@ function updateProjectDropdown(projects) {
     
     // Add default option
     const defaultOption = document.createElement('option');
-    defaultOption.value = 'none';
-    defaultOption.textContent = 'Create standalone dataset';
+    defaultOption.value = 'create_standalone';
+    defaultOption.textContent = 'Create New Dataset';
     projectSelect.appendChild(defaultOption);
     
     // Add projects
@@ -329,6 +329,13 @@ function addOptimizedLoadingStyles() {
             background-color: #f8f9fa;
             color: #6c757d;
             cursor: wait;
+        }
+        
+        /* Prevent browser from styling empty-value options as italic grey placeholders */
+        #omeroProjectSelect option,
+        #omeroProjectSelect_viewer option {
+            font-style: normal !important;
+            color: #374151 !important;
         }
         
         .omero-loading {

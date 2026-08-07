@@ -284,17 +284,30 @@ window.copyPathToClipboard = async function () {
 
     const path = previewDiv.textContent;
     if (path === 'Choose directory...' || !path) {
-        // Show small toast/tooltip
         showToast('⚠️ No path generated yet');
         return;
     }
 
     try {
-        await navigator.clipboard.writeText(path);
+        if (window.electronAPI && window.electronAPI.copyToClipboard) {
+            window.electronAPI.copyToClipboard(path);
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(path);
+        } else {
+            // Fallback for older browsers or non-secure contexts
+            const textArea = document.createElement('textarea');
+            textArea.value = path;
+            textArea.style.position = 'fixed'; // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
         showToast('📋 Path copied to clipboard!');
     } catch (err) {
-        console.error('Failed to copy path:', err);
-        showToast('❌ Failed to copy path');
+        console.error('Failed to copy text:', err);
+        showToast('❌ Failed to copy to clipboard');
     }
 };
 
