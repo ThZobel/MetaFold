@@ -513,6 +513,40 @@ const profileManager = {
         return group ? group.name : 'Default';
     },
 
+    // =================== PREFERENCES ===================
+
+    /**
+     * Update user preferences in the user profile
+     * @param {string} username - The username
+     * @param {Object} preferences - The preferences object
+     */
+    async updateUserPreferences(username, preferences) {
+        if (!username) return false;
+        const user = this.getUserByUsername(username);
+        if (!user) {
+            console.warn(`⚠️ updateUserPreferences: User ${username} not found in profiles`);
+            return false;
+        }
+
+        user.preferences = { ...preferences };
+        user.updatedAt = new Date().toISOString();
+        await this._saveProfiles();
+        console.log(`✅ Preferences updated for user: ${username}`);
+        return true;
+    },
+
+    /**
+     * Get user preferences from the user profile
+     * @param {string} username - The username
+     * @returns {Object|null}
+     */
+    getUserPreferences(username) {
+        if (!username) return null;
+        const user = this.getUserByUsername(username);
+        if (!user || !user.preferences) return null;
+        return { ...user.preferences };
+    },
+
     // =================== PROVENANCE ===================
 
     /**

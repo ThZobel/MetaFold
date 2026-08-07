@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Platform info
     platform: process.platform,
 
+    // Clipboard
+    copyToClipboard: (text) => ipcRenderer.invoke('write-to-clipboard', text),
+
     // =================== FILE OPERATIONS ===================
 
     // Load JSON file

@@ -4,48 +4,7 @@
  */
 
 // Enhanced JavaScript for the project setup
-function copyPathToClipboard() {
-    const pathPreview = document.getElementById('fullPathPreview');
-    const path = pathPreview.textContent;
 
-    if (path && path !== 'Choose directory and project name') {
-        navigator.clipboard.writeText(path).then(() => {
-            // Show feedback
-            const copyBtn = document.querySelector('.copy-path-btn');
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = '✅';
-            copyBtn.style.background = 'rgba(5, 150, 105, 0.2)';
-            copyBtn.style.color = '#059669';
-
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-                copyBtn.style.background = '';
-                copyBtn.style.color = '';
-            }, 2000);
-        }).catch(() => {
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = path;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-
-            // Show feedback
-            const copyBtn = document.querySelector('.copy-path-btn');
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = '✅';
-            copyBtn.style.background = 'rgba(5, 150, 105, 0.2)';
-            copyBtn.style.color = '#059669';
-
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-                copyBtn.style.background = '';
-                copyBtn.style.color = '';
-            }, 2000);
-        });
-    }
-}
 
 // Enhanced validation for inputs
 function setupEnhancedValidation() {
@@ -148,6 +107,6 @@ if (document.readyState === 'loading') {
 }
 
 // Expose functions globally
-window.copyPathToClipboard = copyPathToClipboard;
+// Copy functionality moved to sidebarIntegration.js
 window.setupEnhancedValidation = setupEnhancedValidation;
 window.validateProjectNameLocal = validateProjectNameLocal;

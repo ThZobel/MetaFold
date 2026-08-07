@@ -360,10 +360,32 @@ const settingsManager = {
         if (!window.storage) return false;
         try {
             const userKey = window.storage.getStorageKey('settings');
-            const stored = localStorage.getItem(userKey);
+            let stored = null;
+
+            // Try loading from profileManager first
+            if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
+                const prefs = window.profileManager.getUserPreferences(window.userManager.currentUser);
+                if (prefs) {
+                    stored = JSON.stringify(prefs);
+                }
+            }
+
+            // Fallback to localStorage
+            if (!stored) {
+                stored = localStorage.getItem(userKey);
+            }
+
             if (stored) {
                 this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-                console.log(`📂 User settings loaded from ${userKey}`);
+                console.log(`📂 User settings loaded`);
+                
+                // If we loaded from localStorage, migrate to profileManager if possible
+                if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
+                    const prefs = window.profileManager.getUserPreferences(window.userManager.currentUser);
+                    if (!prefs) {
+                        window.profileManager.updateUserPreferences(window.userManager.currentUser, JSON.parse(stored));
+                    }
+                }
             } else {
                 // Try migration
                 if (this.migrateGlobalSettingsToUser && this.migrateGlobalSettingsToUser()) {
@@ -371,6 +393,11 @@ const settingsManager = {
                     // But we need to reload them into this.settings
                     const migrated = localStorage.getItem(userKey);
                     this.settings = { ...this.defaultSettings, ...JSON.parse(migrated) };
+                    
+                    // Also migrate to profileManager
+                    if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
+                        window.profileManager.updateUserPreferences(window.userManager.currentUser, JSON.parse(migrated));
+                    }
                 } else {
                     this.settings = { ...this.defaultSettings };
                 }
@@ -386,7 +413,18 @@ const settingsManager = {
         if (!window.storage) return false;
         try {
             const userKey = window.storage.getStorageKey('settings');
+            
+            // Save to localStorage as fallback
             localStorage.setItem(userKey, JSON.stringify(this.settings));
+            
+            // Save to profileManager
+            if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
+                // We use setTimeout to not block the UI during file IO
+                setTimeout(() => {
+                    window.profileManager.updateUserPreferences(window.userManager.currentUser, this.settings);
+                }, 0);
+            }
+            
             return true;
         } catch (error) {
             console.error('Error saving user settings:', error);

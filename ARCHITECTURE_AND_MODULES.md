@@ -76,8 +76,10 @@ Key stylesheets:
 ### Core Logic
 | Module | Purpose |
 |--------|---------|
+| `main.js` | Electron main process: Window creation, system integrations (e.g., OMERO Proxy), and secure IPC endpoints (e.g. `write-to-clipboard` to bypass Renderer context limits). |
+| `preload.js` | ContextBridge: Securely exposes native functions (`window.electronAPI`) like file system access and clipboard operations to the frontend. |
 | `app.js` | Main application initialisation, startup sequence, and Admin account checks |
-| `projectManager.js` | Project creation logic, path generation, file system interactions, batch file writing (`ReadyToImport.json`). Always injects user/group `provenance` metadata and `System.ProjectAbsolutePath` / `System.ProjectRelativePath` to guarantee consistent tracking, and triggers `README.html` generation containing this data. |
+| `projectManager.js` | Project creation logic, path generation, file system interactions, batch file writing (`ReadyToImport.json`). Always injects user/group `provenance` metadata. Supports dynamic folder structures via `[fieldName]` placeholders. |
 | `templateManager.js` | Template loading, saving, selection, rendering; dynamically toggles UI modes (e.g. `writeFilesOnly`, `multipleFolders`) |
 | `experimentForm.js` | Dynamic metadata form, drag & drop field ordering, filename preview, integration toggle management. Supports advanced field types (e.g. `email` with validation, `rating` with 5-star UI) and groups fields under Accordion UIs. Outputs nested JSON payloads for hierarchical metadata export. |
 | `metadataLoader.js` | Loads and parses existing project metadata files |

@@ -181,10 +181,10 @@ const experimentForm = {
             const targetPathEl = document.getElementById('targetPath');
             const projectNameEl = document.getElementById('projectName');
 
-            if (targetPathEl && defaults.basePath) {
+            if (targetPathEl && defaults.basePath !== undefined) {
                 targetPathEl.value = defaults.basePath;
             }
-            if (projectNameEl && defaults.projectName) {
+            if (projectNameEl && defaults.projectName !== undefined) {
                 projectNameEl.value = defaults.projectName;
             }
 
@@ -1781,6 +1781,42 @@ const experimentForm = {
         } else {
             if (warningDiv) warningDiv.style.display = 'none';
             previewDiv.style.color = '#4b5563';
+        }
+    },
+
+    /**
+     * Copy the generated filename to clipboard
+     */
+    async copyFilenameToClipboard() {
+        const previewDiv = document.getElementById('filenamePreview');
+        if (!previewDiv) return;
+        
+        const filename = previewDiv.textContent;
+        if (filename === '(No fields selected)' || !filename) {
+            if (typeof showToast === 'function') showToast('⚠️ No filename generated yet');
+            return;
+        }
+
+        try {
+            if (window.electronAPI && window.electronAPI.copyToClipboard) {
+                window.electronAPI.copyToClipboard(filename);
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(filename);
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                const textArea = document.createElement('textarea');
+                textArea.value = filename;
+                textArea.style.position = 'fixed';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            if (typeof showToast === 'function') showToast('📋 Filename copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to copy filename:', err);
+            if (typeof showToast === 'function') showToast('❌ Failed to copy to clipboard');
         }
     },
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu, clipboard } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
 const OMEROProxyServer = require('./js/proxyManager.js');
@@ -240,6 +240,12 @@ async function createWindow() {
         const isAdmin = username === 'Admin';
         console.log(`🔐 User "${username}" is ${isAdmin ? 'ADMIN' : 'NOT admin'}`);
         return { isAdmin };
+    });
+
+    // IPC Handler: Clipboard
+    ipcMain.handle('write-to-clipboard', (event, text) => {
+        clipboard.writeText(text);
+        return { success: true };
     });
 
     // IPC Handler: Request to open DevTools (Admin only)

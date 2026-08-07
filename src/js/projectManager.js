@@ -18,6 +18,64 @@ async function getConfiguredOMEROServerUrl() {
 }
 
 const projectManager = {
+    // NEW Helper: Process dynamic folder variables
+    processDynamicFolderStructure(templateStructure, experimentMetadata, template) {
+        if (!templateStructure || !experimentMetadata) return templateStructure;
+        
+        console.log('🔄 Processing dynamic folder structure variables...');
+        let lines = templateStructure.split('\n');
+        let processedLines = [];
+        
+        // Helper to find field value even if it's nested in a group
+        const getFieldValue = (fieldName) => {
+            if (experimentMetadata[fieldName] !== undefined) return experimentMetadata[fieldName];
+            for (const key in experimentMetadata) {
+                if (typeof experimentMetadata[key] === 'object' && experimentMetadata[key] !== null && !Array.isArray(experimentMetadata[key])) {
+                    if (experimentMetadata[key][fieldName] !== undefined) {
+                        return experimentMetadata[key][fieldName];
+                    }
+                }
+            }
+            return null;
+        };
+
+        for (let line of lines) {
+            let skipLine = false;
+            
+            let processedLine = line.replace(/\[([^\]]+)\]/g, (match, fieldName) => {
+                // Check if this is an actual field in the template
+                const isField = template && template.metadata && template.metadata.fields && template.metadata.fields[fieldName];
+                
+                if (!isField) {
+                    return match; // Not a field, leave as is
+                }
+                
+                let val = getFieldValue(fieldName);
+                
+                // If value is empty or not found, mark to skip this folder line
+                if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
+                    skipLine = true;
+                    return ""; 
+                }
+                
+                if (typeof val === 'object' && !Array.isArray(val) && val.value !== undefined) {
+                    val = val.value;
+                } else if (Array.isArray(val)) {
+                    val = val.join('-'); 
+                }
+                
+                return String(val).replace(/[<>:"/\\|?*]/g, '_');
+            });
+            
+            if (!skipLine) {
+                processedLines.push(processedLine);
+            } else {
+                console.log(`⚠️ Skipping folder creation for line due to missing/empty variable: ${line}`);
+            }
+        }
+        return processedLines.join('\n');
+    },
+
     // Initialize project manager
     init() {
         this.updatePathPreview();
@@ -283,19 +341,43 @@ const projectManager = {
         let successCount = 0;
         let errors = [];
 
-        // Use custom filename if provided, otherwise default to ReadyToImport.json
         let customFileName = document.getElementById('projectName').value.trim();
-        if (!customFileName) {
+        
+        // Get and process folder structure
+        let templateStructure = template.folderStructure || template.structure || '';
+        if (Array.isArray(templateStructure)) {
+            templateStructure = templateStructure.join('\n');
+        }
+        templateStructure = String(templateStructure || '');
+        
+        if (templateStructure && experimentMetadata) {
+            templateStructure = this.processDynamicFolderStructure(templateStructure, experimentMetadata, template);
+        }
+
+        // If no filename is provided but we have a folder structure, we ONLY create folders
+        const shouldOnlyCreateFolders = !customFileName && templateStructure.trim().length > 0;
+
+        if (!customFileName && !shouldOnlyCreateFolders) {
             customFileName = 'ReadyToImport.json';
         }
 
         for (const targetPath of targetPaths) {
             try {
-                const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
-                await window.electronAPI.writeFile(filePath, metadataStr);
+                if (shouldOnlyCreateFolders) {
+                    console.log(`📁 Creating dynamic folders in ${targetPath}...`);
+                    if (window.electronAPI && window.electronAPI.createFolders) {
+                        await window.electronAPI.createFolders(targetPath, templateStructure);
+                    } else {
+                        throw new Error('Folder creation not available in browser mode.');
+                    }
+                } else {
+                    console.log(`📄 Writing metadata JSON to ${targetPath}...`);
+                    const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
+                    await window.electronAPI.writeFile(filePath, metadataStr);
+                }
                 successCount++;
             } catch (err) {
-                console.error(`Failed to write to ${targetPath}:`, err);
+                console.error(`Failed to process ${targetPath}:`, err);
                 errors.push(err.message);
             }
         }
@@ -421,6 +503,13 @@ const projectManager = {
 
             // Update hasMetadata so the JSON is actually written later on
             hasMetadata = Object.keys(experimentMetadata).length > 0;
+
+            // --- NEW: Dynamic Folder Structure Replacement ---
+            if (templateStructure && experimentMetadata) {
+                templateStructure = this.processDynamicFolderStructure(templateStructure, experimentMetadata, template);
+                console.log('📋 templateStructure (post-variables):', templateStructure);
+            }
+            // -----------------------------------------------
 
             // VALIDATION: Check required fields before creating project
             // Only validate if it's an experiment template with actual metadata fields (not just provenance)
