@@ -1,0 +1,105 @@
+{
+  "name": "Intro Microscopes 4 Copy",
+  "description": "elabFTW ID 469 (Copied from Thomas) (Copy of original)",
+  "structure": "",
+  "metadata": {
+    "fields": {
+      "Date Training Session 1": {
+        "type": "date",
+        "label": "Date of Introduction",
+        "value": "",
+        "required": false,
+        "position": 1,
+        "defaultValue": ""
+      },
+      "Date Training Session 2": {
+        "type": "date",
+        "label": "Date Training Session 2",
+        "value": "",
+        "required": false,
+        "position": 2,
+        "defaultValue": ""
+      },
+      "User": {
+        "type": "text",
+        "label": "User",
+        "value": "",
+        "required": true,
+        "position": 3,
+        "defaultValue": "tz"
+      },
+      "Email": {
+        "type": "text",
+        "label": "Email of the user",
+        "value": "",
+        "required": true,
+        "position": 4,
+        "defaultValue": "tz@me.de"
+      },
+      "Project Details": {
+        "type": "textarea",
+        "label": "Project Details",
+        "value": "",
+        "required": false,
+        "position": 5,
+        "defaultValue": ""
+      },
+      "Misc": {
+        "type": "text",
+        "label": "Misc",
+        "value": "",
+        "required": false,
+        "position": 6,
+        "defaultValue": ""
+      }
+    },
+    "fieldOrder": [
+      "Date Training Session 1",
+      "Date Training Session 2",
+      "User",
+      "Email",
+      "Project Details",
+      "Misc"
+    ],
+    "totalFields": 6
+  },
+  "type": "experiment",
+  "category": "category4",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2025-12-04T20:10:41.421Z",
+  "updatedAt": "2026-08-07T10:55:53.905Z",
+  "id": "template_1764879041421_tt2rxqde1",
+  "_fileInfo": {
+    "filename": "intro_microscopes_4_copy.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\intro_microscopes_4_copy.json",
+    "savedAt": "2026-08-07T10:55:53.905Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Intro Microscopes 4 Copy",
+  "sourceFilename": "intro_microscopes_4_copy.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2026-08-07T10:47:13.014Z",
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": null,
+      "fetchNextId": false
+    },
+    "omero": true,
+    "rspace": true
+  },
+  "projectDefaults": {
+    "projectName": "21",
+    "basePath": "",
+    "targetPath": ""
+  },
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}
