@@ -186,16 +186,16 @@ function showAboutDialog() {
         message: 'MetaFold',
         detail: `Laboratory Data Management & Experiment Organization
 
-Version: 0.0.1
+Version: ${app.getVersion()}
 License: MIT
 
 Developed by: Dr. Thomas Zobel
-(with assistance from Claude AI)
+(with assistance from AI)
 
 GitHub: https://github.com/ThZobel/MetaFold
 Documentation: https://metafold-docs.readthedocs.io/en/latest/
 
-Built for NFDI4BioImage and life sciences research.`,
+Built for life sciences research workflows.`,
         buttons: ['OK'],
         defaultId: 0,
         noLink: false
