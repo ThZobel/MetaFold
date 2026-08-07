@@ -53,52 +53,95 @@ const metadataLinksManager = {
             if (elabftwResult && elabftwResult.success) {
                 console.log('🧪 Adding elabFTW integration info');
                 const experimentId = elabftwResult.experimentId || elabftwResult.id;
+                
+                // Get elabFTW username via /api/v2/users/me (API key identifies the user)
+                let elabUsername = null;
+                try {
+                    if (window.settingsManager) {
+                        const elabServerUrl = await window.settingsManager.getFormattedElabFTWUrl();
+                        const elabApiKey = await window.settingsManager.get('elabftw.api_key');
+                        if (elabServerUrl && elabApiKey) {
+                            const meResponse = await fetch(`${elabServerUrl}api/v2/users/me`, {
+                                headers: { 'Authorization': elabApiKey }
+                            });
+                            if (meResponse.ok) {
+                                const meData = await meResponse.json();
+                                elabUsername = meData.fullname || meData.name || meData.email || null;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Could not retrieve elabFTW username from API:', e.message);
+                }
+                console.log('🧪 elabFTW username resolved:', elabUsername);
+                
                 enhancedMetadata.metafold_integration.external_links.elabftw = {
                     url: elabftwResult.url || await this.generateElabFTWUrl(experimentId),
                     experiment_id: experimentId.toString(),
+                    user_name: elabUsername || null,
                     uploaded_at: new Date().toISOString(),
                     status: 'uploaded'
                 };
             }
             
             
-    // Add OMERO link info (ENHANCED VERSION with username)
+    // Add OMERO link info (ENHANCED VERSION with correct object type and username)
     if (omeroResult && omeroResult.success) {
         console.log('🔬 Adding OMERO integration info');
         
-        // Get OMERO username from the correct locations (based on debug results)
+        // Get OMERO username from multiple possible locations
         let omeroUsername = null;
         
         // Option 1: hybridAuth session (most reliable)
         if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.userName) {
             omeroUsername = window.metaFoldOMEROIntegration.hybridAuth.session.userName;
         }
-        // Option 2: omeroAuth eventContext (backup)
+        // Option 2: omeroAuth eventContext
         else if (window.omeroAuth?.session?.eventContext?.userName) {
             omeroUsername = window.omeroAuth.session.eventContext.userName;
+        }
+        // Option 3: omeroAuth session username (non-placeholder only)
+        else if (window.omeroAuth?.session?.username &&
+                 window.omeroAuth.session.username !== 'authenticated_user') {
+            omeroUsername = window.omeroAuth.session.username;
         }
         
         console.log('🔬 OMERO username resolved:', omeroUsername);
         
-        // Get OMERO URL - handle both direct URL and generated URL
+        // Determine the OMERO object URL (prefer URL already in the result)
         let omeroUrl = omeroResult.url || omeroResult.integration?.url || omeroResult.dataset?.omeroWebUrl;
-        const omeroId = omeroResult.integration?.datasetId || omeroResult.dataset?.datasetId || omeroResult.dataset?.id;
+        
+        // Determine object ID
+        const omeroId = omeroResult.dataset?.id || omeroResult.integration?.datasetId || omeroResult.dataset?.datasetId;
+        
+        // Detect whether a Project or Dataset was created:
+        // 1. Check projectContext value ('create_new_project' means a new project was created)
+        // 2. Fall back to URL pattern: show=project-XXX vs show=dataset-XXX
+        const isProject =
+            omeroResult.integration?.projectContext === 'create_new_project' ||
+            (omeroUrl && omeroUrl.includes('show=project-'));
+        const objectType = isProject ? 'project' : 'dataset';
+        
+        // Generate URL if not already available
         if (!omeroUrl && omeroId) {
-            const objectType = omeroResult.dataset?.projectId === omeroId ? 'project' : 'dataset';
-            // Use await since generateOMEROUrl is now async
             omeroUrl = await this.generateOMEROUrl(omeroId, null, objectType);
         }
         
+        // Use the correct key name based on object type
+        const omeroIdKey = isProject ? 'project_id' : 'dataset_id';
+        
         enhancedMetadata.metafold_integration.external_links.omero = {
             url: omeroUrl,
-            dataset_id: omeroId?.toString(),
-            user_name: omeroUsername || 'Unknown',
+            [omeroIdKey]: omeroId?.toString(),
+            object_type: objectType,
+            user_name: omeroUsername || null,
             uploaded_at: new Date().toISOString(),
             status: 'uploaded'
         };
         
         console.log('🔬 OMERO integration info added:', {
-            dataset_id: omeroResult.dataset?.id,
+            [omeroIdKey]: omeroId,
+            object_type: objectType,
             user_name: omeroUsername,
             url: omeroUrl
         });
@@ -231,18 +274,19 @@ const metadataLinksManager = {
     },
     
     /**
-     * Generate OMERO URL based on dataset ID - NO HARDCODED FALLBACK!
-     * @param {string|number} datasetId - OMERO dataset ID
+     * Generate OMERO URL based on object ID and type - NO HARDCODED FALLBACK!
+     * @param {string|number} objectId - OMERO object ID (project or dataset)
      * @param {string|number} groupId - Optional group ID
-     * @returns {Promise<string>} Full URL to OMERO dataset
+     * @param {string} objectType - 'dataset' (default) or 'project'
+     * @returns {Promise<string>} Full URL to OMERO object
      */
-    async generateOMEROUrl(datasetId, groupId = null) {
+    async generateOMEROUrl(objectId, groupId = null, objectType = 'dataset') {
         const serverUrl = await getConfiguredOMEROServerUrl();
-        let url = `${serverUrl}webclient/?show=dataset-${datasetId}`;
+        let url = `${serverUrl}webclient/?show=${objectType}-${objectId}`;
         if (groupId) {
             url += `&group=${groupId}`;
         }
-        console.log(`🔗 metadataLinksManager: Generated OMERO URL: ${url}`);
+        console.log(`🔗 metadataLinksManager: Generated OMERO URL (${objectType}): ${url}`);
         return url;
     },
     

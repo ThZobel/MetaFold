@@ -67,7 +67,17 @@ const settingsManager = {
         'templates.category3_color': '#10b981',
         'templates.category4_name': 'Misc',
         'templates.category4_icon': '📋',
-        'templates.category4_color': '#f59e0b'
+        'templates.category4_color': '#f59e0b',
+        // =================== FILE SCANNER / BIOFORMATS PLUGIN ===================
+        'plugins.filescanner_enabled': false,
+        'plugins.filescanner_extensions': JSON.stringify([
+            '.lif', '.czi', '.lsm', '.nd2',
+            '.tif', '.tiff', '.ome.tif',
+            '.oif', '.oib', '.vsi', '.svs',
+            '.ims', '.zvi', '.lof'
+        ]),
+        'plugins.bioformats_enabled': false,
+        'plugins.bioformats_path': ''
     },
 
     // 🔐 NEW: Temporary in-memory password cache (NEVER stored in localStorage!)
@@ -1098,15 +1108,31 @@ const settingsManager = {
         }
 
         try {
-            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+            const processField = (key, fieldInfo) => {
                 // Skip if fieldInfo is not valid
                 if (!fieldInfo || typeof fieldInfo !== 'object') {
                     console.warn(`⚠️ Skipping invalid field: ${key}`, fieldInfo);
                     return;
                 }
 
-                // Skip group headers
-                if (fieldInfo.type === 'group') return;
+                // If it doesn't have a type, it might be a nested group object
+                if (!fieldInfo.type) {
+                    Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
+                        processField(subKey, subFieldInfo);
+                    });
+                    return;
+                }
+
+                if (fieldInfo.type === 'group') {
+                    // Do not send group headers to elabFTW Extra Fields
+                    return;
+                }
+
+                // Skip empty values
+                const val = fieldInfo.value;
+                if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
+                    return;
+                }
 
                 const elabField = {
                     type: this.mapFieldTypeToElabFTW(fieldInfo.type),
@@ -1136,6 +1162,12 @@ const settingsManager = {
 
                 const fieldKey = fieldInfo.label || key;
                 elabftwFields[fieldKey] = elabField;
+            };
+
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                if (key !== 'provenance' && key !== 'metafold_integration' && key !== 'metafold_project_id' && key !== 'projectName' && !key.startsWith('System.')) {
+                    processField(key, fieldInfo);
+                }
             });
 
             console.log('✅ convertMetadataToElabFTW: Successfully converted', Object.keys(elabftwFields).length, 'fields');
@@ -1156,7 +1188,8 @@ const settingsManager = {
             'date': 'date',
             'textarea': 'text',
             'dropdown': 'select',
-            'checkbox': 'checkbox'
+            'checkbox': 'checkbox',
+            'group': 'text'
         };
 
         return typeMap[type] || 'text';
@@ -1190,17 +1223,44 @@ const settingsManager = {
         if (metadata && Object.keys(metadata).length > 0) {
             body += `<h2>Experiment Metadata</h2>\n<ul>\n`;
 
-            Object.entries(metadata).forEach(([key, fieldInfo]) => {
-                if (fieldInfo.type !== 'group') {
-                    const value = fieldInfo.value || 'Not filled';
-                    const label = fieldInfo.label || key;
+            const processFieldBody = (key, fieldInfo) => {
+                if (!fieldInfo || typeof fieldInfo !== 'object') return;
 
-                    if (fieldInfo.type === 'checkbox') {
-                        const checkValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
-                        body += `<li><strong>${label}:</strong> ${checkValue}</li>\n`;
-                    } else {
-                        body += `<li><strong>${label}:</strong> ${value}</li>\n`;
-                    }
+                // Nested group object
+                if (!fieldInfo.type) {
+                    body += `</ul>\n<h3>${key}</h3>\n<ul>\n`;
+                    Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
+                        processFieldBody(subKey, subFieldInfo);
+                    });
+                    return;
+                }
+
+                // Group field
+                if (fieldInfo.type === 'group') {
+                    body += `</ul>\n<h3>${fieldInfo.label || key}</h3>\n<ul>\n`;
+                    return;
+                }
+
+                // Skip empty
+                const value = fieldInfo.value;
+                if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+                    return;
+                }
+                
+                const label = fieldInfo.label || key;
+                if (fieldInfo.type === 'checkbox') {
+                    const checkValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
+                    body += `<li><strong>${label}:</strong> ${checkValue}</li>\n`;
+                } else if (Array.isArray(value)) {
+                    body += `<li><strong>${label}:</strong> ${value.join(', ')}</li>\n`;
+                } else {
+                    body += `<li><strong>${label}:</strong> ${value}</li>\n`;
+                }
+            };
+
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                if (key !== 'provenance' && key !== 'metafold_integration' && key !== 'metafold_project_id' && key !== 'projectName' && !key.startsWith('System.')) {
+                    processFieldBody(key, fieldInfo);
                 }
             });
 
@@ -1210,11 +1270,6 @@ const settingsManager = {
         if (structure && structure.trim() !== '') {
             body += `<h2>Project Structure</h2>\n<pre>${structure}</pre>\n\n`;
         }
-
-        body += `<h2>Description</h2>\n<p><em>Add your project description here...</em></p>\n\n`;
-        body += `<h2>Methodology</h2>\n<p><em>Describe your methodology here...</em></p>\n\n`;
-        body += `<h2>Results</h2>\n<p><em>Document your results here...</em></p>\n\n`;
-        body += `<h2>Notes</h2>\n<p><em>Add any additional notes here...</em></p>\n`;
 
         return body;
     },

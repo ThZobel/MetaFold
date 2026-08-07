@@ -1050,6 +1050,11 @@ const templateManager = {
         if (baseDirSection) baseDirSection.style.display = isMultiFolder ? 'none' : 'block';
         if (multiFolderSection) multiFolderSection.style.display = isMultiFolder ? 'block' : 'none';
         
+        const onlyIntegrationsContainer = document.getElementById('onlyIntegrationsContainer');
+        if (onlyIntegrationsContainer) {
+            onlyIntegrationsContainer.style.display = isWriteFilesOnly ? 'none' : 'flex';
+        }
+        
         // projectNameSection is ALWAYS visible, but its label changes
         if (projectNameSection) {
             projectNameSection.style.display = 'block';

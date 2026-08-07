@@ -199,16 +199,16 @@ const metadataLoader = {
     renderMetadataView() {
         const container = document.getElementById('metadataViewerContainer');
         const scannerContainer = document.getElementById('projectScannerContainer');
-        const quickStart = document.getElementById('discoveryQuickStart');
+        const tiles = document.getElementById('discoveryTiles');
 
         if (!container) {
             console.error('❌ Metadata viewer container not found');
             return;
         }
 
-        // Hide scanner results and quick start
+        // Hide scanner results and tiles
         if (scannerContainer) scannerContainer.style.display = 'none';
-        if (quickStart) quickStart.style.display = 'none';
+        if (tiles) tiles.style.display = 'none';
 
         // Get project name using intelligent extraction
         const projectName = this.getProjectName();
@@ -255,14 +255,14 @@ const metadataLoader = {
     closeMetadataView() {
         const container = document.getElementById('metadataViewerContainer');
         const scannerContainer = document.getElementById('projectScannerContainer');
-        const quickStart = document.getElementById('discoveryQuickStart');
+        const tiles = document.getElementById('discoveryTiles');
 
         if (container) container.style.display = 'none';
         if (scannerContainer) scannerContainer.style.display = 'block';
 
-        // Show quick start only if no scan results
+        // Show tiles only if no scan results
         const hasResults = scannerContainer && scannerContainer.children.length > 0;
-        if (quickStart) quickStart.style.display = hasResults ? 'none' : 'block';
+        if (tiles) tiles.style.display = hasResults ? 'none' : 'grid';
     },
 
     // Render metadata table
@@ -616,7 +616,7 @@ const metadataLoader = {
             console.log('✅ Projects loaded:', projects.length);
 
             // Clear and rebuild options
-            projectSelect.innerHTML = '<option value="">-- Create standalone dataset --</option>';
+            projectSelect.innerHTML = '<option value="">Create Standalone Dataset</option>';
 
             if (projects.length === 0) {
                 projectSelect.innerHTML += '<option value="" disabled>No projects in this group</option>';
@@ -809,9 +809,13 @@ const metadataLoader = {
                         results.omero && results.omero.success ? {
                             success: true,
                             dataset: {
-                                id: results.omero.datasetId
+                                id: results.omero.datasetId,
+                                omeroWebUrl: results.omero.datasetUrl  // contains 'show=project-' or 'show=dataset-'
                             },
-                            url: results.omero.datasetUrl
+                            url: results.omero.datasetUrl,
+                            integration: {
+                                projectContext: results.omero.projectContext || null
+                            }
                         } : null,
                         results.rspace && results.rspace.success ? {
                             success: true,
@@ -902,7 +906,7 @@ const metadataLoader = {
                                 await window.metaFoldOMEROIntegration.addWorkingMapAnnotations(
                                     results.omero.datasetId,
                                     Object.fromEntries(omeroKeyValues.map(([k, v]) => [k, { type: 'text', value: v }])),
-                                    'NFDI4BioImage.MetaFold.IntegrationLinks'
+                                    'System Metadata by MetaFold'
                                 );
                                 console.log('✅ metadataLoader: Integration links added to OMERO');
                             }
@@ -1023,9 +1027,13 @@ const metadataLoader = {
 
         // Add OMERO link
         if (results.omero?.success && results.omero.datasetUrl) {
+            const isProject = results.omero.datasetUrl.includes('show=project-') ||
+                              results.omero.projectContext === 'create_new_project';
+            const omeroIdKey = isProject ? 'project_id' : 'dataset_id';
             enhancedMetadata.metafold_integration.external_links.omero = {
                 url: results.omero.datasetUrl,
-                dataset_id: results.omero.datasetId,
+                [omeroIdKey]: String(results.omero.datasetId || ''),
+                object_type: isProject ? 'project' : 'dataset',
                 uploaded_at: new Date().toISOString(),
                 status: 'uploaded'
             };
@@ -1200,7 +1208,8 @@ const metadataLoader = {
                 return {
                     success: true,
                     datasetUrl: result.dataset.omeroWebUrl,
-                    datasetId: result.dataset.id
+                    datasetId: result.dataset.id,
+                    projectContext: projectId  // 'create_new_project' if a new OMERO project was created
                 };
             } else {
                 console.error('❌ OMERO creation failed:', result.message);
@@ -1254,7 +1263,7 @@ const metadataLoader = {
     clearView() {
         const container = document.getElementById('metadataViewerContainer');
         const scannerContainer = document.getElementById('projectScannerContainer');
-        const quickStart = document.getElementById('discoveryQuickStart');
+        const tiles = document.getElementById('discoveryTiles');
 
         if (container) container.style.display = 'none';
         if (scannerContainer) scannerContainer.style.display = 'block';

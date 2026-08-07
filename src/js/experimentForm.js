@@ -99,8 +99,7 @@ const experimentForm = {
         this.filenameState.isSwitchingTemplate = true;
 
         try {
-            // 1. Clear all form inputs using existing function
-            this.clearAllFormInputs();
+            // 1. (Removed clearAllFormInputs to prevent change events from wiping savedFieldValues of the previous template)
 
             // 2. Clear the form container completely (force clean slate)
             const container = document.getElementById('experimentFields');
@@ -254,26 +253,35 @@ const experimentForm = {
             </tr>
         `;
         table.appendChild(thead);
-
-        // Table Body
-        const tbody = document.createElement('tbody');
-        table.appendChild(tbody);
         container.appendChild(table);
 
+        // Initial default tbody for fields before any group
+        let currentGroupTbody = document.createElement('tbody');
+        table.appendChild(currentGroupTbody);
+
         // Render fields in the specified order
-        fieldOrder.forEach(fieldName => {
+        fieldOrder.forEach((fieldName, index) => {
             const fieldInfo = fieldsToRender[fieldName];
             if (!fieldInfo) {
                 console.warn(`⚠️ Field "${fieldName}" in fieldOrder but not found in fields`);
                 return;
             }
 
+            // FIX: Hide 'Detailed Metadata' field from the main UI (moved to OMERO menu)
+            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' || 
+                fieldName === 'Detailed metadata format' || fieldInfo.label === 'Detailed metadata format') {
+                return;
+            }
+
             if (fieldInfo.type === 'group') {
-                // Render group header
-                this.renderGroupHeader(tbody, fieldName, fieldInfo);
+                // Render group header in a new tbody
+                currentGroupTbody = document.createElement('tbody');
+                currentGroupTbody.className = 'group-tbody expanded';
+                table.appendChild(currentGroupTbody);
+                this.renderGroupHeader(currentGroupTbody, fieldName, fieldInfo, index);
             } else {
-                // Render normal field
-                this.renderField(tbody, fieldName, fieldInfo);
+                // Render normal field in the current tbody
+                this.renderField(currentGroupTbody, fieldName, fieldInfo);
             }
         });
 
@@ -341,17 +349,48 @@ const experimentForm = {
     },
 
     // Render group header (Row spanning all columns)
-    renderGroupHeader(tbody, fieldName, fieldInfo) {
+    renderGroupHeader(tbody, fieldName, fieldInfo, index) {
         const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.className = 'group-header-row';
         tr.innerHTML = `
             <td colspan="4" style="padding: 0;">
                 <div style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); 
-                            border-radius: 8px; padding: 10px 15px; margin: 15px 0 5px 0;">
-                    <h4 style="color: #a855f7; margin: 0; font-size: 0.95rem;">${fieldInfo.label}</h4>
-                    ${fieldInfo.description ? `<p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">${fieldInfo.description}</p>` : ''}
+                            border-radius: 8px; padding: 10px 15px; margin: 15px 0 5px 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="color: #a855f7; margin: 0; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                            <svg class="accordion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; transform: rotate(180deg);">
+                                <polyline points="18 15 12 9 6 15"></polyline>
+                            </svg>
+                            ${fieldInfo.label}
+                        </h4>
+                        ${fieldInfo.description ? `<p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 24px;">${fieldInfo.description}</p>` : ''}
+                    </div>
                 </div>
             </td>
         `;
+        
+        tr.addEventListener('click', () => {
+            const isExpanded = tbody.classList.contains('expanded');
+            if (isExpanded) {
+                tbody.classList.remove('expanded');
+                tbody.classList.add('collapsed');
+                tr.querySelector('.accordion-icon').style.transform = 'rotate(0deg)';
+                // Hide all rows in this tbody except the header
+                Array.from(tbody.children).forEach(child => {
+                    if (child !== tr) child.style.display = 'none';
+                });
+            } else {
+                tbody.classList.remove('collapsed');
+                tbody.classList.add('expanded');
+                tr.querySelector('.accordion-icon').style.transform = 'rotate(180deg)';
+                // Show all rows
+                Array.from(tbody.children).forEach(child => {
+                    if (child !== tr) child.style.display = '';
+                });
+            }
+        });
+        
         tbody.appendChild(tr);
     },
 
@@ -374,8 +413,17 @@ const experimentForm = {
         const requiredMark = isRequired ? ' <span style="color: #ef4444;">*</span>' : '';
         const safeFieldId = 'field_' + this.createSafeId(fieldName);
 
-        // FIX: Check saved values, then defaultValue (saved in file), then value (legacy)
-        const savedValue = this.getSavedFieldValue(fieldName) || fieldInfo.defaultValue || fieldInfo.value || '';
+        // FIX: Robust check for saved values to handle false/0/empty array properly
+        let savedValue = this.getSavedFieldValue(fieldName);
+        if (savedValue === undefined || savedValue === null) {
+            if (fieldInfo.defaultValue !== undefined) {
+                savedValue = fieldInfo.defaultValue;
+            } else if (fieldInfo.value !== undefined) {
+                savedValue = fieldInfo.value;
+            } else {
+                savedValue = '';
+            }
+        }
 
         // 1. Field Name Column
         const nameCell = document.createElement('td');
@@ -398,15 +446,43 @@ const experimentForm = {
         let inputHtml = '';
         switch (fieldInfo.type) {
             case 'text':
+            case 'id_anchor':
                 inputHtml = `<input type="text" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
                 break;
             case 'number':
                 const min = fieldInfo.min !== undefined ? `min="${fieldInfo.min}"` : '';
                 const max = fieldInfo.max !== undefined ? `max="${fieldInfo.max}"` : '';
-                inputHtml = `<input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''}>`;
+                const unitHtml = fieldInfo.unit ? `<span style="margin-left: 8px; color: #9ca3af; font-size: 0.9em; user-select: none;">${fieldInfo.unit}</span>` : '';
+                if (fieldInfo.unit) {
+                    inputHtml = `<div style="display: flex; align-items: center;"><input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''} style="flex: 1;">${unitHtml}</div>`;
+                } else {
+                    inputHtml = `<input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''}>`;
+                }
                 break;
             case 'date':
                 inputHtml = `<input type="date" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                break;
+            case 'time':
+                inputHtml = `<input type="time" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                break;
+            case 'url':
+                inputHtml = `<input type="url" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} placeholder="https://...">`;
+                break;
+            case 'email':
+                inputHtml = `<input type="email" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} placeholder="name@domain.com">`;
+                break;
+            case 'rating':
+                const ratingVal = parseInt(savedValue) || 0;
+                let starsHtml = '';
+                for (let i = 1; i <= 5; i++) {
+                    const isFilled = i <= ratingVal;
+                    starsHtml += `<svg class="star-icon" data-value="${i}" width="24" height="24" viewBox="0 0 24 24" fill="${isFilled ? '#a855f7' : 'none'}" stroke="${isFilled ? '#a855f7' : '#9ca3af'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer; transition: all 0.2s; margin-right: 2px;">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>`;
+                }
+                inputHtml = `<div class="rating-container" id="${safeFieldId}" data-field-name="${fieldName}" data-value="${ratingVal}" style="display: flex; align-items: center;">
+                    ${starsHtml}
+                </div>`;
                 break;
             case 'textarea':
                 inputHtml = `<textarea id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''} rows="1">${savedValue}</textarea>`;
@@ -433,8 +509,12 @@ const experimentForm = {
                 let mcSavedArr = [];
                 if (Array.isArray(savedValue)) {
                     mcSavedArr = savedValue;
-                } else if (typeof savedValue === 'string' && savedValue.startsWith('[')) {
-                    try { mcSavedArr = JSON.parse(savedValue); } catch(e) { mcSavedArr = []; }
+                } else if (typeof savedValue === 'string') {
+                    if (savedValue.startsWith('[')) {
+                        try { mcSavedArr = JSON.parse(savedValue); } catch(e) { mcSavedArr = []; }
+                    } else if (savedValue.trim() !== '') {
+                        mcSavedArr = savedValue.split(',').map(s => s.trim());
+                    }
                 }
                 const mcOptions = fieldInfo.options || [];
                 const mcPills = mcOptions.map(opt => {
@@ -459,6 +539,46 @@ const experimentForm = {
                     ${mcOptions.length > 3 ? `<button type="button" class="mc-toggle-all" onclick="experimentForm.toggleAllMultiCheckbox('${safeFieldId}', '${fieldName}')" title="Toggle all">⊞</button>` : ''}
                 </div>`;
                 break;
+            case 'derived_from':
+            case 'tags': {
+                // Resolve initial tags array from saved value
+                let initialTags = [];
+                if (Array.isArray(savedValue)) {
+                    initialTags = savedValue;
+                } else if (typeof savedValue === 'string' && savedValue.startsWith('[')) {
+                    try { initialTags = JSON.parse(savedValue); } catch(e) { initialTags = []; }
+                }
+                const isDerivedFrom = fieldName === 'derived_from' || fieldInfo.type === 'derived_from';
+                const datalistId = isDerivedFrom ? `datalist_${safeFieldId}` : '';
+                const existingPills = initialTags.map(tag =>
+                    `<span class="tag-pill-form" data-tag="${tag}"
+                           style="display:inline-flex;align-items:center;gap:4px;
+                                  background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);
+                                  color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;">
+                        ${tag}
+                        <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;"
+                              onclick="experimentForm.removeTagFromField('${safeFieldId}','${fieldName}','${tag}')">×</span>
+                    </span>`
+                ).join('');
+                inputHtml = `
+                    <div class="tags-form-container" id="${safeFieldId}" data-field-name="${fieldName}" style="display:flex;flex-direction:column;gap:5px;">
+                        <div class="tags-pills-row" style="display:flex;flex-wrap:wrap;gap:4px;min-height:26px;">${existingPills}</div>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input type="text" class="tags-form-input"
+                                   placeholder="${isDerivedFrom ? 'Enter or select an ID...' : 'Add tag + Enter'}"
+                                   ${datalistId ? `list="${datalistId}"` : ''}
+                                   style="flex:1;font-size:12px;"
+                                   onkeydown="experimentForm.handleFormTagInput(event, '${safeFieldId}', '${fieldName}')"
+                                   onfocus="${isDerivedFrom ? `experimentForm.loadIdAutocomplete('${datalistId}')` : ''}">
+                            ${isDerivedFrom ? `<button type="button" title="Scan folder for IDs" onclick="experimentForm.scanFolderForIds('${safeFieldId}','${fieldName}')"
+                                    style="background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;">
+                                    📂 Scan Folder
+                                </button>` : ''}
+                        </div>
+                        ${datalistId ? `<datalist id="${datalistId}"></datalist>` : ''}
+                    </div>`;
+                break;
+            }
         }
         valueCell.innerHTML = inputHtml;
         tr.appendChild(valueCell);
@@ -490,6 +610,29 @@ const experimentForm = {
                     cb.addEventListener('change', () => {
                         const vals = this.getMultiCheckboxValues(fieldName);
                         this.saveFieldValue(fieldName, vals);
+                        if (this.filenameState.selectedFields.includes(fieldName)) {
+                            this.updateFilenamePreview();
+                        }
+                    });
+                });
+            } else if (input.classList.contains('tags-form-container')) {
+                // Tags: no standard change event – values are managed by add/remove pill functions
+                // Value is read directly at collect time via getTagValues()
+                // Nothing extra needed here.
+            } else if (input.classList.contains('rating-container')) {
+                // Rating: listen on each star
+                const stars = input.querySelectorAll('.star-icon');
+                stars.forEach(star => {
+                    star.addEventListener('click', () => {
+                        const val = parseInt(star.getAttribute('data-value'));
+                        input.setAttribute('data-value', val);
+                        stars.forEach(s => {
+                            const sVal = parseInt(s.getAttribute('data-value'));
+                            const isFilled = sVal <= val;
+                            s.setAttribute('fill', isFilled ? '#a855f7' : 'none');
+                            s.setAttribute('stroke', isFilled ? '#a855f7' : '#9ca3af');
+                        });
+                        this.saveFieldValue(fieldName, val);
                         if (this.filenameState.selectedFields.includes(fieldName)) {
                             this.updateFilenamePreview();
                         }
@@ -834,6 +977,24 @@ const experimentForm = {
             }
         });
 
+        const emailFields = document.querySelectorAll('input[type="email"]');
+        emailFields.forEach(field => {
+            if (field.value.trim()) {
+                const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!re.test(field.value.trim())) {
+                    isValid = false;
+                    field.classList.add('error');
+                    if (!message) {
+                        const fieldName = field.getAttribute('data-field-name');
+                        const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace('*', '').trim();
+                        message = `Field "${label || fieldName || 'Unknown'}" contains an invalid E-Mail address.`;
+                    }
+                } else if (field.classList.contains('error') && requiredFields.includes && !requiredFields.includes(field)) {
+                    field.classList.remove('error');
+                }
+            }
+        });
+
         return { valid: isValid, message: message };
     },
 
@@ -1091,11 +1252,20 @@ const experimentForm = {
         Object.entries(fieldsToCollect).forEach(([fieldName, fieldInfo]) => {
             if (fieldInfo.type === 'group') return; // Skip groups
 
+            // FIX: Hide 'Detailed Metadata' field as requested by the user, because it's now in the OMERO sidebar menu
+            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' || 
+                fieldName === 'Detailed metadata format' || fieldInfo.label === 'Detailed metadata format') {
+                return;
+            }
+
             const safeFieldId = 'field_' + this.createSafeId(fieldName);
 
             // Multi-Checkbox: collect from grouped checkboxes
             if (fieldInfo.type === 'multicheckbox') {
                 formValues[fieldName] = this.getMultiCheckboxValues(fieldName);
+                return;
+            } else if (fieldInfo.type === 'tags' || fieldInfo.type === 'derived_from') {
+                formValues[fieldName] = this.getTagValues(safeFieldId);
                 return;
             }
 
@@ -1231,25 +1401,61 @@ const experimentForm = {
             fieldOrder = Object.keys(fieldsSource).sort();
         }
 
+        let currentGroupObj = null;
+
         // Collect data in the specified field order
         fieldOrder.forEach(fieldName => {
             const fieldInfo = fieldsSource[fieldName];
-            if (!fieldInfo || fieldInfo.type === 'group') return; // Skip groups
+            
+            if (fieldInfo && fieldInfo.type === 'group') {
+                currentGroupObj = {};
+                metadata[fieldInfo.label || fieldName] = currentGroupObj;
+                return;
+            }
+            
+            if (!fieldInfo) return; // Skip invalid
 
-            const safeFieldId = 'field_' + this.createSafeId(fieldName);
-            const input = document.getElementById(safeFieldId);
-            if (!input) return;
+            let value;
 
-            let value = input.value;
-            if (input.type === 'checkbox') {
-                value = input.checked;
-            } else if (input.type === 'number') {
-                value = parseFloat(value) || 0;
-            } else if (input.tagName === 'SELECT') {
-                value = input.value || '';
+            // Handle multi-checkbox specifically
+            if (fieldInfo.type === 'multicheckbox') {
+                value = this.getMultiCheckboxValues(fieldName);
+            } else if (fieldInfo.type === 'tags' || fieldInfo.type === 'derived_from') {
+                // Tags: read pills array from the DOM container
+                const safeFieldId = 'field_' + this.createSafeId(fieldName);
+                value = this.getTagValues(safeFieldId);
+                
+                // UX FIX: Capture pending text that the user typed but forgot to press 'Enter' for
+                const container = document.getElementById(safeFieldId);
+                if (container) {
+                    const inputEl = container.querySelector('.tag-input-form');
+                    if (inputEl && inputEl.value && inputEl.value.trim() !== '') {
+                        const pendingValue = inputEl.value.trim();
+                        if (!value.includes(pendingValue)) {
+                            value.push(pendingValue);
+                        }
+                    }
+                }
+            } else {
+                const safeFieldId = 'field_' + this.createSafeId(fieldName);
+                const input = document.getElementById(safeFieldId);
+                if (!input) return;
+
+                if (input.classList.contains('rating-container')) {
+                    value = parseInt(input.getAttribute('data-value')) || 0;
+                } else {
+                    value = input.value;
+                    if (input.type === 'checkbox') {
+                        value = input.checked;
+                    } else if (input.type === 'number') {
+                        value = parseFloat(value) || 0;
+                    } else if (input.tagName === 'SELECT') {
+                        value = input.value || '';
+                    }
+                }
             }
 
-            metadata[fieldName] = {
+            const fieldData = {
                 label: fieldInfo.label,
                 type: fieldInfo.type,
                 value: value,
@@ -1258,7 +1464,14 @@ const experimentForm = {
             };
 
             // Carry over additional properties
-            if (fieldInfo.options) metadata[fieldName].options = fieldInfo.options;
+            if (fieldInfo.options) fieldData.options = fieldInfo.options;
+            if (fieldInfo.unit !== undefined) fieldData.unit = fieldInfo.unit;
+
+            if (currentGroupObj) {
+                currentGroupObj[fieldName] = fieldData;
+            } else {
+                metadata[fieldName] = fieldData;
+            }
         });
 
         return metadata;
@@ -1600,6 +1813,159 @@ const experimentForm = {
     // Helper: Deep copy
     createDeepCopy(obj) {
         return JSON.parse(JSON.stringify(obj));
+    },
+
+    // =================== TAGS FIELD HELPERS ===================
+
+    /**
+     * Handle keydown in the tags form input field.
+     * Enter or comma confirms the current tag and adds a pill.
+     */
+    handleFormTagInput(event, containerId, fieldName) {
+        if (event.key === 'Enter' || event.key === ',') {
+            event.preventDefault();
+            const inputEl = event.target;
+            const value = inputEl.value.trim().replace(/,$/, '');
+            if (!value) return;
+
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // Check for duplicate
+            const existing = this.getTagValues(containerId);
+            if (existing.includes(value)) {
+                inputEl.value = '';
+                return;
+            }
+
+            // Create pill
+            const pillsRow = container.querySelector('.tags-pills-row');
+            if (pillsRow) {
+                const pill = document.createElement('span');
+                pill.className = 'tag-pill-form';
+                pill.setAttribute('data-tag', value);
+                pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;';
+                pill.innerHTML = `${value} <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;"
+                    onclick="experimentForm.removeTagFromField('${containerId}','${fieldName}','${value}')">×</span>`;
+                pillsRow.appendChild(pill);
+            }
+
+            inputEl.value = '';
+            this.saveFieldValue(fieldName, this.getTagValues(containerId));
+        } else if (event.key === 'Backspace' && event.target.value === '') {
+            const container = document.getElementById(containerId);
+            const pillsRow = container?.querySelector('.tags-pills-row');
+            if (pillsRow) {
+                const lastPill = pillsRow.querySelector('.tag-pill-form:last-child');
+                if (lastPill) {
+                    lastPill.remove();
+                    this.saveFieldValue(fieldName, this.getTagValues(containerId));
+                }
+            }
+        }
+    },
+
+    /**
+     * Remove a specific tag pill from a tags-form-container
+     */
+    removeTagFromField(containerId, fieldName, tagValue) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const pill = container.querySelector(`.tag-pill-form[data-tag="${tagValue}"]`);
+        if (pill) {
+            pill.remove();
+            this.saveFieldValue(fieldName, this.getTagValues(containerId));
+        }
+    },
+
+    /**
+     * Get all tag values from a tags-form-container as a string array
+     */
+    getTagValues(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return [];
+        return [...container.querySelectorAll('.tag-pill-form')].map(p => p.getAttribute('data-tag'));
+    },
+
+    /**
+     * Load id_dictionary.json for the current user and populate a <datalist>
+     */
+    async loadIdAutocomplete(datalistId) {
+        if (!datalistId) return;
+        const datalist = document.getElementById(datalistId);
+        if (!datalist) return;
+        if (datalist.dataset.loaded === 'true') return; // Only load once per focus session
+
+        try {
+            const userInfo = window.userManager?.getCurrentUserInfo() || { username: 'Unknown' };
+            if (window.electronAPI?.loadIdDictionary) {
+                const result = await window.electronAPI.loadIdDictionary(userInfo);
+                if (result?.success && Array.isArray(result.ids)) {
+                    datalist.innerHTML = result.ids.map(item => {
+                        const id = typeof item === 'string' ? item : item.id;
+                        const type = typeof item === 'string' ? 'id_anchor' : item.type;
+                        const label = type === 'project' ? `📁 Projekt` : `⚓ ID`;
+                        return `<option value="${id}">${label}</option>`;
+                    }).join('');
+                    datalist.dataset.loaded = 'true';
+                    console.log(`📋 Loaded ${result.ids.length} IDs into autocomplete`);
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ Could not load ID dictionary for autocomplete:', err.message);
+        }
+    },
+
+    /**
+     * Open folder picker and harvest IDs into the user's id_dictionary.json
+     */
+    async scanFolderForIds(containerId, fieldName) {
+        try {
+            // Open folder picker
+            const folderResult = await window.electronAPI.selectFolder?.();
+            if (!folderResult) return;
+            const dirPath = folderResult;
+
+            // Show inline recursive option
+            const recursive = confirm(
+                `Scan folder for IDs:\n"${dirPath}"\n\n` +
+                `Click OK to include ALL subfolders (recursive).\n` +
+                `Click Cancel to scan only this folder.`
+            );
+
+            const userInfo = window.userManager?.getCurrentUserInfo() || { username: 'Unknown' };
+
+            let result;
+            if (window.electronAPI?.harvestIdsFromFolder) {
+                result = await window.electronAPI.harvestIdsFromFolder(dirPath, recursive, userInfo);
+            }
+
+            if (result?.success) {
+                const msg = `✅ ${result.foundCount || 0} IDs found, ${result.newCount ?? 0} new IDs imported (total: ${result.total ?? '?'})`;
+                console.log(msg);
+                if (result.debugInfo) {
+                    console.log('🔍 Scanner Debug Info:', result.debugInfo);
+                }
+                // Refresh autocomplete datalist
+                const container = document.getElementById(containerId);
+                const datalist = document.getElementById('datalist_' + containerId) || 
+                               (container ? container.parentElement.querySelector('datalist') : null);
+                if (datalist) {
+                    datalist.dataset.loaded = ''; // Reset so next focus reloads
+                    await this.loadIdAutocomplete(datalist.id);
+                }
+                // Show brief feedback next to the button
+                const btn = container?.querySelector('button[title="Scan folder for IDs"]');
+                if (btn) {
+                    const orig = btn.textContent;
+                    btn.textContent = msg;
+                    btn.style.color = '#4ade80';
+                    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 3000);
+                }
+            }
+        } catch (err) {
+            console.error('❌ scanFolderForIds error:', err);
+        }
     }
 };
 

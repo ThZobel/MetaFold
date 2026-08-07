@@ -13,10 +13,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
     selectFolders: () => ipcRenderer.invoke('select-folders'),
+    showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+    showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
+    getSubfolders: (projectPaths) => ipcRenderer.invoke('get-subfolders', projectPaths),
+    harvestProjects: (exportPath, projectsData) => ipcRenderer.invoke('harvest-projects', exportPath, projectsData),
 
     // Create project (Main API)
-    createProject: (basePath, projectName, structure, metadata = null) =>
-        ipcRenderer.invoke('create-project', basePath, projectName, structure, metadata),
+    createProject: (basePath, projectName, structure, metadata = null, options = {}) =>
+        ipcRenderer.invoke('create-project', basePath, projectName, structure, metadata, options),
 
     // Create folder structure (Legacy for compatibility)
     createFolders: (targetPath, structure) =>
@@ -48,6 +52,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File writing for export
     writeFile: (filePath, content) => ipcRenderer.invoke('writeFile', filePath, content),
 
+    // File reading
+    readFile: (filePath) => ipcRenderer.invoke('readFile', filePath),
+
     // Copy file from source to destination
     copyFile: (srcPath, destPath) => ipcRenderer.invoke('copyFile', srcPath, destPath),
 
@@ -72,6 +79,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Template directory and file operations
     getTemplatesDirectory: (userInfo) =>
         ipcRenderer.invoke('get-templates-directory', userInfo),
+
+    getMetaFoldDirectory: () =>
+        ipcRenderer.invoke('get-metafold-directory'),
 
     loadAllTemplates: (userInfo) =>
         ipcRenderer.invoke('load-all-templates', userInfo),
@@ -137,14 +147,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // =================== PROJECT SCANNER APIS ===================
 
     // Project Scanner APIs
-    scanMetaFoldProjects: (basePath, maxDepth = 5) =>
-        ipcRenderer.invoke('scan-metafold-projects', basePath, maxDepth),
+    scanMetaFoldProjects: (basePath, maxDepth = 5, options = {}) =>
+        ipcRenderer.invoke('scan-metafold-projects', basePath, maxDepth, options),
 
     getProjectDetails: (projectPath) =>
         ipcRenderer.invoke('get-project-details', projectPath),
 
     getProjectsStatistics: (projects) =>
         ipcRenderer.invoke('get-projects-statistics', projects),
+
+    // =================== ID DICTIONARY / HARVESTER APIS ===================
+
+    saveIdValues: (metadata, username) => ipcRenderer.invoke('save-id-values', metadata, username),
+    
+    harvestIdsFromFolder: (dirPath, recursive, username) => 
+        ipcRenderer.invoke('harvest-ids-from-folder', dirPath, recursive, username),
+        
+    loadIdDictionary: (username) => ipcRenderer.invoke('load-id-dictionary', username),
+
+    // =================== BIOFORMATS FILE SCANNER APIS ===================
+
+    // Recursively list microscopy files by extension
+    listFilesRecursive: (dirPath, extensions) =>
+        ipcRenderer.invoke('list-files-recursive', dirPath, extensions),
+
+    // Auto-detect BioFormats CLI (showinf)
+    detectBioFormats: (customPath) =>
+        ipcRenderer.invoke('bioformats-detect', customPath),
+
+    // Read OME-XML metadata from a microscopy file via showinf
+    readOmeXml: (filePath, showiNFPath) =>
+        ipcRenderer.invoke('bioformats-read-omexml', filePath, showiNFPath),
+
+    // List files (non-recursive) in a directory – for metadata inheritance
+    listDirFiles: (dirPath) =>
+        ipcRenderer.invoke('list-dir-files', dirPath),
+
+    // Load and parse a JSON file by absolute path – for metadata inheritance
+    loadJsonPath: (filePath) =>
+        ipcRenderer.invoke('load-json-path', filePath),
 
     // =================== OMERO PROXY APIS ===================
 
