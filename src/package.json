@@ -64,6 +64,7 @@
       "js/**/*",
       "components/**/*",
       "docs/**/*",
+      "build/**/*",
       "node_modules/jsoncrack/**/*",
       "node_modules/react/**/*",
       "node_modules/react-dom/**/*"

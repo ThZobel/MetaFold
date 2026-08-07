@@ -9,20 +9,40 @@
         <div style="display: flex; gap: 10px;">
             <!-- NEW: Visualization Type Selector -->
             <div class="visualization-type-selector">
-                <button class="viz-type-btn active" onclick="visualizationManager.setVisualizationType('jsoncrack')"
-                    id="jsoncrackTypeBtn" title="JSONCrack Interactive Graph">
-                    🕸️ JSONCrack
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('jsoncrack')"
+                    id="jsoncrackTypeBtn" title="Legacy Node Graph View">
+                    🕸️ JSON Graph
                 </button>
-                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('d3graph')"
-                    id="d3graphTypeBtn" title="D3.js Force Graph">
-                    🌐 D3 Graph
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('dashboard')"
+                    id="dashboardTypeBtn" title="Metadata Analytics Dashboard">
+                    📊 D3 Dashboard
+                </button>
+                <button class="viz-type-btn active" onclick="visualizationManager.setVisualizationType('knowledgegraph')"
+                    id="knowledgegraphTypeBtn" title="D3.js Knowledge Graph">
+                    🌌 Knowledge Graph
+                </button>
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('metadatatree')"
+                    id="metadatatreeTypeBtn" title="Legacy Metadata Graph">
+                    🏷️ Metadata Tree
+                </button>
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('lineagetree')"
+                    id="lineagetreeTypeBtn" title="Collapsible Lineage Tree">
+                    🌱 Lineage Tree
                 </button>
                 <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('tree')"
-                    id="treeTypeBtn" title="Collapsible Tree View">
-                    🌳 Tree
+                    id="treeTypeBtn" title="Collapsible JSON Tree View">
+                    🌳 JSON Tree
                 </button>
             </div>
             <div style="border-left: 1px solid rgba(255,255,255,0.2); margin: 0 10px;"></div>
+            
+            <label style="display: flex; align-items: center; gap: 5px; color: #e0e0e0; font-size: 13px; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="showFolderLinksToggle" onchange="if(window.visualizationManager && window.visualizationManager.currentData) window.visualizationManager.renderVisualization(window.visualizationManager.currentData)">
+                📁 Ordner-Beziehungen
+            </label>
+
+            <div style="border-left: 1px solid rgba(255,255,255,0.2); margin: 0 10px;"></div>
+            
             <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromTemplate()"
                 title="Visualize current template metadata">
                 🧪 Template Data
@@ -44,18 +64,38 @@
             </button>
         </div>
     </div>
-    <div class="visualization-content" id="visualizationContent">
-        <div class="visualization-placeholder">
-            <svg fill="currentColor" viewBox="0 0 24 24">
-                <path
-                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 7.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-            </svg>
-            <h4>No Data Loaded</h4>
-            <p>Select a template or load a JSON file to start visualizing your data</p>
-            <div style="margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="visualizationManager.showSampleData()">
-                    🎯 Show Sample
-                </button>
+    <div class="visualization-main" style="display: flex; flex: 1; overflow: hidden;">
+        <!-- Left Sidebar for Active Filters -->
+        <div id="vizSidebar" class="visualization-sidebar" style="display: none; width: 250px; background: rgba(30,30,46,0.95); border-right: 1px solid rgba(255,255,255,0.1); padding: 15px; overflow-y: auto;">
+            <h4 style="margin: 0 0 15px 0; color: #e0e0e0; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <span>Active Filters</span>
+                <span id="vizFilterCount" style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+            </h4>
+            <div id="vizSidebarContent" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Filter chips injected here -->
+            </div>
+            <button class="btn btn-secondary btn-small" style="width: 100%; margin-top: 15px;" onclick="window.switchMainTab('discover'); if(window.facetSearch) facetSearch.openModal();">
+                Edit Filters
+            </button>
+            <button class="btn btn-secondary btn-small" style="width: 100%; margin-top: 5px; color: #ef4444; border-color: #ef4444;" onclick="visualizationManager.resetFilters()">
+                Reset Filters
+            </button>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="visualization-content" id="visualizationContent" style="flex: 1;">
+            <div class="visualization-placeholder">
+                <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 7.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                </svg>
+                <h4>No Data Loaded</h4>
+                <p>Select a template or load a JSON file to start visualizing your data</p>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="visualizationManager.showSampleData()">
+                        🎯 Show Sample
+                    </button>
+                </div>
             </div>
         </div>
     </div>
