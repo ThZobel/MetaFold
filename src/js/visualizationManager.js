@@ -4,19 +4,13 @@
 const visualizationManager = {
     initialized: false,
     currentData: null,
-    currentVisualizationType: 'jsoncrack', // Default to JSONCrack
+    currentVisualizationType: 'knowledgegraph', // Default to Knowledge Graph
     usesFallback: false,
     activeFilters: null, // Store active filters from search
     
     
     // Available visualization types
     visualizationTypes: {
-        jsoncrack: {
-            name: 'JSONCrack',
-            icon: '🕸️',
-            description: 'Interactive JSONCrack graph visualization',
-            requiresLibrary: 'JSONCrackViewer'
-        },
         dashboard: {
             name: 'Analytics Dashboard',
             icon: '📊',
@@ -53,7 +47,7 @@ const visualizationManager = {
     init() {
         if (this.initialized) return;
         
-        console.log('📊 Initializing Enhanced Visualization Manager with Modern JSONCrack...');
+        console.log('📊 Initializing Enhanced Visualization Manager...');
         
         try {
             this.setupVisualizationContainer();
@@ -70,22 +64,14 @@ const visualizationManager = {
     // ENHANCED: Modern library availability check
     checkAvailableLibraries() {
         const availability = {
-            react: typeof React !== 'undefined',
-            reactDOM: typeof ReactDOM !== 'undefined',
-            jsonCrackViewer: typeof window.JSONCrackViewer !== 'undefined',
             d3: typeof d3 !== 'undefined'
         };
         
         console.log('📊 Library availability check:', availability);
         
-        // ENHANCED: Modern JSONCrack is always available via iframe (no dependencies needed)
-        if (availability.react && availability.reactDOM) {
+        // Check D3.js availability
+        if (availability.d3) {
             this.usesFallback = false;
-            console.log('✅ Modern JSONCrack available - using iframe-based graph visualization');
-        } else if (availability.d3) {
-            this.usesFallback = false;
-            this.currentVisualizationType = 'dashboard';
-            console.log('⚠️ React not available - using D3.js dashboard mode');
         } else {
             this.usesFallback = true;
             this.currentVisualizationType = 'tree';
@@ -99,11 +85,6 @@ const visualizationManager = {
     getAvailableTypes() {
         const availability = this.checkAvailableLibraries();
         const availableTypes = [];
-        
-        // ENHANCED: JSONCrack availability - now depends only on React/ReactDOM
-        if (availability.react && availability.reactDOM) {
-            availableTypes.push('jsoncrack');
-        }
         
         // D3.js availability
         if (availability.d3) {
@@ -130,9 +111,6 @@ const visualizationManager = {
         }
         
         // ENHANCED: Cleanup previous visualization
-        if (this.currentVisualizationType === 'jsoncrack') {
-            this.cleanupJSONCrack();
-        }
         
         this.currentVisualizationType = type;
         console.log(`📊 Visualization type set to: ${type}`);
@@ -224,11 +202,6 @@ const visualizationManager = {
         if (countBadge) countBadge.textContent = totalFilters;
     },
 
-    // Check JSONCrack availability (legacy function for compatibility)
-    checkJSONCrackAvailability() {
-        return this.checkAvailableLibraries();
-    },
-
     // Setup the visualization container
     setupVisualizationContainer() {
         const container = document.getElementById('visualizationContent');
@@ -251,7 +224,6 @@ const visualizationManager = {
         
         const availableLibraries = [];
         if (typeof React !== 'undefined') availableLibraries.push('React');
-        if (typeof window.JSONCrackViewer !== 'undefined') availableLibraries.push('JSONCrack');
         if (typeof d3 !== 'undefined') availableLibraries.push('D3.js');
         
         const libraryStatus = availableLibraries.length > 0 ? 
@@ -608,9 +580,6 @@ const visualizationManager = {
 
             // Route to appropriate visualization method
             switch (this.currentVisualizationType) {
-                case 'jsoncrack':
-                    this.renderJSONCrackVisualization(data);
-                    break;
                 case 'dashboard':
                     this.renderDashboardVisualization(data);
                     break;
@@ -642,337 +611,6 @@ const visualizationManager = {
                 this.renderTreeVisualization(data);
             }
         }
-    },
-
-    // FIXED: Real JSONCrack with MessagePort API (Official Method)
-    renderJSONCrackVisualization(data) {
-        console.log('🕸️ Rendering JSONCrack visualization with MessagePort API...');
-        
-        const container = document.getElementById('visualizationContent');
-        if (!container) {
-            console.error('❌ Visualization container not found');
-            return;
-        }
-
-        try {
-            // Create container for JSONCrack
-            container.innerHTML = `
-                <div style="height: 100%; display: flex; flex-direction: column;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">
-                        <div>
-                            <h4 style="margin: 0; color: #e0e0e0;">🕸️ JSONCrack Interactive Graph</h4>
-                            <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 12px;">Real JSONCrack iframe integration with MessagePort API</p>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()" title="Copy JSON">
-                                📋 Copy
-                            </button>
-                            <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()" title="Export">
-                                💾 Export
-                            </button>
-                        </div>
-                    </div>
-                    <div id="jsoncrackContainer" class="jsoncrack-container" style="flex: 1; position: relative;">
-                        <div id="jsoncrackContent" style="width: 100%; height: 100%;">
-                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">
-                                <div style="text-align: center;">
-                                    <div style="
-                                        width: 40px; height: 40px;
-                                        border: 3px solid rgba(124, 58, 237, 0.3);
-                                        border-top: 3px solid #7c3aed;
-                                        border-radius: 50%;
-                                        animation: spin 1s linear infinite;
-                                        margin: 0 auto 15px;
-                                    "></div>
-                                    <p>Preparing JSONCrack visualization...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <style>
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                </style>
-            `;
-
-            // Create JSONCrack iframe with MessagePort
-            this.createJSONCrackIframe(data);
-
-        } catch (error) {
-            console.error('❌ Error in JSONCrack visualization:', error);
-            this.renderJSONCrackError(container, error.message);
-        }
-    },
-
-    // ENHANCED: Real JSONCrack iframe with MessagePort API
-    createJSONCrackIframe(data) {
-        const jsoncrackContent = document.getElementById('jsoncrackContent');
-        if (!jsoncrackContent) return;
-
-        try {
-            const jsonString = JSON.stringify(data);
-            
-            console.log(`🔍 Data size: ${jsonString.length} chars`);
-            console.log('📊 Using MessagePort API for JSONCrack (official method)');
-            console.log('📊 Data to send:', data);
-            
-            // Store data for MessagePort transmission
-            this.pendingJSONCrackData = data;
-            
-            // Create JSONCrack iframe WITHOUT data (loads faster)
-            const baseUrl = 'https://jsoncrack.com/widget?theme=dark&direction=DOWN';
-            
-            jsoncrackContent.innerHTML = `
-                <div style="position: relative; width: 100%; height: 100%; min-height: 500px;">
-                    <iframe
-                        id="jsoncrackMessagePortIframe"
-                        src="${baseUrl}"
-                        width="100%"
-                        height="100%"
-                        style="border: none; background: transparent; min-height: 500px; height: 100%;"
-                        title="JSONCrack Interactive Graph"
-                        allow="clipboard-write"
-                        sandbox="allow-scripts allow-same-origin allow-popups"
-                    ></iframe>
-                    <div id="jsoncrackLoadingOverlay" style="
-                        position: absolute; 
-                        top: 0; left: 0; right: 0; bottom: 0;
-                        background: rgba(30, 30, 46, 0.9);
-                        display: flex; 
-                        flex-direction: column; 
-                        align-items: center; 
-                        justify-content: center;
-                        color: #9ca3af;
-                        z-index: 10;
-                        min-height: 500px;
-                    ">
-                        <div style="
-                            width: 40px; height: 40px;
-                            border: 3px solid rgba(124, 58, 237, 0.3);
-                            border-top: 3px solid #7c3aed;
-                            border-radius: 50%;
-                            animation: spin 1s linear infinite;
-                            margin-bottom: 15px;
-                        "></div>
-                        <h4>Loading JSONCrack...</h4>
-                        <p style="font-size: 12px;">Preparing your data for visualization</p>
-                        <p style="font-size: 10px; color: #6b7280; margin-top: 10px;">Using MessagePort API</p>
-                    </div>
-                </div>
-                <style>
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                </style>
-            `;
-
-            // Setup MessagePort communication
-            this.setupJSONCrackMessagePort();
-
-        } catch (error) {
-            console.error('❌ Error creating JSONCrack with MessagePort:', error);
-            this.renderJSONCrackError(jsoncrackContent, error.message);
-        }
-    },
-
-    // Setup MessagePort communication with JSONCrack
-    setupJSONCrackMessagePort() {
-        console.log('📨 Setting up MessagePort communication with JSONCrack...');
-        
-        const iframe = document.getElementById('jsoncrackMessagePortIframe');
-        const overlay = document.getElementById('jsoncrackLoadingOverlay');
-        
-        if (!iframe || !this.pendingJSONCrackData) {
-            console.error('❌ MessagePort setup failed - missing iframe or data');
-            return;
-        }
-        
-        let messagePortReady = false;
-        let dataTransmitted = false;
-        
-        // Setup message listener for iframe communication
-        const handleMessage = (event) => {
-            // Security check - only accept messages from jsoncrack.com
-            if (event.origin !== 'https://jsoncrack.com') {
-                console.warn('🔒 Rejected message from unauthorized origin:', event.origin);
-                return;
-            }
-            
-            console.log('📨 Received message from JSONCrack:', event.data);
-            
-            // Handle different message types
-            if (event.data && (event.data.type === 'widget-ready' || event.data === 'ready' || event.data.ready)) {
-                console.log('✅ JSONCrack widget is ready for data');
-                messagePortReady = true;
-                this.sendDataToJSONCrack();
-                
-            } else if (event.data.type === 'error') {
-                console.error('❌ JSONCrack widget error:', event.data.message);
-                this.handleJSONCrackError(event.data.message || 'JSONCrack visualization error');
-                
-            } else if (event.data.type === 'loaded' || event.data.loaded) {
-                console.log('🎉 JSONCrack successfully loaded data');
-                dataTransmitted = true;
-                
-                // Hide loading overlay
-                if (overlay) {
-                    overlay.style.display = 'none';
-                }
-                
-            } else {
-                console.log('📋 JSONCrack message (unknown type):', event.data);
-            }
-        };
-        
-        // Add message listener
-        window.addEventListener('message', handleMessage);
-        
-        // Cleanup function
-        this.jsoncrackCleanup = () => {
-            window.removeEventListener('message', handleMessage);
-            this.pendingJSONCrackData = null;
-        };
-        
-        // Try to send data after iframe loads
-        iframe.onload = () => {
-            console.log('📨 JSONCrack iframe loaded, attempting initial data transmission...');
-            setTimeout(() => {
-                if (!messagePortReady) {
-                    console.log('🔄 Attempting to trigger JSONCrack ready state...');
-                    this.sendDataToJSONCrack();
-                }
-            }, 1000);
-            
-            // Fallback timeout
-            setTimeout(() => {
-                if (!dataTransmitted) {
-                    console.log('⚠️ JSONCrack loading timeout, trying fallback...');
-                    this.sendDataToJSONCrack(true); // Force send
-                }
-            }, 5000);
-            
-            // Final timeout - show error if nothing worked
-            setTimeout(() => {
-                if (!dataTransmitted && overlay && overlay.style.display !== 'none') {
-                    console.error('❌ JSONCrack MessagePort timeout');
-                    this.handleJSONCrackError('JSONCrack loading timeout - the widget may not support MessagePort API properly');
-                }
-            }, 10000);
-        };
-    },
-
-    // Send data to JSONCrack via MessagePort
-    sendDataToJSONCrack(force = false) {
-        const iframe = document.getElementById('jsoncrackMessagePortIframe');
-        
-        if (!iframe || !this.pendingJSONCrackData) {
-            console.error('❌ Cannot send data - missing iframe or data');
-            return;
-        }
-        
-        try {
-            const jsonString = JSON.stringify(this.pendingJSONCrackData);
-            
-            // Prepare message according to JSONCrack documentation
-            const message = {
-                json: jsonString,
-                options: {
-                    theme: 'dark',
-                    direction: 'DOWN'
-                }
-            };
-            
-            console.log('📨 Sending data to JSONCrack via MessagePort...');
-            console.log('📨 Message size:', jsonString.length, 'characters');
-            console.log('📨 Message preview:', jsonString.substring(0, 100) + '...');
-            
-            // Send message to iframe
-            iframe.contentWindow.postMessage(message, 'https://jsoncrack.com');
-            
-            console.log('✅ Data sent to JSONCrack successfully');
-            
-            // If forced, assume success after delay
-            if (force) {
-                setTimeout(() => {
-                    const overlay = document.getElementById('jsoncrackLoadingOverlay');
-                    if (overlay) {
-                        overlay.style.display = 'none';
-                    }
-                    console.log('✅ Forced data transmission completed');
-                }, 2000);
-            }
-            
-        } catch (error) {
-            console.error('❌ Error sending data to JSONCrack:', error);
-            this.handleJSONCrackError('Failed to send data: ' + error.message);
-        }
-    },
-
-    // Handle JSONCrack errors
-    handleJSONCrackError(errorMessage) {
-        console.error('❌ JSONCrack MessagePort error:', errorMessage);
-        
-        const overlay = document.getElementById('jsoncrackLoadingOverlay');
-        if (overlay) {
-            overlay.innerHTML = `
-                <div style="text-align: center; color: #ef4444;">
-                    <svg fill="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px; margin-bottom: 15px;">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM13 17h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                    </svg>
-                    <h4>JSONCrack Communication Error</h4>
-                    <p style="font-size: 12px; max-width: 300px; margin: 10px auto;">${errorMessage}</p>
-                    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.retryJSONCrack()" style="padding: 6px 12px; font-size: 12px;">
-                            🔄 Retry
-                        </button>
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.setVisualizationType('dashboard')" style="padding: 6px 12px; font-size: 12px;">
-                            📊 D3 Dashboard
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-    },
-
-    // Retry JSONCrack
-    retryJSONCrack() {
-        console.log('🔄 Retrying JSONCrack visualization...');
-        if (this.currentData) {
-            this.renderJSONCrackVisualization(this.currentData);
-        }
-    },
-
-    // Cleanup when switching away from JSONCrack
-    cleanupJSONCrack() {
-        if (this.jsoncrackCleanup) {
-            this.jsoncrackCleanup();
-            this.jsoncrackCleanup = null;
-        }
-    },
-
-    // Error display for JSONCrack failures
-    renderJSONCrackError(container, errorMessage) {
-        container.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #ef4444; text-align: center; flex-direction: column; padding: 40px;">
-                <svg fill="currentColor" viewBox="0 0 24 24" style="width: 64px; height: 64px; margin-bottom: 20px;">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM13 17h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                </svg>
-                <h4>JSONCrack Rendering Error</h4>
-                <p><strong>Error:</strong> ${errorMessage}</p>
-                <div style="margin-top: 20px; display: flex; gap: 10px;">
-                    <button class="btn btn-secondary" onclick="visualizationManager.setVisualizationType('dashboard')">
-                        📊 Try D3 Dashboard
-                    </button>
-                    <button class="btn btn-secondary" onclick="visualizationManager.setVisualizationType('tree')">
-                        🌳 Try Tree View
-                    </button>
-                </div>
-            </div>
-        `;
     },
 
     // =================== DASHBOARD HELPERS ===================

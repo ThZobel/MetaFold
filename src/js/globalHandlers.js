@@ -52,6 +52,16 @@ window.switchMainTab = function (tabName) {
             }
         }
 
+        // Toggle Right Sidebar (Integrations)
+        const rightSidebar = document.getElementById('right-sidebar-container');
+        if (rightSidebar) {
+            if (tabName === 'visualize') {
+                rightSidebar.style.display = 'none';
+            } else {
+                rightSidebar.style.display = '';
+            }
+        }
+
         // Tab-specific initialization
         if (tabName === 'discover') {
             console.log('📁 Initializing Discovery tab...');
