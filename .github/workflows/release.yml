@@ -176,7 +176,7 @@ jobs:
       - name: Build visualization (webpack)
         run: |
           echo "=== Building visualization ==="
-          npx webpack --mode=production
+          npx webpack --entry ./index.js --mode=production
         working-directory: src
         continue-on-error: false
 
@@ -313,10 +313,13 @@ jobs:
           
           ## 📖 Documentation
           
-          See the [README](https://github.com/ThZobel/MetaFold/blob/main/README.md) for detailed usage instructions.
-          For a complete history of updates, fixes, and new features, check out the [CHANGELOG](https://github.com/ThZobel/MetaFold/blob/main/CHANGELOG.md).
+           See the [README](https://github.com/ThZobel/MetaFold/blob/${{ github.ref_name }}/README.md) for detailed usage instructions.
+          For a complete history of updates, fixes, and new features, check out the [CHANGELOG](https://github.com/ThZobel/MetaFold/blob/${{ github.ref_name }}/CHANGELOG.md).
           
           ---
+          
+          **Admin User Password:** `admin`  
+          **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/${{ github.ref_name }}/templates)
           
           **Admin User Password:** `admin`  
           **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
