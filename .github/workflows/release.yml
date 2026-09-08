@@ -108,13 +108,6 @@ jobs:
         run: |
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
-          echo "=== Post-install verification ==="
-          if (Test-Path "node_modules\.bin\webpack.cmd") { 
-            echo "✅ webpack.cmd found"
-          } else { 
-            echo "❌ webpack.cmd NOT found - installing webpack-cli"
-            npm install webpack webpack-cli --save-dev
-          }
         working-directory: src
         shell: pwsh
         continue-on-error: false
@@ -124,13 +117,6 @@ jobs:
         run: |
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
-          echo "=== Post-install verification ==="
-          if [ -f "node_modules/.bin/webpack" ]; then
-            echo "✅ webpack found"
-          else
-            echo "❌ webpack NOT found - installing webpack-cli"
-            npm install webpack webpack-cli --save-dev
-          fi
         working-directory: src
         continue-on-error: false
 
@@ -153,13 +139,6 @@ jobs:
           ls -la node_modules/ | head -10 || echo "No node_modules"
           npx webpack --version || echo "webpack not found"
           npx electron-builder --version || echo "electron-builder not found"
-
-      - name: Build visualization (webpack)
-        run: |
-          echo "=== Building visualization ==="
-          npm run build-visualization
-        working-directory: src
-        continue-on-error: false
 
       - name: Build for Windows
         if: matrix.platform == 'windows'
