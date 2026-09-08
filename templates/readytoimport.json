@@ -1,0 +1,55 @@
+{
+  "name": "Readytoimport",
+  "description": "",
+  "type": "experiment",
+  "category": "category4",
+  "structure": "",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2026-07-02T12:27:13.238Z",
+  "options": {
+    "writeFilesOnly": true,
+    "multipleFolders": true
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0,
+      "fetchNextId": false
+    },
+    "elabftwEnabled": true,
+    "omeroEnabled": false,
+    "rspaceEnabled": true,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "targetPath": "D:\\Projects\\neu_user_7",
+    "projectName": "test.txt",
+    "basePath": "D:\\Projects\\neu_user_7"
+  },
+  "metadata": {
+    "fields": {},
+    "fieldOrder": [],
+    "totalFields": 0
+  },
+  "id": "template_1782995233239_r1gtd8kql",
+  "updatedAt": "2026-08-07T10:55:52.806Z",
+  "_fileInfo": {
+    "filename": "readytoimport.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\readytoimport.json",
+    "savedAt": "2026-08-07T10:55:52.806Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Readytoimport",
+  "sourceFilename": "readytoimport.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2026-08-07T10:47:13.018Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

@@ -39,6 +39,17 @@ Since the HTML is no longer in `index.html`, a loading mechanism is required to 
 
 ## 3. Key JavaScript Modules
 
+### Discover Projects & Faceted Search
+*   **`src/js/projectScanner.js`**:
+    *   **Purpose:** Triggers the backend file system scanner to discover MetaFold projects and displays the HTML-based project list.
+    *   **Functionality:** Orchestrates UI interactions for scanning, exporting `*-Summary-*.html` and `*-Data-*.json` files.
+*   **`src/js/facetSearch.js`**:
+    *   **Purpose:** The interactive Faceted Search UI which loads the `*-Data-*.json` summary files.
+    *   **Functionality:** Parses the flattened metadata, dynamically generates filter categories and selectable tags (Facets), and renders a tabulated, searchable list of projects. Automatically extracts external links (like OMERO) and creates clickable action buttons.
+*   **`src/main.js (Backend)`**:
+    *   **Purpose:** Handles the actual file I/O for `scan-metafold-projects`.
+    *   **Functionality:** `parseMetaFoldProject` extracts metadata dynamically, supporting both legacy (`metadata.extra_fields`) and modern flattened metadata structures to ensure backward compatibility and rich data export.
+
 ### Sidebar & Integrations
 *   **`src/js/sidebarIntegration.js`**: 
     *   **Purpose:** Manages the interactivity of the Right Sidebar.

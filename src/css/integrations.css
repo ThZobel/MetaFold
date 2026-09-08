@@ -275,6 +275,18 @@
     border-color: #d97706;
 }
 
+/* Fix: "Create Standalone Dataset" option must not appear italic/grey
+   (browsers sometimes render option[value=""] as a placeholder style) */
+#omeroProjectSelect option {
+    font-style: normal !important;
+    color: inherit !important;
+}
+
+#omeroProjectSelect option[value=""] {
+    font-style: normal !important;
+    color: inherit !important;
+}
+
 /* OMERO Dataset Name Override */
 #omeroDatasetName {
     margin-top: 15px;

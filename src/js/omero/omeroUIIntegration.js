@@ -990,8 +990,8 @@ const omeroUIIntegration = {
 
             const projects = await window.omeroProjects.getProjectsForGroupEnhanced(groupId);
 
-            projectSelect.innerHTML = '<option value="create_new_project">Create New OMERO Project</option>';
-            projectSelect.innerHTML += '<option value="">-- Create standalone dataset --</option>';
+            projectSelect.innerHTML = '<option value="">Create New Dataset</option>';
+            projectSelect.innerHTML += '<option value="create_new_project">Create New OMERO Project</option>';
 
             if (projects.length === 0) {
                 projectSelect.innerHTML += '<option value="" disabled>No projects in this group</option>';
@@ -1081,11 +1081,16 @@ const omeroUIIntegration = {
             const projectName = projectNameInput ? projectNameInput.value || 'New Project' : 'New Project';
             
             if (projectSelect.value === 'create_new_project') {
-                hintDiv.textContent = `Project "${projectName}" will be created`;
+                hintDiv.textContent = `Project "${projectName}" will be created in OMERO`;
             } else if (projectSelect.value !== '') {
-                hintDiv.textContent = `Dataset "${projectName}" will be created`;
+                // Existing project selected — show project name from dropdown
+                const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+                // Strip the " (ID: 1234)" suffix for a cleaner display
+                const rawText = selectedOption ? selectedOption.textContent : '';
+                const cleanProjectName = rawText.replace(/\s*\(ID:\s*\d+\)\s*$/, '').trim();
+                hintDiv.textContent = `Dataset "${projectName}" will be created in Project "${cleanProjectName}"`;
             } else {
-                hintDiv.textContent = `Dataset "${projectName}" will be created`; // Standalone dataset
+                hintDiv.textContent = `"${projectName}" will be created as New Dataset`;
             }
         }
     },

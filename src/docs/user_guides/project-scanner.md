@@ -71,11 +71,10 @@ The Project Scanner is one of MetaFold's most powerful features, designed to dis
 
    ![Scanner Interface](images/scanner-interface.png)
 
-3. **Interface Overview**
-   - **Scan Controls**: Directory selection and scan options
-   - **Results Panel**: Discovered projects and statistics
-   - **Filter and Search**: Tools to find specific projects
-   - **Actions**: Export, visualize, and management options
+   - **Scan Controls**: Options to load specific metadata, scan directories, or search via exported summaries.
+   - **Load Metadata**: Inspect individual project metadata.
+   - **Scan Projects**: Discover projects in a directory and generate an exportable JSON summary.
+   - **Search Metadata**: Faceted tag-search over a previously exported JSON summary to quickly filter datasets.
 
 ### Your First Scan
 
@@ -245,6 +244,17 @@ For each project, you can:
 - Custom filter expressions
 
 ![Search and Filtering](images/scanner-search-filtering.png)
+
+### Faceted Metadata Search (Tag Search)
+
+To handle large amounts of research data, you can use the **Search Metadata** tile on the discovery screen.
+
+1. **Export a Summary**: First, perform a normal scan and click **Export Summary** to generate a JSON file.
+2. **Load the Summary**: Click **Search Metadata** on the start screen and select the exported JSON file.
+3. **Cascading Filters**: The sidebar will dynamically generate tags (chips) based on your metadata.
+    - When you click a tag (e.g., `Coloring: DAPI`), the list of available projects immediately shrinks.
+    - All other tags instantly update. Tags that don't exist in the remaining projects will disappear, meaning you can never hit a "0 results" dead end.
+4. **Integration Links**: The resulting project cards include direct links to open the project locally, or view it directly in OMERO / eLabFTW if an integration is present.
 
 ## Data Visualization
 

@@ -20,6 +20,12 @@
     <link rel="stylesheet" href="css/experimentFormDrag.css">
     <link rel="stylesheet" href="css/enhanced-actions.css">
     <link rel="stylesheet" href="css/userManagement.css">
+    <!-- NEW: Facet Search Styles -->
+    <link rel="stylesheet" href="css/facetSearch.css">
+    <!-- NEW: File Scanner & BioFormats Plugin Styles -->
+    <link rel="stylesheet" href="css/fileScanner.css">
+    <!-- Tabulator.js - Table library for Facet Search (midnight dark theme) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.0/css/tabulator_midnight.min.css">
     <!-- CRITICAL: Layout override to force full width -->
     <link rel="stylesheet" href="css/layout-override.css">
     <!-- Sidebar Resize Styles -->
@@ -148,24 +154,16 @@
 
         <!-- RIGHT SIDEBAR - Integrations & Info -->
         <div id="right-sidebar-container" class="right-sidebar"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 
-        <script>// Manual jsongraph-react export für FallbackViewer
-            window.jsongraphReact = {
-                version: "0.0.12"
-            };
-        </script>
 
-        <!-- JSONCrack Viewer Bundle (NEW - CRITICAL) -->
-        <script src="build/jsoncrack-viewer.js"></script>
-
-        <!-- D3.js for fallback visualization -->
+        <!-- D3.js and Dagre-D3 for Knowledge Graph visualization -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre-d3/0.6.4/dagre-d3.min.js"></script>
 
         <!-- Basis-Module zuerst (PRESERVED) -->
         <script src="js/utils.js"></script>
         <script src="js/storage.js"></script>
+        <script src="js/profileManager.js"></script>
         <script src="js/userManager.js"></script>
         <script src="js/loginModal.js"></script>
         <script src="js/userManagementModal.js"></script>
@@ -205,7 +203,7 @@
         <script src="js/omeroPasswordPrompt.js"></script>
 
         <!-- ENHANCED: Visualization Manager with JSONCrack (LOADED BEFORE OTHER MODULES) -->
-        <script src="js/visualizationManager.js"></script>
+        <script src="js/visualizationManager.js?v=3"></script>
 
         <!-- Template und Form Module (PRESERVED) -->
         <script src="js/templateManager.js"></script>
@@ -214,6 +212,9 @@
         <script src="js/experimentForm.js"></script>
         <script src="js/templateModal.js"></script>
         <script src="js/projectManager.js"></script>
+        <script src="js/knowledgeGraph.js"></script>
+        <script src="js/metadataGraph.js"></script>
+        <script src="js/lineageTree.js"></script>
         <script src="js/enhancedActions.js"></script>
 
         <!-- App Initialisierung zuletzt (PRESERVED) -->
@@ -222,6 +223,12 @@
         <script src="js/componentLoader.js"></script>
         <!-- Sidebar Integration Logic -->
         <script src="js/sidebarIntegration.js"></script>
+        <!-- Tabulator.js - loaded before facetSearch.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.0/js/tabulator.min.js"></script>
+        <!-- NEW: Facet Search Logic -->
+        <script src="js/facetSearch.js"></script>
+        <!-- NEW: File Sidecar Scanner + BioFormats Plugin -->
+        <script src="js/fileScanner.js"></script>
         <script src="js/init_components.js" defer></script>
         <script src="js/app.js"></script>
 
@@ -234,6 +241,9 @@
         <script src="js/projectValidation.js"></script>
         <!-- SETTINGS MODAL CONTAINER -->
         <div id="settings-modal-container"></div>
+
+        <!-- FACET SEARCH MODAL CONTAINER -->
+        <div id="facet-search-modal-container"></div>
 
         <!-- TEMPLATE MODAL CONTAINER -->
         <div id="templateModal"></div>

@@ -525,19 +525,15 @@ const loginModal = {
                             " onclick="loginModal.togglePasswordVisibilityInPrompt()">👁️</button>
                         </div>
                         <div style="display: flex; gap: 1rem;">
-                            <button onclick="document.getElementById('loginPasswordPrompt').remove(); resolve({ action: 'switch_user' });" style="
+                            <button id="loginPasswordSwitchUser" style="
                                 background: linear-gradient(45deg, #3b82f6, #60a5fa); color: white;
                                 border: none; padding: 1rem; border-radius: 12px; cursor: pointer; font-weight: 600;
                             ">🔄 Switch User</button>
-                            <button onclick="document.getElementById('loginPasswordPrompt').remove(); resolve(null);" style="
+                            <button id="loginPasswordCancel" style="
                                 flex: 2; background: linear-gradient(45deg, #6b7280, #9ca3af); color: white;
                                 border: none; padding: 1rem; border-radius: 12px; cursor: pointer; font-weight: 600;
                             ">❌ Cancel</button>
-                            <button onclick="
-                                const pwd = document.getElementById('loginPasswordInput').value;
-                                document.getElementById('loginPasswordPrompt').remove();
-                                resolve(pwd);
-                            " style="
+                            <button id="loginPasswordContinue" style="
                                 flex: 2; background: linear-gradient(45deg, #7c3aed, #a855f7); color: white;
                                 border: none; padding: 1rem; border-radius: 12px; cursor: pointer; font-weight: 600;
                             ">🔓 Continue</button>
@@ -558,6 +554,31 @@ const loginModal = {
                             document.getElementById('loginPasswordPrompt').remove();
                             resolve(pwd);
                         }
+                    });
+                }
+
+                const switchBtn = document.getElementById('loginPasswordSwitchUser');
+                if (switchBtn) {
+                    switchBtn.addEventListener('click', () => {
+                        document.getElementById('loginPasswordPrompt').remove();
+                        resolve({ action: 'switch_user' });
+                    });
+                }
+
+                const cancelBtn = document.getElementById('loginPasswordCancel');
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => {
+                        document.getElementById('loginPasswordPrompt').remove();
+                        resolve(null);
+                    });
+                }
+
+                const continueBtn = document.getElementById('loginPasswordContinue');
+                if (continueBtn) {
+                    continueBtn.addEventListener('click', () => {
+                        const pwd = document.getElementById('loginPasswordInput').value;
+                        document.getElementById('loginPasswordPrompt').remove();
+                        resolve(pwd);
                     });
                 }
             }, 100);

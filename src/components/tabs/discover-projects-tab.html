@@ -4,31 +4,67 @@
             <h2>📁 MetaFold Project Discovery</h2>
             <p>Scan directories to discover and analyze your MetaFold projects</p>
         </div>
-        <div class="header-actions">
-            <button class="btn" onclick="metadataLoader.loadMetadataFile()" id="loadMetadataBtn">
-                📥 Load Metadata
-            </button>
-        </div>
     </div>
 
-    <div id="discoveryQuickStart" class="quick-start-section">
-        <div class="quick-start-content">
-            <div class="quick-start-icon">🔍</div>
-            <h3>Discover Your MetaFold Projects</h3>
-            <p>Scan any directory to find all MetaFold projects with their metadata and get
-                insights
-                into your research data organization.</p>
+    <div id="discoveryTiles" class="discovery-tiles-grid">
+        <!-- Tile 1: Load Metadata -->
+        <div class="discovery-tile" onclick="metadataLoader.loadMetadataFile()">
+            <div class="tile-icon">📥</div>
+            <div class="tile-content">
+                <h3>Load Metadata</h3>
+                <p>Inspect individual project metadata or send them directly to integrations.</p>
+            </div>
+        </div>
+        
+        <!-- Tile 2: Scan Folders (includes ISA option) -->
+        <div class="discovery-tile discovery-tile--scan" style="cursor: default;">
+            <div class="tile-clickable-area" onclick="projectScanner.scanDirectory();" style="cursor: pointer;">
+                <div class="tile-icon">🔍</div>
+                <div class="tile-content">
+                    <h3>Scan Projects</h3>
+                    <p>Scan directories to generate an overview summary of your MetaFold projects.</p>
+                </div>
+            </div>
+            <!-- ISA Option: lives inside the scan tile, read at scan time -->
+            <div class="discovery-tile-option" onclick="event.stopPropagation()">
+                <label for="inheritMetadataCheckbox" style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 0 0 0; border-top: 1px solid rgba(139, 92, 246, 0.2); margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                    <input type="checkbox" id="inheritMetadataCheckbox" style="width: 16px; height: 16px; accent-color: #8b5cf6; cursor: pointer; flex-shrink: 0;">
+                    <span>🧬 <strong>Inherit parent metadata (ISA)</strong></span>
+                </label>
+                <label for="includeFileSidecarsCheckbox" id="includeFileSidecarsLabel" style="display: none; align-items: center; gap: 10px; cursor: pointer; padding: 6px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                    <input type="checkbox" id="includeFileSidecarsCheckbox" style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer; flex-shrink: 0;">
+                    <span>📄 <strong>Include file sidecar metadata</strong></span>
+                </label>
+            </div>
+        </div>
 
-            <div class="quick-start-actions">
-                <button class="btn btn-primary" onclick="projectScanner.scanDirectory()">
-                    🔍 Start Scanning
-                </button>
+        <!-- Tile 3: Search Metadata -->
+        <div class="discovery-tile" onclick="facetSearch.loadSummaryFile()">
+            <div class="tile-icon">🏷️</div>
+            <div class="tile-content">
+                <h3>Search Metadata</h3>
+                <p>Dynamically filter and explore your projects based on an exported JSON summary.</p>
+            </div>
+        </div>
+
+        <!-- Tile 4: File Sidecar Scanner (visible only when plugin is enabled in Settings → Plugins) -->
+        <div class="discovery-tile" id="fileScannerTile" style="display:none;" onclick="fileScanner.startWizard()">
+            <div class="tile-icon">🔬</div>
+            <div class="tile-content">
+                <h3>File Sidecar Scanner</h3>
+                <p>Erstelle JSON-Sidecars für Mikroskopie-Dateien – mit vererbten Projektmetadaten und optional OME-XML via BioFormats.</p>
             </div>
         </div>
     </div>
 
+
     <div id="projectScannerContainer" class="scanner-main-container">
         <!-- Project scanner content will be rendered here -->
+    </div>
+
+    <!-- File Scanner Container (Wizard, Progress, Results) -->
+    <div id="fileScannerContainer" class="scanner-main-container" style="display:none;">
+        <!-- File scanner wizard/progress/results will be rendered here by fileScanner.js -->
     </div>
 
     <!-- Metadata Viewer & Sender Section -->

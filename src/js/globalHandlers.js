@@ -38,6 +38,30 @@ window.switchMainTab = function (tabName) {
         if (tabContent) tabContent.classList.add('active');
         if (tabButton) tabButton.classList.add('active');
 
+        // Sidebar Toggling for Metadata
+        const templateView = document.getElementById('sidebar-template-view');
+        const projectView = document.getElementById('sidebar-project-view');
+        
+        if (templateView && projectView) {
+            if (tabName === 'discover') {
+                templateView.style.display = 'none';
+                projectView.style.display = 'block';
+            } else {
+                templateView.style.display = 'block';
+                projectView.style.display = 'none';
+            }
+        }
+
+        // Toggle Right Sidebar (Integrations)
+        const rightSidebar = document.getElementById('right-sidebar-container');
+        if (rightSidebar) {
+            if (tabName === 'visualize') {
+                rightSidebar.style.display = 'none';
+            } else {
+                rightSidebar.style.display = '';
+            }
+        }
+
         // Tab-specific initialization
         if (tabName === 'discover') {
             console.log('📁 Initializing Discovery tab...');
@@ -605,10 +629,159 @@ window.loadSettingsIntoModal = async function () {
             updaten8nAuthTypeUI(authType);
         }
 
+        // Initialize plugins settings tab UI (so fields have correct saved values when modal opens)
+        if (typeof pluginsSettingsInit === 'function') {
+            await pluginsSettingsInit();
+        }
+
         console.log('✅ All settings loaded into modal successfully');
 
     } catch (error) {
         console.error('❌ Error loading settings into modal:', error);
+    }
+};
+
+// =================== PLUGINS SETTINGS FUNCTIONS ===================
+
+/**
+ * Initialise the Plugins settings tab UI:
+ * - Sync toggles from settingsManager
+ * - Render extension checkboxes
+ */
+window.pluginsSettingsInit = async function () {
+    const sm = window.settingsManager;
+    if (!sm) return;
+
+    // Sync toggle states
+    const fse = document.getElementById('fileScannerEnabled');
+    const bfe = document.getElementById('bioformatsEnabled');
+    const bfp = document.getElementById('bioformatsPath');
+    const bfStatus = document.getElementById('bfStatus');
+
+    if (fse) fse.checked = (await sm.get('plugins.filescanner_enabled')) === true;
+    if (bfe) bfe.checked = (await sm.get('plugins.bioformats_enabled')) === true;
+    if (bfp) bfp.value  = (await sm.get('plugins.bioformats_path'))    || '';
+    if (bfStatus) { bfStatus.className = 'plugins-bf-status idle'; bfStatus.textContent = 'ℹ Noch nicht getestet'; }
+
+    // Render extension checkboxes
+    const grid = document.getElementById('pluginsExtGrid');
+    if (!grid) return;
+
+    const ALL_EXTS = [
+        '.lif', '.czi', '.lsm', '.nd2',
+        '.tif', '.tiff', '.ome.tif',
+        '.oif', '.oib', '.vsi', '.svs',
+        '.ims', '.zvi', '.lof'
+    ];
+
+    let activeExts;
+    try {
+        const raw = await sm.get('plugins.filescanner_extensions');
+        activeExts = typeof raw === 'string' ? JSON.parse(raw) : (raw || ALL_EXTS);
+    } catch (_) {
+        activeExts = ALL_EXTS;
+    }
+
+    grid.innerHTML = ALL_EXTS.map(ext => {
+        const checked = activeExts.includes(ext) ? 'checked' : '';
+        return `
+            <label class="plugins-ext-item" title="${ext}">
+                <input type="checkbox" ${checked}
+                    onchange="pluginsToggleExtension('${ext}', this.checked)">
+                ${ext}
+            </label>
+        `;
+    }).join('');
+};
+
+/**
+ * Toggle a single file extension in the settings
+ */
+window.pluginsToggleExtension = async function (ext, enabled) {
+    const sm = window.settingsManager;
+    if (!sm) return;
+    let exts;
+    try {
+        const raw = await sm.get('plugins.filescanner_extensions');
+        exts = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+    } catch (_) {
+        exts = [];
+    }
+    if (enabled && !exts.includes(ext)) exts.push(ext);
+    if (!enabled) exts = exts.filter(e => e !== ext);
+    await sm.set('plugins.filescanner_extensions', JSON.stringify(exts));
+};
+
+/**
+ * Test BioFormats CLI detectability and show status
+ */
+window.pluginsTestBioFormats = async function () {
+    const statusEl = document.getElementById('bfStatus');
+    const pathEl = document.getElementById('bioformatsPath');
+    if (!statusEl) return;
+
+    statusEl.className = 'plugins-bf-status checking';
+    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Teste BioFormats…';
+
+    try {
+        const customPath = pathEl ? pathEl.value.trim() || undefined : undefined;
+        const result = await window.electronAPI.detectBioFormats(customPath);
+
+        if (result.found) {
+            statusEl.className = 'plugins-bf-status found';
+            statusEl.innerHTML = `✅ Gefunden: ${result.path} (${result.version || 'Version unbekannt'})`;
+            if (pathEl) {
+                pathEl.value = result.path;
+                if (window.settingsManager) {
+                    await window.settingsManager.set('plugins.bioformats_path', result.path);
+                }
+            }
+        } else {
+            statusEl.className = 'plugins-bf-status not-found';
+            statusEl.innerHTML = `❌ Nicht gefunden. Bitte BioFormats CLI installieren und Pfad angeben.`;
+        }
+    } catch (err) {
+        statusEl.className = 'plugins-bf-status not-found';
+        statusEl.textContent = `❌ Fehler: ${err.message}`;
+    }
+};
+
+/**
+ * Auto-detect BioFormats from PATH
+ */
+window.pluginsAutoDetectBioFormats = async function () {
+    const statusEl = document.getElementById('bfStatus');
+    const pathEl   = document.getElementById('bioformatsPath');
+    if (!statusEl) return;
+
+    statusEl.className = 'plugins-bf-status checking';
+    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Auto-Erkennung…';
+
+    try {
+        const result = await window.electronAPI.detectBioFormats(undefined);
+        if (result.found) {
+            if (pathEl) {
+                pathEl.value = result.path;
+                window.settingsManager && window.settingsManager.set('plugins.bioformats_path', result.path);
+            }
+            statusEl.className = 'plugins-bf-status found';
+            statusEl.innerHTML = `✅ Automatisch gefunden: ${result.path} (${result.version || ''})`;
+        } else {
+            statusEl.className = 'plugins-bf-status not-found';
+            statusEl.textContent = '❌ Nicht gefunden. Pfad manuell eingeben.';
+        }
+    } catch (err) {
+        statusEl.className = 'plugins-bf-status not-found';
+        statusEl.textContent = `❌ Fehler: ${err.message}`;
+    }
+};
+
+// Hook into switchSettingsTab – init plugins UI when tab is opened
+const _origSwitchSettingsTab = window.switchSettingsTab;
+window.switchSettingsTab = function (tabName) {
+    _origSwitchSettingsTab(tabName);
+    if (tabName === 'plugins') {
+        pluginsSettingsInit();
     }
 };
 
@@ -1739,6 +1912,109 @@ window.testJSONCrackIntegration = async function () {
         console.error('❌ JSONCrack integration test failed:', error);
         alert(`❌ JSONCrack test failed:\n\n${error.message}\n\nCheck console for details.`);
     }
+};
+
+
+// =================== SIDEBAR PROJECT METADATA VIEWER ===================
+window.showProjectMetadataInSidebar = function(projectPath) {
+    const projectView = document.getElementById('sidebar-project-view');
+    if (!projectView) return;
+
+    const templateView = document.getElementById('sidebar-template-view');
+    if (templateView) templateView.style.display = 'none';
+    projectView.style.display = 'block';
+
+    let project = null;
+    
+    if (window.projectScanner && window.projectScanner.projects) {
+        project = window.projectScanner.projects.find(p => p.path === projectPath || p.path.replace(/\\/g, '\\\\') === projectPath.replace(/\\/g, '\\\\'));
+    }
+    
+    // Highlight the selected project item in the UI
+    document.querySelectorAll('.project-item').forEach(item => {
+        item.classList.remove('active');
+        const itemPathRaw = item.getAttribute('data-project-path');
+        if (itemPathRaw && project) {
+            const itemPath = itemPathRaw.replace(/\\\\/g, '\\').replace(/&quot;/g, '"');
+            if (itemPath === project.path || itemPath.replace(/\\/g, '\\\\') === project.path.replace(/\\/g, '\\\\')) {
+                item.classList.add('active');
+            }
+        }
+    });
+
+    if (!project) {
+        projectView.innerHTML = `
+            <div style="text-align: center; color: #ef4444; margin-top: 40px; padding: 20px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);">
+                <span style="font-size: 2rem; display: block; margin-bottom: 10px;">⚠️</span>
+                Project not found in current scan.
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 5px 0; color: #89b4fa; font-size: 1.1rem; word-break: break-all;">${project.name}</h3>
+            <div style="font-size: 0.8rem; color: #6c7086; word-break: break-all;">${project.path}</div>
+        </div>
+    `;
+
+    if (!project.metadata || Object.keys(project.metadata).length === 0) {
+        html += `
+            <div style="text-align: center; color: #9ca3af; font-style: italic; padding: 20px; background: rgba(0, 0, 0, 0.2); border-radius: 8px;">
+                No metadata fields found for this project.
+            </div>
+        `;
+    } else {
+        html += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
+        
+        const renderMetadataField = (key, field) => {
+            if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level'].includes(key)) return '';
+
+            // If field is an object but doesn't have 'value' and 'type', it's likely a nested category
+            if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
+                let catHtml = `<div style="margin-bottom: 5px; padding: 10px; background: rgba(0,0,0,0.15); border-radius: 8px; border-left: 3px solid #89b4fa;">`;
+                catHtml += `<div style="font-size: 0.85rem; color: #89b4fa; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span>📁</span> ${key.replace(/_/g, ' ')}</div>`;
+                catHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+                for (const [subKey, subField] of Object.entries(field)) {
+                    catHtml += renderMetadataField(subKey, subField);
+                }
+                catHtml += `</div></div>`;
+                return catHtml;
+            }
+
+            const value = (field && field.value !== undefined) ? field.value : field;
+            const type = (field && field.type) ? field.type : 'text';
+            let label = (field && field.label) ? field.label : key.replace(/_/g, ' ');
+            label = label.charAt(0).toUpperCase() + label.slice(1);
+
+            let displayValue = value;
+            if (displayValue === null || displayValue === undefined || displayValue === '') {
+                displayValue = '<em style="color: #6c7086;">Empty</em>';
+            } else if (type === 'url' || (typeof displayValue === 'string' && displayValue.startsWith('http'))) {
+                displayValue = `<a href="${displayValue}" target="_blank" style="color: #a6e3a1; text-decoration: underline; word-break: break-all;">${displayValue}</a>`;
+            } else if (Array.isArray(displayValue)) {
+                displayValue = displayValue.length > 0 ? displayValue.join(', ') : '<em style="color: #6c7086;">Empty</em>';
+            } else if (typeof displayValue === 'object') {
+                displayValue = '<pre style="margin: 0; font-size: 0.8rem; color: #cdd6f4; white-space: pre-wrap;">' + JSON.stringify(displayValue, null, 2) + '</pre>';
+            }
+
+            return `
+                <div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size: 0.7rem; color: #a6adc8; margin-bottom: 2px; font-weight: bold; text-transform: uppercase;">${label}</div>
+                    <div style="color: #cdd6f4; font-size: 0.85rem; word-break: break-word;">${displayValue}</div>
+                </div>
+            `;
+        };
+
+        for (const [key, field] of Object.entries(project.metadata)) {
+            html += renderMetadataField(key, field);
+        }
+        
+        html += `</div>`;
+    }
+
+    projectView.innerHTML = html;
 };
 
 console.log('✅ ENHANCED MetaFold UI Integration loaded with JSONCrack support');

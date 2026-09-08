@@ -1,0 +1,814 @@
+/* ============================================================
+   File Scanner & BioFormats Plugin – MetaFold Styles
+   ============================================================ */
+
+/* ─── Tile: File Sidecar Scanner in Discover Tab ────────────── */
+
+#fileScannerTile {
+    position: relative;
+    overflow: hidden;
+}
+
+#fileScannerTile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.08));
+    pointer-events: none;
+}
+
+/* ─── File Scanner Container ─────────────────────────────────── */
+
+#fileScannerContainer {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    animation: fsc-fadeIn 0.25s ease;
+}
+
+#fileScannerContainer.active {
+    display: flex;
+}
+
+@keyframes fsc-fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Wizard ──────────────────────────────────────────────────── */
+
+.fsc-wizard {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Stepper header */
+.fsc-stepper {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.15);
+    padding: 16px 24px;
+    gap: 8px;
+    align-items: center;
+}
+
+.fsc-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.fsc-step.active {
+    color: #10b981;
+}
+
+.fsc-step.done {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.fsc-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.fsc-step.active .fsc-step-num {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.fsc-step.done .fsc-step-num {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.fsc-step-sep {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    max-width: 40px;
+}
+
+/* Wizard step content panels */
+.fsc-wizard-body {
+    padding: 28px 32px;
+}
+
+.fsc-step-panel {
+    display: none;
+    animation: fsc-fadeIn 0.2s ease;
+}
+
+.fsc-step-panel.active {
+    display: block;
+}
+
+.fsc-step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    margin: 0 0 6px 0;
+}
+
+.fsc-step-desc {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+/* Path picker rows */
+.fsc-path-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.fsc-path-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #e5e7eb;
+    font-size: 0.875rem;
+    font-family: monospace;
+    min-width: 0;
+    cursor: default;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fsc-path-input.placeholder {
+    color: #6b7280;
+    font-style: italic;
+    font-family: inherit;
+}
+
+.fsc-btn {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fsc-btn-primary {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.fsc-btn-primary:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.fsc-btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #d1d5db;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fsc-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #e5e7eb;
+}
+
+.fsc-btn-skip {
+    background: transparent;
+    color: #6b7280;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    font-weight: 500;
+}
+
+.fsc-btn-skip:hover {
+    color: #9ca3af;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.fsc-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Inheritance hint box */
+.fsc-inherit-hint {
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: #6ee7b7;
+    line-height: 1.55;
+    margin-top: 12px;
+}
+
+.fsc-inherit-hint strong {
+    color: #10b981;
+}
+
+/* Confirmation summary box */
+.fsc-summary {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+}
+
+.fsc-summary-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.875rem;
+}
+
+.fsc-summary-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.fsc-summary-label {
+    color: #9ca3af;
+    font-weight: 500;
+    width: 160px;
+    flex-shrink: 0;
+}
+
+.fsc-summary-value {
+    color: #e5e7eb;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 0.82rem;
+}
+
+.fsc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.fsc-badge-green {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.fsc-badge-grey {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.25);
+}
+
+.fsc-badge-yellow {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Wizard nav buttons */
+.fsc-wizard-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 32px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.1);
+    gap: 10px;
+}
+
+/* ─── Progress UI ─────────────────────────────────────────────── */
+
+.fsc-progress-wrapper {
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fsc-progress-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fsc-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(16, 185, 129, 0.25);
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: fsc-spin 0.8s linear infinite;
+}
+
+@keyframes fsc-spin {
+    to { transform: rotate(360deg); }
+}
+
+.fsc-progress-bar-wrap {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.fsc-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.fsc-progress-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.fsc-progress-current-file {
+    font-size: 0.78rem;
+    color: #6b7280;
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ─── Results Table ───────────────────────────────────────────── */
+
+.fsc-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.fsc-results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fsc-results-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fsc-results-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.fsc-results-summary-strip {
+    display: flex;
+    gap: 20px;
+    padding: 10px 24px;
+    background: rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.82rem;
+    color: #9ca3af;
+}
+
+.fsc-results-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 420px;
+}
+
+.fsc-results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.fsc-results-table th {
+    padding: 9px 14px;
+    text-align: left;
+    color: #9ca3af;
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+}
+
+.fsc-results-table td {
+    padding: 8px 14px;
+    color: #d1d5db;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+
+.fsc-results-table tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.fsc-results-table .fsc-col-status {
+    width: 28px;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.fsc-results-table .fsc-col-name {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.fsc-results-table .fsc-col-size {
+    white-space: nowrap;
+    color: #6b7280;
+    font-size: 0.78rem;
+}
+
+.fsc-results-table .fsc-col-ome {
+    font-size: 0.78rem;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fsc-results-table .fsc-col-path {
+    color: #6b7280;
+    font-family: monospace;
+    font-size: 0.72rem;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Error row highlight */
+.fsc-results-table tr.fsc-row-error td {
+    color: #f87171;
+}
+
+/* ─── Plugins Settings Tab ────────────────────────────────────── */
+
+#pluginsSettings {
+    display: none;
+}
+
+#pluginsSettings.active {
+    display: block;
+}
+
+.plugins-section {
+    margin-bottom: 28px;
+    padding: 20px 22px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+}
+
+.plugins-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.plugins-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    margin: 0;
+    flex: 1;
+}
+
+.plugins-section-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.plugins-section-badge.core {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.plugins-section-badge.optional {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.plugins-toggle-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.plugins-toggle-label {
+    flex: 1;
+}
+
+.plugins-toggle-label strong {
+    display: block;
+    color: #e5e7eb;
+    font-size: 0.9rem;
+    margin-bottom: 3px;
+}
+
+.plugins-toggle-label small {
+    color: #9ca3af;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+/* Toggle switch (reuse existing pattern) */
+.plugins-toggle {
+    position: relative;
+    width: 42px;
+    height: 22px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.plugins-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.plugins-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 22px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.plugins-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.plugins-toggle input:checked + .plugins-toggle-slider {
+    background: #10b981;
+}
+
+.plugins-toggle input:checked + .plugins-toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* Extension checkboxes grid */
+.plugins-ext-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+    margin-bottom: 4px;
+}
+
+.plugins-ext-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    font-size: 0.82rem;
+    color: #d1d5db;
+    user-select: none;
+}
+
+.plugins-ext-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.plugins-ext-item input[type="checkbox"] {
+    accent-color: #10b981;
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* BioFormats path row */
+.plugins-path-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+    margin-bottom: 10px;
+}
+
+.plugins-path-input {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+    font-family: monospace;
+    min-width: 0;
+}
+
+.plugins-path-input::placeholder {
+    color: #6b7280;
+    font-style: italic;
+    font-family: inherit;
+}
+
+.plugins-path-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+
+/* BioFormats status indicator */
+.plugins-bf-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    margin-top: 6px;
+    transition: all 0.2s ease;
+}
+
+.plugins-bf-status.idle {
+    background: rgba(255, 255, 255, 0.03);
+    color: #6b7280;
+}
+
+.plugins-bf-status.checking {
+    background: rgba(245, 158, 11, 0.07);
+    color: #f59e0b;
+}
+
+.plugins-bf-status.found {
+    background: rgba(16, 185, 129, 0.07);
+    color: #10b981;
+}
+
+.plugins-bf-status.not-found {
+    background: rgba(239, 68, 68, 0.07);
+    color: #f87171;
+}
+
+.plugins-bf-download-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #60a5fa;
+    font-size: 0.8rem;
+    text-decoration: none;
+    margin-left: auto;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.plugins-bf-download-link:hover {
+    color: #93c5fd;
+    text-decoration: underline;
+}
+
+/* ─── Light Mode overrides ────────────────────────────────────── */
+
+body.light-mode .fsc-wizard,
+body.light-mode .fsc-results {
+    background: #ffffff;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .fsc-stepper {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .fsc-step {
+    color: #9ca3af;
+}
+
+body.light-mode .fsc-step.active { color: #059669; }
+body.light-mode .fsc-step.active .fsc-step-num { background: #059669; border-color: #059669; }
+
+body.light-mode .fsc-step-title { color: #111827; }
+body.light-mode .fsc-step-desc  { color: #6b7280; }
+
+body.light-mode .fsc-path-input {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #374151;
+}
+
+body.light-mode .fsc-btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #d1d5db;
+}
+
+body.light-mode .fsc-wizard-nav,
+body.light-mode .fsc-results-header {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .fsc-results-table th {
+    background: #f3f4f6;
+    color: #6b7280;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .fsc-results-table td {
+    color: #374151;
+    border-color: #f3f4f6;
+}
+
+body.light-mode .plugins-section {
+    background: #ffffff;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .plugins-section-title { color: #111827; }
+body.light-mode .plugins-toggle-label strong { color: #111827; }
+body.light-mode .plugins-toggle-label small  { color: #6b7280; }
+
+body.light-mode .plugins-ext-item {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    color: #374151;
+}
+
+body.light-mode .plugins-path-input {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #111827;
+}

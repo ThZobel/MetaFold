@@ -9,7 +9,7 @@ const projectScanner = {
     statistics: null,
     
     // UI state
-    currentView: 'grid', // 'grid', 'list', 'tree'
+    currentView: 'list', // 'grid', 'list', 'tree'
     currentSort: { field: 'created', ascending: false },
     currentFilters: {},
     searchQuery: '',
@@ -43,6 +43,34 @@ const projectScanner = {
     
     // =================== CORE SCANNING FUNCTIONS ===================
     
+    // Close the scanner and return to discovery tiles
+    closeScanner() {
+        const scannerContainer = document.getElementById('projectScannerContainer');
+        const tiles = document.getElementById('discoveryTiles');
+        
+        if (scannerContainer) {
+            scannerContainer.innerHTML = '';
+            scannerContainer.style.display = 'none';
+        }
+        if (tiles) tiles.style.display = 'grid';
+        
+        const mainHeader = document.querySelector('.discovery-header');
+        if (mainHeader) mainHeader.style.display = 'flex';
+        
+        if (window.updateFooterVisibility) {
+            window.updateFooterVisibility();
+        } else {
+            const footer = document.querySelector('.main-content-footer .footer-actions-container');
+            if (footer) footer.style.display = 'block';
+        }
+        
+        this.projects = [];
+        this.filteredProjects = [];
+        this.currentScannedPath = null;
+        this.statistics = null;
+    },
+
+    
     // Scan a directory for MetaFold projects
     async scanDirectory(directoryPath = null) {
         try {
@@ -57,10 +85,34 @@ const projectScanner = {
                 }
             }
             
+            // Hide discovery tiles when scanning starts
+            const tiles = document.getElementById('discoveryTiles');
+            if (tiles) tiles.style.display = 'none';
+            
+            const mainHeader = document.querySelector('.discovery-header');
+            if (mainHeader) mainHeader.style.display = 'none';
+            
+            const footer = document.querySelector('.main-content-footer .footer-actions-container');
+            if (footer) footer.style.display = 'none';
+            
+            // Ensure scanner container is visible
+            const scannerContainer = document.getElementById('projectScannerContainer');
+            if (scannerContainer) scannerContainer.style.display = 'block';
+            
             this.showScanningUI(directoryPath);
             
-            // Perform the scan
-            const result = await window.electronAPI.scanMetaFoldProjects(directoryPath, 5);
+            // Read ISA inheritance option from checkbox
+            const inheritCheckbox = document.getElementById('inheritMetadataCheckbox');
+            const inheritMetadata = inheritCheckbox ? inheritCheckbox.checked : false;
+            
+            // Read file sidecar option from checkbox
+            const sidecarCheckbox = document.getElementById('includeFileSidecarsCheckbox');
+            const includeFileSidecars = sidecarCheckbox ? sidecarCheckbox.checked : false;
+            
+            const scanOptions = { inheritMetadata, includeFileSidecars };
+            
+            // Perform the scan with options
+            const result = await window.electronAPI.scanMetaFoldProjects(directoryPath, 5, scanOptions);
             
             if (result.success) {
                 // FIXED: Normalize paths and ensure proper structure
@@ -91,8 +143,19 @@ const projectScanner = {
                 console.log(`✅ Found ${this.projects.length} MetaFold projects`);
                 console.log('📋 Project paths:', this.projects.map(p => p.path));
                 
+                // Warn if many file sidecars were found
+                const totalSidecars = this.projects.reduce((sum, p) => sum + (p.fileSidecars ? p.fileSidecars.length : 0), 0);
+                if (totalSidecars > 0) {
+                    console.log(`📄 Total file sidecars collected: ${totalSidecars}`);
+                }
+                if (totalSidecars > 500) {
+                    console.warn(`⚠️ Large number of file sidecars (${totalSidecars}). Summary JSON may be large.`);
+                }
+                
                 this.renderResults();
-                this.showSuccess(`Found ${this.projects.length} MetaFold projects in ${directoryPath}`);
+                
+                const sidecarInfo = totalSidecars > 0 ? ` (+ ${totalSidecars} file sidecars)` : '';
+                this.showSuccess(`Found ${this.projects.length} MetaFold projects${sidecarInfo} in ${directoryPath}`);
                 
                 return true;
             } else {
@@ -226,11 +289,40 @@ const projectScanner = {
             return;
         }
         
+        // Check if the results container already exists
+        const existingResults = container.querySelector('.project-scanner-results');
+        if (existingResults) {
+            // Update only the dynamic parts to prevent losing focus on input fields
+            const listContainer = existingResults.querySelector('.projects-container') || existingResults.querySelector('.no-results');
+            if (listContainer) {
+                listContainer.outerHTML = this.renderProjectList();
+                this.setupResultEventHandlers();
+            }
+            
+            const badge = existingResults.querySelector('.project-count-badge');
+            if (badge) {
+                badge.textContent = `${this.filteredProjects.length} / ${this.projects.length} Projects`;
+            }
+            
+            // Update view toggle buttons if they exist
+            const gridBtn = existingResults.querySelector('.view-btn[title="Grid View"]');
+            const listBtn = existingResults.querySelector('.view-btn[title="List View"]');
+            if (gridBtn) gridBtn.className = `view-btn ${this.currentView === 'grid' ? 'active' : ''}`;
+            if (listBtn) listBtn.className = `view-btn ${this.currentView === 'list' ? 'active' : ''}`;
+            
+            // Sync search query in case it was changed programmatically
+            const searchInput = existingResults.querySelector('#projectSearch');
+            if (searchInput && document.activeElement !== searchInput) {
+                searchInput.value = this.searchQuery || '';
+            }
+            
+            return;
+        }
+        
         const html = `
             <div class="project-scanner-results">
                 ${this.renderHeader()}
                 ${this.renderControls()}
-                ${this.renderStatistics()}
                 ${this.renderProjectList()}
             </div>
         `;
@@ -248,19 +340,51 @@ const projectScanner = {
                     <p>Found <strong>${this.projects.length}</strong> projects in <code>${this.currentScannedPath}</code></p>
                 </div>
                 <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="projectScanner.closeScanner()">
+                        ⬅️ Back
+                    </button>
                     <button class="btn btn-secondary" onclick="projectScanner.rescan()">
                         🔄 Rescan
                     </button>
-                    <button class="btn btn-secondary" onclick="projectScanner.scanDirectory()">
-                        🔍 Change Directory
+                    <button class="btn btn-primary" onclick="projectScanner.scanDirectory()">
+                        🔄 New Scan
                     </button>
-                    <!-- NEW: Export Button -->
                     <button class="btn btn-primary" onclick="projectScanner.exportScanResults()" style="margin-left: 10px;">
-                        💾 Export Summary
+                        📥 Export Summary
                     </button>
                 </div>
             </div>
         `;
+    },
+
+    // Handle Search Metadata
+    searchMetadata() {
+        if (!this.projects || this.projects.length === 0) {
+            this.showError('No projects scanned yet. Scan a directory first.');
+            return;
+        }
+        if (window.facetSearch && typeof window.facetSearch.loadFromProjects === 'function') {
+            window.facetSearch.loadFromProjects(this.projects);
+        } else {
+            console.error("Facet Search module not loaded or missing loadFromProjects method.");
+            this.showError("Facet Search module not loaded.");
+        }
+    },
+
+    // Handle Visualisation
+    visualizeAll() {
+        if (!this.projects || this.projects.length === 0) {
+            this.showError('No projects scanned yet. Scan a directory first.');
+            return;
+        }
+        if (window.switchMainTab) {
+            window.switchMainTab('visualize');
+        }
+        if (window.visualizationManager && typeof window.visualizationManager.loadFromScannedProjects === 'function') {
+            window.visualizationManager.loadFromScannedProjects(this.projects);
+        } else {
+            console.error("Visualization Manager not loaded or missing loadFromScannedProjects method.");
+        }
     },
     
     // Render controls (search, filter, sort)
@@ -273,12 +397,18 @@ const projectScanner = {
                            placeholder="🔍 Search projects..." 
                            value="${this.searchQuery}"
                            onInput="projectScanner.handleSearch(this.value)">
+                    <span class="project-count-badge" style="margin-left: 10px; font-weight: bold;">${this.filteredProjects.length} / ${this.projects.length} Projects</span>
                 </div>
                 
                 <div class="view-controls">
+                    <div style="display: flex; gap: 8px; margin-right: 15px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 15px;">
+                        <button class="btn btn-primary btn-small" onclick="projectScanner.searchMetadata()">🎯 Smart Filters</button>
+                        <button class="btn btn-primary btn-small" onclick="projectScanner.visualizeAll()">📊 Visualisation</button>
+                    </div>
                     <select id="sortSelect" onchange="projectScanner.handleSort(this.value)">
                         <option value="created">📅 Latest First</option>
                         <option value="name">📝 Name A-Z</option>
+                        <option value="name_desc">📝 Name Z-A</option>
                         <option value="size">📏 Size</option>
                         <option value="fieldCount">📊 Field Count</option>
                     </select>
@@ -293,38 +423,6 @@ const projectScanner = {
                             ☰
                         </button>
                     </div>
-                </div>
-            </div>
-        `;
-    },
-    
-    // Render statistics summary
-    renderStatistics() {
-        if (!this.statistics) return '';
-        
-        const stats = this.statistics;
-        
-        return `
-            <div class="scanner-statistics">
-                <div class="stat-item">
-                    <span class="stat-value">${stats.totalProjects}</span>
-                    <span class="stat-label">Projects</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${stats.totalSizeFormatted || '0 B'}</span>
-                    <span class="stat-label">Total Size</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${Math.round(stats.averageFieldCount || 0)}</span>
-                    <span class="stat-label">Avg Fields</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${Math.round(stats.averageCompletionRate || 0)}%</span>
-                    <span class="stat-label">Completion</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${stats.projectsWithReadme}</span>
-                    <span class="stat-label">With README</span>
                 </div>
             </div>
         `;
@@ -366,11 +464,60 @@ const projectScanner = {
         const size = project.size ? this.formatBytes(project.size) : 'Unknown';
         const fieldCount = project.metadataFieldCount || 0;
         
+        // Extract integration URLs dynamically
+        let integrationButtons = '';
+        const addedLinks = new Set();
+        
+        const addIntegrationBtn = (name, url, color, bgColor, icon) => {
+            if (!addedLinks.has(url)) {
+                integrationButtons += `<button class="btn btn-small" style="background: ${bgColor}; color: ${color}; border: 1px solid ${color.replace(')', ', 0.3)').replace('rgb', 'rgba')};" onclick="window.electronAPI.openExternal('${url.replace(/'/g, "\\'")}')" title="Open in ${name}">${icon} ${name}</button>`;
+                addedLinks.add(url);
+            }
+        };
+
+        const knownColors = {
+            'omero': { c: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)', icon: '🔵' },
+            'elabftw': { c: '#22c55e', bg: 'rgba(34, 197, 94, 0.2)', icon: '🟢' },
+            'rspace': { c: '#f97316', bg: 'rgba(249, 115, 22, 0.2)', icon: '🟠' }
+        };
+
+        const getColors = (key) => {
+            const lowerKey = key.toLowerCase();
+            for (let k in knownColors) {
+                if (lowerKey.includes(k)) return knownColors[k];
+            }
+            return { c: '#a855f7', bg: 'rgba(168, 85, 247, 0.2)', icon: '🔗' }; // fallback purple
+        };
+
+        if (project.integrations) {
+            for (const [key, data] of Object.entries(project.integrations)) {
+                const url = data.url || data.link || data.webUrl;
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    const style = getColors(key);
+                    addIntegrationBtn(key.toUpperCase(), url, style.c, style.bg, style.icon);
+                }
+            }
+        }
+        
+        const meta = project.flattenedMetadata || {};
+        for (const k in meta) {
+            if (typeof meta[k] === 'string' && meta[k].startsWith('http')) {
+                const lowerK = k.toLowerCase();
+                if (lowerK.includes('link') || lowerK.includes('url')) {
+                    let name = k.split('.').pop().replace(/_Link|_URL/i, '').replace(/Link|Url/i, '').trim();
+                    if (!name || name.toLowerCase() === 'system') name = k.split('.')[0] || 'Link';
+                    if (name.toLowerCase() === 'system') name = 'Link';
+                    const style = getColors(name);
+                    addIntegrationBtn(name, meta[k], style.c, style.bg, style.icon);
+                }
+            }
+        }
+        
         // FIXED: Properly escape path for HTML attributes
         const escapedPath = project.path.replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
         
         return `
-            <div class="project-item" data-project-path="${escapedPath}">
+            <div class="project-item" data-project-path="${escapedPath}" style="cursor: pointer;" onclick="if(typeof window.showProjectMetadataInSidebar === 'function') window.showProjectMetadataInSidebar('${escapedPath}')">
                 <div class="project-icon">${displayInfo.icon}</div>
                 <div class="project-info">
                     <h4 class="project-name">${displayInfo.displayName}</h4>
@@ -378,7 +525,6 @@ const projectScanner = {
                         <span class="project-date">📅 ${createdDate}</span>
                         <span class="project-size">📏 ${size}</span>
                         <span class="project-fields">📊 ${fieldCount} fields</span>
-                        ${project.hasReadme ? '<span class="project-readme">📖 README</span>' : ''}
                     </div>
                     <div class="project-path" title="${project.path}">${project.path}</div>
                 </div>
@@ -386,9 +532,8 @@ const projectScanner = {
                     <button class="btn btn-small" onclick="projectScanner.openProject('${escapedPath}')" title="Open in Explorer">
                         📂 Open
                     </button>
-                    <button class="btn btn-small" onclick="projectScanner.viewProjectDetails('${escapedPath}')" title="View Details">
-                        👁️ Details
-                    </button>
+                    ${project.hasReadme ? `<button class="btn btn-small" onclick="projectScanner.openReadme('${escapedPath}', '${project.name.replace(/'/g, "\\'")}')" title="Open README">📖 README</button>` : ''}
+                    ${integrationButtons}
                     <button class="btn btn-small" onclick="projectScanner.visualizeProject('${escapedPath}')" title="Visualize">
                         📊 Visualize
                     </button>
@@ -492,27 +637,19 @@ const projectScanner = {
         }
     },
     
-    // View detailed project information
-    async viewProjectDetails(projectPath) {
+    // Open README file
+    async openReadme(projectPath, projectName) {
         try {
-            console.log('👁️ Getting project details for:', projectPath);
-            
-            // FIXED: Ensure proper path formatting
+            console.log('📖 Opening README for:', projectPath);
             let normalizedPath = projectPath;
             if (window.electronAPI.platform === 'win32') {
                 normalizedPath = projectPath.replace(/\//g, '\\').replace(/\\\\/g, '\\');
             }
-            
-            const result = await window.electronAPI.getProjectDetails(normalizedPath);
-            if (result.success) {
-                this.showProjectDetailsModal(result.details);
-            } else {
-                this.showError(`Failed to get project details: ${result.message}`);
-                console.error('👁️ Project details error:', result);
-            }
+            const readmePath = await window.utils.joinPath(normalizedPath, `${projectName}-README.html`);
+            await window.electronAPI.openExternal(`file:///${readmePath.replace(/\\/g, '/')}`);
         } catch (error) {
-            console.error('❌ Error getting project details:', error);
-            this.showError(`Error getting project details: ${error.message}`);
+            console.error('❌ Error opening README:', error);
+            this.showError(`Error opening README: ${error.message}`);
         }
     },
     
@@ -527,12 +664,21 @@ const projectScanner = {
                 window.switchMainTab('visualize');
             }
             
-            // Load project metadata into visualizer
+            // Load ALL projects into visualizer so context is retained
             setTimeout(() => {
-                if (window.visualizationManager.renderVisualization) {
+                if (window.visualizationManager.setVisualizationType) {
+                    window.visualizationManager.setVisualizationType('lineagetree');
+                }
+                
+                if (window.visualizationManager.visualizeFilteredProjects) {
+                    window.visualizationManager.visualizeFilteredProjects(this.projects, null);
+                } else if (window.visualizationManager.renderVisualization) {
                     window.visualizationManager.renderVisualization(project.metadata);
-                } else {
-                    console.warn('⚠️ visualizationManager.renderVisualization not available');
+                }
+                
+                // Focus on the specific project node
+                if (window.visualizationManager.focusNode) {
+                    setTimeout(() => window.visualizationManager.focusNode(projectPath), 300);
                 }
             }, 200);
         } else {
@@ -772,19 +918,67 @@ async copyExportCSS(exportPath) {
 
     // Enrich project data for export
     enrichProjectForExport(project) {
-        return {
+        const enriched = {
             ...project,
             exportEnhancements: {
                 metadataFieldNames: Object.keys(project.metadata || {}),
                 hasReadme: project.hasReadme || false,
                 complexity: this.calculateProjectComplexity(project),
-                completeness: this.calculateProjectCompleteness(project)
+                completeness: this.calculateProjectCompleteness(project),
+                fileSidecarCount: project.fileSidecars ? project.fileSidecars.length : 0
             },
             // Keep original metadata structure for AI searchability
             originalMetadata: project.metadata,
             // Add flattened version for easy searching
             flattenedMetadata: this.flattenMetadata(project.metadata || {})
         };
+        
+        // Include file sidecars with flattened OME-XML for facet search
+        if (project.fileSidecars && project.fileSidecars.length > 0) {
+            enriched.fileSidecars = project.fileSidecars.map(sc => ({
+                sidecar_id: sc.sidecar_id,
+                file: sc.file,
+                generated_at: sc.generated_at,
+                nearest_project_id: sc.nearest_project_id,
+                // Flatten OME-XML metadata for facet search (prefix with OME.)
+                flattenedOmeMetadata: sc.ome_metadata
+                    ? this.flattenOmeMetadata(sc.ome_metadata)
+                    : {}
+            }));
+        }
+        
+        return enriched;
+    },
+    
+    // Flatten OME-XML metadata into dot-notation keys for facet search
+    // e.g. { Pixels: { SizeX: "1024" } } → { "OME.Pixels.SizeX": "1024" }
+    flattenOmeMetadata(omeData, prefix = 'OME') {
+        const flattened = {};
+        
+        for (const [key, value] of Object.entries(omeData)) {
+            // Skip internal markers
+            if (key.startsWith('_')) continue;
+            
+            const fullKey = `${prefix}.${key}`;
+            
+            if (Array.isArray(value)) {
+                // Arrays of objects (e.g. Channels): flatten each with index
+                value.forEach((item, i) => {
+                    if (item && typeof item === 'object') {
+                        Object.assign(flattened, this.flattenOmeMetadata(item, `${fullKey}[${i}]`));
+                    } else if (item !== null && item !== undefined) {
+                        flattened[`${fullKey}[${i}]`] = String(item);
+                    }
+                });
+            } else if (value && typeof value === 'object') {
+                // Nested objects (e.g. Instrument.Objective)
+                Object.assign(flattened, this.flattenOmeMetadata(value, fullKey));
+            } else if (value !== null && value !== undefined && String(value).trim() !== '') {
+                flattened[fullKey] = String(value);
+            }
+        }
+        
+        return flattened;
     },
 
     // Analyze aggregated metadata patterns
@@ -905,12 +1099,16 @@ async copyExportCSS(exportPath) {
         Object.entries(metadata).forEach(([key, value]) => {
             const newKey = prefix ? `${prefix}.${key}` : key;
             
-            if (value && typeof value === 'object' && !Array.isArray(value)) {
+            if (value && typeof value === 'object' && value.hasOwnProperty('value')) {
+                // MetaFold standard format: { value: "...", type: "..." }
+                // Use 'key' instead of 'newKey' to ignore category hierarchies and prevent duplicate facets
+                flattened[key] = value.value;
+            } else if (value && typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively flatten nested objects
                 Object.assign(flattened, this.flattenMetadata(value, newKey));
             } else {
                 // Store the actual value for searching
-                flattened[newKey] = typeof value === 'object' ? value.value : value;
+                flattened[newKey] = value;
             }
         });
         

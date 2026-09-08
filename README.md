@@ -1,79 +1,47 @@
-<img src="/assets/MetafoldLogoPurple.png" alt="MetaFold Logo" width="256">
+# MetaFold 🔬
 
 **A powerful desktop application for laboratory data management and experiment organization**
 
-## Which problem is solved by this tool
-
-MetaFold simplifies laboratory data management through easy-to-use templates that create **reproducible metadata**.  
-It reduces manual steps by automatically generating folder structures and metadata files at multiple locations simultaneously.  
-Thanks to its **integration with OMERO, ELNs, and RSpace**, microscopy data can be automatically imported based on the existing metadata — saving researchers significant time and effort.
-
-- [⚠️ Development Status: PROTOTYPE](#️-development-status-prototype)
-- [✨ Key Features](#-key-features)
-- [Live demo](#live-demo)
-- [🚀 Installation](#-installation)
-  - [Option 1: Pre-built Binaries (Recommended for Most Users)](#option-1-pre-built-binaries-recommended-for-most-users)
-  - [Option 2: Development Setup](#option-2-development-setup)
-    - [Prerequisites](#prerequisites)
-    - [Installation Steps](#installation-steps)
-    - [Building for Production](#building-for-production)
-- [📝 Getting Started with Templates](#-getting-started-with-templates)
-  - [Using Example Templates](#using-example-templates)
-    - [Method 1: Import via User Interface (Recommended)](#method-1-import-via-user-interface-recommended)
-    - [Method 2: Manual Installation](#method-2-manual-installation)
-- [🛡️ Admin User and User Management](#️-admin-user-and-user-management)
-- [🔧 Core Concepts](#-core-concepts)
-  - [Templates](#templates)
-  - [Projects](#projects)
-  - [Discovery](#discovery)
-- [🎯 Target Audience](#-target-audience)
-- [🤝 Contributing](#-contributing)
-- [📄 Acknowledgements](#-acknowledgements)
-- [🔗 Links](#-links)
-
----
-
-## ⚠️ Development Status: PROTOTYPE
-
-> **Disclaimer:**  
-> This project was completely developed with the assistance of [claude.ai](https://claude.ai).  
-> It is currently in a **prototype** stage — use at your own risk.  
-> Contributions, reviews, and testing are highly appreciated.
+MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks, image management systems, and workflow automation tools.
 
 ---
 
 ## ✨ Key Features
 
-<img src="/assets/MetafoldGrafikPurple.png" alt="MetaFold Grafic" width="512">
-
 🗂️ **Template-Based Project Creation**
-- Create standardized folder structures and metadata forms from configurable templates
-- Create .json and .html metadata files.
-- Send your metadata to different systems like electronic lab notebooks (elabFTW, RSpace) and special Databases (OMERO).
+- Create standardized folder structures from configurable templates
+- Dynamic metadata forms with drag & drop field ordering
+- Support for both folder and experiment templates
 
-👥 **Multi-User Support**
-- Secure user and group management with credential storage
+👥 **Multi-User Support & RDM Provenance**
+- Secure user management with credential storage
+- **RDM-compliant profiles** (ISA-JSON inspired) with ORCID & Affiliation support
+- **Automated provenance injection** into metadata files for FAIR compliance
 - User-specific templates and settings
 - Group-based access control
+- Admin account with automatic initialization on first launch
 
 🔗 **Laboratory Integrations**
-- **[elabFTW](https://github.com/elabftw/elabftw)**: Direct experiment creation with metadata based on templates
-- **[RSpace](https://www.researchspace.com/)**: Direct experiment creation with metadata based on templates
-- **[OMERO](https://www.openmicroscopy.org/index.html)**: Dataset creation with map annotations / metadata annotation
-- Directly linking of all integrations 
+- **elabFTW**: Direct experiment creation with metadata sync; select experiment templates via dropdown
+- **OMERO**: Project/Dataset creation with map annotations and smart namespaces
+- **RSpace**: Electronic lab notebook integration
+- **n8n**: Workflow automation via webhooks – trigger custom workflows on project creation
+- **BioFormats**: Automated OME-XML extraction via the built-in File Sidecar Scanner
+- **Secure Authentication**: Multi-layer encryption (DPAPI + user-specific entropy) for all credentials
 
 📊 **Project Discovery & Visualization**
 - Recursive scanning of existing projects
 - Interactive data visualization with JSONCrack
+- **Knowledge Graph & Lineage Tree**: Visualize, connect, and explore project dependencies interactively
+- **Lineage Export & Data Harvest**: Export standalone graph dashboards and selectively copy linked raw data
+- **File Sidecar Scanner**: 3-step wizard to scan microscopy files and extract metadata automatically
 
 🎨 **Modern Interface**
+- **Light & Dark Mode** – toggle with a single click, preference is remembered
+- **Sidebar Metadata Viewer** – Instantly inspect fully parsed, recursive project metadata directly in the sidebar
 - Responsive design for different screen sizes
----
-## Live demo
-
-<img src="/assets/MetaFold_Teaser_konv3.gif" alt="MetaFold Gif" width="512">
-
-<https://youtu.be/OV1vB6SOis8> *(early state & and first try(I will remove / exchange it soon)*
+- Drag & drop functionality
+- Real-time validation and feedback
 
 ---
 
@@ -91,7 +59,7 @@ Thanks to its **integration with OMERO, ELNs, and RSpace**, microscopy data can 
 3. Install the application:
    - **Windows**: Run the `.exe` installer and follow the setup wizard
    - **macOS**: Open the `.dmg` file and drag MetaFold to Applications
-   - **Linux**: 
+   - **Linux**:
      - For `.AppImage`: Make executable (`chmod +x`) and run directly
      - For `.deb`: Install with `sudo dpkg -i MetaFold-x.x.x.deb`
 4. Launch MetaFold from your applications menu
@@ -109,8 +77,7 @@ For developers who want to run from source:
 1. **Clone the repository**
    ```bash
    git clone https://github.com/ThZobel/MetaFold.git
-   cd MetaFold/src
-
+   cd MetaFold
    ```
 
 2. **Install dependencies**
@@ -173,10 +140,18 @@ MetaFold provides example templates to help you get started quickly:
 
 ---
 
-## 🛡️ Admin User and User Management 
+## 📖 Documentation
 
-Admin User Password: `admin`
-To manage users and their passwords, switch to the Admin user (the default password is admin). After switching, you can manage all users — for example, change their groups or reset their passwords.
+For comprehensive documentation, tutorials, and API references, visit:
+
+**📚 [MetaFold Documentation](https://metafold-docs.readthedocs.io/en/latest/)**
+
+The documentation includes:
+- Detailed setup guides
+- Template creation tutorials
+- Integration configuration (elabFTW, OMERO, RSpace, n8n)
+- Advanced features and workflows
+- Troubleshooting guides
 
 ---
 
@@ -186,7 +161,7 @@ To manage users and their passwords, switch to the Admin user (the default passw
 Define reusable project structures with:
 - Custom folder hierarchies
 - Metadata schemas with validation
-- Integration settings for elabFTW/RSpace/OMERO
+- Integration settings for elabFTW / OMERO / RSpace / n8n
 
 ### Projects
 Create standardized experiments with:
@@ -196,9 +171,42 @@ Create standardized experiments with:
 
 ### Discovery
 Analyze existing projects with:
-- Recursive project scanning
-- Statistical analysis and visualization
-- Export capabilities for further analysis
+- **Recursive project scanning**: Generate statistical analysis and data visualization.
+- **JSON Export**: Export aggregated project metadata for further analysis.
+- **Knowledge Graph**: Interactively explore project lineages, visual link connections, and export dependency subgraphs.
+- **Faceted Search**: Explore exported metadata dynamically via an interactive UI.
+  - **Column Selection**: Customize which metadata fields are visible in the results table independently of active filters.
+  - **Multi-Select Filtering**: Combine multiple filter tags for precise project discovery.
+  - **Integrations**: Directly launch OMERO (🔵) or eLabFTW (🟢) links associated with the discovered projects right from the search results.
+
+---
+
+## 🔗 Integrations Overview
+
+| Integration | Purpose | Key Feature |
+|---|---|---|
+| **elabFTW** | Electronic lab notebook | Experiment creation; template selection via dropdown |
+| **OMERO** | Image data management | Project/Dataset + map annotation creation |
+| **RSpace** | Electronic lab notebook | Document creation with folder targeting |
+| **n8n** | Workflow automation | Webhook trigger on project creation |
+
+### n8n Workflow Automation
+Connect MetaFold to your [n8n](https://n8n.io) automation server to trigger custom workflows whenever a new project is created. Configure in **Settings → 🤖 n8n**:
+- Enter your webhook URL
+- Choose authentication (None / Bearer Token / Basic Auth)
+- Optionally set an Instance ID for multi-machine setups
+- Enable the n8n toggle per project in the right sidebar
+
+### elabFTW Template Selection
+When elabFTW is enabled, the right sidebar shows a **Template** dropdown populated directly from your elabFTW server. Select the appropriate experiment template per MetaFold project template – the selection is saved and restored automatically.
+
+---
+
+## 🎨 Light & Dark Mode
+
+MetaFold supports both **dark mode** (default) and **light mode**:
+- Click the ☀️/🌙 button in the top-left sidebar header to toggle
+- Your preference is saved across sessions
 
 ---
 
@@ -214,11 +222,14 @@ MetaFold is designed for:
 
 ## 🤝 Contributing
 
-We welcome contributions! - Development setup guides
+We welcome contributions! Please check our documentation for:
+- Development setup guides
+- Code contribution guidelines
+- Feature request procedures
 
 ---
 
-## 📄 Acknowledgements
+## 📄 License & Acknowledgements
 
 ### Inspiration
 MetaFold is inspired by the excellent **RDM-Desktop Tool** by T. Haraszti:
@@ -228,12 +239,19 @@ MetaFold is inspired by the excellent **RDM-Desktop Tool** by T. Haraszti:
 We thank T. Haraszti for the inspiration and foundation.
 
 ### Development
-This project was developed with the assistance of [claude.ai](https://claude.ai/)
+This project was developed with the assistance of [claude.ai](https://claude.ai/) as part of the **NFDI4BioImage** initiative.
 
 ---
 
 ## 🔗 Links
+
+- 📚 [Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)
 - 📦 [Download Latest Release](https://github.com/ThZobel/MetaFold/releases)
 - 📝 [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
 - 🐛 [Report Issues](https://github.com/ThZobel/MetaFold/issues)
+- 💬 [Discussions](https://github.com/ThZobel/MetaFold/discussions)
 - 🌐 [NFDI4BioImage](https://nfdi4bioimage.de/)
+
+---
+
+*Simplifying laboratory data management, one experiment at a time* ✨
