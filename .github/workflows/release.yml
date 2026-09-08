@@ -1,12 +1,9 @@
-# .github/workflows/release.yml
 name: Build and Release MetaFold
 
-# Wichtig: Permissions für GITHUB_TOKEN
 permissions:
   contents: write
-  
+
 on:
-  # Händischer Trigger über GitHub UI  
   workflow_dispatch:
     inputs:
       version:
@@ -22,8 +19,7 @@ on:
         required: true
         type: boolean
         default: true
-  
-  # Automatischer Trigger bei Tag-Push (optional)
+
   push:
     tags:
       - 'v*'
@@ -31,14 +27,14 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             platform: linux
-          - os: windows-latest  
+          - os: windows-latest
             platform: windows
           - os: macos-latest
             platform: mac
@@ -63,7 +59,6 @@ jobs:
         working-directory: src
         run: npm --no-git-tag-version version ${{ env.VERSION }}
 
-      # Debug: Check file structure (Windows)
       - name: Debug - Check repository structure (Windows)
         if: matrix.platform == 'windows'
         run: |
@@ -74,7 +69,6 @@ jobs:
           echo "=== Find package files ==="
           Get-ChildItem -Recurse -Name "package*.json" 2>nul || echo "No package files found"
 
-      # Debug: Check file structure (Unix-like)
       - name: Debug - Check repository structure (Unix)
         if: matrix.platform != 'windows'
         run: |
@@ -92,7 +86,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: src/package-lock.json
 
-      # Linux specific dependencies
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
@@ -110,16 +103,14 @@ jobs:
             libatspi2.0-0 \
             libgtk-3-0
 
-      # WICHTIG: Dependencies ZUERST installieren!
       - name: Install dependencies (Windows)
         if: matrix.platform == 'windows'
         run: |
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
           echo "=== Post-install verification ==="
-          echo "Checking if webpack was installed..."
           if (Test-Path "node_modules\.bin\webpack.cmd") { 
-            echo "✅ webpack.cmd found in node_modules\.bin\"
+            echo "✅ webpack.cmd found"
           } else { 
             echo "❌ webpack.cmd NOT found - installing webpack-cli"
             npm install webpack webpack-cli --save-dev
@@ -134,9 +125,8 @@ jobs:
           echo "=== Installing npm dependencies ==="
           npm ci --verbose
           echo "=== Post-install verification ==="
-          echo "Checking if webpack was installed..."
           if [ -f "node_modules/.bin/webpack" ]; then
-            echo "✅ webpack found in node_modules/.bin/"
+            echo "✅ webpack found"
           else
             echo "❌ webpack NOT found - installing webpack-cli"
             npm install webpack webpack-cli --save-dev
@@ -144,33 +134,24 @@ jobs:
         working-directory: src
         continue-on-error: false
 
-      # Debug NACH der Installation
       - name: Debug - Check npm setup (Windows)
         if: matrix.platform == 'windows'
         working-directory: src
         run: |
-          echo "=== Node and NPM versions ==="
           node --version
           npm --version
-          echo "=== Checking node_modules ==="
           dir node_modules\ 2>nul | Select-Object -First 10 || echo "No node_modules"
-          echo "=== Checking webpack ==="
           npx webpack --version || echo "webpack not found"
-          echo "=== Checking electron-builder ==="
           npx electron-builder --version || echo "electron-builder not found"
 
       - name: Debug - Check npm setup (Unix)
         if: matrix.platform != 'windows'
         working-directory: src
         run: |
-          echo "=== Node and NPM versions ==="
           node --version
           npm --version
-          echo "=== Checking node_modules ==="
           ls -la node_modules/ | head -10 || echo "No node_modules"
-          echo "=== Checking webpack ==="
           npx webpack --version || echo "webpack not found"
-          echo "=== Checking electron-builder ==="
           npx electron-builder --version || echo "electron-builder not found"
 
       - name: Build visualization (webpack)
@@ -190,7 +171,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
 
-      - name: Build for macOS  
+      - name: Build for macOS
         if: matrix.platform == 'mac'
         run: |
           echo "=== Building for macOS ==="
@@ -201,7 +182,7 @@ jobs:
           DEBUG: electron-builder
 
       - name: Build for Linux
-        if: matrix.platform == 'linux'  
+        if: matrix.platform == 'linux'
         run: |
           echo "=== Building for Linux ==="
           npx electron-builder --linux --publish=never
@@ -210,19 +191,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
 
-      # Debug: Check what was built (Windows)
       - name: Debug - Check build output (Windows)
         if: matrix.platform == 'windows'
         run: |
-          echo "=== Build output ==="
           dir src\dist\ 2>nul || echo "No dist directory found"
           Get-ChildItem -Path src\dist -Recurse -File 2>nul || echo "No files in dist"
 
-      # Debug: Check what was built (Unix)
       - name: Debug - Check build output (Unix)
         if: matrix.platform != 'windows'
         run: |
-          echo "=== Build output ==="
           ls -la src/dist/ || echo "No dist directory found"
           find src/dist -type f -name "*.*" 2>/dev/null || echo "No files in dist"
 
@@ -242,13 +219,12 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    # Läuft wenn: Tag-Push ODER (workflow_dispatch UND create_release=true)
     if: |
       always() && 
       needs.build.result == 'success' &&
       (github.event_name == 'push' || 
        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'))
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -260,7 +236,6 @@ jobs:
 
       - name: Debug - Check downloaded artifacts
         run: |
-          echo "=== Downloaded artifacts ==="
           find ./artifacts -type f -ls 2>/dev/null || echo "No artifacts found"
 
       - name: Get version number
@@ -277,11 +252,11 @@ jobs:
         run: |
           cat << 'EOF' > release_body.md
           # MetaFold ${{ steps.version.outputs.version }}
-          
+
           **Laboratory data management platform for automated folder structures, experiment metadata, and seamless integration with electronic lab notebooks.**
-          
+
           EOF
-          
+
           if [ -n "${{ github.event.inputs.release_notes }}" ]; then
             echo "" >> release_body.md
             echo "## 📝 Release Notes" >> release_body.md
@@ -289,40 +264,37 @@ jobs:
             echo "${{ github.event.inputs.release_notes }}" >> release_body.md
             echo "" >> release_body.md
           fi
-          
+
           cat << 'EOF' >> release_body.md
           ## 📥 Downloads
-          
+
           Choose the version for your operating system:
-          
+
           ### Windows
           - `*.exe` - Windows Installer
-          
-          ### macOS  
+
+          ### macOS
           - `*.dmg` - macOS Disk Image
-          
+
           ### Linux
           - `*.AppImage` - Universal Linux AppImage
           - `*.deb` - Debian/Ubuntu Package
-          
+
           ## 🚀 Installation
-          
+
           - **Windows**: Run the `.exe` installer
-          - **macOS**: Open the `.dmg` and drag MetaFold to Applications  
+          - **macOS**: Open the `.dmg` and drag MetaFold to Applications
           - **Linux**: Make the `.AppImage` executable (`chmod +x`) or install the `.deb` package
-          
+
           ## 📖 Documentation
-          
-           See the [README](https://github.com/ThZobel/MetaFold/blob/${{ github.ref_name }}/README.md) for detailed usage instructions.
+
+          See the [README](https://github.com/ThZobel/MetaFold/blob/${{ github.ref_name }}/README.md) for detailed usage instructions.
           For a complete history of updates, fixes, and new features, check out the [CHANGELOG](https://github.com/ThZobel/MetaFold/blob/${{ github.ref_name }}/CHANGELOG.md).
-          
+
           ---
-          
-          **Admin User Password:** `admin`  
+
+          **Admin User Password:** `admin`
           **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/${{ github.ref_name }}/templates)
-          
-          **Admin User Password:** `admin`  
-          **First-time users:** Check out the [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
           EOF
 
       - name: Create GitHub Release
