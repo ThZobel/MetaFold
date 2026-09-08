@@ -176,7 +176,7 @@ jobs:
       - name: Build visualization (webpack)
         run: |
           echo "=== Building visualization ==="
-          npx webpack --entry ./index.js --mode=production
+          npm run build
         working-directory: src
         continue-on-error: false
 
