@@ -129,20 +129,33 @@ const metadataLinksManager = {
         
         // Use the correct key name based on object type
         const omeroIdKey = isProject ? 'project_id' : 'dataset_id';
+        const omeroGroupId = omeroResult.integration?.actualGroup || omeroResult.integration?.groupContext || null;
+        let omeroGroupName = null;
+        if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
+            omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
+        } else if (window.omeroAuth?.session?.eventContext?.groupName) {
+            omeroGroupName = window.omeroAuth.session.eventContext.groupName;
+        } else if (window.omeroAuth?.session?.groupName) {
+            omeroGroupName = window.omeroAuth.session.groupName;
+        }
         
         enhancedMetadata.metafold_integration.external_links.omero = {
             url: omeroUrl,
             [omeroIdKey]: omeroId?.toString(),
             object_type: objectType,
             user_name: omeroUsername || null,
+            group_id: omeroGroupId?.toString() || null,
+            group_name: omeroGroupName || null,
             uploaded_at: new Date().toISOString(),
             status: 'uploaded'
         };
         
-        console.log('🔬 OMERO integration info added:', {
+        console.log('✨ OMERO integration info added:', {
             [omeroIdKey]: omeroId,
             object_type: objectType,
             user_name: omeroUsername,
+            group_id: omeroGroupId,
+            group_name: omeroGroupName,
             url: omeroUrl
         });
     }

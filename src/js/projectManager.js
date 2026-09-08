@@ -1959,6 +1959,15 @@ const projectManager = {
                     }
                     // ✅ FIX: Use projectData.projectName instead of undefined finalProjectName
                     const projectName = projectData.projectName;
+                    
+                    let omeroGroupName = null;
+                    if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
+                        omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
+                    } else if (window.omeroAuth?.session?.eventContext?.groupName) {
+                        omeroGroupName = window.omeroAuth.session.eventContext.groupName;
+                    } else if (window.omeroAuth?.session?.groupName) {
+                        omeroGroupName = window.omeroAuth.session.groupName;
+                    }
 
                     // Insert links if we have any
                     if (elabftwUrl || omeroUrl || rspaceUrl) {
@@ -1967,7 +1976,8 @@ const projectManager = {
                             elabftwUrl,
                             omeroUrl,
                             projectName,  // ✅ FIXED: Now using defined variable
-                            rspaceUrl
+                            rspaceUrl,
+                            omeroGroupName
                         );
 
                         if (insertResult.success) {

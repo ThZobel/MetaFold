@@ -112,8 +112,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // =================== PROJECT ENHANCEMENT ===================
 
     // Insert links into README files
-    insertLinksIntoReadme: async (projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null) => {
-        return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl, projectName, rspaceUrl);
+    insertLinksIntoReadme: async (projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null, omeroGroupName = null) => {
+        return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl, projectName, rspaceUrl, omeroGroupName);
     },
 
     // Regenerate README.html with metadata and integration links

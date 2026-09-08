@@ -1431,9 +1431,9 @@ ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, pr
 
 // Insert integration links into existing README.html
 // Insert integration links into existing README.html
-ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null) => {
+ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null, omeroGroupName = null) => {
     try {
-        console.log(`📄 IPC: Inserting integration links into README: ${projectPath}`);
+        console.log(`✨ IPC: Inserting integration links into README: ${projectPath}`);
 
         // Construct the correct README filename with project name
         const sanitizedProjectName = projectName
@@ -1466,8 +1466,11 @@ ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl
         if (omeroUrl) {
             linksHtml += `
                     <a href="${omeroUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
-                        <span class="link-icon">🔬</span>
-                        <span class="link-text">Open in OMERO</span>
+                        <span class="link-icon">🔵</span>
+                        <div class="link-content" style="display:flex; flex-direction:column;">
+                            <span class="link-text">Open in OMERO</span>
+                            ${omeroGroupName ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">(Group: ${omeroGroupName})</span>` : ''}
+                        </div>
                     </a>`;
         }
 
