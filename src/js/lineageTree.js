@@ -142,22 +142,22 @@ class MetaFoldLineageTree {
         const zoom = d3.zoom().scaleExtent([0.15, 5]).on('zoom', (event) => g.attr('transform', event.transform));
         svg.call(zoom);
 
-        const treeLayout = d3.tree().size([width - 100, height - 200]);
+        const treeLayout = d3.tree().size([height - 100, width - 250]);
         let i = 0;
         const duration = 500;
 
         const update = (source) => {
             let nodeCount = 0;
             root.eachBefore(d => { nodeCount++; }); // count only visible
-            const dynamicWidth = Math.max(width - 100, nodeCount * 120);
-            treeLayout.size([dynamicWidth, height - 200]);
+            const dynamicHeight = Math.max(height - 100, nodeCount * 35);
+            treeLayout.size([dynamicHeight, width - 250]);
 
             const treeData = treeLayout(root);
             const nodes = treeData.descendants();
             const links = treeData.links();
 
-            // Normalize for fixed-depth (give more vertical space for link labels)
-            nodes.forEach(d => d.y = d.depth * 180);
+            // Normalize for fixed-depth (give more horizontal space for link labels)
+            nodes.forEach(d => d.y = d.depth * 320);
 
             // -- Nodes --
             const nodeSel = g.selectAll('g.node')
@@ -165,7 +165,7 @@ class MetaFoldLineageTree {
 
             const nodeEnter = nodeSel.enter().append('g')
                 .attr('class', 'node')
-                .attr('transform', d => `translate(${source.x0 || root.x},${source.y0 || root.y})`)
+                .attr('transform', d => `translate(${source.y0 || root.y},${source.x0 || root.x})`)
                 .style('cursor', 'pointer')
                 .on('click', (e, d) => {
                     // Node Highlighting
@@ -254,9 +254,9 @@ class MetaFoldLineageTree {
 
             // Add project name labels
             nodeEnter.append('text')
-                .attr('dy', d => (d.children || d._children) ? '-1.5em' : '2.0em')
-                .attr('x', 0)
-                .attr('text-anchor', 'middle')
+                .attr('dy', '.31em')
+                .attr('x', d => d.children || d._children ? -12 : 12)
+                .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
                 .text(d => d.data.name)
                 .style('fill', '#e5e7eb')
                 .style('font-size', d => d.data._type === 'root' ? '16px' : '14px')
@@ -264,11 +264,12 @@ class MetaFoldLineageTree {
                 .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)')
                 .style('pointer-events', 'none');
 
-            // We place this above the link
+            // Add relationship label (_ID -> derived_from)
+            // We place this above the link, slightly offset to the left of the child node
             nodeEnter.append('text')
                 .attr('class', 'link-label')
-                .attr('dy', '-1.5em')
-                .attr('x', -10)
+                .attr('dy', '-1em')
+                .attr('x', -25)
                 .attr('text-anchor', 'end')
                 .text(d => d.data._linkId ? `🔗 ${d.data._linkId}` : '')
                 .style('fill', '#60a5fa') // light blue to highlight the relationship
@@ -280,9 +281,9 @@ class MetaFoldLineageTree {
             // Add badge for children count
             nodeEnter.append('text')
                 .attr('class', 'kg-badge')
-                .attr('dy', '2.8em')
-                .attr('x', 0)
-                .attr('text-anchor', 'middle')
+                .attr('dy', '1.5em')
+                .attr('x', d => d.children || d._children ? -12 : 12)
+                .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
                 .text(d => d._children ? `+${d._children.length} derived` : '')
                 .style('fill', '#9ca3af')
                 .style('font-size', '10px');
@@ -298,24 +299,24 @@ class MetaFoldLineageTree {
                 .style('stroke-width', '2px')
                 .attr('d', d => {
                     const o = {x: source.x0 || root.x, y: source.y0 || root.y};
-                    return d3.linkVertical().x(d => d.x).y(d => d.y)({source: o, target: o});
+                    return d3.linkHorizontal().x(d => d.y).y(d => d.x)({source: o, target: o});
                 });
 
             const linkUpdate = linkEnter.merge(linkSel);
             linkUpdate.transition().duration(duration)
-                .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
+                .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x));
 
             linkSel.exit().transition().duration(duration)
                 .attr('d', d => {
                     const o = {x: source.x, y: source.y};
-                    return d3.linkVertical().x(d => d.x).y(d => d.y)({source: o, target: o});
+                    return d3.linkHorizontal().x(d => d.y).y(d => d.x)({source: o, target: o});
                 })
                 .remove();
 
             // Node updates
             const nodeUpdate = nodeEnter.merge(nodeSel);
             nodeUpdate.transition().duration(duration)
-                .attr('transform', d => `translate(${d.x},${d.y})`);
+                .attr('transform', d => `translate(${d.y},${d.x})`);
                 
             nodeUpdate.select('circle').transition().duration(duration)
                 .attr('r', d => d.depth === 0 ? 10 : d.data._type === 'cycle' ? 6 : 8)
@@ -328,14 +329,14 @@ class MetaFoldLineageTree {
                 .style('opacity', 1);
 
             const nodeExit = nodeSel.exit().transition().duration(duration)
-                .attr('transform', `translate(${source.x},${source.y})`).remove();
+                .attr('transform', `translate(${source.y},${source.x})`).remove();
             nodeExit.select('circle').attr('r', 0);
             nodeExit.select('.link-label').style('opacity', 0);
 
             nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
         };
 
-        root.x0 = width / 2;
+        root.x0 = height / 2;
         root.y0 = 0;
         update(root);
 
@@ -344,11 +345,11 @@ class MetaFoldLineageTree {
         if (allNodes.length > 0) {
             const xExtent = d3.extent(allNodes, d => d.x);
             const yExtent = d3.extent(allNodes, d => d.y);
-            const treeW = (xExtent[1] - xExtent[0]) + 150;
-            const treeH = (yExtent[1] - yExtent[0]) + 250;
+            const treeW = (yExtent[1] - yExtent[0]) + 250;
+            const treeH = (xExtent[1] - xExtent[0]) + 150;
             const scale = Math.min(width / (treeW || 1), height / (treeH || 1), 1) * 0.85;
-            const tx = width / 2 - (xExtent[0] + xExtent[1]) / 2 * scale;
-            const ty = 100;
+            const tx = 100;
+            const ty = height / 2 - (xExtent[0] + xExtent[1]) / 2 * scale;
             svg.transition().duration(600).call(
                 zoom.transform,
                 d3.zoomIdentity.translate(tx, ty).scale(scale)
@@ -409,8 +410,8 @@ window.lineageTreeFocusNode = (projectPath) => {
         const scale = 2.0; // Stronger zoom
         const width = window.__lastLineageTreeWidth || 800;
         const height = window.__lastLineageTreeHeight || 600;
-        const tx = width / 2 - targetNode.x * scale;
-        const ty = height / 2 - targetNode.y * scale;
+        const tx = width / 2 - targetNode.y * scale;
+        const ty = height / 2 - targetNode.x * scale;
         
         window.__lastLineageTreeSvg.transition().duration(800).call(
             window.__lastLineageTreeZoom.transform,

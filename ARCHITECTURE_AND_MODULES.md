@@ -468,6 +468,9 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
 - **Recursive Metadata Rendering**: Upgraded `globalHandlers.js` to parse and render nested metadata categories (e.g., `Microscopy`, `Biological Sample`) recursively. Nested objects are formatted cleanly with folder icons and distinct borders instead of raw JSON stringification, maintaining the original type logic (URL highlighting, empty states) across all depths.
 - **Active Selection Highlighting**: Clicking a project item adds an `.active` CSS state in `projectScanner.css`, visually highlighting the currently inspected row with a gradient background, border, and glow effect to indicate the active selection.
 
+### Lineage Tree Orientation (Current Session)
+- **Horizontal Left-to-Right Layout**: Reverted the Lineage Tree (`lineageTree.js`) from a top-to-bottom layout to a horizontal (left-to-right) collapsible tidy tree. Projects are now stacked vertically below each other, preventing long project names from creating overly wide layouts and excessive gaps.
+
 ---
 
 ## 14. Version Control & Repository Structure
