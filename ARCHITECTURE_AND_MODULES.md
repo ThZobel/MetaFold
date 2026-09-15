@@ -471,6 +471,13 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
 ### Lineage Tree Orientation (Current Session)
 - **Horizontal Left-to-Right Layout**: Reverted the Lineage Tree (`lineageTree.js`) from a top-to-bottom layout to a horizontal (left-to-right) collapsible tidy tree. Projects are now stacked vertically below each other, preventing long project names from creating overly wide layouts and excessive gaps.
 
+### Template List Scrollbar Fix (Current Session)
+- **Root Cause**: When `<div id="sidebar-template-view">` was introduced to wrap `.header` and `#templateList` (to toggle between templates and `#sidebar-project-view`), it lacked flex container styles. Because it defaulted to `display: block` with unconstrained height, `#templateList`'s `flex: 1` had no effect and `#templateList` expanded to its full content height instead of being bounded by the sidebar. Consequently, `#templateList` never overflowed internally to trigger its scrollbar, while `.sidebar` (`overflow: hidden; height: 100vh`) clipped all templates overflowing the viewport.
+- **Fix**:
+  - `src/css/base.css`: Added `#sidebar-template-view` rule (`display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; width: 100%;`) and added `min-height: 0;` plus standard `scrollbar-width` to `#templateList`.
+  - `src/components/sidebars/left-sidebar.html`: Added inline style to `#sidebar-template-view` matching the flex column layout and full height.
+  - `src/js/globalHandlers.js`: Updated `switchMainTab()` to toggle `templateView.style.display = 'flex'` (instead of `'block'`) when switching back from the Discovery tab.
+
 ---
 
 ## 14. Version Control & Repository Structure

@@ -47,7 +47,7 @@ window.switchMainTab = function (tabName) {
                 templateView.style.display = 'none';
                 projectView.style.display = 'block';
             } else {
-                templateView.style.display = 'block';
+                templateView.style.display = 'flex';
                 projectView.style.display = 'none';
             }
         }
