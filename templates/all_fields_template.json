@@ -19,7 +19,7 @@
   },
   "projectDefaults": {
     "basePath": "D:\\Projects",
-    "projectName": "AllFields_Test",
+    "projectName": "json_example",
     "targetPath": "D:\\Projects"
   },
   "metadata": {
@@ -99,7 +99,8 @@
         "required": false,
         "position": 9,
         "description": "A 5-star rating input",
-        "defaultValue": 3
+        "defaultValue": 3,
+        "useForFilename": true
       },
       "field_dropdown": {
         "type": "dropdown",
@@ -190,11 +191,11 @@
   "nameSource": "filename",
   "originalCreator": "Admin",
   "originalGroup": "System",
-  "updatedAt": "2026-08-07T10:59:59.535Z",
+  "updatedAt": "2026-09-14T10:54:00.943Z",
   "_fileInfo": {
     "filename": "all_fields_template.json",
     "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\all_fields_template.json",
-    "savedAt": "2026-08-07T10:59:59.535Z",
+    "savedAt": "2026-09-14T10:54:00.943Z",
     "source": "file",
     "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
     "stable": true,
@@ -203,7 +204,7 @@
   },
   "originalName": "All Fields Template",
   "sourceFilename": "all_fields_template.json",
-  "lastFileUpdate": "2026-08-07T10:59:51.535Z",
+  "lastFileUpdate": "2026-09-14T10:53:29.021Z",
   "savedLocally": true,
   "storageType": "file",
   "storageDisplay": "Saved as file",

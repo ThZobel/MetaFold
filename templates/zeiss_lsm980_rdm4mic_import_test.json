@@ -3,7 +3,7 @@
   "description": "Professional microscopy experiment template with comprehensive metadata fields",
   "type": "experiment",
   "category": "category3",
-  "structure": "",
+  "structure": "egg/\n  [stage]/\n    sub/",
   "createdBy": "Admin",
   "createdByGroup": "System",
   "createdAt": "2025-06-12T12:38:25.751Z",
@@ -23,7 +23,7 @@
   },
   "projectDefaults": {
     "basePath": "D:\\Projects",
-    "projectName": "AutoUpload_Test_02",
+    "projectName": "Archane_test4",
     "targetPath": "D:\\Projects"
   },
   "metadata": {
@@ -56,8 +56,7 @@
           "jDCV",
           "Linear Unmixing (34Ch)"
         ],
-        "defaultValue": "Airyscan SR",
-        "useForFilename": true
+        "defaultValue": "Airyscan SR"
       },
       "laser_lines": {
         "type": "multicheckbox",
@@ -73,22 +72,29 @@
           "635nm"
         ],
         "defaultValue": [
-          "488nm",
-          "561nm"
-        ],
-        "useForFilename": false
+          "561nm",
+          "635nm"
+        ]
       },
       "Biological Sample_group": {
         "type": "group",
         "label": "Biological Sample",
         "position": 5
       },
+      "stage": {
+        "type": "text",
+        "label": "EggChamber Stage",
+        "value": "",
+        "required": false,
+        "position": 6,
+        "defaultValue": "Stage_9"
+      },
       "dyes": {
         "type": "text",
         "label": "Dyes",
         "value": "",
         "required": false,
-        "position": 6,
+        "position": 7,
         "description": "Used fluorescent dyes (multiple values separated by comma)",
         "defaultValue": ""
       },
@@ -97,7 +103,7 @@
         "label": "Fluorescent Proteins",
         "value": "",
         "required": false,
-        "position": 7,
+        "position": 8,
         "description": "Used fluorescent proteins (multiple values separated by comma)",
         "defaultValue": ""
       },
@@ -106,7 +112,7 @@
         "label": "Organism",
         "value": "",
         "required": false,
-        "position": 8,
+        "position": 9,
         "description": "Source organism",
         "options": [
           "Homo sapiens",
@@ -117,25 +123,23 @@
           "Arabidopsis thaliana",
           "Other"
         ],
-        "defaultValue": "Mus musculus",
-        "useForFilename": false
+        "defaultValue": ""
       },
       "Strain": {
         "type": "text",
         "label": "Strain",
         "value": "",
         "required": false,
-        "position": 9,
+        "position": 10,
         "description": "Strain ID",
-        "defaultValue": "",
-        "useForFilename": true
+        "defaultValue": ""
       },
       "Strain URL": {
         "type": "url",
         "label": "Strain URL",
         "value": "",
         "required": false,
-        "position": 10,
+        "position": 11,
         "description": "URLto your Strain",
         "defaultValue": ""
       },
@@ -144,7 +148,7 @@
         "label": "Cell Type",
         "value": "",
         "required": false,
-        "position": 11,
+        "position": 12,
         "description": "Type of cells being imaged",
         "defaultValue": ""
       },
@@ -153,7 +157,7 @@
         "label": "Organism Part",
         "value": "",
         "required": false,
-        "position": 12,
+        "position": 13,
         "description": "Specific part of organism",
         "defaultValue": ""
       },
@@ -162,7 +166,7 @@
         "label": "Fixation",
         "value": "",
         "required": true,
-        "position": 13,
+        "position": 14,
         "description": "Sample fixation status",
         "options": [
           "Fixed",
@@ -175,7 +179,7 @@
         "label": "Sample Type",
         "value": "",
         "required": false,
-        "position": 14,
+        "position": 15,
         "description": "Type of sample preparation",
         "options": [
           "Cell Culture",
@@ -193,7 +197,7 @@
         "label": "Sample Description",
         "value": "",
         "required": false,
-        "position": 15,
+        "position": 16,
         "description": "Detailed description of the sample",
         "defaultValue": ""
       },
@@ -202,7 +206,7 @@
         "label": "Imaging Purpose",
         "value": "",
         "required": false,
-        "position": 16,
+        "position": 17,
         "description": "Purpose and goals of the imaging experiment",
         "defaultValue": ""
       },
@@ -211,7 +215,7 @@
         "label": "qwer ID",
         "value": "",
         "required": false,
-        "position": 17,
+        "position": 18,
         "description": "Creates an anchor point for the Knowledge Graph.",
         "defaultValue": ""
       },
@@ -220,7 +224,7 @@
         "label": "Derived From (IDs)",
         "value": "",
         "required": false,
-        "position": 18,
+        "position": 19,
         "description": "Link this experiment to previous IDs (e.g. Parent Sample, Protocol).",
         "defaultValue": []
       }
@@ -231,6 +235,7 @@
       "mode",
       "laser_lines",
       "Biological Sample_group",
+      "stage",
       "dyes",
       "fluorescent_proteins",
       "organism",
@@ -245,14 +250,14 @@
       "qwer_ID",
       "derived_from"
     ],
-    "totalFields": 18
+    "totalFields": 19
   },
   "id": "template_1752607858111_3jgszxznc",
-  "updatedAt": "2026-08-07T10:47:28.331Z",
+  "updatedAt": "2026-08-07T14:21:22.703Z",
   "_fileInfo": {
     "filename": "zeiss_lsm980_rdm4mic_import_test.json",
     "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\zeiss_lsm980_rdm4mic_import_test.json",
-    "savedAt": "2026-08-07T10:47:28.331Z",
+    "savedAt": "2026-08-07T14:21:22.703Z",
     "source": "file",
     "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
     "stable": true,
@@ -263,7 +268,7 @@
   "sourceFilename": "zeiss_lsm980_rdm4mic_import_test.json",
   "fileBasedNaming": true,
   "nameSource": "filename",
-  "lastFileUpdate": "2026-08-07T10:47:13.021Z",
+  "lastFileUpdate": "2026-08-07T14:20:50.650Z",
   "savedLocally": true,
   "storageType": "file",
   "storageDisplay": "Saved as file",

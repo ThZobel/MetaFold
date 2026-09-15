@@ -42,7 +42,7 @@
   "createdBy": "Admin",
   "createdByGroup": "System",
   "createdAt": "2026-08-04T10:19:47.867Z",
-  "updatedAt": "2026-08-07T10:55:49.892Z",
+  "updatedAt": "2026-08-07T12:34:03.376Z",
   "integrations": {
     "elabftw": {
       "defaultCategory": 5,
@@ -62,7 +62,7 @@
   "_fileInfo": {
     "filename": "retrospective_copy.json",
     "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\retrospective_copy.json",
-    "savedAt": "2026-08-07T10:55:49.892Z",
+    "savedAt": "2026-08-07T12:34:03.376Z",
     "source": "file",
     "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
     "stable": true,
@@ -73,7 +73,7 @@
   "sourceFilename": "retrospective_copy.json",
   "fileBasedNaming": true,
   "nameSource": "filename",
-  "lastFileUpdate": "2026-08-07T10:47:13.019Z",
+  "lastFileUpdate": "2026-08-07T12:20:20.654Z",
   "savedLocally": true,
   "storageType": "file",
   "storageDisplay": "Saved as file",
