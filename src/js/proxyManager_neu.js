@@ -265,15 +265,33 @@ class OMEROProxyServer {
         delete headers.host;
         delete headers['content-length']; // Will be set automatically
         
+        // Clean origin (strict: no trailing slash or path for Django 4+ CSRF)
+        let cleanOrigin = this.omeroServerUrl;
+        try {
+            const parsed = new URL(this.omeroServerUrl);
+            cleanOrigin = parsed.origin;
+        } catch (e) {
+            cleanOrigin = (this.omeroServerUrl || '').replace(/\/+$/, '');
+        }
+
         // CSRF FIX 1: Set proper Referer header
-        headers.referer = this.omeroServerUrl + '/';
+        headers.referer = `${cleanOrigin}/webclient/login/`;
         
-        // CSRF FIX 2: Set Origin header for Django 4+ compatibility
-        headers.origin = this.omeroServerUrl;
+        // CSRF FIX 2: Set Origin header for Django 4+ compatibility (STRICT: no trailing slash!)
+        headers.origin = cleanOrigin;
         
         // CSRF FIX 3: Ensure proper cookie handling
         if (this.clientSessions.has(clientId)) {
             headers.cookie = this.clientSessions.get(clientId);
+        }
+
+        // CSRF FIX 4: Ensure CSRF cookie matches X-CSRFToken header if provided
+        const csrfTokenHeader = req.headers['x-csrftoken'];
+        if (csrfTokenHeader) {
+            let currentCookies = headers.cookie || '';
+            if (!currentCookies.includes('csrftoken=')) {
+                headers.cookie = currentCookies ? `${currentCookies}; csrftoken=${csrfTokenHeader}` : `csrftoken=${csrfTokenHeader}`;
+            }
         }
         
         console.log(`🔧 Headers for ${clientId}:`, {
