@@ -84,6 +84,17 @@
                 }
             }
             
+            let omeroGroupName = null;
+            if (omeroUrl) {
+                if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
+                    omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
+                } else if (window.omeroAuth?.session?.eventContext?.groupName) {
+                    omeroGroupName = window.omeroAuth.session.eventContext.groupName;
+                } else if (window.omeroAuth?.session?.groupName) {
+                    omeroGroupName = window.omeroAuth.session.groupName;
+                }
+            }
+
             // Only proceed with link insertion if we have at least one link
             if (elabftwUrl || omeroUrl) {
                 console.log('📄 metadataLoader: STEP 2 - Inserting integration links...');
@@ -104,7 +115,9 @@
                             directoryPath,  // Folder where README is saved
                             elabftwUrl,
                             omeroUrl,
-                            projectName
+                            projectName,
+                            null, // rspaceUrl
+                            omeroGroupName
                         );
                         
                         if (insertResult.success) {

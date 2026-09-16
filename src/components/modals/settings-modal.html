@@ -16,6 +16,9 @@
             <button class="settings-tab" onclick="switchSettingsTab('n8n')" id="n8nTab">
                 🤖 n8n
             </button>
+            <button class="settings-tab" onclick="switchSettingsTab('plugins')" id="pluginsTab">
+                🔌 Plugins
+            </button>
         </div>
 
         <!-- General Settings Tab -->
@@ -795,6 +798,14 @@
 
 
 
+                    <div class="form-group" style="padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="omeroUseJsonTriplets">
+                            <span>Detailed metadata format</span>
+                        </label>
+                        <small>Use advanced JSON triplets for OMERO metadata mapping</small>
+                    </div>
+
                     <div class="form-group">
                         <button class="btn btn-secondary" onclick="testOMEROConnection()">🔍 Test Connection</button>
                         <div id="omeroConnectionStatus" style="margin-top: 10px; display: none;"></div>
@@ -880,6 +891,93 @@
                 </div>
             </div>
         </div>
+
+        <!-- =================== PLUGINS SETTINGS TAB =================== -->
+        <div id="pluginsSettings" class="settings-tab-content">
+
+            <!-- Section 1: File Sidecar Scanner -->
+            <div class="plugins-section">
+                <div class="plugins-section-header">
+                    <h3 class="plugins-section-title">🗂 File Sidecar Scanner</h3>
+                    <span class="plugins-section-badge core">Core</span>
+                </div>
+                <p style="color:#9ca3af; font-size:0.85rem; margin:0 0 16px 0; line-height:1.5;">
+                    Scannt Ordner nach Mikroskopie-Dateien und legt neben jeder Datei eine
+                    <code>.metafold-sidecar.json</code> an. Diese enthält Dateiinfos und vererbte
+                    Projektmetadaten aus übergeordneten Ordnern.
+                </p>
+
+                <div class="plugins-toggle-row">
+                    <label class="plugins-toggle" title="File Sidecar Scanner aktivieren">
+                        <input type="checkbox" id="fileScannerEnabled"
+                            onchange="settingsManager && settingsManager.set('plugins.filescanner_enabled', this.checked); fileScanner && fileScanner._applyVisibility();">
+                        <span class="plugins-toggle-slider"></span>
+                    </label>
+                    <div class="plugins-toggle-label">
+                        <strong>File Sidecar Scanner aktivieren</strong>
+                        <small>Zeigt den &quot;🔬 File Sidecar Scanner&quot; Button im Discover-Tab.</small>
+                    </div>
+                </div>
+
+                <p style="color:#9ca3af; font-size:0.82rem; margin: 14px 0 6px 0;">Gesuchte Dateiendungen:</p>
+                <div class="plugins-ext-grid" id="pluginsExtGrid">
+                    <!-- Rendered by pluginsSettingsInit() -->
+                </div>
+            </div>
+
+            <!-- Section 2: BioFormats OME-XML (Optional) -->
+            <div class="plugins-section">
+                <div class="plugins-section-header">
+                    <h3 class="plugins-section-title">🔬 BioFormats OME-XML</h3>
+                    <span class="plugins-section-badge optional">Optional</span>
+                </div>
+                <p style="color:#9ca3af; font-size:0.85rem; margin:0 0 16px 0; line-height:1.5;">
+                    Liest OME-XML-Metadaten (Mikroskop-Modell, Objektiv, Kanäle, Voxelgröße…)
+                    direkt aus den Dateien und schreibt sie in die Sidecar.<br>
+                    <strong style="color:#e5e7eb;">Voraussetzung:</strong> Java 8+ und
+                    <a href="#" onclick="window.electronAPI.openExternal('https://www.openmicroscopy.org/bio-formats/downloads/'); return false;"
+                       style="color:#60a5fa;">BioFormats Command Line Tools</a> müssen installiert sein.
+                    Kein WSL nötig – läuft nativ auf Windows.
+                </p>
+
+                <div class="plugins-toggle-row">
+                    <label class="plugins-toggle" title="BioFormats OME-XML aktivieren">
+                        <input type="checkbox" id="bioformatsEnabled"
+                            onchange="settingsManager && settingsManager.set('plugins.bioformats_enabled', this.checked);">
+                        <span class="plugins-toggle-slider"></span>
+                    </label>
+                    <div class="plugins-toggle-label">
+                        <strong>OME-XML-Metadaten in Sidecar schreiben</strong>
+                        <small>Ruft <code>showinf</code> (BioFormats CLI) als Hintergrundprozess auf. Pro Datei ca. 5-15 Sek.</small>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <label style="color:#9ca3af; font-size:0.82rem; display:block; margin-bottom:6px;">Pfad zu <code>showinf</code> / <code>showinf.bat</code>:</label>
+                    <div class="plugins-path-row">
+                        <input type="text" class="plugins-path-input" id="bioformatsPath"
+                            placeholder="Leer lassen für Auto-Erkennung aus PATH…"
+                            onchange="settingsManager && settingsManager.set('plugins.bioformats_path', this.value);"
+                            oninput="document.getElementById('bfStatus').className='plugins-bf-status idle'; document.getElementById('bfStatus').textContent='Klicke Test zum Prüfen';">
+                        <button class="fsc-btn fsc-btn-secondary" onclick="pluginsTestBioFormats()" style="white-space:nowrap;">
+                            ▶ Test
+                        </button>
+                        <button class="fsc-btn fsc-btn-secondary" onclick="pluginsAutoDetectBioFormats()" style="white-space:nowrap;">
+                            🔍 Auto-Detect
+                        </button>
+                    </div>
+                    <div class="plugins-bf-status idle" id="bfStatus">
+                        ℹ Noch nicht getestet
+                    </div>
+                    <a href="#" class="plugins-bf-download-link"
+                        onclick="window.electronAPI.openExternal('https://www.openmicroscopy.org/bio-formats/downloads/'); return false;">
+                        📥 BioFormats CLI herunterladen →
+                    </a>
+                </div>
+            </div>
+
+        </div>
+        <!-- END: Plugins Settings Tab -->
 
         <!-- Settings Actions -->
         <div

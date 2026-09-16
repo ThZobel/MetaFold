@@ -1,0 +1,257 @@
+{
+  "name": "Leica Stellaris System",
+  "description": "Template for Leica Stellaris System",
+  "type": "experiment",
+  "category": "category3",
+  "structure": "",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2026-08-07T12:00:00.000Z",
+  "options": {
+    "writeFilesOnly": false,
+    "multipleFolders": false
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0,
+      "fetchNextId": false
+    },
+    "elabftwEnabled": false,
+    "omeroEnabled": true,
+    "rspaceEnabled": false,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "basePath": "D:\\Projects",
+    "projectName": "Leica_Stellaris_01",
+    "targetPath": "D:\\Projects"
+  },
+  "metadata": {
+    "fields": {
+      "Microscopy_group": {
+        "type": "group",
+        "label": "Microscopy",
+        "position": 1
+      },
+      "mode": {
+        "type": "dropdown",
+        "label": "Mode",
+        "value": "",
+        "required": true,
+        "position": 2,
+        "description": "Microscopy acquisition mode",
+        "options": [
+          "resonant Scanner",
+          "Normal",
+          "FLIM",
+          "Tau-Functions"
+        ],
+        "defaultValue": "Normal",
+        "useForFilename": true
+      },
+      "laser_lines": {
+        "type": "multicheckbox",
+        "label": "Laser Lines (nm)",
+        "value": [],
+        "required": false,
+        "position": 3,
+        "description": "Used laser wavelengths",
+        "options": [
+          "405nm",
+          "448nm",
+          "488nm",
+          "514nm",
+          "561nm",
+          "633nm",
+          "White Light Laser"
+        ],
+        "defaultValue": [],
+        "useForFilename": false
+      },
+      "Biological Sample_group": {
+        "type": "group",
+        "label": "Biological Sample",
+        "position": 4
+      },
+      "dyes": {
+        "type": "text",
+        "label": "Dyes",
+        "value": "",
+        "required": false,
+        "position": 5,
+        "description": "Used fluorescent dyes (multiple values separated by comma)",
+        "defaultValue": ""
+      },
+      "fluorescent_proteins": {
+        "type": "text",
+        "label": "Fluorescent Proteins",
+        "value": "",
+        "required": false,
+        "position": 6,
+        "description": "Used fluorescent proteins (multiple values separated by comma)",
+        "defaultValue": ""
+      },
+      "organism": {
+        "type": "dropdown",
+        "label": "Organism",
+        "value": "",
+        "required": false,
+        "position": 7,
+        "description": "Source organism",
+        "options": [
+          "Homo sapiens",
+          "Mus musculus",
+          "Rattus norvegicus",
+          "Danio rerio",
+          "Drosophila melanogaster",
+          "Arabidopsis thaliana",
+          "Other"
+        ],
+        "defaultValue": "Mus musculus",
+        "useForFilename": false
+      },
+      "Strain": {
+        "type": "text",
+        "label": "Strain",
+        "value": "",
+        "required": false,
+        "position": 8,
+        "description": "Strain ID",
+        "defaultValue": "",
+        "useForFilename": true
+      },
+      "Strain URL": {
+        "type": "url",
+        "label": "Strain URL",
+        "value": "",
+        "required": false,
+        "position": 9,
+        "description": "URL to your Strain",
+        "defaultValue": ""
+      },
+      "cell_type": {
+        "type": "text",
+        "label": "Cell Type",
+        "value": "",
+        "required": false,
+        "position": 10,
+        "description": "Type of cells being imaged",
+        "defaultValue": ""
+      },
+      "organism_part": {
+        "type": "text",
+        "label": "Organism Part",
+        "value": "",
+        "required": false,
+        "position": 11,
+        "description": "Specific part of organism",
+        "defaultValue": ""
+      },
+      "fixation": {
+        "type": "dropdown",
+        "label": "Fixation",
+        "value": "",
+        "required": true,
+        "position": 12,
+        "description": "Sample fixation status",
+        "options": [
+          "Fixed",
+          "Live"
+        ],
+        "defaultValue": "Fixed"
+      },
+      "sample_type": {
+        "type": "dropdown",
+        "label": "Sample Type",
+        "value": "",
+        "required": false,
+        "position": 13,
+        "description": "Type of sample preparation",
+        "options": [
+          "Cell Culture",
+          "Tissue Sample",
+          "Tissue Section",
+          "Embryo",
+          "Preparation",
+          "Primary Cells",
+          "Other"
+        ],
+        "defaultValue": ""
+      },
+      "sample_description": {
+        "type": "textarea",
+        "label": "Sample Description",
+        "value": "",
+        "required": false,
+        "position": 14,
+        "description": "Detailed description of the sample",
+        "defaultValue": ""
+      },
+      "imaging_purpose": {
+        "type": "textarea",
+        "label": "Imaging Purpose",
+        "value": "",
+        "required": false,
+        "position": 15,
+        "description": "Purpose and goals of the imaging experiment",
+        "defaultValue": ""
+      },
+      "qwer_ID": {
+        "type": "id_anchor",
+        "label": "qwer ID",
+        "value": "",
+        "required": false,
+        "position": 16,
+        "description": "Creates an anchor point for the Knowledge Graph.",
+        "defaultValue": ""
+      },
+      "derived_from": {
+        "type": "derived_from",
+        "label": "Derived From (IDs)",
+        "value": "",
+        "required": false,
+        "position": 17,
+        "description": "Link this experiment to previous IDs (e.g. Parent Sample, Protocol).",
+        "defaultValue": []
+      }
+    },
+    "fieldOrder": [
+      "Microscopy_group",
+      "mode",
+      "laser_lines",
+      "Biological Sample_group",
+      "dyes",
+      "fluorescent_proteins",
+      "organism",
+      "Strain",
+      "Strain URL",
+      "cell_type",
+      "organism_part",
+      "fixation",
+      "sample_type",
+      "sample_description",
+      "imaging_purpose",
+      "qwer_ID",
+      "derived_from"
+    ],
+    "totalFields": 17
+  },
+  "id": "template_leica_stellaris_system_01",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "savedLocally": true,
+  "storageType": "file",
+  "originalCreator": "Admin",
+  "originalGroup": "System",
+  "updatedAt": "2026-08-07T10:52:55.811Z",
+  "_fileInfo": {
+    "filename": "leica_stellaris_system.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\leica_stellaris_system.json",
+    "savedAt": "2026-08-07T10:52:55.811Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  }
+}

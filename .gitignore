@@ -1,0 +1,36 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+src/dist/
+src/build/
+
+# Electron-builder output
+dist/
+out/
+build/
+release/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Temp files
+temp_files/
+*.log
+*.tmp
+*.bak
+patch.py
+found_code.txt
+*MetaFold-Projects-Data*.json
+
+# IDEs
+.idea/
+.vscode/
+
+# If you have local templates you don't want in version control
+# templates/ 

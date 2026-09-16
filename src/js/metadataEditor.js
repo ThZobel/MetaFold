@@ -61,6 +61,13 @@ const metadataEditor = {
                         <option value="dropdown" ${defaultType === 'dropdown' ? 'selected' : ''}>Dropdown</option>
                         <option value="checkbox" ${defaultType === 'checkbox' ? 'selected' : ''}>Checkbox</option>
                         <option value="multicheckbox" ${defaultType === 'multicheckbox' ? 'selected' : ''}>Multi-Checkbox</option>
+                        <option value="time" ${defaultType === 'time' ? 'selected' : ''}>Time</option>
+                        <option value="url" ${defaultType === 'url' ? 'selected' : ''}>URL</option>
+                        <option value="email" ${defaultType === 'email' ? 'selected' : ''}>E-Mail</option>
+                        <option value="rating" ${defaultType === 'rating' ? 'selected' : ''}>Rating</option>
+                        <option value="tags" ${defaultType === 'tags' ? 'selected' : ''}>Tags / IDs (Array)</option>
+                        <option value="id_anchor" ${defaultType === 'id_anchor' ? 'selected' : ''}>Lineage Anchor (ID)</option>
+                        <option value="derived_from" ${defaultType === 'derived_from' ? 'selected' : ''}>Derived From (Link)</option>
                         <option value="group" ${defaultType === 'group' ? 'selected' : ''}>Group</option>
                     </select>
                     <button class="btn btn-danger btn-small" onclick="metadataEditor.removeField(this)">×</button>
@@ -355,11 +362,33 @@ const metadataEditor = {
                         </div>
                     </div>
                 `;
+            } else if (type === 'tags') {
+                optionsDiv.innerHTML = `
+                    <div class="tags-editor-container">
+                        <div class="tags-editor-pills" style="
+                            display: flex; flex-wrap: wrap; gap: 5px;
+                            padding: 6px 8px; min-height: 34px;
+                            background: rgba(255,255,255,0.04);
+                            border: 1px solid rgba(255,255,255,0.15);
+                            border-radius: 6px;
+                            margin-bottom: 6px;
+                        "></div>
+                        <input type="text" class="tags-editor-input"
+                               placeholder="Type a tag and press Enter or comma..."
+                               draggable="false"
+                               style="width: 100%; font-size: 12px;"
+                               onkeydown="metadataEditor.handleTagInput(event, this)">
+                        <small style="color: #6b7280; font-size: 11px; margin-top: 4px; display: block;">
+                            Stored as JSON array. Press <kbd style='background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;'>Enter</kbd> or <kbd style='background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;'>,</kbd> to add a tag.
+                        </small>
+                    </div>
+                `;
             } else if (type === 'number') {
                 optionsDiv.innerHTML = `
                     <div style="display: flex; gap: 10px;">
                         <input type="number" class="number-min-input" placeholder="Min" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
                         <input type="number" class="number-max-input" placeholder="Max" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
+                        <input type="text" class="number-unit-input" placeholder="Unit (e.g. µl, °C)" draggable="false" onchange="metadataEditor.updateJsonPreview()" style="flex: 1;">
                     </div>
                 `;
             }
@@ -391,8 +420,8 @@ const metadataEditor = {
         `).join('');
     },
 
-    // Enhanced JSON preview with proper Group field support
-    updateJsonPreview() {
+    // Extract metadata from the DOM
+    collectMetadata() {
         const fields = document.querySelectorAll('.metadata-field');
         const metadata = {};
         const fieldOrder = [];
@@ -460,11 +489,23 @@ const metadataEditor = {
                             fieldData.options = optionsInput.value.split(',').map(s => s.trim()).filter(s => s);
                         }
                         fieldData.value = []; // Default: nothing selected
+                    } else if (fieldType === 'tags') {
+                        // Tags: read current pills from the editor
+                        const pillsContainer = field.querySelector('.tags-editor-pills');
+                        if (pillsContainer) {
+                            const tags = [...pillsContainer.querySelectorAll('.tag-pill-editor')]
+                                .map(p => p.getAttribute('data-tag'));
+                            fieldData.value = tags;
+                        } else {
+                            fieldData.value = [];
+                        }
                     } else if (fieldType === 'number') {
                         const minInput = field.querySelector('.number-min-input');
                         const maxInput = field.querySelector('.number-max-input');
+                        const unitInput = field.querySelector('.number-unit-input');
                         if (minInput && minInput.value) fieldData.min = parseInt(minInput.value);
                         if (maxInput && maxInput.value) fieldData.max = parseInt(maxInput.value);
+                        if (unitInput && unitInput.value) fieldData.unit = unitInput.value;
                     }
                     
                     metadata[name] = fieldData;
@@ -482,7 +523,16 @@ const metadataEditor = {
             totalFields: fieldOrder.length
         };
         
-        document.getElementById('jsonPreview').textContent = JSON.stringify(enhancedMetadata, null, 2);
+        return enhancedMetadata;
+    },
+
+    // Enhanced JSON preview with proper Group field support
+    updateJsonPreview() {
+        const enhancedMetadata = this.collectMetadata();
+        const previewEl = document.getElementById('jsonPreview');
+        if (previewEl) {
+            previewEl.textContent = JSON.stringify(enhancedMetadata, null, 2);
+        }
         console.log('📊 JSON Preview updated:', enhancedMetadata);
     },
 
@@ -492,7 +542,12 @@ const metadataEditor = {
             case 'number': return 0;
             case 'checkbox': return false;
             case 'multicheckbox': return [];
+            case 'tags': return [];
             case 'date': return '';
+            case 'time': return '';
+            case 'url': return '';
+            case 'email': return '';
+            case 'rating': return 0;
             default: return '';
         }
     },
@@ -835,8 +890,10 @@ const metadataEditor = {
                 } else if (fieldData.type === 'number') {
                     const minInput = lastField.querySelector('.number-min-input');
                     const maxInput = lastField.querySelector('.number-max-input');
+                    const unitInput = lastField.querySelector('.number-unit-input');
                     if (minInput && fieldData.min !== undefined) minInput.value = fieldData.min;
                     if (maxInput && fieldData.max !== undefined) maxInput.value = fieldData.max;
+                    if (unitInput && fieldData.unit !== undefined) unitInput.value = fieldData.unit;
                 }
                 
                 console.log(`📝 Loaded normal field: ${key}`);
@@ -866,98 +923,104 @@ const metadataEditor = {
         container.appendChild(groupDiv);
     },
 
-    // Enhanced collect metadata with proper Group support
-    collectMetadata() {
-        const fields = document.querySelectorAll('.metadata-field');
-        const metadata = {};
-        const fieldOrder = [];
-        
-        fields.forEach((field, index) => {
-            const nameInput = field.querySelector('.field-name-input');
-            const labelInput = field.querySelector('.field-label-input');
-            const descInput = field.querySelector('.field-description-input');
-            const typeSelect = field.querySelector('.field-type-selector');
-            const requiredCheckbox = field.querySelector('.required-checkbox');
-            
-            const fieldType = typeSelect.value;
-            const label = labelInput.value.trim();
-            const description = descInput ? descInput.value.trim() : '';
-            const required = requiredCheckbox.checked;
-            
-            // Handle Group fields specially
-            if (fieldType === 'group') {
-                const groupName = label || `Group_${index + 1}`;
-                const groupKey = `${groupName}_group`;
-                
-                const fieldData = {
-                    type: 'group',
-                    label: groupName,
-                    position: index + 1
-                };
-                
-                // Add description if present
-                if (description) {
-                    fieldData.description = description;
-                }
-                
-                metadata[groupKey] = fieldData;
-                fieldOrder.push(groupKey);
-                
-                console.log(`📋 Collected group: ${groupKey}`, fieldData);
-            } else {
-                // Normal fields
-                const fieldName = nameInput.value.trim();
-                
-                if (fieldName) {
-                    const fieldData = {
-                        type: fieldType,
-                        label: label || fieldName,
-                        value: this.getDefaultValueForType(fieldType),
-                        required: required,
-                        position: index + 1
-                    };
-                    
-                    // Add description if present
-                    if (description) {
-                        fieldData.description = description;
-                    }
-                    
-                    // Type-specific options
-                    if (fieldType === 'dropdown') {
-                        const optionsInput = field.querySelector('.dropdown-options-input');
-                        if (optionsInput && optionsInput.value) {
-                            fieldData.options = optionsInput.value.split(',').map(s => s.trim());
-                        }
-                    } else if (fieldType === 'multicheckbox') {
-                        const optionsInput = field.querySelector('.multicheckbox-options-input');
-                        if (optionsInput && optionsInput.value) {
-                            fieldData.options = optionsInput.value.split(',').map(s => s.trim()).filter(s => s);
-                        }
-                        fieldData.value = []; // Default: nothing selected
-                    } else if (fieldType === 'number') {
-                        const minInput = field.querySelector('.number-min-input');
-                        const maxInput = field.querySelector('.number-max-input');
-                        if (minInput && minInput.value) fieldData.min = parseInt(minInput.value);
-                        if (maxInput && maxInput.value) fieldData.max = parseInt(maxInput.value);
-                    }
-                    
-                    metadata[fieldName] = fieldData;
-                    fieldOrder.push(fieldName);
-                    
-                    console.log(`📝 Collected field: ${fieldName}`, fieldData);
+    // ===================== TAG INPUT HANDLERS =====================
+
+    /**
+     * Handle keydown in the tag editor input (Enter or comma adds a tag)
+     */
+    handleTagInput(event, inputEl) {
+        if (event.key === 'Enter' || event.key === ',') {
+            event.preventDefault();
+            const value = inputEl.value.trim().replace(/,$/, '');
+            if (value) {
+                this._addEditorTag(inputEl, value);
+                inputEl.value = '';
+                this.updateJsonPreview();
+            }
+        } else if (event.key === 'Backspace' && inputEl.value === '') {
+            // Remove last tag on Backspace when input is empty
+            const pillsContainer = inputEl.closest('.tags-editor-container')?.querySelector('.tags-editor-pills');
+            if (pillsContainer) {
+                const lastPill = pillsContainer.querySelector('.tag-pill-editor:last-child');
+                if (lastPill) {
+                    lastPill.remove();
+                    this.updateJsonPreview();
                 }
             }
-        });
-        
-        // Return enhanced metadata format
-        const result = {
-            fields: metadata,
-            fieldOrder: fieldOrder,
-            totalFields: fieldOrder.length
-        };
-        
-        console.log('📊 Collected metadata:', result);
-        return result;
+        }
+    },
+
+    /**
+     * Add a tag pill to the editor tags container
+     */
+    _addEditorTag(inputEl, tagValue) {
+        const pillsContainer = inputEl.closest('.tags-editor-container')?.querySelector('.tags-editor-pills');
+        if (!pillsContainer) return;
+
+        // Prevent duplicates
+        const existing = [...pillsContainer.querySelectorAll('.tag-pill-editor')].map(p => p.getAttribute('data-tag'));
+        if (existing.includes(tagValue)) return;
+
+        const pill = document.createElement('span');
+        pill.className = 'tag-pill-editor';
+        pill.setAttribute('data-tag', tagValue);
+        pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.5);color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:11px;';
+        pill.innerHTML = `${tagValue} <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;" onclick="this.parentElement.remove();metadataEditor.updateJsonPreview()">×</span>`;
+        pillsContainer.appendChild(pill);
+    },
+
+    // ==================== LINEAGE QUICK-ACTION METHODS ====================
+
+    /**
+     * Prompts for a prefix and adds a text field with key "<Prefix>_ID".
+     * This creates an anchor node for the Knowledge Graph.
+     */
+    addLineageIdField() {
+        this.addField('id_anchor');
+        const lastField = document.querySelector('#metadataFields .metadata-field:last-child');
+        if (lastField) {
+            const nameInput = lastField.querySelector('.field-name-input');
+            const labelInput = lastField.querySelector('.field-label-input');
+            const descInput  = lastField.querySelector('.field-description-input');
+            if (nameInput)  nameInput.value  = 'lineage_id';
+            if (labelInput) labelInput.value  = 'Lineage ID';
+            if (descInput)  descInput.value   = 'Creates an anchor point for the Knowledge Graph.';
+            this.updateJsonPreview();
+        }
+        console.log(`🔑 Lineage ID field added: lineage_id`);
+    },
+
+    /**
+     * Adds a hardcoded "derived_from" field with type "tags".
+     * This creates a directed edge in the Knowledge Graph.
+     */
+    addDerivedFromField() {
+        // Check if derived_from already exists
+        const existing = document.querySelector('#metadataFields .field-name-input[value="derived_from"]');
+        if (existing) {
+            if (window.templateModal?.showMessage) {
+                window.templateModal.showMessage('A \'derived_from\' field already exists in this template.', 'warning');
+            }
+            return;
+        }
+
+        this.addField('derived_from');
+        const lastField = document.querySelector('#metadataFields .metadata-field:last-child');
+        if (lastField) {
+            const nameInput  = lastField.querySelector('.field-name-input');
+            const labelInput = lastField.querySelector('.field-label-input');
+            const descInput  = lastField.querySelector('.field-description-input');
+            if (nameInput) {
+                nameInput.value = 'derived_from';
+                nameInput.readOnly = true; // Key is hardcoded
+                nameInput.style.opacity = '0.6';
+                nameInput.title = 'This key is fixed and cannot be changed (Knowledge Graph convention)';
+            }
+            if (labelInput) labelInput.value = 'Derived From (IDs)';
+            if (descInput)  descInput.value  = 'Link this experiment to previous IDs (e.g. Parent Sample, Protocol).';
+            this.updateJsonPreview();
+        }
+        console.log('🔗 derived_from field added');
     }
 };
 

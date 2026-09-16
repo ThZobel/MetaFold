@@ -1,0 +1,77 @@
+{
+  "name": "Dynamic Folders",
+  "description": "",
+  "type": "experiment",
+  "category": "category1",
+  "structure": "[groupName]/\n  [userName]/",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
+  "createdAt": "2026-08-07T13:44:06.843Z",
+  "options": {
+    "writeFilesOnly": true,
+    "multipleFolders": false
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0,
+      "fetchNextId": false
+    },
+    "elabftwEnabled": true,
+    "omeroEnabled": false,
+    "rspaceEnabled": true,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "targetPath": "D:\\Projects",
+    "projectName": "",
+    "basePath": "D:\\Projects"
+  },
+  "metadata": {
+    "fields": {
+      "groupName": {
+        "type": "text",
+        "label": "Group Name",
+        "value": "",
+        "required": false,
+        "position": 1,
+        "defaultValue": "Luschnig",
+        "useForFilename": true
+      },
+      "userName": {
+        "type": "text",
+        "label": "User Name",
+        "value": "",
+        "required": false,
+        "position": 2,
+        "defaultValue": "Archane_Test12",
+        "useForFilename": true
+      }
+    },
+    "fieldOrder": [
+      "groupName",
+      "userName"
+    ],
+    "totalFields": 2
+  },
+  "id": "template_1786110246844_dcdrw5831",
+  "updatedAt": "2026-09-14T10:53:59.027Z",
+  "_fileInfo": {
+    "filename": "dynamic_folders.json",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\dynamic_folders.json",
+    "savedAt": "2026-09-14T10:53:59.027Z",
+    "source": "file",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
+    "stable": true,
+    "version": "2.0",
+    "isUpdate": true
+  },
+  "originalName": "Dynamic Folders",
+  "sourceFilename": "dynamic_folders.json",
+  "fileBasedNaming": true,
+  "nameSource": "filename",
+  "lastFileUpdate": "2026-09-14T10:53:29.030Z",
+  "savedLocally": true,
+  "storageType": "file",
+  "storageDisplay": "Saved as file",
+  "storageIcon": "📁"
+}

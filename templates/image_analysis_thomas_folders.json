@@ -1,19 +1,47 @@
 {
   "name": "Image Analysis Thomas Folders",
   "description": "Folder Structure for Image Analysis Projects",
-  "type": "folders",
+  "type": "experiment",
+  "category": "category1",
   "structure": "0_RAW_Data/\n1_Processed_Data/\n  0_cellprofiler_processed_images/\n  1_fiji_processed_images/\n  2_ilastik_processed_images/\n2_Macros_Pipelines/\n  0_cellprofiler/\n  1_fiji/\n  2_ilastik/\n3_Results_csv/\n  0_cellprofiler_result_tables/\n  1_fiji_result_tables/\n  2_ilastik_result_tables/\n4_Organizational/\n  0_Project_meetings/\n5_Publications/\n  0_Presentations/\n  1_Figures/\n  2_Movies/\n  3_Paper/",
-  "createdBy": "Thomas",
-  "createdByGroup": "MIN",
+  "createdBy": "Admin",
+  "createdByGroup": "System",
   "createdAt": "2025-07-28T07:54:44.617Z",
+  "options": {
+    "writeFilesOnly": false,
+    "multipleFolders": false
+  },
+  "integrations": {
+    "elabftw": {
+      "defaultCategory": 0,
+      "fetchNextId": true
+    },
+    "omero": true,
+    "rspace": true,
+    "n8n": false,
+    "elabftwEnabled": false,
+    "omeroEnabled": false,
+    "rspaceEnabled": true,
+    "n8nEnabled": false
+  },
+  "projectDefaults": {
+    "projectName": "User_Info",
+    "basePath": "D:\\Projects",
+    "targetPath": "D:\\Projects"
+  },
+  "metadata": {
+    "fields": {},
+    "fieldOrder": [],
+    "totalFields": 0
+  },
   "id": "template_1753689284618_9vv2i8uc8",
-  "updatedAt": "2025-09-25T15:52:29.202Z",
+  "updatedAt": "2026-09-14T10:53:46.150Z",
   "_fileInfo": {
     "filename": "image_analysis_thomas_folders.json",
-    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas\\image_analysis_thomas_folders.json",
-    "savedAt": "2025-09-25T15:52:29.202Z",
+    "filePath": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin\\image_analysis_thomas_folders.json",
+    "savedAt": "2026-09-14T10:53:46.150Z",
     "source": "file",
-    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\MIN\\Thomas",
+    "directory": "C:\\Users\\Thomas Zobel\\MetaFold\\Templates\\System\\Admin",
     "stable": true,
     "version": "2.0",
     "isUpdate": true
@@ -22,7 +50,7 @@
   "sourceFilename": "image_analysis_thomas_folders.json",
   "fileBasedNaming": true,
   "nameSource": "filename",
-  "lastFileUpdate": "2025-09-25T15:51:22.874Z",
+  "lastFileUpdate": "2026-09-14T10:53:29.035Z",
   "savedLocally": true,
   "storageType": "file",
   "storageDisplay": "Saved as file",

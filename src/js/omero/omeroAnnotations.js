@@ -512,11 +512,12 @@ const omeroAnnotations = {
     // =================== NEUE KEY-VALUE METHODEN (nach bestehenden Funktionen einfügen) ===================
 
     // Test multiple key-value pairs at once - NEW SIMPLE METHOD
-    async testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType = 'dataset') {
+    async testCreateMultipleKeyValues(datasetId, keyValuePairs, objectType = 'dataset', namespace = null) {
             try {
                 console.log('🧪 === OMERO Console Test: Create Multiple Key-Value Pairs ===');
                 console.log(`🧪 Object ID: ${datasetId}`);
                 console.log(`🧪 Object Type: ${objectType}`);
+                console.log(`🧪 Namespace: ${namespace || 'default'}`);
                 console.log(`🧪 Pairs count: ${keyValuePairs.length}`);
                 
                 // *** FIX: ROBUSTE SESSION VALIDATION ***
@@ -574,6 +575,11 @@ const omeroAnnotations = {
                 formData.append('parents', 'true');
                 formData.append(objectType, datasetId);
                 formData.append('mapAnnotation', mapAnnotation);
+                
+                // Add namespace if provided
+                if (namespace) {
+                    formData.append('ns', namespace);
+                }
                 
                 // FIX: Verwende Proxy URL statt direkte Server URL
                 const proxyUrl = window.omeroAuth.proxyUrl || 'http://localhost:3000/omero-api/';
@@ -1060,31 +1066,45 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                     console.log(`🔄 Added GROUP in order: "${groupName}" = "" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
                 }
                 // Check if this is a DATA field with actual value
-                else if (metadata[fieldKey]) {
-                    const fieldInfo = metadata[fieldKey];
-                    
-                    // Skip if empty
-                    let value = fieldInfo.value;
-                    if (value === undefined || value === null || value === '') {
-                        console.log(`🔄 Skipping empty field: ${fieldKey}`);
-                        return;
+                else {
+                    let fieldInfo = metadata[fieldKey];
+                    // If not found at top level, search inside nested groups
+                    if (!fieldInfo) {
+                        for (const rootKey of Object.keys(metadata)) {
+                            const rootVal = metadata[rootKey];
+                            if (rootVal && typeof rootVal === 'object' && !rootVal.type && rootVal[fieldKey]) {
+                                fieldInfo = rootVal[fieldKey];
+                                break;
+                            }
+                        }
                     }
                     
-                    // Use label if available, otherwise use key
-                    const fieldName = fieldInfo.label || fieldKey;
-                    
-                    // Convert value to string for OMERO
-                    let stringValue;
-                    if (typeof value === 'boolean') {
-                        stringValue = value ? 'true' : 'false';
-                    } else if (typeof value === 'number') {
-                        stringValue = value.toString();
-                    } else {
-                        stringValue = String(value);
+                    if (fieldInfo) {
+                        // Skip if empty
+                        let value = fieldInfo.value;
+                        if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+                            console.log(`🔄 Skipping empty field: ${fieldKey}`);
+                            return;
+                        }
+                        
+                        // Use label if available, otherwise use key
+                        const fieldName = fieldInfo.label || fieldKey;
+                        
+                        // Convert value to string for OMERO
+                        let stringValue;
+                        if (typeof value === 'boolean') {
+                            stringValue = value ? 'true' : 'false';
+                        } else if (typeof value === 'number') {
+                            stringValue = value.toString();
+                        } else if (Array.isArray(value)) {
+                            stringValue = value.join(', ');
+                        } else {
+                            stringValue = String(value);
+                        }
+                        
+                        keyValuePairs.push([fieldName, stringValue]);
+                        console.log(`🔄 Added DATA in order: "${fieldName}" = "${stringValue}" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
                     }
-                    
-                    keyValuePairs.push([fieldName, stringValue]);
-                    console.log(`🔄 Added DATA in order: "${fieldName}" = "${stringValue}" (position ${fieldOrder.indexOf(fieldKey) + 1})`);
                 }
             });
             
@@ -1105,9 +1125,7 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
             }
             
             // STEP 2: Add regular metadata fields
-            Object.entries(metadata).forEach(([key, fieldInfo]) => {
-                totalFields++;
-                
+            const processFallbackField = (key, fieldInfo) => {
                 try {
                     if (!fieldInfo || typeof fieldInfo !== 'object') {
                         console.warn(`🔄 Invalid field info for key: ${key}`);
@@ -1120,9 +1138,17 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                         return;
                     }
                     
+                    // If it doesn't have a type, it's a nested group object
+                    if (!fieldInfo.type) {
+                        Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
+                            processFallbackField(subKey, subFieldInfo);
+                        });
+                        return;
+                    }
+                    
                     // Extract actual value
                     let value = fieldInfo.value;
-                    if (value === undefined || value === null || value === '') {
+                    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
                         console.log(`🔄 Skipping empty field: ${key}`);
                         return;
                     }
@@ -1136,6 +1162,8 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                         stringValue = value ? 'true' : 'false';
                     } else if (typeof value === 'number') {
                         stringValue = value.toString();
+                    } else if (Array.isArray(value)) {
+                        stringValue = value.join(', ');
                     } else {
                         stringValue = String(value);
                     }
@@ -1148,6 +1176,11 @@ convertGroupFieldsToKeyOnlyPairs(templateMetadata) {
                 } catch (error) {
                     console.warn(`🔄 Error processing field ${key}:`, error);
                 }
+            };
+
+            Object.entries(metadata).forEach(([key, fieldInfo]) => {
+                totalFields++;
+                processFallbackField(key, fieldInfo);
             });
             
             console.log(`🔄 Fallback conversion complete: ${processedFields}/${totalFields} data fields processed`);

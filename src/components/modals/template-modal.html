@@ -24,8 +24,8 @@
             <div class="form-group" style="padding: 15px; background: #2d2d2d; border-radius: 8px; margin-bottom: 15px; border: 1px solid #404040;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                     <div>
-                        <strong style="display: block; margin-bottom: 4px;">Write files only</strong>
-                        <span style="font-size: 0.85em; color: #9ca3af;">Do not create a new project folder, just write metadata/files</span>
+                        <strong style="display: block; margin-bottom: 4px;">Write files only (Flag-File)</strong>
+                        <span style="font-size: 0.85em; color: #9ca3af;">These files are not treated as a Project with metadata</span>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="templateWriteFilesOnly">
@@ -58,7 +58,7 @@ README.md
 experiment_log.md"></textarea>
                 <small style="color: #6b7280; margin-top: 5px; display: block;">
                     💡 Tip: End lines with <code>/</code> for folders. Use 2 spaces indentation for subfolders to create
-                    hierarchy.
+                    hierarchy. You can use <code>[FieldName]</code> for dynamic folders (e.g., <code>[userName]/Data</code>).
                 </small>
             </div>
         </div>
@@ -66,18 +66,33 @@ experiment_log.md"></textarea>
         <div id="metadataContent" class="tab-content">
             <div class="form-group">
                 <label>Metadata Fields:</label>
-                <button class="btn btn-secondary btn-small" onclick="addMetadataField()">+ Add
-                    Field</button>
-                <button class="btn btn-secondary btn-small" onclick="loadJsonMetadata()" style="margin-left: 10px;">📂
-                    Load JSON</button>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                    <button class="btn btn-secondary btn-small" onclick="addMetadataField()">+ Add Field</button>
+                    <button class="btn btn-secondary btn-small" onclick="loadJsonMetadata()">📂 Load JSON</button>
+                </div>
+            </div>
+
+            <!-- Lineage Quick-Actions -->
+            <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+                <div style="font-size: 11px; font-weight: 600; color: #a855f7; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;">🔗 Knowledge Graph – Lineage Fields</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-small" onclick="metadataEditor.addLineageIdField()" title="Creates an anchor point for the Knowledge Graph"
+                            style="background: linear-gradient(135deg, #7c3aed, #6d28d9); border-color: #7c3aed; color: white; font-size: 12px;">
+                        🔑 Add Lineage ID (Anchor)
+                    </button>
+                    <button class="btn btn-small" onclick="metadataEditor.addDerivedFromField()" title="Link this experiment to previous IDs"
+                            style="background: linear-gradient(135deg, #0d9488, #0f766e); border-color: #0d9488; color: white; font-size: 12px;">
+                        🔗 Add 'Derived From' (Link)
+                    </button>
+                </div>
+                <div style="font-size: 11px; color: #6b7280; margin-top: 8px; line-height: 1.5;">
+                    <strong style="color: #9ca3af;">🔑 Lineage ID:</strong> Unique ID for this record (key ends with <code style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px;">_ID</code>) &nbsp;·&nbsp;
+                    <strong style="color: #9ca3af;">🔗 Derived From:</strong> Reference IDs of parent experiments
+                </div>
             </div>
 
             <div id="metadataFields"></div>
 
-            <div class="metadata-preview">
-                <h4>JSON Preview:</h4>
-                <pre id="jsonPreview">{}</pre>
-            </div>
         </div>
     </div>
 

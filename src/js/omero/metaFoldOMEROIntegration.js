@@ -120,42 +120,98 @@ const metaFoldOMEROIntegration = {
                 }
 
                 if (hasGroups && templateMetadata) {
-                    console.log('🔄 Using ENHANCED conversion (with groups and correct fieldOrder)...');
+                    console.log('🔄 Using ENHANCED conversion with Namespaces (Groups)...');
 
-                    const keyValuePairs = window.omeroAnnotations.convertMetadataToSimpleKeyValuesWithGroups(
-                        metadata,
-                        templateMetadata
-                    );
-                    // Check for integration data
-                    if (options.integrationData) {
-                        console.log('🔗 Adding integration links to map annotations...');
+                    const results = [];
+                    let totalPairs = 0;
+
+                    const flatMetadata = {};
+                    const groupedMetadata = {};
+
+                    // Split metadata into flat fields and groups
+                    Object.entries(metadata || {}).forEach(([key, fieldData]) => {
+                        // Skip internal metadata injected by projectManager
+                        if (key === 'provenance' || key === '_metafold' || key.startsWith('_')) {
+                            return;
+                        }
+                        
+                        if (fieldData !== undefined) {
+                            if (typeof fieldData === 'object' && fieldData.type === undefined && fieldData.value === undefined) {
+                                // It's a group!
+                                groupedMetadata[key] = fieldData;
+                            } else {
+                                flatMetadata[key] = fieldData;
+                            }
+                        }
+                    });
+
+                    // 1. Process System Metadata (integrationData)
+                    if (options.integrationData && Object.keys(options.integrationData).length > 0) {
+                        console.log('🔗 Processing system metadata (integration links)...');
+                        const systemPairs = [];
                         if (window.omeroAnnotations && window.omeroAnnotations.convertIntegrationLinksToKeyValue) {
                             const integrationPairs = window.omeroAnnotations.convertIntegrationLinksToKeyValue(options.integrationData);
-                            keyValuePairs.push(...integrationPairs);
+                            systemPairs.push(...integrationPairs);
                         } else {
-                            Object.entries(options.integrationData).forEach(([k, v]) => keyValuePairs.push([k, String(v)]));
+                            Object.entries(options.integrationData).forEach(([k, v]) => systemPairs.push([k, String(v)]));
+                        }
+                        
+                        if (systemPairs.length > 0) {
+                            const systemNamespace = 'System Metadata by MetaFold';
+                            console.log(`🔄 Uploading ${systemPairs.length} system key-value pairs (Namespace: ${systemNamespace})...`);
+                            const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, systemPairs, options.objectType || 'dataset', systemNamespace);
+                            if (result.success) {
+                                results.push(result);
+                                totalPairs += systemPairs.length;
+                            } else {
+                                console.error('❌ System metadata upload failed:', result.error);
+                                throw new Error(result.error);
+                            }
                         }
                     }
 
+                    // 2. Process flat metadata
+                    const flatPairs = window.omeroAnnotations.convertMetadataToSimpleKeyValues(flatMetadata);
 
-                    if (keyValuePairs.length > 0) {
-                        console.log(`🔄 Generated ${keyValuePairs.length} total key-value pairs`);
-
-                        const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, keyValuePairs, options.objectType || 'dataset');
-
+                    if (flatPairs.length > 0) {
+                        const flatNamespace = 'MetaFold Annotation';
+                        console.log(`🔄 Uploading ${flatPairs.length} flat key-value pairs (Namespace: ${flatNamespace})...`);
+                        const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, flatPairs, options.objectType || 'dataset', flatNamespace);
                         if (result.success) {
-                            console.log('✅ Enhanced method with groups successful!');
-                            return {
-                                success: true,
-                                method: 'enhanced_key_value_with_groups',
-                                annotationId: result.annotationId,
-                                keyValuePairs: keyValuePairs.length,
-                                templateGroupsUsed: true
-                            };
+                            results.push(result);
+                            totalPairs += flatPairs.length;
                         } else {
-                            console.error('❌ Enhanced method failed:', result.error);
+                            console.error('❌ Flat metadata upload failed:', result.error);
                             throw new Error(result.error);
                         }
+                    }
+
+                    // 3. Process grouped metadata
+                    for (const [groupName, groupFields] of Object.entries(groupedMetadata)) {
+                        const groupPairs = window.omeroAnnotations.convertMetadataToSimpleKeyValues(groupFields);
+                        if (groupPairs.length > 0) {
+                            const groupNamespace = groupName;
+                            console.log(`🔄 Uploading ${groupPairs.length} key-value pairs for group '${groupName}' (Namespace: ${groupNamespace})...`);
+                            const result = await window.omeroAnnotations.testCreateMultipleKeyValues(datasetId, groupPairs, options.objectType || 'dataset', groupNamespace);
+                            if (result.success) {
+                                results.push(result);
+                                totalPairs += groupPairs.length;
+                            } else {
+                                console.error(`❌ Group '${groupName}' metadata upload failed:`, result.error);
+                                throw new Error(result.error);
+                            }
+                        }
+                    }
+
+                    if (results.length > 0) {
+                        console.log('✅ Enhanced method with namespaces successful!');
+                        return {
+                            success: true,
+                            method: 'enhanced_key_value_with_namespaces',
+                            annotationId: results[0].annotationId, // Return first annotation ID for reference
+                            keyValuePairs: totalPairs,
+                            templateGroupsUsed: true
+                        };
                     } else {
                         throw new Error('No key-value pairs generated from metadata');
                     }

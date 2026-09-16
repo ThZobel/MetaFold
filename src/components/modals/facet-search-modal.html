@@ -1,0 +1,88 @@
+<!-- Facet Search Modal -->
+<div id="facetSearchModal" class="facet-modal-overlay" style="display: none;" onclick="facetSearch.handleOverlayClick(event)">
+    <div class="facet-modal-window" onclick="event.stopPropagation()">
+
+        <!-- Modal Header -->
+        <div class="facet-modal-header">
+            <div class="facet-modal-title">
+                <span class="facet-modal-icon">🏷️</span>
+                <div>
+                    <h2>Metadata Search</h2>
+                    <p id="facetModalSubtitle">Faceted search across your MetaFold projects <span style="color:#9ca3af; font-size:0.85em; font-style:italic;">(Right-click category headers to hide them)</span></p>
+                </div>
+            </div>
+            <div class="facet-modal-header-actions">
+                <div style="position: relative;">
+                    <button class="btn btn-secondary" onclick="facetSearch.toggleColumnSelector()" id="columnSelectorBtn">⚙️ Columns</button>
+                    <div id="columnSelectorDropdown" class="column-selector-dropdown" style="display: none; position: absolute; top: 100%; right: 0; border-radius: 6px; padding: 12px; z-index: 200; max-height: 320px; overflow-y: auto; width: 260px; margin-top: 4px;">
+                        <!-- Checkboxes will be injected here -->
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="facetSearch.exportCsv()" title="Export filtered results with selected columns as CSV">📥 Export CSV</button>
+                <button class="btn btn-secondary" onclick="facetSearch.resetFilters()">🔄 Reset</button>
+                <button class="facet-modal-close-btn" onclick="facetSearch.closeSearch()" title="Close">✕</button>
+            </div>
+        </div>
+
+        <!-- Modal Body: Sidebar + Results -->
+        <div class="facet-modal-body">
+
+            <!-- Filter Sidebar -->
+            <div class="facet-modal-sidebar" id="facetSidebar">
+                <div class="facet-modal-sidebar-header">
+                    <h3>Filters</h3>
+                    <span id="facetActiveCount" class="facet-active-badge" style="display:none;"></span>
+                </div>
+                <div id="facetGroupsContainer" class="facet-groups-container">
+                    <!-- Facet chips will be injected here -->
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="facet-modal-main">
+                <div class="facet-modal-results-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="facetResultsCount">0 Projects</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="facetSearch.showManageCategoriesModal()" title="Manage hidden categories" style="padding: 6px 12px; font-size: 13px;">
+                            👁️ Manage Categories
+                        </button>
+                        <button class="btn btn-primary" onclick="facetSearch.visualizeSelection()" title="Visualize the currently filtered projects" style="padding: 6px 12px; font-size: 13px;">
+                            🌌 Visualize Selection
+                        </button>
+                    </div>
+                </div>
+                <div id="facetResultsContainer" class="facet-results-table-container">
+                    <!-- Table will be injected here -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div id="facetManageCategoriesModal" class="facet-modal-overlay" style="display: none; z-index: 10003;" onclick="facetSearch.handleManageCategoriesOverlayClick(event)">
+    <div class="facet-modal-window" style="max-width: 500px;" onclick="event.stopPropagation()">
+        <div class="facet-modal-header">
+            <div class="facet-modal-title">
+                <span class="facet-modal-icon">👁️</span>
+                <div>
+                    <h2>Manage Categories</h2>
+                    <p>Select which metadata categories should be visible.</p>
+                </div>
+            </div>
+            <div class="facet-modal-header-actions">
+                <button class="facet-modal-close-btn" onclick="facetSearch.closeManageCategoriesModal()" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="facet-modal-body" style="padding: 20px; display: flex; flex-direction: column;">
+            <div id="facetManageCategoriesList" style="flex: 1; overflow-y: auto; max-height: 400px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Checkboxes will be injected here -->
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 15px;">
+                <button class="btn btn-secondary" onclick="facetSearch.closeManageCategoriesModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="facetSearch.saveManageCategories()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
