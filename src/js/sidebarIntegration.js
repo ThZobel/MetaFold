@@ -500,7 +500,7 @@ window.loadElabFTWTemplates = async function () {
         templateSelect.disabled = true;
 
         const response = await fetch(`${serverUrl}api/v2/experiments_templates`, {
-            headers: { 'Authorization': apiKey }
+            headers: { 'Authorization': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' }
         });
 
         if (!response.ok) {
@@ -545,3 +545,138 @@ window.loadElabFTWTemplates = async function () {
 
 // Expose to window
 window.sidebarIntegration = sidebarIntegration;
+window.importElabFTWTemplate = async function () {
+    const templateSelect = document.getElementById('elabftwProjectCategory');
+    if (!templateSelect || !templateSelect.value) {
+        alert("Please select an eLabFTW Template first.");
+        return;
+    }
+    
+    const templateId = templateSelect.value;
+    if (isNaN(parseInt(templateId)) || parseInt(templateId) <= 0) {
+        alert("Invalid template selected.");
+        return;
+    }
+
+    try {
+        const serverUrl = await window.settingsManager.getFormattedElabFTWUrl();
+        const apiKey = await window.settingsManager.get('elabftw.api_key');
+
+        if (!serverUrl || !apiKey) {
+             alert("eLabFTW is not fully configured.");
+             return;
+        }
+
+        const templateName = templateSelect.options[templateSelect.selectedIndex].text;
+        
+        // Show loading state
+        const btn = document.querySelector('button[onclick="importElabFTWTemplate()"]');
+        let originalText = '??';
+        if (btn) {
+            originalText = btn.innerHTML;
+            btn.innerHTML = '?';
+            btn.disabled = true;
+        }
+
+        const response = await fetch($(${serverUrl}api/v2/experiments_templates/), {
+            headers: { 
+                'Authorization': apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error($(API returned ));
+        }
+
+        const tplData = await response.json();
+        
+        // Parse metadata
+        let metadata = {};
+        if (tplData.metadata) {
+            try {
+                metadata = typeof tplData.metadata === 'string' ? JSON.parse(tplData.metadata) : tplData.metadata;
+            } catch (e) {
+                console.warn("Could not parse eLabFTW metadata JSON:", e);
+            }
+        }
+        
+        let mappedFields = {};
+        let fieldOrder = [];
+        if (metadata.extra_fields) {
+            for (const [key, field] of Object.entries(metadata.extra_fields)) {
+                let metafoldType = 'text';
+                if (field.type === 'number') metafoldType = 'number';
+                else if (field.type === 'date' || field.type === 'datetime') metafoldType = 'date';
+                else if (field.type === 'select' || field.type === 'radio' || field.type === 'items') metafoldType = 'dropdown';
+                else if (field.type === 'checkbox') metafoldType = 'checkbox';
+                else if (field.type === 'email') metafoldType = 'email';
+                
+                let sourceText = field.description || key;
+                let baseKey = sourceText.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').toLowerCase();
+                if (baseKey.length > 20) baseKey = baseKey.substring(0, 20);
+                if (!baseKey) baseKey = 'field';
+                
+                let finalKey = baseKey;
+                let counter = 1;
+                while (mappedFields[finalKey]) {
+                    finalKey = $(${baseKey}_);
+                    counter++;
+                }
+                
+                let mappedField = {
+                    label: key,
+                    type: metafoldType,
+                    required: field.required === true || field.required === 'true',
+                    description: field.description || ''
+                };
+                
+                if (metafoldType === 'dropdown' && field.options) {
+                    mappedField.options = Array.isArray(field.options) ? field.options : String(field.options).split('|');
+                }
+                
+                if (field.value !== undefined && field.value !== '') {
+                    mappedField.default = field.value;
+                }
+                
+                mappedFields[finalKey] = mappedField;
+                fieldOrder.push(finalKey);
+            }
+        }
+
+        // Now open the MetaFold template modal
+        if (window.templateModal && window.metadataEditor) {
+            await window.templateModal.show();
+            
+            // Set title
+            const nameInput = document.getElementById('templateName');
+            if (nameInput) {
+                nameInput.value = $(eLabFTW - );
+            }
+            
+            // Populate fields
+            window.metadataEditor.loadMetadataIntoEditor({ fields: mappedFields, fieldOrder: fieldOrder });
+            
+            // Switch to metadata tab
+            if (typeof window.switchModalTab === 'function') {
+                window.switchModalTab('metadata');
+            } else {
+                const metadataTab = document.querySelector('.tab[onclick="switchModalTab(''metadata'')"]');
+                if (metadataTab) metadataTab.click();
+            }
+        } else {
+            alert("Template editor is not available.");
+        }
+
+    } catch (error) {
+        console.error('? Error importing eLabFTW template:', error);
+        alert("Error importing template: " + error.message);
+    } finally {
+        const btn = document.querySelector('button[onclick="importElabFTWTemplate()"]');
+        if (btn) {
+            btn.innerHTML = '??';
+            btn.disabled = false;
+        }
+    }
+};
