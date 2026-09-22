@@ -58,8 +58,13 @@
                 <select id="elabftwProjectCategory" onchange="saveElabFTWCategoryToTemplate()" style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #e0e0e0; margin-bottom: 5px;">
                     <option value="">-- Default Template --</option>
                 </select>
-                <small style="display: block; margin-bottom: 10px; color: #a855f7; cursor: pointer; font-size: 0.8rem;"
-                    onclick="loadElabFTWTemplates()">🔄 Refresh Templates</small>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <small style="color: #a855f7; cursor: pointer; font-size: 0.8rem;"
+                        onclick="loadElabFTWTemplates()">🔄 Refresh Templates</small>
+                    <button class="btn btn-secondary btn-small" id="btnImportElabFTW" onclick="importElabFTWTemplate()" style="padding: 4px 8px; font-size: 0.9rem;" title="Import as MetaFold Template">
+                        📥
+                    </button>
+                </div>
             </div>
             <label class="checkbox-label" style="margin-top: 8px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
                 <input type="checkbox" id="elabftwFetchNextId" onchange="saveElabFTWFetchNextIdToTemplate()">
