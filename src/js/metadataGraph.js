@@ -412,10 +412,11 @@ class MetaFoldMetadataGraph {
         if (actionBar && project) {
             const escapedPath = project.path.replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
             actionBar.innerHTML = `
-                <span style="color: #9ca3af; font-size: 13px; align-self: center; margin-right: auto;">Selected: <strong>${project.displayName || project.name}</strong></span>
-                <button class="btn btn-sm btn-secondary" onclick="window.projectScanner.showProjectDetailsModal(window.projectScanner.projects.find(p => p.path === '${escapedPath}'))" style="padding: 4px 8px; font-size: 12px;">View Details</button>
-                <button class="btn btn-sm btn-secondary" onclick="window.electronAPI.openFolder('${escapedPath}')" style="padding: 4px 8px; font-size: 12px;">Open Folder</button>
-                <button class="btn btn-sm btn-primary" onclick="window.exportLineage('${escapedPath}')" style="padding: 4px 8px; font-size: 12px;">Export Lineage</button>
+                <span style="color: #9ca3af; font-size: 13px; align-self: center;">Selected: <strong>${project.displayName || project.name}</strong></span>
+                <button class="btn btn-sm btn-secondary" onclick="window.projectScanner.showProjectDetailsModal(window.projectScanner.projects.find(p => p.path === '${escapedPath}'))" style="padding: 4px 8px; font-size: 12px;" title="View detailed project metadata">View Details</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.electronAPI.openFolder('${escapedPath}')" style="padding: 4px 8px; font-size: 12px;" title="Open folder in File Explorer">Open Folder</button>
+                <button class="btn btn-sm btn-primary" onclick="window.exportLineage('${escapedPath}')" style="padding: 4px 8px; font-size: 12px;" title="Export lineage as MetaFold JSON & HTML interactive dashboard">Export Lineage</button>
+                <button class="btn btn-sm btn-success" onclick="window.roCrateManager.exportLineageRoCrate('${escapedPath}')" style="padding: 4px 8px; font-size: 12px; background: #10b981; border: none; color: white;" title="Export as FAIR Research Object Crate (ro-crate-metadata.json, provenance & pre-flight check)">📦 Export RO-Crate</button>
             `;
         }
     }

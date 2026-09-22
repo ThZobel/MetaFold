@@ -1871,7 +1871,7 @@ const visualizationManager = {
 window.visualizationManager = visualizationManager;
 
 // Export Lineage function for use by Knowledge Graph and Lineage Tree context menus
-window.generateLineageHtml = function(exportData) {
+window.generateLineageHtml = async function(exportData) {
     const rootName = exportData.rootProject;
     const timestamp = new Date(exportData.timestamp).toLocaleString();
     
@@ -1954,6 +1954,53 @@ window.generateLineageHtml = function(exportData) {
         mermaidGraph += `    click node_${cleanName} href "#card_${cleanName}" "Go to project details"\n`;
     });
     
+    // --- Pre-render Mermaid Graph to Static SVG (100% Offline Support) ---
+    let renderedSvg = null;
+    if (window.mermaid) {
+        try {
+            window.mermaid.initialize({
+                startOnLoad: false,
+                theme: 'dark',
+                securityLevel: 'loose',
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true
+                }
+            });
+            const renderId = 'lineage_mermaid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+            const renderResult = await window.mermaid.render(renderId, mermaidGraph);
+            if (renderResult && renderResult.svg) {
+                renderedSvg = renderResult.svg;
+            }
+        } catch (mermaidErr) {
+            console.warn('⚠️ MetaFold: Mermaid SVG pre-render failed, using dynamic fallback:', mermaidErr);
+        }
+    }
+
+    let flowchartContent = '';
+    let scriptTag = '';
+
+    if (renderedSvg) {
+        // Solution A: Embedded static SVG - zero dependencies, completely offline
+        flowchartContent = renderedSvg;
+        scriptTag = '<!-- Flowchart is pre-rendered as native SVG: 100% offline & self-contained -->';
+    } else {
+        // Fallback: Dynamic rendering via CDN if local rendering was unavailable
+        flowchartContent = `
+                <div class="mermaid">
+${mermaidGraph}
+                </div>`;
+        scriptTag = `
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                if (window.mermaid) {
+                    mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+                }
+            });
+        </script>`;
+    }
+
     let html = `
     <!DOCTYPE html>
     <html lang="en">
@@ -1961,12 +2008,7 @@ window.generateLineageHtml = function(exportData) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Lineage Export - ${rootName}</title>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
-            });
-        </script>
+        ${scriptTag}
         <style>
             html { scroll-behavior: smooth; }
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e2e; color: #cdd6f4; margin: 0; padding: 20px; }
@@ -1974,6 +2016,8 @@ window.generateLineageHtml = function(exportData) {
             .meta { text-align: center; color: #a6adc8; margin-bottom: 30px; font-size: 0.9em; }
             .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
             .mermaid-container { background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); overflow-x: auto; margin-bottom: 20px; }
+            .mermaid-container svg { max-width: 100%; height: auto; display: inline-block; }
+            .mermaid-container svg a { cursor: pointer; }
             .project-card { background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); scroll-margin-top: 20px; }
             .project-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #313244; padding-bottom: 15px; margin-bottom: 15px; }
             .project-title { font-size: 1.4em; font-weight: bold; color: #cba6f7; margin: 0; }
@@ -2000,9 +2044,7 @@ window.generateLineageHtml = function(exportData) {
         <div class="container">
             <div class="mermaid-container">
                 <div class="section-title" style="margin-top: 0; text-align: left;">Lineage Flowchart</div>
-                <div class="mermaid">
-${mermaidGraph}
-                </div>
+                ${flowchartContent}
             </div>
     `;
 
@@ -2485,7 +2527,7 @@ window.exportLineage = async (projectPath) => {
         }
 
         const jsonContent = JSON.stringify(exportData, null, 2);
-        const htmlContent = window.generateLineageHtml(exportData);
+        const htmlContent = await window.generateLineageHtml(exportData);
         
         const jsonResult = await window.electronAPI.writeFile(jsonPath, jsonContent);
         const htmlResult = await window.electronAPI.writeFile(htmlPath, htmlContent);

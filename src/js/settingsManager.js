@@ -77,7 +77,10 @@ const settingsManager = {
             '.ims', '.zvi', '.lof'
         ]),
         'plugins.bioformats_enabled': false,
-        'plugins.bioformats_path': ''
+        'plugins.bioformats_path': '',
+        // =================== RO-CRATE & FAIR STANDARDS ===================
+        'rocrate.default_license': 'https://creativecommons.org/licenses/by/4.0/',
+        'rocrate.generate_preview': true
     },
 
     // 🔐 NEW: Temporary in-memory password cache (NEVER stored in localStorage!)

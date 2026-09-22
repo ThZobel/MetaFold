@@ -355,7 +355,7 @@ Projects are linked via two specific metadata field types:
   - **Entire Connected Graph**: Uses a flood-fill algorithm to capture the entire weakly connected component, including siblings and cousins.
 - **Dual Export (JSON & HTML)**: The feature creates an isolated JSON bundle of the graph dependency chain, alongside a rich, interactive HTML dashboard. The HTML view includes:
   - A Kahn's Algorithm-based **Topological Sort** to display projects chronologically from origin to end.
-  - A **Mermaid.js Flowchart** at the top with clickable anchor nodes that scroll to detailed project cards. The flowchart is **color-coded**: the root project is highlighted, direct lineage nodes have a primary color, and indirect projects are muted.
+  - A **Mermaid.js Flowchart** at the top with clickable anchor nodes that scroll to detailed project cards. The flowchart is **pre-rendered as an inline SVG** directly by MetaFold at export time using a bundled local Mermaid instance (`src/js/vendor/mermaid.min.js`), making the exported HTML file 100% self-contained and offline-compatible (no CDN or internet connection required). The flowchart is **color-coded**: the root project is highlighted, direct lineage nodes have a primary color, and indirect projects are muted.
   - Buttons for **"Copy Path"**, **"Open README"**, and direct integration links (OMERO/eLabFTW).
 - **Full Data Harvest**: When selected, this mode automatically finds all subdirectories across the exported projects and presents a subfolder selection modal. It then physically copies all selected data into a new standalone directory, while dynamically rewriting internal HTML links to be portable relative paths.
 
@@ -454,7 +454,7 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
 - **Path Resolution Sync**: Changed `visualizationManager.js` to rely entirely on the backend-resolved `lineage_links` rather than repeating the name-based ID lookup. This prevents graph disconnections caused by duplicate project names in nested folder structures.
 - **Export Scope Selection**: Refactored `exportLineage` to calculate both a strictly vertical "Direct Lineage" (via `collectAncestors` and `collectDescendants`) and the full connected graph (via `collectDependencies`). 
 - **Custom Export Modal**: Replaced the native Electron `showMessageBox` with a styled HTML overlay modal for selecting Export Mode (Metadata/Harvest) and Scope (Direct/Full).
-- **Flowchart Color-Coding**: Injected CSS class definitions into the generated Mermaid diagram in `generateLineageHtml` to visually distinguish the root node (purple), direct lineage nodes (blue), and indirect lineage nodes (dark grey).
+- **Flowchart Color-Coding & Offline SVG Pre-Rendering**: Injected CSS class definitions into the generated Mermaid diagram in `generateLineageHtml` to visually distinguish the root node (purple), direct lineage nodes (blue), and indirect lineage nodes (dark grey). Furthermore, bundled `mermaid.min.js` locally in `src/js/vendor/` and pre-rendered the diagram directly into static, interactive inline `<svg>` during export, removing the external CDN script dependency and ensuring 100% offline functionality.
 - **Harvest Subfolder Selector**: Added an interactive modal during Full Data Harvest that parses the directory tree of all exported projects and lets the user choose exactly which nested folders they want to physically copy over.
 
 ### Lineage Graph Connect Mode (Current Session)
@@ -462,6 +462,12 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
 - **Strict Metadata Compliance**: When projects are connected visually, the logic bypasses `ReadyToImport.json` flag files in favor of the actual `*-metadata.json` payload files.
 - **Object Formatting & Audit Trails**: Automatically structures the newly inserted `derived_from` field to match MetaFold's internal standards (`{ type: "derived_from", value: [...] }`). Furthermore, it mimics the native "Extend Metadata" behavior by tracking modification timestamps (`lastUpdatedAt`) and the editing user (`lastUpdatedBy`).
 - **README Synchronization**: After writing the updated JSON via DPAPI handlers, the script immediately calls `regenerateReadmeHtml` to ensure the project's visual representation (which relies heavily on HTML rendering for performance during scans) is kept perfectly in sync with the backend graph data.
+
+### 📦 RO-Crate & FAIR Data Workflow (Current Session)
+- **roCrateValidator.js**: In-memory structural validation of RO-Crate JSON-LD objects before export. Checks for RO-Crate 1.1 requirements (License, Dates, Author ORCID, Connected Lineage).
+- **roCrateManager.js**: Constructs the RO-Crate payload, builds the HTML preview, and provides the Pre-Flight Export Wizard UI.
+- **Export UI Integration**: "📦 Export RO-Crate" button injected into the `visualizationManager.js` headers (`#kg-action-bar` & `#lineage-action-bar`) and `projectScanner.js` summary action bar.
+- **Settings UI**: Added a dedicated settings tab for configuring default license and preview HTML generation.
 
 ### Sidebar Metadata Viewer (Current Session)
 - **Discovery Tab Preview**: Selecting a project in the Discovery list (or double-clicking a graph node) dynamically hides the Template view in the left sidebar and renders the selected project's full metadata in a dedicated container (`#sidebar-project-view`).
@@ -477,6 +483,12 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
   - `src/css/base.css`: Added `#sidebar-template-view` rule (`display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; width: 100%;`) and added `min-height: 0;` plus standard `scrollbar-width` to `#templateList`.
   - `src/components/sidebars/left-sidebar.html`: Added inline style to `#sidebar-template-view` matching the flex column layout and full height.
   - `src/js/globalHandlers.js`: Updated `switchMainTab()` to toggle `templateView.style.display = 'flex'` (instead of `'block'`) when switching back from the Discovery tab.
+
+### OMERO Proxy & CSRF Origin Fix (Current Session)
+- **Root Cause**: Connecting to OMERO from external/guest networks triggered `403 CSRF Origin Check failed`. In `proxyManager.js`, `headers.origin` and `headers.referer` contained trailing slashes and malformed paths, causing Django's strict RFC 6454 origin check to fail. Furthermore, the proxy did not refresh `omeroServerUrl` if it was already running, and loopback addresses (`::1` vs `127.0.0.1`) could desynchronize client session cookies.
+- **Fix**:
+  - `src/js/proxyManager.js`: Sanitized `headers.origin` via `new URL().origin` (strictly removing trailing slashes/paths); normalized `headers.referer` to `${origin}/webclient/login/`; synchronized `csrftoken` cookies from `X-CSRFToken` headers; normalized `localhost` loopback addresses in `getClientId()`; ensured `omeroServerUrl` is always updated on `start(settings)` calls even if the proxy was already running.
+  - `src/js/omero/omeroAuth.js`: Added native `Webclient Login` (`/webclient/login/`) fallback strategy to mirror standard browser logins.
 
 ---
 

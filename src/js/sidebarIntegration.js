@@ -500,7 +500,7 @@ window.loadElabFTWTemplates = async function () {
         templateSelect.disabled = true;
 
         const response = await fetch(`${serverUrl}api/v2/experiments_templates`, {
-            headers: { 'Authorization': apiKey }
+            headers: { 'Authorization': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' }
         });
 
         if (!response.ok) {
@@ -545,7 +545,6 @@ window.loadElabFTWTemplates = async function () {
 
 // Expose to window
 window.sidebarIntegration = sidebarIntegration;
-
 window.importElabFTWTemplate = async function () {
     const templateSelect = document.getElementById('elabftwProjectCategory');
     if (!templateSelect || !templateSelect.value) {
@@ -572,19 +571,23 @@ window.importElabFTWTemplate = async function () {
         
         // Show loading state
         const btn = document.querySelector('button[onclick="importElabFTWTemplate()"]');
-        let originalText = '📥';
+        let originalText = '??';
         if (btn) {
             originalText = btn.innerHTML;
-            btn.innerHTML = '⏳';
+            btn.innerHTML = '?';
             btn.disabled = true;
         }
 
-        const response = await fetch(`${serverUrl}api/v2/experiments_templates/${templateId}`, {
-            headers: { 'Authorization': apiKey }
+        const response = await fetch($(${serverUrl}api/v2/experiments_templates/), {
+            headers: { 
+                'Authorization': apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
         });
 
         if (!response.ok) {
-            throw new Error(`API returned ${response.status}`);
+            throw new Error($(API returned ));
         }
 
         const tplData = await response.json();
@@ -618,7 +621,7 @@ window.importElabFTWTemplate = async function () {
                 let finalKey = baseKey;
                 let counter = 1;
                 while (mappedFields[finalKey]) {
-                    finalKey = `${baseKey}_${counter}`;
+                    finalKey = $(${baseKey}_);
                     counter++;
                 }
                 
@@ -649,7 +652,7 @@ window.importElabFTWTemplate = async function () {
             // Set title
             const nameInput = document.getElementById('templateName');
             if (nameInput) {
-                nameInput.value = `eLabFTW - ${templateName}`;
+                nameInput.value = $(eLabFTW - );
             }
             
             // Populate fields
@@ -659,7 +662,7 @@ window.importElabFTWTemplate = async function () {
             if (typeof window.switchModalTab === 'function') {
                 window.switchModalTab('metadata');
             } else {
-                const metadataTab = document.querySelector('.tab[onclick="switchModalTab(\'metadata\')"]');
+                const metadataTab = document.querySelector('.tab[onclick="switchModalTab(''metadata'')"]');
                 if (metadataTab) metadataTab.click();
             }
         } else {
@@ -667,12 +670,12 @@ window.importElabFTWTemplate = async function () {
         }
 
     } catch (error) {
-        console.error('❌ Error importing eLabFTW template:', error);
+        console.error('? Error importing eLabFTW template:', error);
         alert("Error importing template: " + error.message);
     } finally {
         const btn = document.querySelector('button[onclick="importElabFTWTemplate()"]');
         if (btn) {
-            btn.innerHTML = '📥';
+            btn.innerHTML = '??';
             btn.disabled = false;
         }
     }

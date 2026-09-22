@@ -35,18 +35,19 @@ class OMEROProxyServer {
      * @returns {Promise<Object>} Start result
      */
     async start(settings = {}) {
+        // Update OMERO server URL if provided in settings (even if already running)
+        if (settings.serverUrl) {
+            this.omeroServerUrl = settings.serverUrl;
+        }
+
         if (this.status === 'running') {
             return {
                 success: true,
                 message: 'Proxy server already running',
                 port: this.port,
+                omeroServer: this.omeroServerUrl,
                 status: this.status
             };
-        }
-
-        // Update OMERO server URL if provided in settings
-        if (settings.serverUrl) {
-            this.omeroServerUrl = settings.serverUrl;
         }
 
         // Find available port if specified port is in use
@@ -280,15 +281,33 @@ class OMEROProxyServer {
         delete headers.host;
         delete headers['content-length']; // Will be set automatically
         
-        // CSRF FIX 1: Set proper Referer header
-        headers.referer = this.omeroServerUrl + '/';
+        // Clean origin (strict: no trailing slash or path for Django 4+ CSRF)
+        let cleanOrigin = this.omeroServerUrl;
+        try {
+            const parsed = new URL(this.omeroServerUrl);
+            cleanOrigin = parsed.origin;
+        } catch (e) {
+            cleanOrigin = (this.omeroServerUrl || '').replace(/\/+$/, '');
+        }
+
+        // CSRF FIX 1: Set proper Referer header (single slash or specific endpoint)
+        headers.referer = `${cleanOrigin}/webclient/login/`;
         
-        // CSRF FIX 2: Set Origin header for Django 4+ compatibility
-        headers.origin = this.omeroServerUrl;
+        // CSRF FIX 2: Set Origin header for Django 4+ compatibility (STRICT: no trailing slash!)
+        headers.origin = cleanOrigin;
         
         // CSRF FIX 3: Ensure proper cookie handling
         if (this.clientSessions.has(clientId)) {
             headers.cookie = this.clientSessions.get(clientId);
+        }
+
+        // CSRF FIX 4: Ensure CSRF cookie matches X-CSRFToken header if provided
+        const csrfTokenHeader = req.headers['x-csrftoken'];
+        if (csrfTokenHeader) {
+            let currentCookies = headers.cookie || '';
+            if (!currentCookies.includes('csrftoken=')) {
+                headers.cookie = currentCookies ? `${currentCookies}; csrftoken=${csrfTokenHeader}` : `csrftoken=${csrfTokenHeader}`;
+            }
         }
         
         console.log(`🔧 Headers for ${clientId}:`, {
@@ -367,16 +386,25 @@ class OMEROProxyServer {
      * Generate unique client ID (like Python proxy)
      */
     getClientId(req) {
-        const clientIp = req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+        let clientIp = req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+        // Normalize localhost/loopback addresses (::1 vs 127.0.0.1)
+        if (clientIp === '::1' || clientIp === '127.0.0.1' || clientIp === '::ffff:127.0.0.1') {
+            clientIp = 'localhost';
+        }
+
         const userAgent = req.headers['user-agent'] || 'unknown';
         
-        // Try to use CSRF token for stable client ID
+        // Try to use CSRF token for stable client ID (from cookie or header)
         const cookies = req.headers.cookie || '';
         if (cookies.includes('csrftoken=')) {
             const csrfMatch = cookies.match(/csrftoken=([^;]+)/);
             if (csrfMatch) {
                 return `${clientIp}_${csrfMatch[1].substring(0, 8)}`;
             }
+        }
+
+        if (req.headers['x-csrftoken']) {
+            return `${clientIp}_${req.headers['x-csrftoken'].substring(0, 8)}`;
         }
         
         // Fallback to IP + hash of user agent

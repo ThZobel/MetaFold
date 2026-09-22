@@ -410,6 +410,10 @@ const omeroAuth = {
                 {
                     name: 'JSON API Login (Alternative)',
                     execute: () => this.attemptJsonLogin(username, password, serverId, csrfToken)
+                },
+                {
+                    name: 'Webclient Login (Browser Equivalent)',
+                    execute: () => this.attemptWebclientLogin(username, password, serverId, csrfToken)
                 }
             ];
             
@@ -427,11 +431,6 @@ const omeroAuth = {
                 } catch (error) {
                     console.warn(`⚠️ ${strategy.name} failed:`, error.message);
                     lastError = error;
-                    
-                    // If CSRF error, don't try other strategies with same token
-                    if (error.message.includes('CSRF')) {
-                        break;
-                    }
                 }
             }
             
@@ -472,7 +471,7 @@ const omeroAuth = {
                 body: loginData
             });
             
-            return await this.processLoginResponse(response, 'Form-based Login', csrfToken);
+            return await this.processLoginResponse(response, 'Form-based Login', csrfToken, username);
         },
 
         // JSON API login (alternative) - FIXED PROXY CONNECTION
@@ -502,11 +501,41 @@ const omeroAuth = {
                 body: JSON.stringify(loginPayload)
             });
             
-            return await this.processLoginResponse(response, 'JSON API Login', csrfToken);
+            return await this.processLoginResponse(response, 'JSON API Login', csrfToken, username);
+        },
+
+        // Webclient standard login (matches native browser login)
+        async attemptWebclientLogin(username, password, serverId, csrfToken) {
+            const loginData = new URLSearchParams({
+                username: username,
+                password: password,
+                server: serverId,
+                csrfmiddlewaretoken: csrfToken
+            });
+            
+            const baseProxyUrl = await this.getDynamicProxyUrl();
+            const loginUrl = baseProxyUrl + '/webclient/login/';
+            console.log('🔬 Webclient login URL:', loginUrl);
+            
+            const response = await fetch(loginUrl, {
+                method: 'POST',
+                credentials: 'include',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'text/html,application/xhtml+xml,application/json,*/*',
+                    'Referer': `${this.baseUrl}webclient/login/`,
+                    'Origin': this.baseUrl.replace(/\/$/, '')
+                },
+                body: loginData
+            });
+            
+            return await this.processLoginResponse(response, 'Webclient Login', csrfToken, username);
         },
 
     // Process login response
-    async processLoginResponse(response, method, csrfToken) {
+    async processLoginResponse(response, method, csrfToken, fallbackUsername = null) {
         console.log('🔬 Login response status:', response.status);
         
         if (response.ok || response.status === 302) {
@@ -521,7 +550,7 @@ const omeroAuth = {
             this.session = {
                 ...this.session,
                 loginTime: Date.now(),
-                username: loginResult.username || loginResult.eventContext?.userName || null,
+                username: loginResult.username || loginResult.eventContext?.userName || fallbackUsername || this.session?.username || null,
                 userId: loginResult.eventContext?.userId || null,
                 groupId: loginResult.eventContext?.groupId || null,
                 groupName: loginResult.eventContext?.groupName || 'private',

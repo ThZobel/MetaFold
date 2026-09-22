@@ -19,6 +19,9 @@
             <button class="settings-tab" onclick="switchSettingsTab('plugins')" id="pluginsTab">
                 🔌 Plugins
             </button>
+            <button class="settings-tab" onclick="switchSettingsTab('rocrate')" id="rocrateTab">
+                📦 RO-Crate & FAIR
+            </button>
         </div>
 
         <!-- General Settings Tab -->
@@ -890,6 +893,34 @@
 
                 </div>
             </div>
+        </div>
+
+        <!-- NEW: RO-Crate & FAIR Settings Tab -->
+        <div id="rocrateSettings" class="settings-tab-content">
+            <h3 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; color: #e0e0e0; border-bottom: 2px solid rgba(16, 185, 129, 0.3); padding-bottom: 10px;">
+                📦 RO-Crate Export Settings
+            </h3>
+            
+            <div class="form-group">
+                <label>Default License</label>
+                <select id="rocrateDefaultLicense" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; margin-bottom: 5px;">
+                    <option value="https://creativecommons.org/licenses/by/4.0/">CC-BY 4.0 (Recommended for Open Data)</option>
+                    <option value="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 (Public Domain)</option>
+                    <option value="https://creativecommons.org/licenses/by-sa/4.0/">CC-BY-SA 4.0</option>
+                    <option value="https://opensource.org/licenses/MIT">MIT License</option>
+                    <option value="Proprietary">Proprietary / All Rights Reserved</option>
+                </select>
+                <small>The license applied to the exported metadata crate by default.</small>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="rocrateGeneratePreview">
+                    <span>📄 Generate HTML Preview</span>
+                </label>
+                <small>Automatically generates a human-readable <code>ro-crate-preview.html</code> file inside exported crates.</small>
+            </div>
+
         </div>
 
         <!-- =================== PLUGINS SETTINGS TAB =================== -->

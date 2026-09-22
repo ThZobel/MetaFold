@@ -13,6 +13,8 @@ const projectScanner = {
     currentSort: { field: 'created', ascending: false },
     currentFilters: {},
     searchQuery: '',
+    selectedProjectPath: null,
+    showNonMetadataFolders: false,
     
     // Initialize the project scanner
     async init() {
@@ -68,6 +70,8 @@ const projectScanner = {
         this.filteredProjects = [];
         this.currentScannedPath = null;
         this.statistics = null;
+        this.selectedProjectPath = null;
+        this.showNonMetadataFolders = false;
     },
 
     
@@ -133,6 +137,10 @@ const projectScanner = {
                 
                 this.currentScannedPath = directoryPath;
                 this.filteredProjects = [...this.projects];
+                
+                if (!this.showNonMetadataFolders) {
+                    this.filteredProjects = this.filteredProjects.filter(p => p.hasMetadata !== false);
+                }
                 
                 // Get statistics
                 const statsResult = await window.electronAPI.getProjectsStatistics(this.projects);
@@ -201,6 +209,10 @@ const projectScanner = {
             });
         }
         
+        if (!this.showNonMetadataFolders) {
+            this.filteredProjects = this.filteredProjects.filter(p => p.hasMetadata !== false);
+        }
+        
         this.renderResults();
         console.log(`🔍 Applied filters, showing ${this.filteredProjects.length}/${this.projects.length} projects`);
     },
@@ -220,6 +232,10 @@ const projectScanner = {
                 project.name.toLowerCase().includes(searchTerm) ||
                 project.path.toLowerCase().includes(searchTerm)
             );
+        }
+        
+        if (!this.showNonMetadataFolders) {
+            this.filteredProjects = this.filteredProjects.filter(p => p.hasMetadata !== false);
         }
         
         this.renderResults();
@@ -343,15 +359,19 @@ const projectScanner = {
                     <button class="btn btn-secondary" onclick="projectScanner.closeScanner()">
                         ⬅️ Back
                     </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="window.projectScanner.exportScanResults()" title="Export simple list as CSV/JSON">
+                            📊 Export Simple List
+                        </button>
+                        <button id="scannerExportBtn" class="btn btn-success" onclick="window.roCrateManager.openScanExportWizard(window.projectScanner.selectedProjectPath)" style="background: #10b981; border: none; color: white;" title="Export scan as FAIR Research Object Crate with all lineage">
+                            📦 Export ALL as RO-Crate
+                        </button>
+                    </div>
                     <button class="btn btn-secondary" onclick="projectScanner.rescan()">
                         🔄 Rescan
                     </button>
                     <button class="btn btn-primary" onclick="projectScanner.scanDirectory()">
                         🔄 New Scan
-                    </button>
-                    <button class="btn btn-primary" onclick="projectScanner.exportScanResults()" style="margin-left: 10px;">
-                        📥 Export Summary
-                    </button>
                 </div>
             </div>
         `;
@@ -401,7 +421,7 @@ const projectScanner = {
                 </div>
                 
                 <div class="view-controls">
-                    <div style="display: flex; gap: 8px; margin-right: 15px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 15px;">
+                    <div style="display: flex; gap: 8px; margin-right: 15px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 15px; align-items: center;">
                         <button class="btn btn-primary btn-small" onclick="projectScanner.searchMetadata()">🎯 Smart Filters</button>
                         <button class="btn btn-primary btn-small" onclick="projectScanner.visualizeAll()">📊 Visualisation</button>
                     </div>
@@ -414,6 +434,12 @@ const projectScanner = {
                     </select>
                     
                     <div class="view-toggle">
+                        <button class="view-btn ${this.showNonMetadataFolders ? 'active' : ''}" 
+                                onclick="projectScanner.toggleNonMetadataFolders()" 
+                                title="Toggle displaying normal folders (without MetaFold metadata)">
+                            ${this.showNonMetadataFolders ? '📂' : '📁'}
+                        </button>
+                        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px;"></div>
                         <button class="view-btn ${this.currentView === 'grid' ? 'active' : ''}" 
                                 onclick="projectScanner.setView('grid')" title="Grid View">
                             ⊞
@@ -444,10 +470,30 @@ const projectScanner = {
         ).join('');
         
         return `
-            <div class="projects-container ${this.currentView}">
+            <div class="projects-container ${this.currentView}" id="projectsContainer">
                 ${projectsHtml}
             </div>
         `;
+    },
+    
+    // Toggle showing non-metadata folders
+    toggleNonMetadataFolders() {
+        this.showNonMetadataFolders = !this.showNonMetadataFolders;
+        this.searchProjects(this.searchQuery); // Re-trigger filter
+    },
+    
+    // Update export button text
+    updateExportButton() {
+        const btn = document.getElementById('scannerExportBtn');
+        if (btn) {
+            if (this.selectedProjectPath) {
+                btn.innerHTML = '📦 Export Project as RO-Crate';
+                btn.title = 'Export ONLY the selected project as FAIR Research Object Crate';
+            } else {
+                btn.innerHTML = '📦 Export ALL as RO-Crate';
+                btn.title = 'Export scan as FAIR Research Object Crate with all lineage';
+            }
+        }
     },
     
     // Render individual project
@@ -463,6 +509,8 @@ const projectScanner = {
         const createdDate = new Date(project.created).toLocaleDateString();
         const size = project.size ? this.formatBytes(project.size) : 'Unknown';
         const fieldCount = project.metadataFieldCount || 0;
+        const noMetadataBadge = project.hasMetadata === false ? '<span style="background: rgba(255, 255, 255, 0.1); color: #a6adc8; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; margin-left: 8px;">No Metadata</span>' : '';
+        const isSelected = this.selectedProjectPath === project.path;
         
         // Extract integration URLs dynamically
         let integrationButtons = '';
@@ -516,11 +564,13 @@ const projectScanner = {
         // FIXED: Properly escape path for HTML attributes
         const escapedPath = project.path.replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
         
+        const selectedStyle = isSelected ? 'border: 2px solid #10b981; background: rgba(16, 185, 129, 0.1);' : 'border: 1px solid transparent;';
+
         return `
-            <div class="project-item" data-project-path="${escapedPath}" style="cursor: pointer;" onclick="if(typeof window.showProjectMetadataInSidebar === 'function') window.showProjectMetadataInSidebar('${escapedPath}')">
+            <div class="project-item ${isSelected ? 'selected' : ''}" data-project-path="${escapedPath}" style="cursor: pointer; transition: all 0.2s; ${selectedStyle}" onclick="if(typeof window.showProjectMetadataInSidebar === 'function') window.showProjectMetadataInSidebar('${escapedPath}')">
                 <div class="project-icon">${displayInfo.icon}</div>
                 <div class="project-info">
-                    <h4 class="project-name">${displayInfo.displayName}</h4>
+                    <h4 class="project-name">${displayInfo.displayName}${noMetadataBadge}</h4>
                     <div class="project-meta">
                         <span class="project-date">📅 ${createdDate}</span>
                         <span class="project-size">📏 ${size}</span>
@@ -534,8 +584,8 @@ const projectScanner = {
                     </button>
                     ${project.hasReadme ? `<button class="btn btn-small" onclick="projectScanner.openReadme('${escapedPath}', '${project.name.replace(/'/g, "\\'")}')" title="Open README">📖 README</button>` : ''}
                     ${integrationButtons}
-                    <button class="btn btn-small" onclick="projectScanner.visualizeProject('${escapedPath}')" title="Visualize">
-                        📊 Visualize
+                    <button class="btn btn-small" onclick="projectScanner.visualizeProject('${escapedPath}')" title="Open interactive graph to select subsets for RO-Crate export">
+                        🧠 Visualize and Edit
                     </button>
                 </div>
             </div>
@@ -571,9 +621,39 @@ const projectScanner = {
     setupResultEventHandlers() {
         // Search input handler is set via onInput in the HTML
         
-        // Double-click to open project
+        const scannerContainer = document.getElementById('projectScannerContainer');
+        if (scannerContainer) {
+            // Remove previous event listener if it exists to avoid duplicates (though innerHTML replacement usually clears it, best to be safe if setupResultEventHandlers is called multiple times)
+            scannerContainer.onclick = (e) => {
+                // Ignore if clicked on a project item (handled separately below)
+                if (e.target.closest('.project-item')) return;
+                
+                // Ignore if clicked on interactive elements (buttons, inputs, selects, labels)
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('label')) return;
+
+                // If we get here, it's a background click, so deselect
+                if (this.selectedProjectPath !== null) {
+                    this.selectedProjectPath = null;
+                    this.updateExportButton();
+                    this.renderResults(); // Re-render to clear selection styling
+                }
+            };
+        }
+        
+        // Double-click to open project and single click to select
         const projectItems = document.querySelectorAll('.project-item');
         projectItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Don't trigger selection if clicking a button
+                if (e.target.closest('button')) return;
+                
+                const projectPath = item.getAttribute('data-project-path');
+                const unescapedPath = projectPath.replace(/\\\\/g, '\\').replace(/&quot;/g, '"');
+                this.selectedProjectPath = unescapedPath;
+                this.updateExportButton();
+                this.renderResults(); // Re-render to apply selection styling
+            });
+            
             item.addEventListener('dblclick', () => {
                 const projectPath = item.getAttribute('data-project-path');
                 // FIXED: Unescape path for actual usage
