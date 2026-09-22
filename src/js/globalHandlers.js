@@ -603,9 +603,12 @@ window.loadSettingsIntoModal = async function () {
         const n8nBasicUserEl = document.getElementById('n8nBasicUser');
         const n8nBasicPassEl = document.getElementById('n8nBasicPass');
         const n8nInstanceIdEl = document.getElementById('n8nInstanceId');
+        const n8nVerifySslEl = document.getElementById('n8nVerifySsl');
         const n8nConfigEl = document.getElementById('n8nConfig');
 
-        const n8nVerifySslEl = document.getElementById('n8nVerifySsl');
+        // RO-Crate UI elements
+        const rocrateDefaultLicenseEl = document.getElementById('rocrateDefaultLicense');
+        const rocrateGeneratePreviewEl = document.getElementById('rocrateGeneratePreview');
 
         if (n8nEnabledEl) n8nEnabledEl.checked = n8nEnabled;
         if (n8nWebhookEl) n8nWebhookEl.value = await sm.get('n8n.webhook_url');
@@ -628,6 +631,10 @@ window.loadSettingsIntoModal = async function () {
         if (typeof updaten8nAuthTypeUI === 'function') {
             updaten8nAuthTypeUI(authType);
         }
+
+        // Load RO-Crate Settings
+        if (rocrateDefaultLicenseEl) rocrateDefaultLicenseEl.value = await sm.get('rocrate.default_license');
+        if (rocrateGeneratePreviewEl) rocrateGeneratePreviewEl.checked = await sm.get('rocrate.generate_preview');
 
         // Initialize plugins settings tab UI (so fields have correct saved values when modal opens)
         if (typeof pluginsSettingsInit === 'function') {
@@ -1040,13 +1047,15 @@ window.testConflictSettings = async function () {
             'Fields will be overwritten directly' :
             `New versions created using ${versioningFormat} format`;
 
+        const rocrateDefaultLicense = document.getElementById('rocrateDefaultLicense')?.value || 'https://creativecommons.org/licenses/by/4.0/';
+        const rocrateGeneratePreview = document.getElementById('rocrateGeneratePreview')?.checked ?? true;
+
         alert(`🧪 Conflict Settings Test\n\nMode: ${mode}\nFormat: ${versioningFormat}\nBehavior: ${details}\n\nSettings are working correctly!`);
 
         console.log('🧪 Conflict settings test:', {
-            overwriteEnabled,
-            versioningFormat,
-            mode,
-            details
+            // RO-Crate settings
+            'rocrate.default_license': rocrateDefaultLicense,
+            'rocrate.generate_preview': rocrateGeneratePreview
         });
 
     } catch (error) {

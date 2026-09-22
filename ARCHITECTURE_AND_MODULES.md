@@ -463,6 +463,12 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
 - **Object Formatting & Audit Trails**: Automatically structures the newly inserted `derived_from` field to match MetaFold's internal standards (`{ type: "derived_from", value: [...] }`). Furthermore, it mimics the native "Extend Metadata" behavior by tracking modification timestamps (`lastUpdatedAt`) and the editing user (`lastUpdatedBy`).
 - **README Synchronization**: After writing the updated JSON via DPAPI handlers, the script immediately calls `regenerateReadmeHtml` to ensure the project's visual representation (which relies heavily on HTML rendering for performance during scans) is kept perfectly in sync with the backend graph data.
 
+### 📦 RO-Crate & FAIR Data Workflow (Current Session)
+- **roCrateValidator.js**: In-memory structural validation of RO-Crate JSON-LD objects before export. Checks for RO-Crate 1.1 requirements (License, Dates, Author ORCID, Connected Lineage).
+- **roCrateManager.js**: Constructs the RO-Crate payload, builds the HTML preview, and provides the Pre-Flight Export Wizard UI.
+- **Export UI Integration**: "📦 Export RO-Crate" button injected into the `visualizationManager.js` headers (`#kg-action-bar` & `#lineage-action-bar`) and `projectScanner.js` summary action bar.
+- **Settings UI**: Added a dedicated settings tab for configuring default license and preview HTML generation.
+
 ### Sidebar Metadata Viewer (Current Session)
 - **Discovery Tab Preview**: Selecting a project in the Discovery list (or double-clicking a graph node) dynamically hides the Template view in the left sidebar and renders the selected project's full metadata in a dedicated container (`#sidebar-project-view`).
 - **Recursive Metadata Rendering**: Upgraded `globalHandlers.js` to parse and render nested metadata categories (e.g., `Microscopy`, `Biological Sample`) recursively. Nested objects are formatted cleanly with folder icons and distinct borders instead of raw JSON stringification, maintaining the original type logic (URL highlighting, empty states) across all depths.

@@ -2404,44 +2404,77 @@ async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0,
         let currentLevelMetadata = { ...parentMetadata };
 
         // If metadata files found, this is a project directory
-        for (const metadataFile of metadataFiles) {
-            console.log(`📁 Found project in: ${basePath}`);
-
-            const project = await parseMetaFoldProject(basePath, metadataFile.name);
-            if (project) {
-                // Always assign System.Level based on nesting depth
-                project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
-
-                if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
-                    // Merge: parent metadata as base, child metadata overrides
-                    const mergedMetadata = { ...parentMetadata };
-                    for (const [key, val] of Object.entries(project.metadata)) {
-                        mergedMetadata[key] = val; // Child wins
+        if (metadataFiles.length > 0) {
+            for (const metadataFile of metadataFiles) {
+                console.log(`📁 Found project in: ${basePath}`);
+    
+                const project = await parseMetaFoldProject(basePath, metadataFile.name);
+                if (project) {
+                    // Always assign System.Level based on nesting depth
+                    project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
+                    project.hasMetadata = true; // NEW FLAG
+    
+                    if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
+                        // Merge: parent metadata as base, child metadata overrides
+                        const mergedMetadata = { ...parentMetadata };
+                        for (const [key, val] of Object.entries(project.metadata)) {
+                            mergedMetadata[key] = val; // Child wins
+                        }
+                        project.metadata = mergedMetadata;
+                        project.metadataFieldCount = Object.keys(project.metadata).length;
+                        console.log(`🔗 Inherited ${Object.keys(parentMetadata).length} metadata fields from parent into: ${project.name}`);
                     }
-                    project.metadata = mergedMetadata;
-                    project.metadataFieldCount = Object.keys(project.metadata).length;
-                    console.log(`🔗 Inherited ${Object.keys(parentMetadata).length} metadata fields from parent into: ${project.name}`);
-                }
-
-                // Collect file sidecars if option is enabled
-                if (includeFileSidecars) {
-                    const sidecars = await collectFileSidecars(basePath);
-                    project.fileSidecars = sidecars;
-                    if (sidecars.length > 0) {
-                        console.log(`📄 Found ${sidecars.length} file sidecar(s) in: ${project.name}`);
+    
+                    // Collect file sidecars if option is enabled
+                    if (includeFileSidecars) {
+                        const sidecars = await collectFileSidecars(basePath);
+                        project.fileSidecars = sidecars;
+                        if (sidecars.length > 0) {
+                            console.log(`📄 Found ${sidecars.length} file sidecar(s) in: ${project.name}`);
+                        }
                     }
-                }
-
-                projects.push(project);
-
-                // Build metadata to pass to children (own clean metadata, excluding System fields)
-                if (inheritMetadata) {
-                    for (const [key, val] of Object.entries(project.metadata)) {
-                        if (!key.startsWith('System.')) {
-                            currentLevelMetadata[key] = val;
+    
+                    projects.push(project);
+    
+                    // Build metadata to pass to children (own clean metadata, excluding System fields)
+                    if (inheritMetadata) {
+                        for (const [key, val] of Object.entries(project.metadata)) {
+                            if (!key.startsWith('System.')) {
+                                currentLevelMetadata[key] = val;
+                            }
                         }
                     }
                 }
+            }
+        } else {
+            // No metadata files found. Create a pseudo-project for this "normal" directory.
+            try {
+                const stat = await fs.stat(basePath);
+                const dirName = path.basename(basePath);
+                const project = {
+                    name: dirName,
+                    path: basePath,
+                    metadata: {},
+                    metadataFieldCount: 0,
+                    hasMetadata: false, // Flag to indicate it's just a regular folder
+                    created: stat.birthtime ? stat.birthtime.toISOString() : new Date().toISOString(),
+                    modified: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
+                    size: 0,
+                    hasReadme: false,
+                    projectId: null
+                };
+                
+                project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
+                
+                if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
+                    project.metadata = { ...parentMetadata, 'System.Level': { value: currentDepth + 1, type: 'system' } };
+                    project.metadataFieldCount = Object.keys(project.metadata).length;
+                }
+                
+                projects.push(project);
+            } catch (err) {
+                // Ignore stat errors for unreadable directories
+                console.log(`⚠️ Could not create pseudo-project for ${basePath}: ${err.message}`);
             }
         }
 

@@ -1,0 +1,158 @@
+/* RO-Crate Pre-Flight Wizard Modal Styles */
+
+.ro-crate-modal {
+    background-color: #1e1e2e;
+    padding: 25px;
+    border-radius: 10px;
+    width: 650px;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: #cdd6f4;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+body.light-mode .ro-crate-modal {
+    background-color: #ffffff;
+    color: #1e293b;
+}
+
+.ro-crate-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 10px;
+}
+
+body.light-mode .ro-crate-modal-header {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ro-crate-modal-header h2 {
+    margin: 0;
+    color: #a6e3a1;
+    font-size: 1.5rem;
+}
+
+body.light-mode .ro-crate-modal-header h2 {
+    color: #10b981;
+}
+
+.ro-crate-step {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+}
+
+body.light-mode .ro-crate-step {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.ro-crate-step h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #89b4fa;
+    font-size: 1.1rem;
+}
+
+body.light-mode .ro-crate-step h3 {
+    color: #3b82f6;
+}
+
+.ro-crate-form-group {
+    margin-bottom: 15px;
+}
+
+.ro-crate-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bac2de;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+body.light-mode .ro-crate-form-group label {
+    color: #475569;
+}
+
+.ro-crate-form-group input, 
+.ro-crate-form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #cdd6f4;
+    font-size: 0.95rem;
+}
+
+body.light-mode .ro-crate-form-group input, 
+body.light-mode .ro-crate-form-group select {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+}
+
+.ro-crate-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 15px;
+}
+
+body.light-mode .ro-crate-modal-footer {
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Validation Badges */
+.badge-success {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(166, 227, 161, 0.2);
+    color: #a6e3a1;
+    border: 1px solid #a6e3a1;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-warning {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(249, 226, 175, 0.2);
+    color: #f9e2af;
+    border: 1px solid #f9e2af;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-error {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(243, 139, 168, 0.2);
+    color: #f38ba8;
+    border: 1px solid #f38ba8;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+body.light-mode .badge-success { background: #dcfce7; color: #166534; border-color: #86efac; }
+body.light-mode .badge-warning { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+body.light-mode .badge-error { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+.validation-box {
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 6px;
+    min-height: 80px;
+}
+
+body.light-mode .validation-box {
+    background: #f1f5f9;
+}
