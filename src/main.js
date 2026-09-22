@@ -1294,6 +1294,21 @@ ipcMain.handle('readFile', async (event, filePath) => {
     }
 });
 
+// List directory contents
+ipcMain.handle('list-directory', async (event, dirPath) => {
+    try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        return entries.map(dirent => ({
+            name: dirent.name,
+            isDirectory: dirent.isDirectory(),
+            isFile: dirent.isFile()
+        }));
+    } catch (error) {
+        console.error('Error listing directory:', error);
+        throw error;
+    }
+});
+
 // File writing for export
 ipcMain.handle('writeFile', async (event, filePath, content) => {
     try {

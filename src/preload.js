@@ -63,6 +63,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Ensure directory exists
     ensureDir: (dirPath) => ipcRenderer.invoke('ensureDir', dirPath),
+    
+    // List directory contents
+    listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
 
     // Get application path
     getAppPath: () => ipcRenderer.invoke('getAppPath'),

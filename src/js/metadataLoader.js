@@ -93,6 +93,128 @@ const metadataLoader = {
         }
     },
 
+    // NEW: Load metadata for project creation
+    async loadMetadataForCreation() {
+        try {
+            console.log('📥 Opening file dialog to load metadata for creation...');
+
+            // Use electron API to select JSON file
+            const result = await window.electronAPI.loadJsonFile();
+
+            if (!result || result.success === false) {
+                console.log('📁 No file selected or error');
+                return;
+            }
+
+            const metadata = result.content;
+            let filePath = result.filePath || result.path || '';
+            let fileName = result.fileName || result.name || '';
+
+            if (!fileName && filePath) {
+                fileName = filePath.split(/[\\\/]/).pop();
+            }
+
+            this.loadedMetadata = metadata;
+            this.loadedFilePath = filePath;
+            this.loadedFileName = fileName;
+
+            // Set the inputs
+            const projectNameInput = document.getElementById('projectName');
+            const targetPathInput = document.getElementById('targetPath');
+
+            if (projectNameInput) {
+                projectNameInput.value = this.getProjectName();
+            }
+
+            if (targetPathInput && filePath) {
+                const pathParts = filePath.split(/[/\\]/);
+                pathParts.pop();
+                targetPathInput.value = pathParts.join(window.electronAPI?.platform === 'win32' ? '\\' : '/');
+            }
+
+            // Update preview
+            if (window.projectManager && window.projectManager.updatePathPreview) {
+                window.projectManager.updatePathPreview();
+            }
+
+            // Populate form if available
+            if (window.experimentForm && typeof window.experimentForm.populateForm === 'function' && metadata) {
+                window.experimentForm.populateForm(metadata.metadata || metadata);
+            }
+
+            this.showSuccess('Metadata loaded successfully');
+
+        } catch (error) {
+            console.error('❌ Error loading metadata for creation:', error);
+            this.showError('Error loading metadata: ' + error.message);
+        }
+    },
+
+    // NEW: Prompt user to load metadata from folder
+    async promptToLoadFromFolder(folderPath, jsonFiles) {
+        if (!jsonFiles || jsonFiles.length === 0) return;
+
+        const targetFile = jsonFiles.find(f => f.name.toLowerCase().includes('metadata')) || jsonFiles[0];
+
+        const confirmMsg = `Found a metadata file in this folder: ${targetFile.name}\nDo you want to load its metadata into the form?`;
+        
+        let userConfirmed = false;
+
+        // Use Electron's native message box to prevent renderer thread blocking
+        if (window.electronAPI && window.electronAPI.showMessageBox) {
+            try {
+                const result = await window.electronAPI.showMessageBox({
+                    type: 'question',
+                    buttons: ['Yes', 'No'],
+                    title: 'Load Metadata',
+                    message: confirmMsg,
+                    defaultId: 0,
+                    cancelId: 1
+                });
+                userConfirmed = (result.response === 0);
+            } catch (e) {
+                console.warn('Could not show message box, falling back to confirm', e);
+                userConfirmed = confirm(confirmMsg);
+            }
+        } else {
+            userConfirmed = confirm(confirmMsg);
+        }
+
+        if (userConfirmed) {
+            try {
+                const filePath = folderPath + (window.electronAPI?.platform === 'win32' ? '\\' : '/') + targetFile.name;
+                const fileContentStr = await window.electronAPI.readFile(filePath);
+                if (fileContentStr) {
+                    const metadata = JSON.parse(fileContentStr);
+                    
+                    this.loadedMetadata = metadata;
+                    this.loadedFilePath = filePath;
+                    this.loadedFileName = targetFile.name;
+
+                    // Set the project name input
+                    const projectNameInput = document.getElementById('projectName');
+                    if (projectNameInput) {
+                        projectNameInput.value = this.getProjectName();
+                    }
+
+                    // Update preview
+                    if (window.projectManager && window.projectManager.updatePathPreview) {
+                        window.projectManager.updatePathPreview();
+                    }
+
+                    // Populate form
+                    if (window.experimentForm && typeof window.experimentForm.populateForm === 'function' && metadata) {
+                        window.experimentForm.populateForm(metadata.metadata || metadata);
+                    }
+                    
+                    this.showSuccess('Metadata loaded from folder successfully');
+                }
+            } catch (error) {
+                console.error('❌ Error reading metadata from folder:', error);
+            }
+        }
+    },
+
     // Validate metadata structure
     validateMetadata(metadata) {
         // Check if it has basic structure
@@ -288,28 +410,55 @@ const metadataLoader = {
             `;
         }
 
-        let tableHTML = '<div class="metadata-table-container"><h3>📊 Metadata Fields</h3><table class="metadata-table"><thead><tr><th>Field Name</th><th>Type</th><th>Value</th></tr></thead><tbody>';
+        let html = '<div class="metadata-table-container"><h3>📊 Metadata Fields</h3>';
+        
+        const renderMetadataField = (key, field) => {
+            if (key === 'elabftw' || key === 'metafold_integration') return '';
 
-        Object.entries(displayMetadata).forEach(([key, field]) => {
-            // Skip integration fields
-            if (key === 'elabftw' || key === 'metafold_integration') return;
+            // If field is an object but doesn't have 'value' and 'type', it's likely a nested category
+            if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
+                let catHtml = `<div style="margin-bottom: 10px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; border-left: 3px solid #89b4fa;">`;
+                catHtml += `<div style="font-size: 0.9rem; color: #89b4fa; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span>📁</span> ${this.formatFieldName ? this.formatFieldName(key) : key.replace(/_/g, ' ')}</div>`;
+                catHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+                for (const [subKey, subField] of Object.entries(field)) {
+                    catHtml += renderMetadataField(subKey, subField);
+                }
+                catHtml += `</div></div>`;
+                return catHtml;
+            }
 
-            const value = field.value !== undefined ? field.value : field;
-            const type = field.type || 'text';
-            const displayValue = value || '<em style="color: #9ca3af;">Empty</em>';
+            const value = (field && field.value !== undefined) ? field.value : field;
+            const type = (field && field.type) ? field.type : 'text';
+            let label = (field && field.label) ? field.label : (this.formatFieldName ? this.formatFieldName(key) : key.replace(/_/g, ' '));
+            label = label.charAt(0).toUpperCase() + label.slice(1);
 
-            tableHTML += `
-                <tr>
-                    <td><strong>${this.formatFieldName(key)}</strong></td>
-                    <td><span class="field-type-badge">${type}</span></td>
-                    <td>${displayValue}</td>
-                </tr>
+            let displayValue = value;
+            if (displayValue === null || displayValue === undefined || displayValue === '') {
+                displayValue = '<em style="color: #6c7086;">Empty</em>';
+            } else if (type === 'url' || (typeof displayValue === 'string' && displayValue.startsWith('http'))) {
+                displayValue = `<a href="${displayValue}" target="_blank" style="color: #a6e3a1; text-decoration: underline; word-break: break-all;">${displayValue}</a>`;
+            } else if (Array.isArray(displayValue)) {
+                displayValue = displayValue.length > 0 ? displayValue.join(', ') : '<em style="color: #6c7086;">Empty</em>';
+            } else if (typeof displayValue === 'object') {
+                displayValue = '<pre style="margin: 0; font-size: 0.8rem; color: #cdd6f4; white-space: pre-wrap;">' + JSON.stringify(displayValue, null, 2) + '</pre>';
+            }
+
+            return `
+                <div style="background: rgba(255,255,255,0.05); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 5px; display: flex; flex-direction: row; align-items: center;">
+                    <div style="flex: 1; font-size: 0.85rem; color: #a6adc8; font-weight: bold; text-transform: uppercase;">${label}</div>
+                    <div style="width: 80px;"><span class="field-type-badge" style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: rgba(137, 180, 250, 0.2); color: #89b4fa;">${type}</span></div>
+                    <div style="flex: 2; color: #cdd6f4; font-size: 0.9rem; word-break: break-word;">${displayValue}</div>
+                </div>
             `;
-        });
+        };
 
-        tableHTML += '</tbody></table></div>';
+        html += `<div style="display: flex; flex-direction: column; gap: 5px;">`;
+        for (const [key, field] of Object.entries(displayMetadata)) {
+            html += renderMetadataField(key, field);
+        }
+        html += `</div></div>`;
 
-        return tableHTML;
+        return html;
     },
 
     // Render integration options (clone from main UI)
@@ -979,7 +1128,8 @@ const metadataLoader = {
                 // Use showEnhancedSuccess from projectManager
                 if (window.projectManager && typeof window.projectManager.showEnhancedSuccess === 'function') {
                     console.log('✅ metadataLoader: Using projectManager.showEnhancedSuccess with', integrationLinks.length, 'links');
-                    window.projectManager.showEnhancedSuccess(successMessage, null, integrationLinks);
+                    const folderPath = localPath !== 'Unknown' ? localPath : null;
+                    window.projectManager.showEnhancedSuccess(successMessage, folderPath, integrationLinks);
                 } else {
                     // Fallback to regular success
                     console.warn('⚠️ metadataLoader: projectManager.showEnhancedSuccess not available, using fallback');

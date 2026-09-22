@@ -105,6 +105,20 @@ const projectManager = {
                 if (selectedPath) {
                     document.getElementById('targetPath').value = selectedPath;
                     this.updatePathPreview();
+                    
+                    if (window.electronAPI.listDirectory) {
+                        try {
+                            const files = await window.electronAPI.listDirectory(selectedPath);
+                            const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+                            if (jsonFiles.length > 0) {
+                                if (window.metadataLoader && typeof window.metadataLoader.promptToLoadFromFolder === 'function') {
+                                    window.metadataLoader.promptToLoadFromFolder(selectedPath, jsonFiles);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn("Could not list directory for metadata files", e);
+                        }
+                    }
                 }
             } catch (error) {
                 this.showError('Error selecting folder: ' + error.message);
@@ -217,6 +231,7 @@ const projectManager = {
         const pathPreview = document.getElementById('fullPathPreview');
         const pathStatus = document.getElementById('pathStatus');
         const projectNameSection = document.getElementById('projectNameSection');
+        const selectMetadataBtn = document.getElementById('selectMetadataBtn');
 
         if (!checkbox || !targetPath) return;
 
@@ -238,6 +253,8 @@ const projectManager = {
                     inputElement.title = 'Enter a name for the metadata file';
                 }
             }
+            
+            if (selectMetadataBtn) selectMetadataBtn.style.display = 'inline-flex';
 
             // Update path preview to show JSON file path
             if (pathPreview) {
@@ -271,6 +288,8 @@ const projectManager = {
                     inputElement.title = 'Enter a name for your project';
                 }
             }
+            
+            if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
 
             if (pathPreview) {
                 this.updatePathPreview();
