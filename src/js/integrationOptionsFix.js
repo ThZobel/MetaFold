@@ -6,7 +6,7 @@ async function updateElabFTWOptions() {
     console.log('🧪 UI: Updating elabFTW options visibility');
     
     try {
-        const elabftwOption = document.getElementById('elabftwOption');
+        const elabftwOption = document.getElementById('elabftwIntegration');
         const elabftwEnabled = await window.settingsManager.get('elabftw.enabled');
         const elabftwAutoSync = await window.settingsManager.get('elabftw.auto_sync');
         
@@ -51,7 +51,7 @@ async function updateOMEROOptions() {
     console.log('🔬 UI: Updating OMERO options visibility');
     
     try {
-        const omeroOption = document.getElementById('omeroOption');
+        const omeroOption = document.getElementById('omeroIntegration');
         const omeroEnabled = await window.settingsManager.get('omero.enabled');
         const omeroAutoSync = await window.settingsManager.get('omero.auto_sync');
         

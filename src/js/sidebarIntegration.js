@@ -578,7 +578,7 @@ window.importElabFTWTemplate = async function () {
             btn.disabled = true;
         }
 
-        const response = await fetch($(${serverUrl}api/v2/experiments_templates/), {
+        const response = await fetch(`${serverUrl}api/v2/experiments_templates/${templateId}`, {
             headers: { 
                 'Authorization': apiKey,
                 'Content-Type': 'application/json',
@@ -587,7 +587,7 @@ window.importElabFTWTemplate = async function () {
         });
 
         if (!response.ok) {
-            throw new Error($(API returned ));
+            throw new Error(`API returned ${response.status}`);
         }
 
         const tplData = await response.json();
@@ -621,7 +621,7 @@ window.importElabFTWTemplate = async function () {
                 let finalKey = baseKey;
                 let counter = 1;
                 while (mappedFields[finalKey]) {
-                    finalKey = $(${baseKey}_);
+                    finalKey = `${baseKey}_${counter}`;
                     counter++;
                 }
                 
@@ -652,7 +652,7 @@ window.importElabFTWTemplate = async function () {
             // Set title
             const nameInput = document.getElementById('templateName');
             if (nameInput) {
-                nameInput.value = $(eLabFTW - );
+                nameInput.value = `eLabFTW - ${templateName}`;
             }
             
             // Populate fields
@@ -662,7 +662,7 @@ window.importElabFTWTemplate = async function () {
             if (typeof window.switchModalTab === 'function') {
                 window.switchModalTab('metadata');
             } else {
-                const metadataTab = document.querySelector('.tab[onclick="switchModalTab(''metadata'')"]');
+                const metadataTab = document.querySelector('.tab[onclick="switchModalTab(\\\'metadata\\\')"]');
                 if (metadataTab) metadataTab.click();
             }
         } else {

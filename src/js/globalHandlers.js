@@ -1630,7 +1630,7 @@ window.updateElabFTWOptions = async function () {
         const elabftwAutoInfo = document.getElementById('elabftwAutoInfo');
         const elabftwManualOption = document.getElementById('elabftwManualOption');
 
-        if (!elabftwOption || !elabftwAutoInfo || !elabftwManualOption) {
+        if (!elabftwOption) {
             console.warn('🧪 UI: elabFTW UI elements not found');
             return;
         }
@@ -1671,11 +1671,11 @@ window.updateOMEROOptions = async function () {
             return;
         }
 
-        const omeroOption = document.getElementById('omeroOption');
+        const omeroOption = document.getElementById('omeroIntegration');
         const omeroAutoInfo = document.getElementById('omeroAutoInfo');
         const omeroManualOption = document.getElementById('omeroManualOption');
 
-        if (!omeroOption || !omeroAutoInfo || !omeroManualOption) {
+        if (!omeroOption) {
             console.warn('🔬 UI: OMERO UI elements not found');
             return;
         }
