@@ -69,6 +69,16 @@
     color: #e9d5ff;
 }
 
+/* Selected row styling */
+.tabulator-row.tabulator-selected,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-selected,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd.tabulator-selected,
+.tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even.tabulator-selected {
+    background-color: rgba(124, 58, 237, 0.35) !important;
+    border-left: 3px solid #a855f7 !important;
+    color: #ffffff !important;
+}
+
 .tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell {
     border-right: 1px solid rgba(255,255,255,0.04) !important;
     padding: 9px 10px !important;
@@ -116,6 +126,14 @@ body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-ro
 body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd:hover,
 body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even:hover {
     background-color: rgba(124, 58, 237, 0.07) !important; color: #1f1235 !important;
+}
+body.light-mode .tabulator-row.tabulator-selected,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-selected,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-odd.tabulator-selected,
+body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even.tabulator-selected {
+    background-color: rgba(124, 58, 237, 0.2) !important;
+    border-left: 3px solid #7c3aed !important;
+    color: #1f1235 !important;
 }
 body.light-mode .tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell { border-right-color: rgba(0,0,0,0.05) !important; }
 

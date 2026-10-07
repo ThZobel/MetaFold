@@ -140,9 +140,9 @@ Key stylesheets:
 
 ---
 
-## 4. Facet Search Module (`facetSearch.js`)
+## 4. Facet Search Module & Template Hub (`facetSearch.js`)
 
-The Facet Search is a dedicated full-screen modal for searching and filtering projects across a MetaFold Summary JSON export.
+The Facet Search is a dedicated full-screen modal for searching and filtering projects across a MetaFold Summary JSON export. It also doubles as the **Community Template Hub** for downloading shared templates from GitHub.
 
 ### Architecture
 `facetSearch` is a singleton object exposed as `window.facetSearch`. It manages all state internally and renders into the `facet-search-modal.html` component.
@@ -217,6 +217,15 @@ loadSummaryFile()
 [Close / ESC / backdrop click]
   └─► closeSearch() → ResizeObserver.disconnect() → destroy tabulatorInstance → reset state
 ```
+
+### Community Template Hub
+When the user clicks the "Explore Community Templates" button in the Left Sidebar:
+1. `app.loadCommunityTemplates()` is triggered.
+2. It fetches the remote `templates-index.json` from the `MetaFold-Templates` repository.
+3. It maps the raw template objects to `flatMeta` objects.
+4. It sets the `facetSearch.isTemplateHub = true` flag.
+5. It triggers `facetSearch.updateUI()`, which renders the community templates inside the same Tabulator/Filter interface.
+6. The preview panel is updated to show an "Install Template" button, which downloads the JSON directly into the user's local template directory.
 
 | File | Role |
 |------|------|
@@ -507,3 +516,21 @@ The following items are deliberately **excluded** from version control:
 - Always place temporary notes, scratch HTML/MD files, and ad-hoc scripts in `temp_files/`.
 - Never commit `node_modules` or `dist` folders.
 - Ensure any new build steps (e.g., via Webpack) output to folders that are ignored by Git but explicitly included in `package.json`'s `files` array for `electron-builder`.
+
+## 15. Parallel AI Agents
+
+MetaFold leverages a multi-agent architecture for development and automation. These parallel AI agents are managed by a central Orchestrator (e.g., Antigravity) and operate within strictly defined domains to ensure separation of concerns, security, and high-quality contributions.
+
+### Agent Definitions
+The behavior, system prompts, and rules for the agents are defined in the `.agents/rules/` directory:
+
+- **`frontend-agent` (`frontend_agent.md`)**: Specialized in UI/UX, HTML, CSS, and client-side JavaScript. Ensures consistency across Dark/Light modes, follows the MetaFold component structure, and prioritizes intuitive user experiences for scientists.
+- **`electron-ipc-agent` (`electron_ipc_agent.md`)**: Backend expert focused on the Electron Main Process, `preload.js`, IPC communication, and native Node.js integrations (e.g., local file system, API fetching). Enforces strict security (Context Isolation) and performance.
+- **`qa-test-agent` (`qa_test_agent.md`)**: Quality Assurance expert responsible for validating new features, testing edge cases, preventing regressions, and ensuring that the UI and logic make sense from a domain-specific (scientific workflow) perspective.
+
+### Workflow & Orchestration
+When implementing complex features (such as the Community Template Hub or Metadata preview panels), the Orchestrator delegates tasks concurrently to these subagents:
+1. The **Frontend Agent** builds and styles the UI components.
+2. The **Electron/IPC Agent** handles data retrieval, parsing, and secure IPC exposure.
+3. The **QA Agent** reviews the implementation for bugs, edge cases, and theme consistency.
+The Orchestrator oversees the process, merges the results, and communicates with the user.

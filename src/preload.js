@@ -486,8 +486,12 @@ contextBridge.exposeInMainWorld('utils', {
         } else {
             console.log(logEntry, data);
         }
-    }
+    },
+
+    // =================== MENU UTILITIES ===================
+    onMenuAction: (callback) => ipcRenderer.on('menu-action', (event, action) => callback(action))
 });
+
 
 // MetaFold v0.0.1 - First public release
 console.log('🚀 MetaFold v0.0.1 preload.js loaded successfully');

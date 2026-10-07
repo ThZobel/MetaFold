@@ -77,6 +77,73 @@ function createMenuTemplate() {
         ]
     });
 
+    // Templates Menu
+    template.push({
+        label: 'Templates',
+        submenu: [
+            {
+                label: 'Browse Community Templates...',
+                accelerator: 'CmdOrCtrl+Shift+T',
+                click: () => {
+                    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+                    if (win) {
+                        win.webContents.send('menu-action', 'browse-templates');
+                        win.webContents.executeJavaScript(`
+                            if (window.app && typeof window.app.openTemplateHub === 'function') {
+                                window.app.openTemplateHub();
+                            }
+                        `).catch(err => console.error('executeJavaScript error:', err));
+                    }
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Import',
+                click: () => {
+                    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+                    if (win) {
+                        win.webContents.send('menu-action', 'import-templates');
+                        win.webContents.executeJavaScript(`
+                            if (typeof window.importTemplatesFromFile === 'function') {
+                                window.importTemplatesFromFile();
+                            }
+                        `).catch(err => console.error('executeJavaScript error:', err));
+                    }
+                }
+            },
+            {
+                label: 'Export',
+                click: () => {
+                    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+                    if (win) {
+                        win.webContents.send('menu-action', 'export-templates');
+                        win.webContents.executeJavaScript(`
+                            if (typeof window.exportCurrentTemplate === 'function') {
+                                window.exportCurrentTemplate();
+                            }
+                        `).catch(err => console.error('executeJavaScript error:', err));
+                    }
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Upload',
+                click: () => {
+                    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+                    if (win) {
+                        win.webContents.send('menu-action', 'upload-template');
+                        win.webContents.executeJavaScript(`
+                            if (window.uploadModal && typeof window.uploadModal.show === 'function') {
+                                window.uploadModal.show();
+                            }
+                        `).catch(err => console.error('executeJavaScript error:', err));
+                    }
+                }
+            }
+        ]
+    });
+
+
     // View Menu
     template.push({
         label: 'View',
@@ -1047,6 +1114,10 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
             // Clean empty fields and ensure templateName from metadata before saving
             Object.keys(enhancedMetadata).forEach(key => {
+                if (key === 'community') {
+                    delete enhancedMetadata[key];
+                    return;
+                }
                 // Keep special internal fields
                 if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
                     return;
@@ -4260,7 +4331,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
         Object.entries(metadata).forEach(([key, fieldInfo]) => {
             // Skip special internal fields from being rendered as normal fields
-            if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
+            if (key === 'community' || key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
                 return;
             }
             if (fieldInfo && typeof fieldInfo === 'object') {
@@ -4814,6 +4885,9 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
 
     let hasMetadata = false;
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
+        if (key === 'community' || key === 'provenance' || key === 'projectName' || key.startsWith('_')) {
+            return;
+        }
         if (fieldInfo.type !== 'group') {
             hasMetadata = true;
             const value = fieldInfo.value || '_Not filled_';

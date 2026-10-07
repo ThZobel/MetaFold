@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Load Template Modal
         await window.componentLoader.load('templateModal', 'components/modals/template-modal.html');
 
+        // Load Upload Template Modal
+        await window.componentLoader.load('upload-modal-container', 'components/modals/upload-template-modal.html');
+
         // Load Slide-out Panel (depends on Create Project Tab)
         await window.componentLoader.load('slide-out-panel-container', 'components/panels/slide-out-panel.html');
 

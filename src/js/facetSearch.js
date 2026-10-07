@@ -8,7 +8,9 @@ const facetSearch = {
     tabulatorInstance: null,   // Tabulator.js table instance
     _hasFileSidecars: false,   // true when any project has file sidecars
     hiddenKeys: [],            // Keys hidden by the user via context menu
-    metadataTypes: {},         // Stores types of metadata fields (e.g. text, select)
+    metadataTypes: {},
+    isTemplateHub: false,
+    _templateCache: {},         // Stores types of metadata fields (e.g. text, select)
     
 
     // Initialize the module
@@ -18,7 +20,15 @@ const facetSearch = {
         // Close modal with ESC key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+
+                const previewModal = document.getElementById('facetTemplatePreviewModal');
+                if (previewModal && previewModal.style.display !== 'none') {
+                    previewModal.style.display = 'none';
+                    e.stopPropagation();
+                    return;
+                }
                 const modal = document.getElementById('facetSearchModal');
+
                 if (modal && modal.style.display !== 'none') {
                     this.closeSearch();
                 }
@@ -85,6 +95,7 @@ const facetSearch = {
 
             this._hasFileSidecars = false;
             this.metadataTypes = {};
+            this.isTemplateHub = false;
             
             this.masterData = projects.map(p => {
                 let flatMeta = p.flattenedMetadata || {};
@@ -226,6 +237,7 @@ const facetSearch = {
             }
 
             this._hasFileSidecars = false;
+            this.isTemplateHub = false;
 
             this.masterData = exportData.projects.map(p => {
                 let flatMeta = p.flattenedMetadata || {};
@@ -449,8 +461,14 @@ const facetSearch = {
 
     _collapsedCategories: {},   // tracks collapsed state per category header
 
-    // Map a metadata key (e.g. OME.Pixels.SizeX, File.Extension, Project.Condition) to a category name
-    _getCategoryForKey(key) {
+    // Map a metadata key (e.g. OME.Pixels.SizeX, File.Extension, Project.Condition, community taxonomy) to a category name
+    _getCategoryForKey(key, isTemplateHub = this.isTemplateHub) {
+        if (isTemplateHub) {
+            const communityKeys = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
+            if (communityKeys.includes(key)) {
+                return '🌐 Community Taxonomy';
+            }
+        }
         if (key.startsWith('OME.')) {
             const parts = key.split('.');
             if (parts.length >= 2) {
@@ -502,6 +520,7 @@ const facetSearch = {
 
         // Preferred display order for categories
         const categoryOrder = [
+            '🌐 Community Taxonomy',
             '📋 Metadata Fields',
             '📁 Project & ISA',
             '📄 File Properties',
@@ -990,7 +1009,12 @@ const facetSearch = {
             formatter: (cell) => {
                 const row = cell.getRow().getData();
                 const path = (row.path || '').replace(/"/g, '&quot;');
-                let html = `<button class="btn btn-small facet-act-open" data-path="${path}" title="Open Folder">📂</button>`;
+                let html = ``;
+                if (window.facetSearch.isTemplateHub) {
+                    html += `<button class="btn btn-small facet-act-preview" style="background:#7c3aed; color:white; border:none; border-radius:4px; padding:4px 8px; font-size:0.75rem; cursor:pointer;" title="Preview Template">👁️ Preview</button>`;
+                } else {
+                    html += `<button class="btn btn-small facet-act-open" data-path="${path}" title="Open Folder">📁</button>`;
+                }
                 if (row.omero_url) {
                     const u = row.omero_url.replace(/"/g, '&quot;');
                     html += ` <a class="integration-icon-link facet-act-link" href="#" data-url="${u}" title="Open in OMERO">🔵</a>`;
@@ -1002,10 +1026,17 @@ const facetSearch = {
                 return html;
             },
             cellClick: (e, cell) => {
-                const target = e.target.closest('.facet-act-open, .facet-act-link');
+                const target = e.target.closest('.facet-act-open, .facet-act-link, .facet-act-preview');
                 if (!target) return;
                 e.preventDefault();
                 e.stopPropagation();
+                
+                if (target.classList.contains('facet-act-preview')) {
+                    const rowData = cell.getRow().getData();
+                    window.facetSearch.showTemplatePreview(rowData);
+                    return;
+                }
+                
                 if (target.classList.contains('facet-act-open')) {
                     const p = target.dataset.path;
                     if (p && window.electronAPI?.openFolder) window.electronAPI.openFolder(p);
@@ -1061,6 +1092,20 @@ const facetSearch = {
             downloadConfig: {
                 columnHeaders: true,
             },
+            selectableRows: 1,
+            rowClick: (e, row) => {
+                row.getTable().deselectRow();
+                row.select();
+                if (window.facetSearch.isTemplateHub) {
+                    window.facetSearch.showTemplatePreview(row.getData());
+                }
+            },
+            rowSelectionChanged: (data, rows) => {
+                if (data.length > 0 && window.facetSearch.isTemplateHub) {
+                    window.facetSearch.showTemplatePreview(data[0]);
+                }
+            }
+
         };
 
         // Enable tree mode when file sidecars exist
@@ -1184,6 +1229,126 @@ const facetSearch = {
         this.updateUI();
     },
 
+
+    async showTemplatePreview(data) {
+        if (!this.isTemplateHub) return;
+        
+        let previewModal = document.getElementById('facetTemplatePreviewModal');
+        if (!previewModal) {
+            previewModal = document.createElement('div');
+            previewModal.id = 'facetTemplatePreviewModal';
+            previewModal.style.cssText = 'position: fixed; top: 0; right: 0; width: 400px; height: 100%; background: var(--bg-secondary, #1e1e2e); z-index: 2000; box-shadow: -5px 0 25px rgba(0,0,0,0.5); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; border-left: 1px solid rgba(255,255,255,0.1); color: #e5e7eb; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateX(100%);';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '✖';
+            closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;';
+            closeBtn.onclick = () => {
+                previewModal.style.transform = 'translateX(100%)';
+            };
+            
+            const content = document.createElement('div');
+            content.id = 'facetTemplatePreviewContent';
+            
+            previewModal.appendChild(closeBtn);
+            previewModal.appendChild(content);
+            document.body.appendChild(previewModal);
+            
+            // Close when clicking outside of the preview modal
+            document.addEventListener('mousedown', (e) => {
+                const isPanelOpen = previewModal.style.transform === 'translateX(0px)' || previewModal.style.transform === 'translateX(0%)';
+                if (isPanelOpen && !previewModal.contains(e.target)) {
+                    // If the user clicks on a preview button, let the preview button logic handle it.
+                    if (!e.target.closest('.facet-act-preview')) {
+                        previewModal.style.transform = 'translateX(100%)';
+                    }
+                }
+            });
+        }
+        
+        // Use timeout to ensure CSS transition works when element is first added
+        setTimeout(() => {
+            previewModal.style.transform = 'translateX(0%)';
+        }, 10);
+        const contentArea = document.getElementById('facetTemplatePreviewContent');
+        contentArea.innerHTML = '<div style="text-align: center; margin-top: 50px;">Loading Template Details...</div>';
+        
+        try {
+            const repoPath = data.path || data._path;
+            let templateData = this._templateCache[repoPath];
+            
+            if (!templateData) {
+                const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+                const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Fetch failed');
+                templateData = await response.json();
+                this._templateCache[repoPath] = templateData;
+            }
+            
+            let html = `<h2 style="margin-top:0; color:#a855f7; padding-right: 20px;">${templateData.name}</h2>`;
+            if (templateData.description) {
+                html += `<p style="color:#d1d5db; line-height:1.4; margin-bottom: 20px;">${templateData.description}</p>`;
+            }
+            
+            html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 20px;">📥 Install Template</button>`;
+            
+            html += `<h3 style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom:15px;">Fields & Options</h3>`;
+            
+            const metadata = templateData.metadata || {};
+            const fieldsObj = metadata.fields || {};
+            const fieldOrder = metadata.fieldOrder || Object.keys(fieldsObj);
+            
+            if (fieldOrder.length > 0) {
+                fieldOrder.forEach(fieldId => {
+                    const field = fieldsObj[fieldId];
+                    if (!field) return;
+                    
+                    // Skip 'group' fields if desired, or render them differently
+                    if (field.type === 'group') {
+                        html += `<div style="margin-top: 20px; margin-bottom: 10px; font-weight:bold; color:#a855f7; border-bottom:1px solid rgba(168,85,247,0.3); padding-bottom:5px;">${field.label || fieldId}</div>`;
+                        return;
+                    }
+                    
+                    html += `<div style="margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">`;
+                    html += `<div style="font-weight:bold; color:#e2e8f0;">${field.label || fieldId} <span style="font-size:0.75rem; color:#9ca3af; font-weight:normal; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:5px;">${field.type}</span></div>`;
+                    
+                    if (field.description) {
+                        html += `<div style="font-size:0.85rem; color:#9ca3af; margin-top:4px;">${field.description}</div>`;
+                    }
+                    
+                    if (field.options && Array.isArray(field.options)) {
+                        html += `<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">`;
+                        field.options.forEach(opt => {
+                            html += `<span style="font-size:0.8rem; background:rgba(124,58,237,0.2); color:#d8b4fe; border:1px solid rgba(124,58,237,0.4); padding:2px 8px; border-radius:12px;">${opt}</span>`;
+                        });
+                        html += `</div>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+            } else {
+                html += `<div style="color:#9ca3af; font-style:italic;">No fields defined.</div>`;
+            }
+            
+            // Add Folder Structure if available
+              if (templateData.structure) {
+                  html += `<h3 style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top:25px; margin-bottom:15px;">Folder Structure</h3>`;
+                  if (window.templateManager && window.templateManager.parseAndRenderFolderTree) {
+                      html += `<div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); overflow-x: auto;">`;
+                      html += window.templateManager.parseAndRenderFolderTree(templateData.structure);
+                      html += `</div>`;
+                  } else {
+                      html += `<pre style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); font-family: monospace; font-size: 0.85rem; color:#d1d5db; white-space: pre-wrap; word-break: break-all;">${templateData.structure}</pre>`;
+                  }
+              }
+              
+              contentArea.innerHTML = html;
+            
+        } catch (error) {
+            contentArea.innerHTML = `<div style="color:#ef4444; padding:20px;">Error loading template details: ${error.message}</div>`;
+        }
+    },
+
     // Open the facet search modal
     openModal() {
         const modal = document.getElementById('facetSearchModal');
@@ -1208,6 +1373,13 @@ const facetSearch = {
         this.masterData = [];
         this.activeFilters = {};
         this._hasFileSidecars = false;
+        this.isTemplateHub = false;
+
+        const previewModal = document.getElementById('facetTemplatePreviewModal');
+        if (previewModal) {
+            previewModal.style.transform = 'translateX(100%)';
+            previewModal.style.display = 'none';
+        }
     },
 
     // Close on overlay click (outside modal window)

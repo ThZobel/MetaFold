@@ -58,6 +58,17 @@
                 </button>
             </div>
 
+            <!-- Upload to Community Action -->
+            <div class="panel-action upload" onclick="uploadCurrentTemplate()" id="uploadAction">
+                <button class="panel-action-button" type="button">
+                    <div class="panel-action-icon">🌐</div>
+                    <div class="panel-action-content">
+                        <div class="panel-action-title">Upload to Community</div>
+                        <div class="panel-action-description">Publish template to community repository on GitHub</div>
+                    </div>
+                </button>
+            </div>
+
             <!-- NEW: Import Action -->
             <div class="panel-action import" onclick="importTemplatesFromFile()" id="importAction">
                 <button class="panel-action-button" type="button">
@@ -580,6 +591,22 @@
             }, 500);
         };
     }
+
+    // Trigger upload from panel
+    window.uploadCurrentTemplate = function () {
+        if (typeof closeMoreMenu === 'function') {
+            closeMoreMenu();
+        }
+        const tm = window.templateManager;
+        let selectedIdx = 0;
+        if (tm && tm.currentTemplate && Array.isArray(tm.templates)) {
+            const idx = tm.templates.findIndex(t => (t.id && t.id === tm.currentTemplate.id) || t.name === tm.currentTemplate.name);
+            if (idx >= 0) selectedIdx = idx;
+        }
+        if (window.uploadModal) {
+            window.uploadModal.show(selectedIdx);
+        }
+    };
 
     console.log('✅ Enhanced panel functions loaded');
 </script>
