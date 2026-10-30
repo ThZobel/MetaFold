@@ -34,3 +34,5 @@ This release brings massive architectural improvements, transitioning MetaFold i
 ## 🛠️ Architecture & Under the Hood
 - **Component Loading System**: Migrated from a monolithic `index.html` to dynamic, runtime-injected HTML components.
 - **Optimized Data Flow**: Refactored the DOM and state management (e.g., `facetSearch.js` singleton) for significant performance gains when rendering thousands of projects.
+- **Fast Startup & Login Initialization**: Parallelized HTML component loading (`Promise.all`), deferred heavy visualization bundles (`mermaid.min.js`, D3, Tabulator), eliminated duplicate `app.init()` / `secureStorage.init()` / `templateManager.init()` passes, and removed full-DOM scans on user login.
+- **Windows 7 SP1 Legacy Support**: Added a dedicated Electron 22 (`22.3.27`) build target (`MetaFold-Setup-x.x.x-win7.exe`) to the GitHub Actions release pipeline for legacy laboratory and microscopy workstations alongside the standard Electron 38 installer.

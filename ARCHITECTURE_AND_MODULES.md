@@ -499,6 +499,22 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
   - `src/js/proxyManager.js`: Sanitized `headers.origin` via `new URL().origin` (strictly removing trailing slashes/paths); normalized `headers.referer` to `${origin}/webclient/login/`; synchronized `csrftoken` cookies from `X-CSRFToken` headers; normalized `localhost` loopback addresses in `getClientId()`; ensured `omeroServerUrl` is always updated on `start(settings)` calls even if the proxy was already running.
   - `src/js/omero/omeroAuth.js`: Added native `Webclient Login` (`/webclient/login/`) fallback strategy to mirror standard browser logins.
 
+### Windows 7 SP1 Legacy Build Support (Current Session)
+- **Root Cause**: Electron 23+ (and the default Electron 38 build) dropped support for Windows 7/8/8.1, embedding `MajorSubsystemVersion = 10.0` in the PE header and linking against Windows 10+ kernel APIs. Attempting to launch the standard installer on Windows 7 SP1 64-bit workstations (e.g., HP Z840) failed with `MetaFold is not a valid Win32 Application`.
+- **Fix**:
+  - `src/electron-builder-win7.json`: Created a dedicated builder configuration pinning `"electronVersion": "22.3.27"` (the final official Electron release supporting Windows 7 SP1) and outputting `${productName}-Setup-${version}-win7.${ext}`.
+  - `src/package.json`: Added `"build-win7"` script (`electron-builder --win --config electron-builder-win7.json`).
+  - `.github/workflows/release.yml`: Added a `Build for Windows 7 (Legacy Electron 22)` step in the Windows CI job so both the modern Windows 10/11 installer (Electron 38) and the Windows 7 SP1 legacy installer (`*-win7.exe`) are built and attached to every GitHub Release.
+
+### Startup & Login Modal Performance Optimization (Current Session)
+- **Root Cause**: Startup and Login Modal rendering were delayed by five compounding bottlenecks: (1) duplicate `DOMContentLoaded` triggers in `app.js` causing `app.init()` to run twice in parallel (destroying and recreating the Login Modal 200ms after first render), (2) synchronous parsing of 3.26 MB `mermaid.min.js` and external CDN scripts before `app.js`, (3) three concurrent unguarded calls to `secureStorage.init()`, (4) sequential `await` loading of all 10 HTML components in `init_components.js`, and (5) redundant `templateManager.init()` disk reads and full-DOM `querySelectorAll('*')` scans during `userManager.setCurrentUser()`.
+- **Fix**:
+  - `src/js/app.js`: Added an `isInitializing` lock at the start of `app.init()`, removed the duplicate 200ms `setTimeout` startup listener, and skipped redundant `storage`/`templateManager` re-initialization when `userManager` has already initialized them.
+  - `src/index.html`: Marked `js/vendor/mermaid.min.js` as `async` and external visualization/table CDN scripts (`d3.min.js`, `dagre-d3.min.js`, `tabulator.min.js`) as `defer`.
+  - `src/js/init_components.js`: Parallelized all 10 HTML component fetches via `Promise.all(...)`.
+  - `src/js/secureStorage.js`, `src/js/secureIntegration.js`, `src/js/settingsManager.js`: Added an in-flight `_initPromise` guard to `secureStorage.init()` and prevented `secureIntegration.js` from overwriting user-specific settings loaded by `app.js`.
+  - `src/js/userManager.js` & `src/js/globalHandlers.js`: Consolidated template loading in `setCurrentUser()` into a single pass, replaced `document.querySelectorAll('*')` in `forceUpdateUserDisplay()` with targeted selectors, and guarded `window.visualizationManager.checkJSONCrackAvailability`.
+
 ---
 
 ## 14. Version Control & Repository Structure
