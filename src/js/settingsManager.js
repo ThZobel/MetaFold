@@ -223,6 +223,16 @@ const settingsManager = {
     async initUserSpecific() {
         console.log('🔧 Initializing settingsManager with user-specific support...');
 
+        if (window.secureStorage) {
+            try {
+                await window.secureStorage.init();
+                this.isSecureStorageReady = true;
+            } catch (error) {
+                console.warn('🔐 Secure storage initialization failed:', error);
+                this.isSecureStorageReady = false;
+            }
+        }
+
         // Wait for dependencies
         let attempts = 0;
         while ((!window.storage || !window.userManager) && attempts < 20) {

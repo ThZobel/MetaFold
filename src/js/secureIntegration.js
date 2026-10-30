@@ -70,8 +70,12 @@ const secureIntegration = {
             throw new Error('settingsManager module not loaded');
         }
         
-        // Initialize settings manager with security support
-        await window.settingsManager.init();
+        // Initialize settings manager with security support only if not already managed by app.js
+        if (!window.app && Object.keys(window.settingsManager.settings || {}).length === 0) {
+            await window.settingsManager.init();
+        } else {
+            window.settingsManager.isSecureStorageReady = true;
+        }
         this.completedSteps.push('settingsManager');
         
         const securityStatus = window.settingsManager.getSecurityStatus();

@@ -1,0 +1,152 @@
+<div id="uploadTemplateModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 650px;">
+        <span class="close" id="uploadCloseBtn" onclick="window.uploadModal.close()">&times;</span>
+        <h2 style="margin-top:0; color: #a855f7;">Upload Community Template</h2>
+        <p style="color: #9ca3af; font-size: 0.9em; margin-bottom: 20px;">
+            Publish a template to the MetaFold community repository on GitHub.
+        </p>
+
+        <!-- Step 1: Select Template -->
+        <div id="uploadStep1Section" class="form-group" style="margin-bottom: 20px;">
+            <label for="uploadTemplateSelect" style="font-weight: 600; color: #e0e0e0;">
+                1. Select Template to Publish:
+            </label>
+            <select id="uploadTemplateSelect" onchange="window.uploadModal.onTemplateSelected(this.value)" style="width: 100%; padding: 10px; background: #2d2d2d; color: #fff; border: 1px solid #404040; border-radius: 6px;">
+                <option value="">-- Choose an installed template --</option>
+            </select>
+        </div>
+
+        <!-- Step 2: Classification & Community Tags Review/Edit -->
+        <div id="uploadStep2Section" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <h3 style="margin-top: 0; font-size: 1.05em; color: #a855f7; margin-bottom: 12px;">
+                2. Classification &amp; Community Tags (Review / Edit)
+            </h3>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="uploadSystem">System / Device:</label>
+                <input type="text" id="uploadSystem" list="uploadSystemList" placeholder="e.g. Microscopy (Confocal / 2-Photon)">
+                <datalist id="uploadSystemList">
+                    <option value="Microscopy (Light / Widefield)">
+                    <option value="Microscopy (Confocal / 2-Photon)">
+                    <option value="Microscopy (Super-Resolution / STED / SIM / STORM)">
+                    <option value="Microscopy (Light Sheet / SPIM)">
+                    <option value="Microscopy (Electron / SEM / TEM / Cryo-EM)">
+                    <option value="Plate Reader / Spectrophotometer">
+                    <option value="Flow Cytometer / FACS">
+                    <option value="Sequencer (NGS / Illumina / Nanopore / PacBio)">
+                    <option value="Mass Spectrometer (Proteomics / Metabolomics)">
+                    <option value="Chromatography (HPLC / FPLC / GC)">
+                    <option value="Wet Lab: PCR / qPCR / Thermal Cycler">
+                    <option value="Wet Lab: Staining / Histology / Immunofluorescence">
+                    <option value="Wet Lab: Sample Prep / Extraction / Purification">
+                    <option value="Wet Lab: Gel Imaging / Western Blot">
+                    <option value="Wet Lab: Cell Culture / Incubator / Bioreactor">
+                    <option value="Wet Lab: General Bench Protocol">
+                    <option value="Data Analysis / Bioimage Analysis">
+                    <option value="Hardware / 3D Printing / Prototyping">
+                </datalist>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="uploadDiscipline">Discipline / Domain:</label>
+                <input type="text" id="uploadDiscipline" list="uploadDisciplineList" placeholder="e.g. Plant Biology / Botany">
+                <datalist id="uploadDisciplineList">
+                    <option value="Plant Biology / Botany">
+                    <option value="Cell Biology">
+                    <option value="Neuroscience">
+                    <option value="Developmental Biology">
+                    <option value="Microbiology / Bacteriology">
+                    <option value="Virology">
+                    <option value="Immunology">
+                    <option value="Molecular Biology & Genetics">
+                    <option value="Biochemistry & Structural Biology">
+                    <option value="Biophysics">
+                    <option value="Pharmacology & Toxicology">
+                    <option value="Ecology & Evolution">
+                    <option value="Material Science & Physics">
+                    <option value="Chemistry & Synthesis">
+                    <option value="Computer Science & Data Engineering">
+                </datalist>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="uploadOrganism">Biological System / Model:</label>
+                <input type="text" id="uploadOrganism" list="uploadOrganismList" placeholder="e.g. Arabidopsis thaliana">
+                <datalist id="uploadOrganismList">
+                    <option value="Arabidopsis thaliana">
+                    <option value="Danio rerio">
+                    <option value="Mus musculus">
+                    <option value="Rattus norvegicus">
+                    <option value="Drosophila melanogaster">
+                    <option value="Caenorhabditis elegans">
+                    <option value="Homo sapiens / Human Cell Lines">
+                    <option value="Saccharomyces cerevisiae / Yeast">
+                    <option value="Escherichia coli / Bacteria">
+                    <option value="Viruses / Phages">
+                    <option value="Organoids / 3D Tissues">
+                    <option value="Non-biological / In vitro / Synthetic">
+                </datalist>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="uploadTags">Tags (comma-separated):</label>
+                <input type="text" id="uploadTags" placeholder="e.g. Confocal, Live-cell, GFP, Time-Lapse">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label for="uploadAuthor">Author:</label>
+                    <input type="text" id="uploadAuthor" placeholder="Your Name">
+                </div>
+                <div class="form-group">
+                    <label for="uploadLicense">License:</label>
+                    <select id="uploadLicense">
+                        <option value="CC0-1.0">CC0-1.0</option>
+                        <option value="CC-BY-4.0" selected>CC-BY-4.0</option>
+                        <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
+                        <option value="MIT">MIT</option>
+                        <option value="Apache-2.0">Apache-2.0</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <datalist id="uploadLicenseList">
+                        <option value="CC0-1.0">
+                        <option value="CC-BY-4.0">
+                        <option value="CC-BY-SA-4.0">
+                        <option value="MIT">
+                        <option value="Apache-2.0">
+                        <option value="Other">
+                    </datalist>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label for="uploadInstitution">Institution / Lab:</label>
+                    <input type="text" id="uploadInstitution" placeholder="e.g. University of Münster">
+                </div>
+                <div class="form-group">
+                    <label for="uploadOrcid">ORCID (optional):</label>
+                    <input type="text" id="uploadOrcid" placeholder="0000-0002-XXXX-XXXX">
+                </div>
+                <div class="form-group">
+                    <label for="uploadVersion">Version:</label>
+                    <input type="text" id="uploadVersion" placeholder="1.0.0" value="1.0.0">
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <input type="checkbox" id="uploadSyncLocal" name="uploadSyncLocalCheckbox" checked style="cursor: pointer;">
+                <label for="uploadSyncLocal" style="cursor: pointer; font-size: 0.9em; color: #e0e0e0;">
+                    Update local template with these tags
+                </label>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button id="uploadBackBtn" class="btn btn-secondary" onclick="window.uploadModal.goToStep(1)" style="padding: 8px 16px; display: none;">&larr; Back</button>
+            <button id="uploadNextBtn" class="btn btn-secondary" onclick="window.uploadModal.goToStep(2)" style="padding: 8px 16px; display: none;">Next &rarr;</button>
+            <button id="uploadCancelBtn" class="btn btn-secondary" onclick="window.uploadModal.close()" style="padding: 8px 16px;">Cancel</button>
+            <button id="uploadConfirmBtn" data-id="btnSubmitUpload" class="btn" onclick="window.uploadModal.submit()" style="padding: 8px 16px; background: #7c3aed; color: #fff;">Continue to GitHub</button>
+        </div>
+    </div>
+</div>

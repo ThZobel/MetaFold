@@ -92,7 +92,9 @@ window.switchMainTab = function (tabName) {
 
             setTimeout(() => {
                 if (window.visualizationManager && window.visualizationManager.checkJSONCrackAvailability) {
+                    if (typeof window.visualizationManager.checkJSONCrackAvailability === 'function') {
                     window.visualizationManager.checkJSONCrackAvailability();
+                }
                 }
             }, 200);
         }
@@ -1823,7 +1825,9 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             console.log('📊 Checking JSONCrack availability after DOM load...');
             if (window.visualizationManager) {
-                window.visualizationManager.checkJSONCrackAvailability();
+                if (typeof window.visualizationManager.checkJSONCrackAvailability === 'function') {
+                    window.visualizationManager.checkJSONCrackAvailability();
+                }
                 console.log('📊 JSONCrack availability:', window.visualizationManager.usesFallback ? 'Fallback mode' : 'Full JSONCrack mode');
             }
         }, 1500);

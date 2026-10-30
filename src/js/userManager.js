@@ -205,21 +205,21 @@ const userManager = {
             }
         }
 
-        // Reload templates for new user
-        if (window.templateManager && window.templateManager.init) {
+        // Load user-specific settings after prefix update if switchToUser did not handle it
+        if (window.settingsManager && !window.settingsManager.switchToUser && window.settingsManager.initUserSpecific) {
             try {
-                await window.templateManager.init();
-                console.log('✅ Templates reloaded for new user');
+                await window.settingsManager.initUserSpecific();
             } catch (error) {
-                console.warn('⚠️ Could not reload templates for new user:', error);
+                console.warn('⚠️ Could not load user-specific settings:', error);
             }
         }
+
         this.updateUserDisplay();
         console.log(`✅ User switch completed: ${previousUser || 'None'} → ${username} (${groupname})`);
 
-        // FORCE UPDATE USER DISPLAY
+        // FORCE UPDATE USER DISPLAY & TEMPLATES (single templateManager.init pass)
         this.forceUpdateUserDisplay();
-        this.forceRefreshTemplates();
+        await this.forceRefreshTemplates();
         return { username, groupname };
     },
 
@@ -246,14 +246,10 @@ const userManager = {
                 el.style.backgroundColor = color;
             });
 
-            // Update all username text elements
-            Array.from(document.querySelectorAll('*')).forEach(el => {
-                const text = el.textContent?.trim();
-                if (text === 'Thomas' || text === 'Kathi' || text === 'User') {
-                    if (text !== username) {
-                        console.log(`Updating username element: "${text}" → "${username}"`);
-                        el.textContent = username;
-                    }
+            // Update targeted username text elements without scanning the entire DOM
+            document.querySelectorAll('#currentUserName, .user-name, .username-display').forEach(el => {
+                if (el.children.length === 0 && el.textContent?.trim() !== username) {
+                    el.textContent = username;
                 }
             });
 
@@ -533,11 +529,6 @@ const userManager = {
 
             if (userInfo && userInfo.username) {
                 await this.setCurrentUser(userInfo.username, userInfo.groupname);
-
-                // Initialize user-specific settings after login
-                if (window.settingsManager.initUserSpecific) {
-                    await window.settingsManager.initUserSpecific();
-                }
 
                 console.log('✅ User selected from login modal with settings support');
                 return userInfo;

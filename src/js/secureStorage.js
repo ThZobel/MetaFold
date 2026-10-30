@@ -16,8 +16,22 @@ const secureStorage = {
     async init() {
         if (this.isInitialized) {
             return this.capabilities;
+        })();
+        return this._initPromise;
+        }
+        if (this._initPromise) {
+            return this._initPromise;
         }
 
+        this._initPromise = (async () => {
+        if (this.isInitialized) {
+            return this.capabilities;
+        }
+        if (this._initPromise) {
+            return this._initPromise;
+        }
+
+        this._initPromise = (async () => {
         console.log('🔐 Initializing Secure Storage with User-Specific Entropy...');
 
         // Check Electron safeStorage capability
@@ -88,6 +102,8 @@ const secureStorage = {
         }
 
         return this.capabilities;
+        })();
+        return this._initPromise;
     },
 
     // Initialize browser-side encryption key

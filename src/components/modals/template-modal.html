@@ -13,57 +13,14 @@
     </div>
 
     <!-- Experiment Tab -->
-    <div id="experimentTab" class="tab-content">
+    <div id="experimentTab" class="tab-content" style="display: block;">
         <div class="tabs">
-            <div class="tab active" onclick="switchModalTab('structure')">Structure</div>
-            <div class="tab" onclick="switchModalTab('metadata')">Metadata</div>
+            <div class="tab active" data-tab="metadata" id="tabBtnMetadata" onclick="switchModalTab('metadata')">📋 Metadata Fields</div>
+            <div class="tab" data-tab="community" id="tabBtnCommunity" onclick="switchModalTab('community')">🌐 Community &amp; Sharing</div>
         </div>
 
-        <div id="structureContent" class="tab-content active">
-            <!-- NEW: Project behavior toggles -->
-            <div class="form-group" style="padding: 15px; background: #2d2d2d; border-radius: 8px; margin-bottom: 15px; border: 1px solid #404040;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <div>
-                        <strong style="display: block; margin-bottom: 4px;">Write files only (Flag-File)</strong>
-                        <span style="font-size: 0.85em; color: #9ca3af;">These files are not treated as a Project with metadata</span>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="templateWriteFilesOnly">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <strong style="display: block; margin-bottom: 4px;">Multiple folders (Batch mode)</strong>
-                        <span style="font-size: 0.85em; color: #9ca3af;">Select existing folders to write to (disables Project Name)</span>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="templateMultipleFolders">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="experimentStructure">Folder Structure (optional):</label>
-                <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
-data/
-  raw/
-  processed/
-analysis/
-results/
-  plots/
-  reports/
-README.md
-experiment_log.md"></textarea>
-                <small style="color: #6b7280; margin-top: 5px; display: block;">
-                    💡 Tip: End lines with <code>/</code> for folders. Use 2 spaces indentation for subfolders to create
-                    hierarchy. You can use <code>[FieldName]</code> for dynamic folders (e.g., <code>[userName]/Data</code>).
-                </small>
-            </div>
-        </div>
-
-        <div id="metadataContent" class="tab-content">
+        <!-- Tab 1: Metadata Fields (Default Active) -->
+        <div id="metadataContent" class="tab-content active">
             <div class="form-group">
                 <label>Metadata Fields:</label>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
@@ -93,6 +50,181 @@ experiment_log.md"></textarea>
 
             <div id="metadataFields"></div>
 
+            <!-- Collapsible Folder Structure Section -->
+            <details id="folderStructureDetails" style="margin-top: 20px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px 16px;">
+                <summary style="cursor: pointer; font-weight: 600; color: #e0e0e0; user-select: none; display: flex; align-items: center; gap: 8px;">
+                    <span>📁</span> Folder Structure &amp; Execution Mode (Optional)
+                </summary>
+                <div style="margin-top: 15px;">
+                    <!-- Project behavior toggles -->
+                    <div class="form-group" style="padding: 15px; background: #2d2d2d; border-radius: 8px; margin-bottom: 15px; border: 1px solid #404040;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <strong style="display: block; margin-bottom: 4px;">Write files only (Flag-File)</strong>
+                                <span style="font-size: 0.85em; color: #9ca3af;">These files are not treated as a Project with metadata</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="templateWriteFilesOnly">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <strong style="display: block; margin-bottom: 4px;">Multiple folders (Batch mode)</strong>
+                                <span style="font-size: 0.85em; color: #9ca3af;">Select existing folders to write to (disables Project Name)</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="templateMultipleFolders">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="experimentStructure">Folder Structure (optional):</label>
+                        <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
+data/
+  raw/
+  processed/
+analysis/
+results/
+  plots/
+  reports/
+README.md
+experiment_log.md"></textarea>
+                        <small style="color: #6b7280; margin-top: 5px; display: block;">
+                            💡 Tip: End lines with <code>/</code> for folders. Use 2 spaces indentation for subfolders to create hierarchy. You can use <code>[FieldName]</code> for dynamic folders (e.g., <code>[userName]/Data</code>).
+                        </small>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- Tab 2: Community & Sharing (Optional) -->
+        <div id="communityContent" class="tab-content">
+            <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;">
+                <div style="font-size: 13px; font-weight: 600; color: #a855f7; margin-bottom: 4px;">
+                    🌐 Publishing &amp; Community Hub Metadata (Optional)
+                </div>
+                <div style="font-size: 12px; color: #9ca3af; line-height: 1.4;">
+                    Configure standardized taxonomy categories for the MetaFold Community Hub and GitHub sharing.
+                    You can pick from curated suggestions or type custom free text.
+                </div>
+            </div>
+
+            <!-- System / Device -->
+            <div class="form-group">
+                <label for="communitySystem">System / Device:</label>
+                <input type="text" id="communitySystem" list="communitySystemList" placeholder="e.g. Microscopy (Confocal / 2-Photon) or type custom...">
+                <datalist id="communitySystemList">
+                    <option value="Microscopy (Light / Widefield)">
+                    <option value="Microscopy (Confocal / 2-Photon)">
+                    <option value="Microscopy (Super-Resolution / STED / SIM / STORM)">
+                    <option value="Microscopy (Light Sheet / SPIM)">
+                    <option value="Microscopy (Electron / SEM / TEM / Cryo-EM)">
+                    <option value="Plate Reader / Spectrophotometer">
+                    <option value="Flow Cytometer / FACS">
+                    <option value="Sequencer (NGS / Illumina / Nanopore / PacBio)">
+                    <option value="Mass Spectrometer (Proteomics / Metabolomics)">
+                    <option value="Chromatography (HPLC / FPLC / GC)">
+                    <option value="Wet Lab: PCR / qPCR / Thermal Cycler">
+                    <option value="Wet Lab: Staining / Histology / Immunofluorescence">
+                    <option value="Wet Lab: Sample Prep / Extraction / Purification">
+                    <option value="Wet Lab: Gel Imaging / Western Blot">
+                    <option value="Wet Lab: Cell Culture / Incubator / Bioreactor">
+                    <option value="Wet Lab: General Bench Protocol">
+                    <option value="Data Analysis / Bioimage Analysis">
+                    <option value="Hardware / 3D Printing / Prototyping">
+                </datalist>
+            </div>
+
+            <!-- Discipline / Domain -->
+            <div class="form-group">
+                <label for="communityDiscipline">Discipline / Domain:</label>
+                <input type="text" id="communityDiscipline" list="communityDisciplineList" placeholder="e.g. Plant Biology / Botany or type custom...">
+                <datalist id="communityDisciplineList">
+                    <option value="Plant Biology / Botany">
+                    <option value="Cell Biology">
+                    <option value="Neuroscience">
+                    <option value="Developmental Biology">
+                    <option value="Microbiology / Bacteriology">
+                    <option value="Virology">
+                    <option value="Immunology">
+                    <option value="Molecular Biology & Genetics">
+                    <option value="Biochemistry & Structural Biology">
+                    <option value="Biophysics">
+                    <option value="Pharmacology & Toxicology">
+                    <option value="Ecology & Evolution">
+                    <option value="Material Science & Physics">
+                    <option value="Chemistry & Synthesis">
+                    <option value="Computer Science & Data Engineering">
+                </datalist>
+            </div>
+
+            <!-- Biological System / Model -->
+            <div class="form-group">
+                <label for="communityOrganism">Biological System / Specimen:</label>
+                <input type="text" id="communityOrganism" list="communityOrganismList" placeholder="e.g. Arabidopsis thaliana or type custom...">
+                <datalist id="communityOrganismList">
+                    <option value="Arabidopsis thaliana">
+                    <option value="Danio rerio">
+                    <option value="Mus musculus">
+                    <option value="Rattus norvegicus">
+                    <option value="Drosophila melanogaster">
+                    <option value="Caenorhabditis elegans">
+                    <option value="Homo sapiens / Human Cell Lines">
+                    <option value="Saccharomyces cerevisiae / Yeast">
+                    <option value="Escherichia coli / Bacteria">
+                    <option value="Viruses / Phages">
+                    <option value="Organoids / 3D Tissues">
+                    <option value="Non-biological / In vitro / Synthetic">
+                </datalist>
+            </div>
+
+            <!-- Tags -->
+            <div class="form-group">
+                <label for="communityTags">Tags (comma-separated):</label>
+                <input type="text" id="communityTags" placeholder="e.g. Confocal, Live-cell, GFP, Time-Lapse, Root Growth">
+                <small style="color: #6b7280; margin-top: 4px; display: block;">
+                    Free-form keywords separated by commas for searching in the Community Hub.
+                </small>
+            </div>
+
+            <!-- Author & Institution Row -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <label for="communityAuthor" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Author:</label>
+                    <input type="text" id="communityAuthor" placeholder="e.g. Dr. Thomas Zobel" style="width: 100%;">
+                </div>
+                <div style="flex: 1;">
+                    <label for="communityInstitution" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Institution / Lab:</label>
+                    <input type="text" id="communityInstitution" placeholder="e.g. University of Münster" style="width: 100%;">
+                </div>
+            </div>
+
+            <!-- ORCID, Version, License Row -->
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label for="communityOrcid" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">ORCID (optional):</label>
+                    <input type="text" id="communityOrcid" placeholder="0000-0002-XXXX-XXXX" style="width: 100%;">
+                </div>
+                <div style="flex: 0.8;">
+                    <label for="communityVersion" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Version:</label>
+                    <input type="text" id="communityVersion" placeholder="1.0.0" value="1.0.0" style="width: 100%;">
+                </div>
+                <div style="flex: 1.2;">
+                    <label for="communityLicense" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">License:</label>
+                    <input type="text" id="communityLicense" list="communityLicenseList" placeholder="CC-BY-4.0" value="CC-BY-4.0" style="width: 100%;">
+                    <datalist id="communityLicenseList">
+                        <option value="CC0-1.0">
+                        <option value="CC-BY-4.0">
+                        <option value="CC-BY-SA-4.0">
+                        <option value="MIT">
+                        <option value="Apache-2.0">
+                        <option value="Other">
+                    </datalist>
+                </div>
+            </div>
         </div>
     </div>
 

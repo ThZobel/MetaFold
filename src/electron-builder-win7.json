@@ -1,0 +1,31 @@
+{
+  "appId": "com.thzobel.metafold",
+  "productName": "MetaFold",
+  "electronVersion": "22.3.27",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "index.html",
+    "assets/**/*",
+    "css/**/*",
+    "js/**/*",
+    "components/**/*",
+    "docs/**/*",
+    "build/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/icon.ico",
+    "artifactName": "${productName}-Setup-${version}-win7.${ext}"
+  }
+}

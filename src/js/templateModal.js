@@ -20,6 +20,9 @@ const templateModal = {
         
         document.getElementById('templateModal').style.display = 'block';
         
+        // Explicitly activate metadata tab
+        this.switchTab('metadata');
+        
         // NEW: Inject "Save as New" button
         this.injectSaveAsNewButton();
         
@@ -48,6 +51,9 @@ const templateModal = {
         this.setCategory(template.category || 'category1');
         
         document.getElementById('templateModal').style.display = 'block';
+        
+        // Explicitly activate metadata tab
+        this.switchTab('metadata');
         
         // NEW: Inject "Save as New" button
         this.injectSaveAsNewButton();
@@ -86,8 +92,45 @@ const templateModal = {
         document.getElementById('experimentStructure').value = '';
         
         // Clear toggles
-        document.getElementById('templateWriteFilesOnly').checked = false;
-        document.getElementById('templateMultipleFolders').checked = false;
+        const writeFilesOnly = document.getElementById('templateWriteFilesOnly');
+        if (writeFilesOnly) writeFilesOnly.checked = false;
+        const multipleFolders = document.getElementById('templateMultipleFolders');
+        if (multipleFolders) multipleFolders.checked = false;
+
+        // Clear community fields
+        const systemInput = document.getElementById('communitySystem');
+        const disciplineInput = document.getElementById('communityDiscipline');
+        const organismInput = document.getElementById('communityOrganism');
+        const tagsInput = document.getElementById('communityTags');
+        const authorInput = document.getElementById('communityAuthor');
+        const institutionInput = document.getElementById('communityInstitution');
+        const orcidInput = document.getElementById('communityOrcid');
+        const versionInput = document.getElementById('communityVersion');
+        const licenseInput = document.getElementById('communityLicense');
+
+        if (systemInput) systemInput.value = '';
+        if (disciplineInput) disciplineInput.value = '';
+        if (organismInput) organismInput.value = '';
+        if (tagsInput) tagsInput.value = '';
+
+        const currentUser = window.userManager?.currentUser;
+        const userProfile = (currentUser && window.profileManager?.isInitialized) ?
+            window.profileManager.getUserByUsername(currentUser) : null;
+        const defaultAuthor = userProfile?.fullName || currentUser || '';
+        const defaultInst = userProfile?.primaryGroupId ?
+            window.profileManager?.getGroupById(userProfile.primaryGroupId)?.institution :
+            (window.userManager?.currentGroup || '');
+        const defaultOrcid = userProfile?.orcid || '';
+
+        if (authorInput) authorInput.value = defaultAuthor;
+        if (institutionInput) institutionInput.value = defaultInst;
+        if (orcidInput) orcidInput.value = defaultOrcid;
+        if (versionInput) versionInput.value = '1.0.0';
+        if (licenseInput) licenseInput.value = 'CC-BY-4.0';
+
+        // Reset collapsible folder structure
+        const folderDetails = document.getElementById('folderStructureDetails');
+        if (folderDetails) folderDetails.open = false;
         
         // Clear metadata fields
         if (window.metadataEditor && window.metadataEditor.clearFields) {
@@ -108,8 +151,55 @@ const templateModal = {
         document.getElementById('experimentStructure').value = template.structure || '';
         
         // Load toggles
-        document.getElementById('templateWriteFilesOnly').checked = template.options?.writeFilesOnly || false;
-        document.getElementById('templateMultipleFolders').checked = template.options?.multipleFolders || false;
+        const writeFilesOnly = document.getElementById('templateWriteFilesOnly');
+        if (writeFilesOnly) writeFilesOnly.checked = template.options?.writeFilesOnly || false;
+        const multipleFolders = document.getElementById('templateMultipleFolders');
+        if (multipleFolders) multipleFolders.checked = template.options?.multipleFolders || false;
+
+        // Populate Community taxonomy
+        const comm = template.community || {};
+        const systemInput = document.getElementById('communitySystem');
+        const disciplineInput = document.getElementById('communityDiscipline');
+        const organismInput = document.getElementById('communityOrganism');
+        const tagsInput = document.getElementById('communityTags');
+        const authorInput = document.getElementById('communityAuthor');
+        const institutionInput = document.getElementById('communityInstitution');
+        const orcidInput = document.getElementById('communityOrcid');
+        const versionInput = document.getElementById('communityVersion');
+        const licenseInput = document.getElementById('communityLicense');
+
+        if (systemInput) systemInput.value = comm.system || '';
+        if (disciplineInput) disciplineInput.value = comm.discipline || '';
+        if (organismInput) organismInput.value = comm.organism || '';
+        if (tagsInput) {
+            tagsInput.value = Array.isArray(comm.tags) ? comm.tags.join(', ') : (comm.tags || '');
+        }
+
+        // Default author/institution/orcid from profile if not present
+        const currentUser = window.userManager?.currentUser;
+        const userProfile = (currentUser && window.profileManager?.isInitialized) ?
+            window.profileManager.getUserByUsername(currentUser) : null;
+        const defaultAuthor = userProfile?.fullName || currentUser || template.createdBy || '';
+        const defaultInst = userProfile?.primaryGroupId ?
+            window.profileManager?.getGroupById(userProfile.primaryGroupId)?.institution :
+            (window.userManager?.currentGroup || template.createdByGroup || '');
+        const defaultOrcid = userProfile?.orcid || '';
+
+        if (authorInput) authorInput.value = comm.author || defaultAuthor;
+        if (institutionInput) institutionInput.value = comm.institution || defaultInst;
+        if (orcidInput) orcidInput.value = comm.orcid || defaultOrcid;
+        if (versionInput) versionInput.value = comm.version || '1.0.0';
+        if (licenseInput) licenseInput.value = comm.license || 'CC-BY-4.0';
+
+        // Auto-expand folder structure if template has existing structure or options
+        const folderDetails = document.getElementById('folderStructureDetails');
+        if (folderDetails) {
+            folderDetails.open = Boolean(
+                template.structure || 
+                template.options?.writeFilesOnly || 
+                template.options?.multipleFolders
+            );
+        }
         
         // Load metadata into editor if it's an experiment template
         const isExperiment = template.type === 'experiment' || (template.metadata && Object.keys(template.metadata).length > 0);
@@ -131,8 +221,15 @@ const templateModal = {
         }
     },
 
-    // Switch between structure and metadata tabs
+    // Switch between metadata and community tabs
     switchTab(tabName) {
+        // Alias legacy 'structure' tab to 'metadata' and auto-expand folder structure
+        if (tabName === 'structure') {
+            tabName = 'metadata';
+            const details = document.getElementById('folderStructureDetails');
+            if (details) details.open = true;
+        }
+
         // Hide all tab contents
         document.querySelectorAll('#experimentTab .tab-content').forEach(content => {
             content.classList.remove('active');
@@ -144,13 +241,48 @@ const templateModal = {
         });
 
         // Show selected tab content
-        if (tabName === 'structure') {
-            document.getElementById('structureContent').classList.add('active');
-            document.querySelector('#experimentTab .tab:first-child').classList.add('active');
-        } else if (tabName === 'metadata') {
-            document.getElementById('metadataContent').classList.add('active');
-            document.querySelector('#experimentTab .tab:last-child').classList.add('active');
+        if (tabName === 'metadata') {
+            const content = document.getElementById('metadataContent');
+            if (content) content.classList.add('active');
+            const tabBtn = document.getElementById('tabBtnMetadata') || 
+                           document.querySelector('#experimentTab .tab[data-tab="metadata"]');
+            if (tabBtn) tabBtn.classList.add('active');
+        } else if (tabName === 'community') {
+            const content = document.getElementById('communityContent');
+            if (content) content.classList.add('active');
+            const tabBtn = document.getElementById('tabBtnCommunity') || 
+                           document.querySelector('#experimentTab .tab[data-tab="community"]');
+            if (tabBtn) tabBtn.classList.add('active');
         }
+    },
+
+    // Collect Community & Sharing metadata
+    collectCommunityData() {
+        const system = document.getElementById('communitySystem')?.value?.trim() || '';
+        const discipline = document.getElementById('communityDiscipline')?.value?.trim() || '';
+        const organism = document.getElementById('communityOrganism')?.value?.trim() || '';
+        const rawTags = document.getElementById('communityTags')?.value || '';
+        const tags = rawTags
+            .split(',')
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+        const author = document.getElementById('communityAuthor')?.value?.trim() || '';
+        const institution = document.getElementById('communityInstitution')?.value?.trim() || '';
+        const orcid = document.getElementById('communityOrcid')?.value?.trim() || '';
+        const version = document.getElementById('communityVersion')?.value?.trim() || '1.0.0';
+        const license = document.getElementById('communityLicense')?.value?.trim() || 'CC-BY-4.0';
+
+        return {
+            system,
+            discipline,
+            organism,
+            tags,
+            author,
+            institution,
+            orcid,
+            version,
+            license
+        };
     },
 
     // FIXED: Better error/success message display without focus-breaking alerts
@@ -343,9 +475,10 @@ const templateModal = {
             createdByGroup: window.userManager?.currentGroup || 'Unknown',
             createdAt: new Date().toISOString(),
             options: {
-                writeFilesOnly: document.getElementById('templateWriteFilesOnly').checked,
-                multipleFolders: document.getElementById('templateMultipleFolders').checked
-            }
+                writeFilesOnly: document.getElementById('templateWriteFilesOnly')?.checked || false,
+                multipleFolders: document.getElementById('templateMultipleFolders')?.checked || false
+            },
+            community: this.collectCommunityData()
         };
 
         if (existingIntegrations) {
@@ -729,6 +862,11 @@ const templateModal = {
                 metadata: metadata || {},
                 type: type,
                 category: category,
+                community: this.collectCommunityData(),
+                options: {
+                    writeFilesOnly: document.getElementById('templateWriteFilesOnly')?.checked || false,
+                    multipleFolders: document.getElementById('templateMultipleFolders')?.checked || false
+                },
                 createdBy: window.userManager?.currentUser || 'Unknown',
                 createdByGroup: window.userManager?.currentGroup || 'Unknown',
                 createdAt: new Date().toISOString(),

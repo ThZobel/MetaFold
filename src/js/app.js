@@ -2,9 +2,11 @@
 
 const app = {
     initialized: false,
+    isInitializing: false,
 
     async init() {
-        if (this.initialized) return;
+        if (this.initialized || this.isInitializing) return;
+        this.isInitializing = true;
 
         console.log('🚀 Starting MetaFold with user-specific settings...');
 
@@ -248,12 +250,13 @@ const app = {
             }
 
             // STEP 3: Initialize other available modules
-            this.initializeAvailableModules();
+            await this.initializeAvailableModules();
 
             // STEP 4: Setup event listeners
             this.setupEventListeners();
 
             this.initialized = true;
+            this.isInitializing = false;
             console.log('✅ MetaFold started successfully with user-specific settings!');
 
             // Show current user info
@@ -271,6 +274,7 @@ const app = {
             }
 
         } catch (error) {
+            this.isInitializing = false;
             console.error('❌ Error starting app:', error);
             this.showError('Error starting the application: ' + error.message);
 
@@ -283,8 +287,8 @@ const app = {
     async initializeAvailableModules() {
         console.log('🔧 Initializing available modules...');
 
-        // *** NEU: Initialize storage FIRST ***
-        if (window.storage && typeof window.storage.initFileStorage === 'function') {
+        // *** NEU: Initialize storage FIRST (skip if userManager already initialized it) ***
+        if (window.storage && typeof window.storage.initFileStorage === 'function' && !window.storage.fileStorageEnabled) {
             try {
                 console.log('📂 Initializing file storage...');
                 await window.storage.initFileStorage();
@@ -304,8 +308,8 @@ const app = {
             }
         }
 
-        // Initialize template manager (now NACH storage initialization)
-        if (window.templateManager && typeof window.templateManager.init === 'function') {
+        // Initialize template manager (skip if userManager already loaded templates during login)
+        if (window.templateManager && typeof window.templateManager.init === 'function' && (!window.userManager || !window.userManager.isInitialized)) {
             try {
                 // Template manager kann jetzt file storage verwenden
                 await window.templateManager.init();
@@ -429,6 +433,175 @@ const app = {
         }, isError ? 15000 : 5000);
     },
 
+
+    async openTemplateHub(customIndexData = null) {
+        try {
+            console.log('Fetching templates index...');
+            const repoUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) 
+                            ? window.settingsManager.settings['templates.repository_url'] 
+                            : 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+            
+            if (window.facetSearch) {
+                window.facetSearch.closeSearch();
+                window.facetSearch.isTemplateHub = true;
+                
+                let indexData = customIndexData;
+                if (!indexData) {
+                    const response = await fetch(repoUrl);
+                    if (!response.ok) throw new Error('Could not fetch templates index');
+                    indexData = await response.json();
+                }
+                
+                const formattedData = indexData.map(item => {
+                    const community = item.community || {};
+                    item.system = community.system || item.system || '';
+                    item.discipline = community.discipline || item.discipline || '';
+                    item.organism = community.organism || item.organism || '';
+                    item.collection = item.collection || community.collection || 'Community';
+                    if (community.tags) {
+                        item.tags = Array.isArray(community.tags) ? community.tags : String(community.tags).split(',').map(s => s.trim()).filter(Boolean);
+                    } else if (item.tags) {
+                        item.tags = Array.isArray(item.tags) ? item.tags : String(item.tags).split(',').map(s => s.trim()).filter(Boolean);
+                    } else {
+                        item.tags = [];
+                    }
+                    if (!item.author && community.author) item.author = community.author;
+                    if (!item.version && community.version) item.version = community.version;
+
+                    const flatMeta = {};
+                    Object.keys(item).forEach(key => {
+                        if (key !== 'id' && key !== 'path' && key !== 'fields' && key !== 'community') {
+                            flatMeta[key] = item[key];
+                        }
+                    });
+
+                    // Ensure all 7 taxonomy keys are present in flatMeta with defaults
+                    const keysToUnpack = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
+                    for (const key of keysToUnpack) {
+                        if (flatMeta[key] === undefined) {
+                            flatMeta[key] = key === 'tags' ? [] : '';
+                        }
+                    }
+                    
+                    return {
+                        _type: 'template_hub',
+                        id: item.id,
+                        name: item.name || 'Unnamed Template',
+                        path: item.path,
+                        flatMeta: flatMeta,
+                        rawFields: item.fields || []
+                    };
+                });
+                
+                window.facetSearch.masterData = formattedData;
+                window.facetSearch.allAvailableKeys = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
+                window.facetSearch.visibleColumns = ['collection', 'system', 'discipline', 'organism', 'tags', 'author'];
+                
+                window.facetSearch.updateUI();
+                window.facetSearch.openModal();
+                return formattedData;
+            }
+        } catch (error) {
+            console.error('Template Hub Error:', error);
+            this.showError('Failed to load templates: ' + error.message);
+        }
+    },
+    
+    async downloadAndInstallTemplate(repoPath, customUserInfo = undefined) {
+        try {
+            let templateData;
+            if (repoPath && typeof repoPath === 'object') {
+                templateData = JSON.parse(JSON.stringify(repoPath));
+            } else {
+                const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url'])
+                                ? window.settingsManager.settings['templates.repository_url']
+                                : 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+                const rawBaseUrl = baseUrl.replace('/templates-index.json', '');
+                const url = `${rawBaseUrl}/${repoPath}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Could not download template');
+                
+                templateData = await response.json();
+            }
+            
+            let userInfo = customUserInfo;
+            if (userInfo === undefined) {
+                if (window.storage && typeof window.storage.getCurrentUserContext === 'function') {
+                    userInfo = window.storage.getCurrentUserContext();
+                } else if (window.userManager) {
+                    userInfo = {
+                        username: window.userManager.currentUser || 'User',
+                        groupname: window.userManager.currentGroup || 'Default'
+                    };
+                }
+            }
+            if (!userInfo) {
+                userInfo = { username: 'User', groupname: 'Default' };
+            }
+            
+            // Strip existing fileInfo to ensure it's treated as a brand new local file
+            if (templateData._fileInfo) {
+                delete templateData._fileInfo;
+            }
+            
+            templateData.name = templateData.name || 'Unnamed Template';
+            templateData.category = templateData.category || 'category1';
+            templateData.originalCreator = userInfo.username || 'User';
+            templateData.originalGroup = userInfo.groupname || 'Default';
+            templateData.id = 'template_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            templateData.savedLocally = true;
+
+            this.lastInstalledTemplate = templateData;
+            
+            if (window.electronAPI && window.electronAPI.saveTemplateToFile) {
+                const result = await window.electronAPI.saveTemplateToFile(templateData, userInfo);
+                if (result.success) {
+                    this.showSuccess(`Template "${templateData.name}" installed successfully!`);
+                    if (window.templateManager) {
+                        if (typeof window.templateManager.refreshFromFiles === 'function') {
+                            await window.templateManager.refreshFromFiles();
+                        } else if (typeof window.templateManager.loadTemplates === 'function') {
+                            await window.templateManager.loadTemplates();
+                        }
+                        if (Array.isArray(window.templateManager.templates)) {
+                            if (!window.templateManager.templates.some(t => t.id === templateData.id)) {
+                                window.templateManager.templates.push(templateData);
+                            }
+                        }
+                    }
+                    return result;
+                } else {
+                    this.showError('Failed to install template: ' + (result.error || 'Unknown error'));
+                    return result;
+                }
+            } else if (window.storage && window.storage.saveTemplateToFileImmediately) {
+                const result = await window.storage.saveTemplateToFileImmediately(templateData);
+                if (result.success) {
+                    this.showSuccess(`Template "${templateData.name}" installed successfully!`);
+                    if (window.templateManager) {
+                        if (typeof window.templateManager.refreshFromFiles === 'function') {
+                            await window.templateManager.refreshFromFiles();
+                        } else if (Array.isArray(window.templateManager.templates)) {
+                            if (!window.templateManager.templates.some(t => t.id === templateData.id)) {
+                                window.templateManager.templates.push(templateData);
+                            }
+                        }
+                    }
+                    return result;
+                } else {
+                    this.showError('Failed to install template: ' + (result.error || 'Unknown error'));
+                    return result;
+                }
+            }
+            return { success: true, template: templateData };
+        } catch (error) {
+            console.error('Download Error:', error);
+            this.showError('Download failed: ' + error.message);
+            return { success: false, error: error.message };
+        }
+    },
+
     // DEBUG FUNCTION: Check user management status
     async debugUserManagement() {
         console.log('🐛 DEBUG: Checking user management status...');
@@ -465,16 +638,7 @@ Settings Manager: ${status.hasSettingsManager}`);
 // Make debug function globally available for testing
 window.debugUserManagement = () => app.debugUserManagement();
 
-// Wait until DOM is fully loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM loaded, starting app in 200ms...');
-        setTimeout(() => app.init(), 200);
-    });
-} else {
-    console.log('DOM already loaded, starting app in 200ms...');
-    setTimeout(() => app.init(), 200);
-};
+// NOTE: Single DOMContentLoaded initialization is handled at the end of this file
 
 // =================== PHASE 5.2: APP LIFECYCLE INTEGRATION ===================
 // Handles app-closing events and user-changed events for OMERO session cleanup
@@ -581,6 +745,17 @@ if (document.readyState === 'loading') {
         });
 
         console.log('✅ Custom user-changed event listener registered as fallback');
+    }
+
+
+    if (window.electronAPI && window.electronAPI.onMenuAction) {
+        window.electronAPI.onMenuAction((action) => {
+            if (action === 'browse-templates') {
+                if (window.app && typeof window.app.openTemplateHub === 'function') {
+                    window.app.openTemplateHub();
+                }
+            }
+        });
     }
 
     console.log('🎉 App lifecycle handlers initialized successfully');
