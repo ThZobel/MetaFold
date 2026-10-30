@@ -2,9 +2,11 @@
 
 const app = {
     initialized: false,
+    isInitializing: false,
 
     async init() {
-        if (this.initialized) return;
+        if (this.initialized || this.isInitializing) return;
+        this.isInitializing = true;
 
         console.log('🚀 Starting MetaFold with user-specific settings...');
 
@@ -248,12 +250,13 @@ const app = {
             }
 
             // STEP 3: Initialize other available modules
-            this.initializeAvailableModules();
+            await this.initializeAvailableModules();
 
             // STEP 4: Setup event listeners
             this.setupEventListeners();
 
             this.initialized = true;
+            this.isInitializing = false;
             console.log('✅ MetaFold started successfully with user-specific settings!');
 
             // Show current user info
@@ -271,6 +274,7 @@ const app = {
             }
 
         } catch (error) {
+            this.isInitializing = false;
             console.error('❌ Error starting app:', error);
             this.showError('Error starting the application: ' + error.message);
 
@@ -283,8 +287,8 @@ const app = {
     async initializeAvailableModules() {
         console.log('🔧 Initializing available modules...');
 
-        // *** NEU: Initialize storage FIRST ***
-        if (window.storage && typeof window.storage.initFileStorage === 'function') {
+        // *** NEU: Initialize storage FIRST (skip if userManager already initialized it) ***
+        if (window.storage && typeof window.storage.initFileStorage === 'function' && !window.storage.fileStorageEnabled) {
             try {
                 console.log('📂 Initializing file storage...');
                 await window.storage.initFileStorage();
@@ -304,8 +308,8 @@ const app = {
             }
         }
 
-        // Initialize template manager (now NACH storage initialization)
-        if (window.templateManager && typeof window.templateManager.init === 'function') {
+        // Initialize template manager (skip if userManager already loaded templates during login)
+        if (window.templateManager && typeof window.templateManager.init === 'function' && (!window.userManager || !window.userManager.isInitialized)) {
             try {
                 // Template manager kann jetzt file storage verwenden
                 await window.templateManager.init();
@@ -634,16 +638,7 @@ Settings Manager: ${status.hasSettingsManager}`);
 // Make debug function globally available for testing
 window.debugUserManagement = () => app.debugUserManagement();
 
-// Wait until DOM is fully loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM loaded, starting app in 200ms...');
-        setTimeout(() => app.init(), 200);
-    });
-} else {
-    console.log('DOM already loaded, starting app in 200ms...');
-    setTimeout(() => app.init(), 200);
-};
+// NOTE: Single DOMContentLoaded initialization is handled at the end of this file
 
 // =================== PHASE 5.2: APP LIFECYCLE INTEGRATION ===================
 // Handles app-closing events and user-changed events for OMERO session cleanup

@@ -150,6 +150,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
 
+      - name: Build for Windows 7 (Legacy Electron 22)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          echo "=== Building for Windows 7 SP1 (Electron 22.3.27) ==="
+          Remove-Item -Path "dist\win-unpacked" -Recurse -Force -ErrorAction SilentlyContinue
+          npx electron-builder --win --config electron-builder-win7.json --publish=never
+        working-directory: src
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
+
       - name: Build for macOS
         if: matrix.platform == 'mac'
         run: |
@@ -250,7 +262,8 @@ jobs:
           Choose the version for your operating system:
 
           ### Windows
-          - `*.exe` - Windows Installer
+          - `*.exe` - Windows 10/11 Installer (`MetaFold Setup x.x.x.exe`)
+          - `*-win7.exe` - Windows 7 SP1 Legacy Installer (`MetaFold-Setup-x.x.x-win7.exe`, Electron 22)
 
           ### macOS
           - `*.dmg` - macOS Disk Image
