@@ -339,6 +339,9 @@ function createMockEnvironment(initialData = {}) {
         show(templateIndex = 0) {
             const modal = documentMock.getElementById('uploadTemplateModal');
             if (modal) modal.style.display = 'block';
+            this.selectedTemplateIndex = templateIndex;
+            const select = documentMock.getElementById('uploadTemplateSelect');
+            if (select) select.value = String(templateIndex);
             this.onTemplateSelected(templateIndex);
         },
         close() {
@@ -346,6 +349,9 @@ function createMockEnvironment(initialData = {}) {
             if (modal) modal.style.display = 'none';
         },
         onTemplateSelected(index) {
+            const select = documentMock.getElementById('uploadTemplateSelect');
+            if (select) select.value = String(index);
+            this.selectedTemplateIndex = index;
             const tm = windowMock.templateManager;
             if (!tm || !tm.templates || !tm.templates[index]) return;
             const t = tm.templates[index];

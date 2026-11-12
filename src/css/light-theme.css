@@ -290,6 +290,19 @@ body.light-mode {
 /* Drag & Drop Headers / Sub-elements */
 .light-mode .metadata-field-header {
     border-bottom: 1px solid #e5e7eb !important;
+    padding-bottom: 6px;
+}
+
+.light-mode .field-remove-btn {
+    background: #f3f4f6 !important;
+    border-color: #d1d5db !important;
+    color: #6b7280 !important;
+}
+
+.light-mode .field-remove-btn:hover {
+    background: #fee2e2 !important;
+    border-color: #f87171 !important;
+    color: #dc2626 !important;
 }
 
 /* Button overrides - keeping gradients but making them pop more on light bg */

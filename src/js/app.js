@@ -442,7 +442,7 @@ const app = {
                             : 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
             
             if (window.facetSearch) {
-                window.facetSearch.closeSearch();
+                await window.facetSearch.closeSearch();
                 window.facetSearch.isTemplateHub = true;
                 
                 let indexData = customIndexData;
@@ -454,10 +454,16 @@ const app = {
                 
                 const formattedData = indexData.map(item => {
                     const community = item.community || {};
+                    const rawCat = community.category || community.type || item.type || 'Experiments';
+                    const catNormalized = ['Systems', 'Protocols', 'Experiments', 'Workflows'].find(
+                        c => c.toLowerCase() === String(rawCat).toLowerCase()
+                    ) || 'Experiments';
+                    item.category = catNormalized;
                     item.system = community.system || item.system || '';
                     item.discipline = community.discipline || item.discipline || '';
                     item.organism = community.organism || item.organism || '';
-                    item.collection = item.collection || community.collection || 'Community';
+                    item.collection = item.collection || community.collection || 'General';
+                    item.description = item.description || community.description || '';
                     if (community.tags) {
                         item.tags = Array.isArray(community.tags) ? community.tags : String(community.tags).split(',').map(s => s.trim()).filter(Boolean);
                     } else if (item.tags) {
@@ -475,8 +481,8 @@ const app = {
                         }
                     });
 
-                    // Ensure all 7 taxonomy keys are present in flatMeta with defaults
-                    const keysToUnpack = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
+                    // Ensure all taxonomy keys are present in flatMeta with defaults
+                    const keysToUnpack = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
                     for (const key of keysToUnpack) {
                         if (flatMeta[key] === undefined) {
                             flatMeta[key] = key === 'tags' ? [] : '';
@@ -494,8 +500,10 @@ const app = {
                 });
                 
                 window.facetSearch.masterData = formattedData;
-                window.facetSearch.allAvailableKeys = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
-                window.facetSearch.visibleColumns = ['collection', 'system', 'discipline', 'organism', 'tags', 'author'];
+                window.facetSearch.allAvailableKeys = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
+                await window.facetSearch._restoreSessionTableState(['category', 'collection', 'tags', 'description', 'author']);
+                window.facetSearch.renderColumnSelector();
+                window.facetSearch.closeRightPanel();
                 
                 window.facetSearch.updateUI();
                 window.facetSearch.openModal();

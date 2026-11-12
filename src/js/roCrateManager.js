@@ -308,7 +308,7 @@ window.roCrateManager = {
         overlay.style.top = '0'; overlay.style.left = '0';
         overlay.style.width = '100vw'; overlay.style.height = '100vh';
         overlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        overlay.style.zIndex = '10000';
+        overlay.style.zIndex = '10010';
         overlay.style.display = 'flex';
         overlay.style.alignItems = 'center';
         overlay.style.justifyContent = 'center';
@@ -563,6 +563,8 @@ window.roCrateManager = {
         }
 
         // --- EXPORT TRADITIONAL METAFOLD DASHBOARD AS WELL ---
+        let legacyJsonPath = null;
+        let legacyHtmlPath = null;
         if (typeof window.generateLineageHtml === 'function') {
             const legacyData = {
                 exportType: this.currentExportData.type === 'lineage' ? 'Lineage' : 'Scan',
@@ -574,16 +576,44 @@ window.roCrateManager = {
                 projects: projectsToExport
             };
             
-            const legacyJsonPath = basePath + '/metafold-lineage-data.json';
-            const legacyHtmlPath = basePath + '/metafold-dashboard.html';
+            legacyJsonPath = basePath + '/metafold-lineage-data.json';
+            legacyHtmlPath = basePath + '/metafold-dashboard.html';
             
             const legacyHtml = window.generateLineageHtml(legacyData);
             await window.electronAPI.writeFile(legacyJsonPath, JSON.stringify(legacyData, null, 2));
             await window.electronAPI.writeFile(legacyHtmlPath, legacyHtml);
         }
 
-        if (jsonResult.success && window.projectScanner && window.projectScanner.showSuccess) {
-            window.projectScanner.showSuccess(`✅ RO-Crate exported successfully! <br><br> <button class="btn btn-secondary btn-sm" onclick="window.electronAPI.openFolder('${escapedBasePath}')">📂 Open Folder</button>`);
+        if (jsonResult.success) {
+            if (window.projectScanner && window.projectScanner.showSuccess) {
+                window.projectScanner.showSuccess(`✅ RO-Crate exported successfully! <br><br> <button class="btn btn-secondary btn-sm" onclick="window.electronAPI.openFolder('${escapedBasePath}')">📂 Open Folder</button>`);
+            }
+            if (typeof window.showExportSuccessModal === 'function') {
+                const crateFiles = [
+                    { name: 'ro-crate-metadata.json', path: jsonPath, icon: '📦', label: 'RO-Crate Metadata (JSON-LD)' }
+                ];
+                if (generatePreview) {
+                    crateFiles.push({ name: 'ro-crate-preview.html', path: htmlPath, icon: '📄', label: 'RO-Crate Preview (HTML)' });
+                }
+                if (legacyHtmlPath) {
+                    crateFiles.push({ name: 'metafold-dashboard.html', path: legacyHtmlPath, icon: '🌐', label: 'Lineage Dashboard' });
+                }
+                if (legacyJsonPath) {
+                    crateFiles.push({ name: 'metafold-lineage-data.json', path: legacyJsonPath, icon: '📊', label: 'Lineage Dataset' });
+                }
+
+                window.showExportSuccessModal({
+                    title: 'RO-Crate Export Completed',
+                    message: `FAIR Research Object Crate successfully created.<br><span style="font-size:0.8rem; color:#9ca3af;">Mode: ${isHarvestMode ? '📦 Full Data Harvest (self-contained)' : '🔗 Metadata Only'}</span>`,
+                    folderPath: basePath,
+                    files: crateFiles,
+                    stats: {
+                        'Mode': isHarvestMode ? 'Harvest (Full Copy)' : 'Metadata Only',
+                        'Entities': projectsToExport.length,
+                        'Format': 'RO-Crate v1.1'
+                    }
+                });
+            }
         } else if (!jsonResult.success && window.projectScanner && window.projectScanner.showError) {
             window.projectScanner.showError("Failed to write RO-Crate: " + jsonResult.message);
         }

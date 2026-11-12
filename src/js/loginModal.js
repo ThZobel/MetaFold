@@ -175,25 +175,24 @@ const loginModal = {
             this.showUserSuggestions(e.target.value);
         });
 
-        // Hide suggestions when clicking outside or losing focus
-        this.usernameInput.addEventListener('blur', (e) => {
-            const suggestionsContainer = this.userSuggestions;
-            const relatedTarget = e.relatedTarget;
-
-            setTimeout(() => {
-                if (suggestionsContainer &&
-                    (!relatedTarget || !suggestionsContainer.contains(relatedTarget))) {
-                    suggestionsContainer.style.display = 'none';
-                }
-            }, 300);
-        });
-
-        // Show suggestions on focus if there's text
+        // Show suggestions on focus and click
         this.usernameInput.addEventListener('focus', () => {
-            if (this.usernameInput.value.trim()) {
-                this.showUserSuggestions(this.usernameInput.value);
-            }
+            this.showUserSuggestions(this.usernameInput.value);
         });
+        this.usernameInput.addEventListener('click', () => {
+            this.showUserSuggestions(this.usernameInput.value);
+        });
+
+        // Hide suggestions when clicking outside
+        const outsideClickListener = (e) => {
+            if (this.userSuggestions &&
+                !this.userSuggestions.contains(e.target) &&
+                e.target !== this.usernameInput) {
+                this.userSuggestions.style.display = 'none';
+            }
+        };
+        document.addEventListener('click', outsideClickListener);
+        this.outsideClickListener = outsideClickListener;
 
         // Password Input Event Handlers
         if (this.passwordInput) {
@@ -232,8 +231,14 @@ const loginModal = {
         // Enter key for Username
         this.usernameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                if (this.passwordInput && this.passwordRequired) {
-                    // Focus on Password field
+                const rawName = this.usernameInput.value.trim();
+                const matchedUser = this.findExistingUser(rawName);
+                if (!matchedUser) {
+                    this.handleConfirm(); // Will trigger user-not-found error cleanly
+                    return;
+                }
+                const hasPassword = window.secureStorage?.hasUserPassword?.(matchedUser);
+                if (this.passwordInput && this.passwordRequired && hasPassword) {
                     this.passwordInput.focus();
                 } else {
                     this.handleConfirm();
@@ -250,7 +255,6 @@ const loginModal = {
         document.addEventListener('keydown', escapeHandler);
         this.escapeHandler = escapeHandler;
 
-        // Initial Focus
         // Initial Focus with Enhanced Reliability
         const focusInput = () => {
             // Ensure modal and input are actually visible
@@ -272,28 +276,65 @@ const loginModal = {
         setTimeout(focusInput, 500);
     },
 
+    getUserList() {
+        const set = new Set();
+        if (window.userManager && Array.isArray(window.userManager.users)) {
+            window.userManager.users.forEach(u => u && set.add(u));
+        }
+        if (window.profileManager && typeof window.profileManager.getAllUsers === 'function') {
+            const profileUsers = window.profileManager.getAllUsers() || [];
+            profileUsers.forEach(u => u && u.username && set.add(u.username));
+        }
+        try {
+            const stored = JSON.parse(localStorage.getItem('metafold_user_history') || '[]');
+            if (Array.isArray(stored)) stored.forEach(u => u && set.add(u));
+        } catch (e) {}
+        try {
+            const mapping = JSON.parse(localStorage.getItem('metafold_user_group_mapping') || '{}');
+            Object.keys(mapping).forEach(u => u && set.add(u));
+        } catch (e) {}
+        if (window.secureStorage?.hasUserPassword?.('Admin')) {
+            set.add('Admin');
+        }
+        return Array.from(set).filter(u => u && typeof u === 'string' && u.trim().length > 0);
+    },
+
+    findExistingUser(name) {
+        if (!name) return null;
+        const trimmed = name.trim().toLowerCase();
+        const users = this.getUserList();
+        return users.find(u => u.toLowerCase() === trimmed) || null;
+    },
+
     loadSuggestions() {
-        // Set placeholder based on existing users
-        const users = window.userManager?.users || [];
+        const users = this.getUserList();
 
         if (users.length > 0) {
-            this.usernameInput.placeholder = `e.g. ${users[0]} or enter new name`;
+            this.usernameInput.placeholder = `Select or type user (e.g. ${users[0]})`;
         } else {
-            this.usernameInput.placeholder = 'e.g. Dr. Jane Smith';
+            this.usernameInput.placeholder = 'Click "➕ New User" to register';
         }
     },
 
-    showUserSuggestions(query) {
-        if (!query || query.length < 1) {
-            this.userSuggestions.style.display = 'none';
-            return;
+    showUserSuggestions(query = '') {
+        const users = this.getUserList();
+        const trimmed = (query || '').trim().toLowerCase();
+
+        let suggestions;
+        if (!trimmed) {
+            suggestions = users.slice(0, 10);
+        } else {
+            suggestions = users
+                .filter(user => user.toLowerCase().includes(trimmed))
+                .slice(0, 10);
         }
 
-        const users = window.userManager?.users || [];
-
-        const suggestions = users
-            .filter(user => user.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 5);
+        if (suggestions.length === 0) {
+            if (this.userSuggestions) {
+                this.userSuggestions.style.display = 'none';
+            }
+            return;
+        }
 
         this.renderUserSuggestions(this.userSuggestions, suggestions, (user) => {
             console.log('🔄 User selected from suggestions:', user);
@@ -302,17 +343,16 @@ const loginModal = {
                 this.usernameInput.value = user;
             }
 
-            setTimeout(() => {
-                if (this.userSuggestions) {
-                    this.userSuggestions.style.display = 'none';
-                }
-            }, 50);
+            if (this.userSuggestions) {
+                this.userSuggestions.style.display = 'none';
+            }
 
-            setTimeout(() => {
-                if (this.usernameInput) {
-                    this.usernameInput.focus();
-                }
-            }, 100);
+            const hasPassword = window.secureStorage?.hasUserPassword?.(user);
+            if (hasPassword && this.passwordInput && this.passwordRequired) {
+                setTimeout(() => {
+                    if (this.passwordInput) this.passwordInput.focus();
+                }, 100);
+            }
         });
     },
 
@@ -409,6 +449,9 @@ const loginModal = {
 
             const originalClose = window.userManagementModal.close;
             window.userManagementModal.close = () => {
+                const createdUser = window.userManagementModal.lastCreatedUser;
+                window.userManagementModal.lastCreatedUser = null;
+
                 if (originalClose && typeof originalClose === 'function') {
                     originalClose.call(window.userManagementModal);
                 }
@@ -416,6 +459,9 @@ const loginModal = {
                 if (this.modal) {
                     this.modal.style.display = 'flex';
                     this.loadSuggestions();
+                    if (createdUser && this.usernameInput) {
+                        this.usernameInput.value = createdUser;
+                    }
                     if (this.usernameInput) {
                         this.usernameInput.focus();
                     }
@@ -433,6 +479,12 @@ const loginModal = {
         const lastUser = this.getLastUser();
         if (!lastUser || !lastUser.username || lastUser.username === 'User') {
             this.showError('No valid last user found');
+            return;
+        }
+
+        const matched = this.findExistingUser(lastUser.username);
+        if (!matched) {
+            this.showError(`User "${lastUser.username}" no longer exists.`);
             return;
         }
 
@@ -643,20 +695,31 @@ const loginModal = {
     },
 
     async handleConfirm() {
-        const username = this.usernameInput.value.trim();
+        const rawUsername = this.usernameInput.value.trim();
         const password = this.passwordInput ? this.passwordInput.value : '';
 
-        if (!username) {
+        if (!rawUsername) {
             this.showError('Please enter your name to continue.');
             this.usernameInput.focus();
             return;
         }
 
-        if (username.length < 2) {
+        if (rawUsername.length < 2) {
             this.showError('Name must be at least 2 characters long.');
             this.usernameInput.focus();
             return;
         }
+
+        // 🛡️ Prevent accidental user creation: only allow existing users
+        const matchedUser = this.findExistingUser(rawUsername);
+        if (!matchedUser) {
+            this.setLoadingState(false);
+            this.showError(`User "${rawUsername}" does not exist. Please select an existing user or use "👥 Manage Users".`);
+            this.usernameInput.focus();
+            return;
+        }
+
+        const username = matchedUser;
 
         try {
             this.setLoadingState(true);
@@ -790,13 +853,14 @@ const loginModal = {
             errorDiv.style.cssText = `
                 background: linear-gradient(45deg, #dc2626, #ef4444);
                 color: white;
-                padding: 0.75rem;
+                padding: 0.75rem 1rem;
                 border-radius: 8px;
                 margin: 1rem 0;
                 border: 1px solid rgba(239, 68, 68, 0.3);
                 text-align: center;
                 font-weight: 500;
                 box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+                font-size: 0.9rem;
             `;
             const contentDiv = this.modal.querySelector('.modal-content');
             if (contentDiv) contentDiv.appendChild(errorDiv);
@@ -804,8 +868,9 @@ const loginModal = {
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
 
-        setTimeout(() => {
-            if (errorDiv.style.display !== 'none') {
+        if (this._errorTimeout) clearTimeout(this._errorTimeout);
+        this._errorTimeout = setTimeout(() => {
+            if (errorDiv && errorDiv.style.display !== 'none') {
                 errorDiv.style.display = 'none';
             }
         }, 4000);
@@ -815,6 +880,16 @@ const loginModal = {
         if (this.escapeHandler) {
             document.removeEventListener('keydown', this.escapeHandler);
             this.escapeHandler = null;
+        }
+
+        if (this.outsideClickListener) {
+            document.removeEventListener('click', this.outsideClickListener);
+            this.outsideClickListener = null;
+        }
+
+        if (this._errorTimeout) {
+            clearTimeout(this._errorTimeout);
+            this._errorTimeout = null;
         }
 
         if (this.modal) {

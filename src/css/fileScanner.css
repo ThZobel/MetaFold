@@ -201,15 +201,16 @@
 }
 
 .fsc-btn-skip {
-    background: transparent;
-    color: #6b7280;
-    border: 1px dashed rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    color: #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     font-weight: 500;
 }
 
 .fsc-btn-skip:hover {
-    color: #9ca3af;
-    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.35);
 }
 
 .fsc-btn:disabled {

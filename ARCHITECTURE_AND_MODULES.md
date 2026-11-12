@@ -218,20 +218,25 @@ loadSummaryFile()
   └─► closeSearch() → ResizeObserver.disconnect() → destroy tabulatorInstance → reset state
 ```
 
-### Community Template Hub
-When the user clicks the "Explore Community Templates" button in the Left Sidebar:
-1. `app.loadCommunityTemplates()` is triggered.
+### Community Template Hub & Simplified Contribution Workflow
+MetaFold includes a community template sharing and discovery system:
+1. `app.openTemplateHub()` is triggered (via sidebar or settings).
 2. It fetches the remote `templates-index.json` from the `MetaFold-Templates` repository.
-3. It maps the raw template objects to `flatMeta` objects.
-4. It sets the `facetSearch.isTemplateHub = true` flag.
-5. It triggers `facetSearch.updateUI()`, which renders the community templates inside the same Tabulator/Filter interface.
-6. The preview panel is updated to show an "Install Template" button, which downloads the JSON directly into the user's local template directory.
+3. Templates are categorized according to the **4 Fixed Categories**: `Systems`, `Protocols`, `Experiments`, `Workflows`.
+4. Collections are discovered dynamically from GitHub (`General`, `REMBI`, `NFDI4BioImage`, etc.).
+5. Users can publish templates via the simplified upload modal (`uploadModal.js`), which validates required fields, derives the GitHub target path automatically, and opens a pre-formatted GitHub Issue.
+6. The preview panel in the Template Hub provides an "Install Template" button to download templates into the local template directory.
 
 | File | Role |
 |------|------|
+| `src/js/communityManager.js` | **Central Service**: dynamic index fetching, caching, 4 fixed categories, collection extraction, tag normalization, and reusable TagPicker component. |
+| `src/components/modals/template-modal.html` | Tab 3 "Community & Sharing" with 4 fixed categories, collection dropdown, and interactive tag chips. |
+| `src/js/templateModal.js` | Form controller binding Tab 3 to `communityManager` (`populateForm`, `collectCommunityData`). |
+| `src/components/modals/upload-template-modal.html` | Streamlined upload assistant with category selector, dynamic collection dropdown, proposed collection form, description textarea, tag picker, and target path badge. |
+| `src/js/uploadModal.js` | Upload modal controller: validates mandatory description, formats GitHub Issue markdown (including proposed collections), and initiates GitHub submission. |
 | `src/components/modals/facet-search-modal.html` | Modal HTML structure (overlay, header with action buttons, filter sidebar, results container) |
 | `src/css/facetSearch.css` | All styling: Tabulator theme overrides (dark + light mode), modal layout, filter chips, column selector dropdown |
-| `src/index.html` | Mounts Tabulator CDN (CSS + JS) before `facetSearch.js`; contains `#facet-search-modal-container` mount point |
+| `src/index.html` | Mounts Tabulator CDN, registers `communityManager.js`, `templateModal.js`, `uploadModal.js` |
 | `src/js/init_components.js` | Loads `facet-search-modal.html` and calls `facetSearch.init()` |
 
 ---
@@ -514,6 +519,38 @@ MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.
   - `src/js/init_components.js`: Parallelized all 10 HTML component fetches via `Promise.all(...)`.
   - `src/js/secureStorage.js`, `src/js/secureIntegration.js`, `src/js/settingsManager.js`: Added an in-flight `_initPromise` guard to `secureStorage.init()` and prevented `secureIntegration.js` from overwriting user-specific settings loaded by `app.js`.
   - `src/js/userManager.js` & `src/js/globalHandlers.js`: Consolidated template loading in `setCurrentUser()` into a single pass, replaced `document.querySelectorAll('*')` in `forceUpdateUserDisplay()` with targeted selectors, and guarded `window.visualizationManager.checkJSONCrackAvailability`.
+
+### User & Group Portability, Profile Import/Export & Login Guarding (Current Session)
+- **Storage Architecture & Portability**:
+  - Templates (`*.json`), project index (`user_index.json`), user profiles (`users.json`), and group profiles (`groups.json`) are stored persistently under `~/MetaFold/Templates/`.
+  - Moving or copying the entire `~/MetaFold/Templates/` folder to another account or machine transfers all templates, the project index, all groups, and all user profiles (including individual `preferences`).
+  - Passwords are tied to the local machine via DPAPI (`safeStorage` in `%APPDATA%/MetaFold`), so imported users simply enter/update their passwords on a new system.
+- **Profile & Template Export/Import Suite (`profileManager.js`, `userManagementModal.js`, `main.js`, `preload.js`)**:
+  - **Scoped Export for Individual Users & Groups**:
+    - Users and Groups can be exported individually (via `📤` buttons on each card in the user/group lists) or globally via `📤 Export...` in the footer.
+    - Single User Export: bundles the user profile, primary group metadata, preferences, and templates created by that user.
+    - Single Group Export: bundles the group profile, all group member profiles, and all templates created under that group.
+  - **Export Modes & Formats**:
+    - **ZIP Package (.zip) (Empfohlen)**: Creates a single portable `.zip` archive containing `metafold-profiles.json`, `users.json`, `groups.json` and a `templates/` subfolder with all associated templates. Powered by a built-in standard PKZIP engine (`createZipBuffer`, `readZipBuffer` via Node.js standard `zlib` in `main.js`), with zero external dependencies and 100% native compatibility with OS tools (Windows Explorer, macOS Archive Utility, Linux unzip/tar).
+    - **Export to Folder**: Creates an uncompressed directory `MetaFold_Export_<scope>_<date>` containing the JSON files and `templates/` folder.
+    - **Single JSON Bundle**: Saves all profiles, groups, and embedded templates into a single `.json` file.
+  - **Unified Import (.zip & .json)**:
+    - `profileManager.importProfiles()` accepts both `.zip` packages and `.json` files.
+    - When importing a `.zip`, profile metadata is merged into `users.json` / `groups.json`, and template files are automatically extracted to `~/MetaFold/Templates/` followed by an immediate hot-reload via `templateManager.init()`.
+- **Streamlined Login Guarding & Clean UX (`loginModal.js`, `login-modal.html`)**:
+  - Gated `loginModal.handleConfirm()` with `findExistingUser()`: entering a non-existent or misspelled username strictly prevents accidental user creation and displays a clean error message without noisy buttons.
+  - Removed all redundant "create user" shortcuts (header button, error message button, dropdown button) from the startup modal.
+  - New user creation is exclusively and intentionally performed via `👥 Manage Users` $\rightarrow$ `➕ Add New User`.
+  - Clicking/focusing `#usernameInput` displays the list of existing users for 1-click selection.
+- **Graceful Discover Projects & Living User Index (`facetSearch.js`, `main.js`)**:
+  - Navigating to **Discover Projects** no longer triggers an automatic JSON file-picker dialog when the index is empty or on a fresh start.
+  - Instead, the search table opens directly in an empty state with a helpful empty placeholder: *"Scan project folders to start"* and a prominent button `📁 Scan Project Folder` to select a directory to scan.
+  - Registered missing Living User Index backend IPC handlers in `main.js`: `load-user-index`, `clear-user-index`, `merge-projects-into-user-index`, and `remove-from-user-index`.
+- **Dynamic Folder Structure Placeholders (`template-modal.html`, `templateModal.js`, `projectManager.js`)**:
+  - In `template-modal.html`, the gray placeholder of `#experimentStructure` includes dynamic folder examples (`[User Name]/`, `[Experiment Type]/`, etc.).
+  - Added an interactive **Dynamic Folder Tags** chip list in the Folder Structure tab showing all Field Labels defined in Tab 1 (Metadata Fields) plus system tags (`[User Name]`, `[Project Name]`, `[Date]`).
+  - Clicking a tag automatically inserts `[Field Label]/` at the current cursor position in `#experimentStructure`.
+  - In `projectManager.js`, `processDynamicFolderStructure()` resolves bracketed tags against metadata field keys or field labels (case-insensitive) as well as system fallbacks. Empty values safely skip the dynamic subfolder line.
 
 ---
 

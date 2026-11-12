@@ -43,14 +43,48 @@ const projectManager = {
             let skipLine = false;
             
             let processedLine = line.replace(/\[([^\]]+)\]/g, (match, fieldName) => {
-                // Check if this is an actual field in the template
-                const isField = template && template.metadata && template.metadata.fields && template.metadata.fields[fieldName];
+                const normalizedTarget = fieldName.trim().toLowerCase();
+
+                // 1. Check built-in system fallbacks (User Name, Project Name, Date)
+                if (normalizedTarget === 'user name' || normalizedTarget === 'username' || normalizedTarget === 'user') {
+                    const userName = window.userManager?.currentUser ||
+                        getFieldValue('user_name') || getFieldValue('User Name') ||
+                        window.profileManager?.getCurrentUser?.()?.username;
+                    if (userName) return String(userName).replace(/[<>:"/\\|?*]/g, '_');
+                }
+                if (normalizedTarget === 'project name' || normalizedTarget === 'projectname' || normalizedTarget === 'project') {
+                    const projName = document.getElementById('projectName')?.value ||
+                        getFieldValue('project_name') || getFieldValue('Project Name') ||
+                        template?.projectDefaults?.projectName;
+                    if (projName) return String(projName).replace(/[<>:"/\\|?*]/g, '_');
+                }
+                if (normalizedTarget === 'date' || normalizedTarget === 'current date' || normalizedTarget === 'today') {
+                    return new Date().toISOString().slice(0, 10);
+                }
+
+                // 2. Resolve field key by exact key, case-insensitive key, or field label
+                let resolvedKey = fieldName;
+                const templateFields = template?.metadata?.fields ||
+                    (template?.metadata && typeof template.metadata === 'object' && !template.metadata.fields ? template.metadata : null);
+
+                if (templateFields && !templateFields[resolvedKey]) {
+                    const matchedEntry = Object.entries(templateFields).find(([k, f]) =>
+                        k.toLowerCase() === normalizedTarget ||
+                        (f?.label && f.label.trim().toLowerCase() === normalizedTarget)
+                    );
+                    if (matchedEntry) {
+                        resolvedKey = matchedEntry[0];
+                    }
+                }
+
+                // Check if this is an actual field in the template or in metadata
+                const isField = (templateFields && templateFields[resolvedKey]) || (getFieldValue(resolvedKey) !== null);
                 
                 if (!isField) {
                     return match; // Not a field, leave as is
                 }
                 
-                let val = getFieldValue(fieldName);
+                let val = getFieldValue(resolvedKey);
                 
                 // If value is empty or not found, mark to skip this folder line
                 if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
@@ -106,7 +140,9 @@ const projectManager = {
                     document.getElementById('targetPath').value = selectedPath;
                     this.updatePathPreview();
                     
-                    if (window.electronAPI.listDirectory) {
+                    if (document.getElementById('onlyIntegrations')?.checked) {
+                        this.checkAndAutoFillExistingProject();
+                    } else if (window.electronAPI.listDirectory) {
                         try {
                             const files = await window.electronAPI.listDirectory(selectedPath);
                             const jsonFiles = files.filter(f => f.name.endsWith('.json'));
@@ -224,7 +260,7 @@ const projectManager = {
         }
     },
 
-    // Toggle Skip Project Folder Creation Mode
+    // Toggle Skip Project Folder / Extend Existing Project Mode
     toggleIntegrationsOnlyMode() {
         const checkbox = document.getElementById('onlyIntegrations');
         const targetPath = document.getElementById('targetPath');
@@ -232,50 +268,36 @@ const projectManager = {
         const pathStatus = document.getElementById('pathStatus');
         const projectNameSection = document.getElementById('projectNameSection');
         const selectMetadataBtn = document.getElementById('selectMetadataBtn');
+        const extendHint = document.getElementById('extendProjectHint');
 
         if (!checkbox || !targetPath) return;
 
         if (checkbox.checked) {
-            // Enable "Skip Folder" mode:
-            // Base Directory stays ACTIVE (user picks target folder for JSON)
-            // Project Name becomes "Metadata Filename"
-
-            // Update Project Name section labels
+            // Enable "Skip Folder / Extend Project" mode:
             if (projectNameSection) {
                 const titleElement = projectNameSection.querySelector('h4');
                 const subtitleElement = projectNameSection.querySelector('.section-subtitle');
                 const inputElement = document.getElementById('projectName');
 
-                if (titleElement) titleElement.textContent = 'Metadata Filename';
-                if (subtitleElement) subtitleElement.textContent = 'Name for the metadata JSON file (saved as {name}-metadata.json)';
+                if (titleElement) titleElement.textContent = 'Project Name';
+                if (subtitleElement) subtitleElement.textContent = 'Name for your experiment/project (saved as {name}-metadata.json)';
                 if (inputElement) {
-                    inputElement.placeholder = 'Experiment_Feedback';
-                    inputElement.title = 'Enter a name for the metadata file';
+                    inputElement.placeholder = 'My_Experiment_2024...';
+                    inputElement.title = 'Enter a name for your project';
                 }
             }
             
-            if (selectMetadataBtn) selectMetadataBtn.style.display = 'inline-flex';
+            // Do NOT display selectMetadataBtn
+            if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
 
-            // Update path preview to show JSON file path
-            if (pathPreview) {
-                const basePath = targetPath.value.trim();
-                const fileName = document.getElementById('projectName')?.value?.trim() || 'Experiment_Feedback';
-                const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : '/';
-                if (basePath) {
-                    pathPreview.textContent = `${basePath}${sep}${fileName}-metadata.json`;
-                } else {
-                    pathPreview.textContent = '(Select a folder and enter a filename)';
-                }
-                pathPreview.style.fontStyle = 'italic';
-                pathPreview.style.color = '#a855f7';
-            }
+            if (extendHint) extendHint.style.display = 'block';
 
-            if (pathStatus) pathStatus.textContent = '';
+            // Check if selected directory already has a metadata file and auto-fill project name
+            this.checkAndAutoFillExistingProject();
 
-            console.log('📄 Skip Project Folder Mode ENABLED');
+            console.log('📄 Skip Project Folder / Extend Mode ENABLED');
         } else {
             // Disable mode: Restore normal Project Name labels
-
             if (projectNameSection) {
                 const titleElement = projectNameSection.querySelector('h4');
                 const subtitleElement = projectNameSection.querySelector('.section-subtitle');
@@ -290,6 +312,7 @@ const projectManager = {
             }
             
             if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
+            if (extendHint) extendHint.style.display = 'none';
 
             if (pathPreview) {
                 this.updatePathPreview();
@@ -297,7 +320,58 @@ const projectManager = {
                 pathPreview.style.color = '';
             }
 
-            console.log('📄 Skip Project Folder Mode DISABLED');
+            console.log('📄 Skip Project Folder / Extend Mode DISABLED');
+        }
+    },
+
+    /**
+     * When skipFolder/extend mode is active, check if target directory contains existing metadata
+     * and automatically prefill project name and preview.
+     */
+    async checkAndAutoFillExistingProject() {
+        const targetPathInput = document.getElementById('targetPath');
+        const checkbox = document.getElementById('onlyIntegrations');
+        const extendHint = document.getElementById('extendProjectHint');
+        const projectNameInput = document.getElementById('projectName');
+        const pathPreview = document.getElementById('fullPathPreview');
+
+        if (!targetPathInput || !checkbox || !checkbox.checked) return;
+        const dirPath = targetPathInput.value.trim();
+        if (!dirPath || !window.electronAPI || !window.electronAPI.checkDirectoryExists) return;
+
+        try {
+            const dirCheck = await window.electronAPI.checkDirectoryExists(dirPath);
+            if (dirCheck && dirCheck.exists && dirCheck.hasMetafoldData && dirCheck.existingProjectName) {
+                if (projectNameInput) {
+                    projectNameInput.value = dirCheck.existingProjectName;
+                }
+                if (extendHint) {
+                    extendHint.style.display = 'block';
+                    extendHint.style.color = '#34d399';
+                    extendHint.innerHTML = `✅ Existing project detected: <strong>${dirCheck.existingProjectName}</strong> — metadata will be merged &amp; extended.`;
+                }
+                if (pathPreview) {
+                    const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : '/';
+                    pathPreview.textContent = `${dirPath}${sep}${dirCheck.existingProjectName}-metadata.json (Extending existing project)`;
+                    pathPreview.style.fontStyle = 'italic';
+                    pathPreview.style.color = '#34d399';
+                }
+            } else {
+                if (extendHint) {
+                    extendHint.style.display = 'block';
+                    extendHint.style.color = '#a78bfa';
+                    extendHint.innerHTML = `💡 If a metadata JSON already exists in the selected folder, your project will be extended and no new folder will be created.`;
+                }
+                if (pathPreview && dirPath) {
+                    const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : '/';
+                    const pName = projectNameInput?.value?.trim() || 'My_Experiment_2024';
+                    pathPreview.textContent = `${dirPath}${sep}${pName}-metadata.json`;
+                    pathPreview.style.fontStyle = 'italic';
+                    pathPreview.style.color = '#a855f7';
+                }
+            }
+        } catch (e) {
+            console.warn('Could not check directory for autofill:', e);
         }
     },
 
@@ -393,12 +467,20 @@ const projectManager = {
                     console.log(`📄 Writing metadata JSON to ${targetPath}...`);
                     const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
                     await window.electronAPI.writeFile(filePath, metadataStr);
+                    if (window.electronAPI.upsertUserIndexProject) {
+                        const ui = window.userManager?.getCurrentUserInfo?.() || null;
+                        await window.electronAPI.upsertUserIndexProject(targetPath, null, ui).catch(() => {});
+                    }
                 }
                 successCount++;
             } catch (err) {
                 console.error(`Failed to process ${targetPath}:`, err);
                 errors.push(err.message);
             }
+        }
+
+        if (window.projectScanner && typeof window.projectScanner.updateIndexBadge === 'function') {
+            window.projectScanner.updateIndexBadge();
         }
 
         if (errors.length > 0) {
@@ -564,7 +646,7 @@ const projectManager = {
 
             console.log('🚀 Starting project creation...');
             console.log('📁 basePath:', basePath);
-            console.log('📁 projectName:', projectName);
+            console.log('📁 projectName:', finalProjectName);
             console.log('📋 templateStructure:', templateStructure);
             console.log('📋 experimentMetadata:', experimentMetadata);
             console.log('📋 hasMetadata:', hasMetadata);
@@ -644,7 +726,7 @@ const projectManager = {
             console.log('✅ Project creation result:', result);
 
             if (result && result.success) {
-                // NEW: Harvest IDs from the new project metadata
+                // NEW: Harvest IDs from the new project metadata (and refresh living user index badge)
                 if (window.electronAPI && window.electronAPI.saveIdValues && experimentMetadata) {
                     try {
                         const harvestResult = await window.electronAPI.saveIdValues(
@@ -654,9 +736,16 @@ const projectManager = {
                         if (harvestResult && harvestResult.success && harvestResult.newCount > 0) {
                             console.log(`🧠 Harvester: Added ${harvestResult.newCount} new IDs to dictionary`);
                         }
+                        if (window.experimentForm) {
+                            window.experimentForm._idDictionaryItems = null;
+                            window.experimentForm._tagDictionaryItems = null;
+                        }
                     } catch (e) {
                         console.error('Error saving ID values:', e);
                     }
+                }
+                if (window.projectScanner && typeof window.projectScanner.updateIndexBadge === 'function') {
+                    window.projectScanner.updateIndexBadge();
                 }
 
                 let successMessage = result.message;
@@ -2005,6 +2094,25 @@ const projectManager = {
                             // Not an error - folder-only templates have no README, that's expected
                             console.log('📄 projectManager: No README to update (folder-only template or README not yet created):', insertResult.message);
                         }
+
+                        // Attach metadata JSON and README.html to elabFTW experiment if created
+                        if (uploadResults.elabftw && uploadResults.elabftw.success && uploadResults.elabftw.id && window.electronAPI?.uploadProjectFilesToElabFTW) {
+                            try {
+                                const serverUrl = await window.settingsManager.getFormattedElabFTWUrl();
+                                const apiKey = await window.settingsManager.get('elabftw.api_key');
+                                const expId = uploadResults.elabftw.id;
+                                console.log(`📎 projectManager: Uploading project attachments to elabFTW experiment ${expId}...`);
+                                await window.electronAPI.uploadProjectFilesToElabFTW({
+                                    serverUrl,
+                                    apiKey,
+                                    experimentId: expId,
+                                    projectPath,
+                                    projectName
+                                });
+                            } catch (attachErr) {
+                                console.warn('⚠️ Could not attach project files to elabFTW:', attachErr);
+                            }
+                        }
                     } else {
                         console.log('📄 projectManager: No integration links to insert');
                     }
@@ -2215,6 +2323,19 @@ const projectManager = {
                     proceed: true,
                     projectName: originalProjectName,
                     projectPath: originalPath
+                };
+            }
+
+            // If user opted to skip folder creation / extend project, and MetaFold metadata already exists in the folder:
+            if (skipFolder && dirCheck.hasMetafoldData) {
+                const projectNameToExtend = dirCheck.existingProjectName || originalProjectName;
+                console.log(`➕ Skip folder / extend mode: extending existing metadata for "${projectNameToExtend}"`);
+                return {
+                    proceed: true,
+                    projectName: projectNameToExtend,
+                    projectPath: originalPath,
+                    extend: true,
+                    existingProjectName: projectNameToExtend
                 };
             }
 

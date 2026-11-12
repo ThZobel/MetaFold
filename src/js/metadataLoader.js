@@ -118,35 +118,112 @@ const metadataLoader = {
             this.loadedFilePath = filePath;
             this.loadedFileName = fileName;
 
-            // Set the inputs
-            const projectNameInput = document.getElementById('projectName');
-            const targetPathInput = document.getElementById('targetPath');
-
-            if (projectNameInput) {
-                projectNameInput.value = this.getProjectName();
+            // Switch to Create Project tab
+            if (typeof window.switchMainTab === 'function') {
+                window.switchMainTab('create');
             }
 
-            if (targetPathInput && filePath) {
-                const pathParts = filePath.split(/[/\\]/);
-                pathParts.pop();
-                targetPathInput.value = pathParts.join(window.electronAPI?.platform === 'win32' ? '\\' : '/');
+            const projectName = this.getProjectName();
+
+            // Render and populate the loaded metadata directly in the center form
+            if (window.experimentForm && typeof window.experimentForm.renderLoadedProject === 'function') {
+                window.experimentForm.renderLoadedProject(metadata, filePath, projectName);
             }
 
-            // Update preview
-            if (window.projectManager && window.projectManager.updatePathPreview) {
-                window.projectManager.updatePathPreview();
-            }
-
-            // Populate form if available
-            if (window.experimentForm && typeof window.experimentForm.populateForm === 'function' && metadata) {
-                window.experimentForm.populateForm(metadata.metadata || metadata);
-            }
-
-            this.showSuccess('Metadata loaded successfully');
+            this.showSuccess(`Project "${projectName}" loaded for editing & synchronization`);
 
         } catch (error) {
             console.error('❌ Error loading metadata for creation:', error);
             this.showError('Error loading metadata: ' + error.message);
+        }
+    },
+
+    // Save changes to loaded existing project (and optionally send to integrations)
+    async saveLoadedProject(sendToIntegrations = false) {
+        try {
+            console.log('💾 Saving loaded project changes...');
+            if (!this.loadedFilePath) {
+                alert('No file path found for the loaded project.');
+                return;
+            }
+
+            const updateBtn = document.getElementById('updateProjectBtn');
+            const updateAndSendBtn = document.getElementById('updateAndSendBtn');
+            if (updateBtn) updateBtn.disabled = true;
+            if (updateAndSendBtn) updateAndSendBtn.disabled = true;
+
+            // 1. Collect form data from experimentForm
+            const collected = window.experimentForm ? window.experimentForm.collectData() : {};
+
+            // 2. Build updated metadata structure
+            const updatedMetadata = { ...this.loadedMetadata };
+
+            // Update project name if edited
+            const nameInput = document.getElementById('projectName');
+            if (nameInput && nameInput.value.trim()) {
+                updatedMetadata.projectName = nameInput.value.trim();
+            }
+
+            // Update timestamp
+            updatedMetadata.updated_at = new Date().toISOString();
+
+            // Merge collected metadata fields
+            if (collected && Object.keys(collected).length > 0) {
+                if (updatedMetadata.metadata && typeof updatedMetadata.metadata === 'object') {
+                    updatedMetadata.metadata = { ...updatedMetadata.metadata, ...collected };
+                } else {
+                    updatedMetadata.metadata = collected;
+                }
+            }
+
+            // Check if notes_markdown was edited
+            const notesEl = document.getElementById('field_notes_markdown') || 
+                            document.querySelector('textarea[data-field-name="notes_markdown"]');
+            if (notesEl && notesEl.value !== undefined) {
+                updatedMetadata.notes_markdown = notesEl.value;
+            }
+
+            // 3. Save JSON to disk
+            const saveRes = await window.electronAPI.saveJsonFile(updatedMetadata, this.loadedFilePath);
+            if (!saveRes || !saveRes.success) {
+                throw new Error(saveRes?.message || 'Failed to save JSON file');
+            }
+
+            this.loadedMetadata = updatedMetadata;
+
+            // 4. Update README.html if project folder exists
+            try {
+                await this.generateAndSaveReadme();
+            } catch (readmeErr) {
+                console.warn('⚠️ Could not update README:', readmeErr);
+            }
+
+            // 5. Update user index if available
+            try {
+                if (window.projectScanner && typeof window.projectScanner.updateIndexBadge === 'function') {
+                    await window.projectScanner.updateIndexBadge();
+                }
+            } catch (_) {}
+
+            console.log('✅ Project saved successfully to disk');
+
+            // 6. If sendToIntegrations is requested:
+            if (sendToIntegrations) {
+                await this.sendMetadata();
+            } else {
+                this.showSuccess(`Project "${updatedMetadata.projectName || 'Metadata'}" updated successfully!`);
+            }
+
+            if (updateBtn) updateBtn.disabled = false;
+            if (updateAndSendBtn) updateAndSendBtn.disabled = false;
+
+        } catch (error) {
+            console.error('❌ Error saving loaded project:', error);
+            alert(`Error saving project: ${error.message}`);
+            const updateBtn = document.getElementById('updateProjectBtn');
+            const updateAndSendBtn = document.getElementById('updateAndSendBtn');
+            if (updateBtn) updateBtn.disabled = false;
+            if (updateAndSendBtn) updateAndSendBtn.disabled = false;
         }
     },
 

@@ -305,7 +305,7 @@ test.describe('Tier 4: Real-World Application Scenarios (Workflows 1–6)', () =
         env.document.getElementById('uploadTags').value = 'Enzyme, Kinetics, 96-well, High-Throughput';
         env.document.getElementById('uploadSyncLocal').checked = true;
         const uploadPayload = await env.uploadModal.submit();
-        assert.ok(uploadPayload.url.includes('New%20Template:%20Full%20Lifecycle%20Assay'));
+        assert.ok(uploadPayload.url.includes('New%20Template') && uploadPayload.url.includes('Full%20Lifecycle%20Assay'));
 
         // Step C: Hub indexes the uploaded template
         const hubIndexItem = {

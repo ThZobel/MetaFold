@@ -1278,20 +1278,47 @@ const visualizationManager = {
     },
 
     // Export visualization (PRESERVED from original)
-    exportVisualization() {
+    async exportVisualization() {
         if (!this.currentData) {
             this.showError('No data to export');
             return;
         }
 
         try {
+            const defaultFilename = `metafold-visualization-${new Date().toISOString().split('T')[0]}.json`;
             const jsonString = JSON.stringify(this.currentData, null, 2);
+
+            if (window.electronAPI && typeof window.electronAPI.showSaveDialog === 'function' && typeof window.electronAPI.writeFile === 'function') {
+                const savePath = await window.electronAPI.showSaveDialog({
+                    title: 'Export Visualization Data',
+                    defaultPath: defaultFilename,
+                    filters: [{ name: 'JSON Files', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
+                });
+                if (!savePath) return; // User cancelled
+
+                const writeResult = await window.electronAPI.writeFile(savePath, jsonString);
+                if (writeResult && writeResult.success) {
+                    this.showSuccess('Visualization data exported successfully');
+                    if (typeof window.showExportSuccessModal === 'function') {
+                        const folderPath = savePath.replace(/[\\/][^\\/]+$/, '');
+                        const fileName = savePath.split(/[\\/]/).pop();
+                        window.showExportSuccessModal({
+                            title: 'Visualization Export Completed',
+                            message: 'Visualization data exported successfully.',
+                            folderPath: folderPath,
+                            files: [{ name: fileName, path: savePath, icon: '📊', label: 'Visualization JSON' }]
+                        });
+                    }
+                    return;
+                }
+            }
+
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `metafold-visualization-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = defaultFilename;
             a.click();
             
             URL.revokeObjectURL(url);
@@ -1720,20 +1747,47 @@ const visualizationManager = {
     },
 
     // Export visualization (PRESERVED from original)
-    exportVisualization() {
+    async exportVisualization() {
         if (!this.currentData) {
             this.showError('No data to export');
             return;
         }
 
         try {
+            const defaultFilename = `metafold-visualization-${new Date().toISOString().split('T')[0]}.json`;
             const jsonString = JSON.stringify(this.currentData, null, 2);
+
+            if (window.electronAPI && typeof window.electronAPI.showSaveDialog === 'function' && typeof window.electronAPI.writeFile === 'function') {
+                const savePath = await window.electronAPI.showSaveDialog({
+                    title: 'Export Visualization Data',
+                    defaultPath: defaultFilename,
+                    filters: [{ name: 'JSON Files', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
+                });
+                if (!savePath) return; // User cancelled
+
+                const writeResult = await window.electronAPI.writeFile(savePath, jsonString);
+                if (writeResult && writeResult.success) {
+                    this.showSuccess('Visualization data exported successfully');
+                    if (typeof window.showExportSuccessModal === 'function') {
+                        const folderPath = savePath.replace(/[\\/][^\\/]+$/, '');
+                        const fileName = savePath.split(/[\\/]/).pop();
+                        window.showExportSuccessModal({
+                            title: 'Visualization Export Completed',
+                            message: 'Visualization data exported successfully.',
+                            folderPath: folderPath,
+                            files: [{ name: fileName, path: savePath, icon: '📊', label: 'Visualization JSON' }]
+                        });
+                    }
+                    return;
+                }
+            }
+
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `metafold-visualization-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = defaultFilename;
             a.click();
             
             URL.revokeObjectURL(url);
@@ -2274,7 +2328,7 @@ window.exportLineage = async (projectPath) => {
             overlay.style.top = '0'; overlay.style.left = '0';
             overlay.style.width = '100vw'; overlay.style.height = '100vh';
             overlay.style.backgroundColor = 'rgba(0,0,0,0.8)';
-            overlay.style.zIndex = '9999';
+            overlay.style.zIndex = '10010';
             overlay.style.display = 'flex';
             overlay.style.alignItems = 'center';
             overlay.style.justifyContent = 'center';
@@ -2537,7 +2591,27 @@ window.exportLineage = async (projectPath) => {
                 window.projectManager.showSuccess(`Lineage exported successfully!\n\nFiles saved:\n- ${jsonPath}\n- ${htmlPath}\n\nProjects Included: ${exportProjects.length}`, finalExportDir);
             } else if (window.projectScanner && window.projectScanner.showSuccess) {
                 window.projectScanner.showSuccess(`Lineage exported successfully!\n\nFiles saved:\n- ${jsonPath}\n- ${htmlPath}\n\nProjects Included: ${exportProjects.length}`);
-            } else {
+            }
+
+            if (typeof window.showExportSuccessModal === 'function') {
+                const jsonName = jsonPath.split(/[\\/]/).pop();
+                const htmlName = htmlPath.split(/[\\/]/).pop();
+                window.showExportSuccessModal({
+                    title: 'Lineage Export Completed',
+                    message: `Lineage graph and dataset exported successfully for <strong>${exportData.rootProject || 'Root Project'}</strong>.<br><span style="font-size:0.8rem; color:#9ca3af;">Mode: ${isHarvestMode ? '📦 Full Data Harvest (self-contained)' : '🔗 Metadata Only'}</span>`,
+                    folderPath: finalExportDir,
+                    files: [
+                        { name: htmlName, path: htmlPath, icon: '🌐', label: 'Interactive Dashboard' },
+                        { name: jsonName, path: jsonPath, icon: '📊', label: 'Lineage JSON Data' }
+                    ],
+                    stats: {
+                        'Root Project': exportData.rootProject,
+                        'Scope': exportOptions.scope === 'direct' ? 'Direct Lineage' : 'Full Lineage Graph',
+                        'Mode': isHarvestMode ? 'Data Harvest' : 'Metadata Only',
+                        'Projects': exportProjects.length
+                    }
+                });
+            } else if (!window.projectManager && !window.projectScanner) {
                 alert(`Lineage exported to:\n${jsonPath}\n${htmlPath}`);
             }
         } else {

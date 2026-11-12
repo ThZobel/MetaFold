@@ -16,16 +16,6 @@ const secureStorage = {
     async init() {
         if (this.isInitialized) {
             return this.capabilities;
-        })();
-        return this._initPromise;
-        }
-        if (this._initPromise) {
-            return this._initPromise;
-        }
-
-        this._initPromise = (async () => {
-        if (this.isInitialized) {
-            return this.capabilities;
         }
         if (this._initPromise) {
             return this._initPromise;

@@ -552,12 +552,28 @@ window.executeConnection = async (targetProject, targetTitle) => {
         // Save the updated JSON
         await window.electronAPI.saveJsonFile(metadata, fullPath);
         
-        // Also regenerate the README.html so the changes are visible there too
+        // Also regenerate the README.html so the changes are visible there too (also updates user_index.json automatically)
         if (window.electronAPI.regenerateReadmeHtml) {
             await window.electronAPI.regenerateReadmeHtml(targetPath, metadata, targetTitle);
         }
+
+        // Refresh projects from Living User Index so the lineage graph updates in-place
+        if (window.electronAPI?.loadUserIndex) {
+            const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+            const idxRes = await window.electronAPI.loadUserIndex(userInfo);
+            if (idxRes && idxRes.success && Array.isArray(idxRes.projects)) {
+                if (window.projectScanner) {
+                    window.projectScanner.projects = idxRes.projects;
+                }
+                window.endConnectMode();
+                if (window.lineageTree && typeof window.lineageTree.render === 'function') {
+                    window.lineageTree.render(idxRes.projects);
+                }
+                return;
+            }
+        }
         
-        alert(`Successfully connected! Target project now derives from '${window.connectSourceNode.title}'. Please re-scan projects to update the visualization.`);
+        alert(`Successfully connected! Target project now derives from '${window.connectSourceNode.title}'.`);
         window.endConnectMode();
         
     } catch (error) {

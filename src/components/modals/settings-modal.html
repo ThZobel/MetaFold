@@ -601,7 +601,7 @@
                         <label for="elabftwDefaultCategory">📂 Default Template ID:</label>
                         <input type="number" id="elabftwDefaultCategory" value="0" min="0"
                             onchange="updateElabFTWDefaultCategory()">
-                        <small><strong>Hint:</strong> Use <code>0</code> to use the default template. The ID is the number of the <em>Experimentvorlage</em> in eLabFTW.
+                        <small><strong>Hint:</strong> Use <code>0</code> to use the default template. The ID is the number of the <em>experiment template</em> in eLabFTW.
                             Other
                             valid IDs
                             will also work.</small>
@@ -933,24 +933,24 @@
                     <span class="plugins-section-badge core">Core</span>
                 </div>
                 <p style="color:#9ca3af; font-size:0.85rem; margin:0 0 16px 0; line-height:1.5;">
-                    Scannt Ordner nach Mikroskopie-Dateien und legt neben jeder Datei eine
-                    <code>.metafold-sidecar.json</code> an. Diese enthält Dateiinfos und vererbte
-                    Projektmetadaten aus übergeordneten Ordnern.
+                    Scans folders for microscopy files and creates a
+                    <code>.metafold-sidecar.json</code> next to each file. This contains file metadata and inherited
+                    project metadata from parent folders.
                 </p>
 
                 <div class="plugins-toggle-row">
-                    <label class="plugins-toggle" title="File Sidecar Scanner aktivieren">
+                    <label class="plugins-toggle" title="Enable File Sidecar Scanner">
                         <input type="checkbox" id="fileScannerEnabled"
                             onchange="settingsManager && settingsManager.set('plugins.filescanner_enabled', this.checked); fileScanner && fileScanner._applyVisibility();">
                         <span class="plugins-toggle-slider"></span>
                     </label>
                     <div class="plugins-toggle-label">
-                        <strong>File Sidecar Scanner aktivieren</strong>
-                        <small>Zeigt den &quot;🔬 File Sidecar Scanner&quot; Button im Discover-Tab.</small>
+                        <strong>Enable File Sidecar Scanner</strong>
+                        <small>Shows the &quot;🔬 File Sidecar Scanner&quot; button in the Discover tab.</small>
                     </div>
                 </div>
 
-                <p style="color:#9ca3af; font-size:0.82rem; margin: 14px 0 6px 0;">Gesuchte Dateiendungen:</p>
+                <p style="color:#9ca3af; font-size:0.82rem; margin: 14px 0 6px 0;">Target file extensions:</p>
                 <div class="plugins-ext-grid" id="pluginsExtGrid">
                     <!-- Rendered by pluginsSettingsInit() -->
                 </div>
@@ -963,33 +963,36 @@
                     <span class="plugins-section-badge optional">Optional</span>
                 </div>
                 <p style="color:#9ca3af; font-size:0.85rem; margin:0 0 16px 0; line-height:1.5;">
-                    Liest OME-XML-Metadaten (Mikroskop-Modell, Objektiv, Kanäle, Voxelgröße…)
-                    direkt aus den Dateien und schreibt sie in die Sidecar.<br>
-                    <strong style="color:#e5e7eb;">Voraussetzung:</strong> Java 8+ und
+                    Reads OME-XML metadata (microscope model, objective, channels, voxel size…)
+                    directly from files and writes them to the sidecar.<br>
+                    <strong style="color:#e5e7eb;">Requirement:</strong> Java 8+ and
                     <a href="#" onclick="window.electronAPI.openExternal('https://www.openmicroscopy.org/bio-formats/downloads/'); return false;"
-                       style="color:#60a5fa;">BioFormats Command Line Tools</a> müssen installiert sein.
-                    Kein WSL nötig – läuft nativ auf Windows.
+                       style="color:#60a5fa;">BioFormats Command Line Tools</a> must be installed.
+                    No WSL required – runs natively on Windows.
                 </p>
 
                 <div class="plugins-toggle-row">
-                    <label class="plugins-toggle" title="BioFormats OME-XML aktivieren">
+                    <label class="plugins-toggle" title="Enable BioFormats OME-XML">
                         <input type="checkbox" id="bioformatsEnabled"
                             onchange="settingsManager && settingsManager.set('plugins.bioformats_enabled', this.checked);">
                         <span class="plugins-toggle-slider"></span>
                     </label>
                     <div class="plugins-toggle-label">
-                        <strong>OME-XML-Metadaten in Sidecar schreiben</strong>
-                        <small>Ruft <code>showinf</code> (BioFormats CLI) als Hintergrundprozess auf. Pro Datei ca. 5-15 Sek.</small>
+                        <strong>Write OME-XML metadata to sidecar</strong>
+                        <small>Calls <code>showinf</code> (BioFormats CLI) as a background process. Approx. 5-15 sec per file.</small>
                     </div>
                 </div>
 
                 <div style="margin-top:14px;">
-                    <label style="color:#9ca3af; font-size:0.82rem; display:block; margin-bottom:6px;">Pfad zu <code>showinf</code> / <code>showinf.bat</code>:</label>
+                    <label style="color:#9ca3af; font-size:0.82rem; display:block; margin-bottom:6px;">Path to <code>showinf</code> / <code>showinf.bat</code>:</label>
                     <div class="plugins-path-row">
                         <input type="text" class="plugins-path-input" id="bioformatsPath"
-                            placeholder="Leer lassen für Auto-Erkennung aus PATH…"
+                            placeholder="e.g. D:\bftools\showinf.bat or leave blank for auto-detection…"
                             onchange="settingsManager && settingsManager.set('plugins.bioformats_path', this.value);"
-                            oninput="document.getElementById('bfStatus').className='plugins-bf-status idle'; document.getElementById('bfStatus').textContent='Klicke Test zum Prüfen';">
+                            oninput="document.getElementById('bfStatus').className='plugins-bf-status idle'; document.getElementById('bfStatus').textContent='Click Test to verify';">
+                        <button class="fsc-btn fsc-btn-secondary" onclick="pluginsBrowseBioFormats()" style="white-space:nowrap;" title="Select showinf.bat in file manager">
+                            📁 Browse
+                        </button>
                         <button class="fsc-btn fsc-btn-secondary" onclick="pluginsTestBioFormats()" style="white-space:nowrap;">
                             ▶ Test
                         </button>
@@ -998,11 +1001,11 @@
                         </button>
                     </div>
                     <div class="plugins-bf-status idle" id="bfStatus">
-                        ℹ Noch nicht getestet
+                        ℹ Not tested yet
                     </div>
                     <a href="#" class="plugins-bf-download-link"
                         onclick="window.electronAPI.openExternal('https://www.openmicroscopy.org/bio-formats/downloads/'); return false;">
-                        📥 BioFormats CLI herunterladen →
+                        📥 Download BioFormats CLI →
                     </a>
                 </div>
             </div>

@@ -24,6 +24,10 @@ const experimentForm = {
 
     // NEW: Prevent auto template creation with validation (SANFTER)
     preventAutoTemplateCreation() {
+        if (window.templateManager?.currentTemplate?.isLoadedProject) {
+            return true;
+        }
+
         // Check if we have a valid user context
         const currentUser = window.userManager?.currentUser;
         const currentGroup = window.userManager?.currentGroup;
@@ -56,6 +60,14 @@ const experimentForm = {
     // Initialize experiment form with drag & drop
     init() {
         this.createDropIndicator();
+        // Dismiss notes autocomplete dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.form-notes-wrapper')) {
+                document.querySelectorAll('.form-notes-ac-dropdown').forEach(d => {
+                    d.style.display = 'none';
+                });
+            }
+        });
         console.log('✅ Experiment Form initialized with Drag & Drop support');
     },
 
@@ -268,7 +280,7 @@ const experimentForm = {
             }
 
             // FIX: Hide 'Detailed Metadata' field from the main UI (moved to OMERO menu)
-            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' || 
+            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' ||
                 fieldName === 'Detailed metadata format' || fieldInfo.label === 'Detailed metadata format') {
                 return;
             }
@@ -369,7 +381,7 @@ const experimentForm = {
                 </div>
             </td>
         `;
-        
+
         tr.addEventListener('click', () => {
             const isExpanded = tbody.classList.contains('expanded');
             if (isExpanded) {
@@ -390,7 +402,7 @@ const experimentForm = {
                 });
             }
         });
-        
+
         tbody.appendChild(tr);
     },
 
@@ -446,8 +458,27 @@ const experimentForm = {
         let inputHtml = '';
         switch (fieldInfo.type) {
             case 'text':
-            case 'id_anchor':
                 inputHtml = `<input type="text" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                break;
+            case 'id_anchor':
+                inputHtml = `
+                    <div class="own-id-form-container" id="${safeFieldId}_container" data-autocomplete-mode="own_id" style="display:flex;flex-direction:column;gap:4px;position:relative;">
+                        <div style="display:flex;gap:6px;align-items:center;position:relative;">
+                            <input type="text" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}
+                                   autocomplete="off"
+                                   style="flex:1;"
+                                   placeholder="Enter or scan Own / Internal ID..."
+                                   oninput="experimentForm.handleOwnIdInput(this, '${safeFieldId}', '${fieldName}')"
+                                   onfocus="experimentForm.openOwnIdSuggestions(this, '${safeFieldId}', '${fieldName}')"
+                                   onclick="experimentForm.openOwnIdSuggestions(this, '${safeFieldId}', '${fieldName}')"
+                                   onkeydown="experimentForm.handleOwnIdKeydown(event, this, '${safeFieldId}', '${fieldName}')">
+                            <button type="button" class="scan-index-folder-btn" title="Scan folder to index IDs &amp; Tags" onclick="experimentForm.scanFolderForIds('${safeFieldId}_container','${fieldName}')"
+                                    style="background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;">
+                                📂 Scan Folder
+                            </button>
+                        </div>
+                        <div class="own-id-status-hint" id="${safeFieldId}_hint" style="display:none;font-size:11px;line-height:1.3;"></div>
+                    </div>`;
                 break;
             case 'number':
                 const min = fieldInfo.min !== undefined ? `min="${fieldInfo.min}"` : '';
@@ -484,9 +515,35 @@ const experimentForm = {
                     ${starsHtml}
                 </div>`;
                 break;
-            case 'textarea':
-                inputHtml = `<textarea id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''} rows="1">${savedValue}</textarea>`;
+            case 'textarea': {
+                inputHtml = `
+                    <div class="form-textarea-wrapper" style="width: 100%;">
+                        <textarea id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''} rows="2" style="width: 100%; min-height: 48px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.4;">${savedValue}</textarea>
+                    </div>
+                `;
                 break;
+            }
+            case 'notes':
+            case 'markdown': {
+                inputHtml = `
+                    <div class="form-textarea-wrapper form-notes-wrapper" style="position: relative; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                            <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: #c4b5fd; background: rgba(139,92,246,0.18); border: 1px solid rgba(139,92,246,0.3); padding: 1px 6px; border-radius: 4px;">📝 Notes &amp; Observations</span>
+                            <button type="button" class="btn btn-secondary btn-sm form-textarea-preview-btn" onclick="experimentForm.toggleTextareaPreview('${safeFieldId}')" style="padding: 1px 7px; font-size: 11px; line-height: 1.4; color: #c4b5fd; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 4px; cursor: pointer;" title="Toggle Markdown Preview">
+                                👁️ Preview
+                            </button>
+                        </div>
+                        <textarea id="${safeFieldId}" data-field-name="${fieldName}" data-field-type="notes" ${isRequired ? 'required' : ''} rows="3"
+                            oninput="experimentForm.handleNotesTextareaInput(event, this)"
+                            onkeydown="experimentForm.handleNotesTextareaKeydown(event, this)"
+                            placeholder="Notes, observations, #tags, [[projects]]..."
+                            style="width: 100%; min-height: 56px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.4;">${savedValue}</textarea>
+                        <div id="${safeFieldId}_preview" class="mf-md form-textarea-preview" onclick="experimentForm.toggleTextareaPreview('${safeFieldId}')" style="display: none; width: 100%; min-height: 56px; padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 4px; font-size: 13px; line-height: 1.4; color: #e5e7eb; cursor: pointer;" title="Click anywhere to return to editing"></div>
+                        <div id="${safeFieldId}_ac" class="form-notes-ac-dropdown" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 2px; max-height: 200px; width: 340px; max-width: 100%; overflow-y: auto; background: #1e293b; border: 1px solid rgba(139, 92, 246, 0.5); border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.65); z-index: 10001; padding: 4px 0;"></div>
+                    </div>
+                `;
+                break;
+            }
             case 'dropdown':
                 const options = fieldInfo.options || [];
                 const optionsHtml = options.map(opt =>
@@ -511,7 +568,7 @@ const experimentForm = {
                     mcSavedArr = savedValue;
                 } else if (typeof savedValue === 'string') {
                     if (savedValue.startsWith('[')) {
-                        try { mcSavedArr = JSON.parse(savedValue); } catch(e) { mcSavedArr = []; }
+                        try { mcSavedArr = JSON.parse(savedValue); } catch (e) { mcSavedArr = []; }
                     } else if (savedValue.trim() !== '') {
                         mcSavedArr = savedValue.split(',').map(s => s.trim());
                     }
@@ -540,42 +597,53 @@ const experimentForm = {
                 </div>`;
                 break;
             case 'derived_from':
+            case 'related_to':
             case 'tags': {
                 // Resolve initial tags array from saved value
                 let initialTags = [];
                 if (Array.isArray(savedValue)) {
                     initialTags = savedValue;
                 } else if (typeof savedValue === 'string' && savedValue.startsWith('[')) {
-                    try { initialTags = JSON.parse(savedValue); } catch(e) { initialTags = []; }
+                    try { initialTags = JSON.parse(savedValue); } catch (e) { initialTags = []; }
                 }
                 const isDerivedFrom = fieldName === 'derived_from' || fieldInfo.type === 'derived_from';
-                const datalistId = isDerivedFrom ? `datalist_${safeFieldId}` : '';
-                const existingPills = initialTags.map(tag =>
-                    `<span class="tag-pill-form" data-tag="${tag}"
+                const isRelatedTo = fieldName === 'related_to' || fieldInfo.type === 'related_to';
+                const isLinkField = isDerivedFrom || isRelatedTo;
+                const autocompleteMode = isDerivedFrom ? 'derived_from' : (isRelatedTo ? 'related_to' : 'tags');
+                const datalistId = `datalist_${safeFieldId}`;
+                const existingPills = initialTags.map(tagItem => {
+                    const tagId = (tagItem && typeof tagItem === 'object') ? (tagItem.id || tagItem.name) : tagItem;
+                    const tagLabel = (tagItem && typeof tagItem === 'object') ? (tagItem.name || tagItem.id) : tagItem;
+                    const safeTagAttr = String(tagId).replace(/"/g, '&quot;');
+                    const safeTagJs = String(tagId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const safeJsonData = (tagItem && typeof tagItem === 'object') ? JSON.stringify(tagItem).replace(/"/g, '&quot;') : '';
+                    return `<span class="tag-pill-form" data-tag="${safeTagAttr}" ${safeJsonData ? `data-item-json="${safeJsonData}"` : ''}
                            style="display:inline-flex;align-items:center;gap:4px;
                                   background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);
-                                  color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;">
-                        ${tag}
+                                  color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;"
+                           title="${tagId}">
+                        ${tagLabel}
                         <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;"
-                              onclick="experimentForm.removeTagFromField('${safeFieldId}','${fieldName}','${tag}')">×</span>
-                    </span>`
-                ).join('');
+                              onclick="experimentForm.removeTagFromField('${safeFieldId}','${fieldName}','${safeTagJs}')">×</span>
+                    </span>`;
+                }).join('');
                 inputHtml = `
-                    <div class="tags-form-container" id="${safeFieldId}" data-field-name="${fieldName}" style="display:flex;flex-direction:column;gap:5px;">
+                    <div class="tags-form-container" id="${safeFieldId}" data-field-name="${fieldName}" data-autocomplete-mode="${autocompleteMode}" style="display:flex;flex-direction:column;gap:5px;position:relative;">
                         <div class="tags-pills-row" style="display:flex;flex-wrap:wrap;gap:4px;min-height:26px;">${existingPills}</div>
-                        <div style="display:flex;gap:6px;align-items:center;">
-                            <input type="text" class="tags-form-input"
-                                   placeholder="${isDerivedFrom ? 'Enter or select an ID...' : 'Add tag + Enter'}"
-                                   ${datalistId ? `list="${datalistId}"` : ''}
+                        <div style="display:flex;gap:6px;align-items:center;position:relative;">
+                            <input type="text" class="tags-form-input" autocomplete="off"
+                                   placeholder="${isLinkField ? 'Enter or select a Project or ID...' : 'Add or select tag + Enter'}"
                                    style="flex:1;font-size:12px;"
                                    onkeydown="experimentForm.handleFormTagInput(event, '${safeFieldId}', '${fieldName}')"
-                                   onfocus="${isDerivedFrom ? `experimentForm.loadIdAutocomplete('${datalistId}')` : ''}">
-                            ${isDerivedFrom ? `<button type="button" title="Scan folder for IDs" onclick="experimentForm.scanFolderForIds('${safeFieldId}','${fieldName}')"
+                                   oninput="experimentForm.handleFormTagChange(event, '${safeFieldId}', '${fieldName}', '${datalistId}', '${autocompleteMode}')"
+                                   onfocus="experimentForm.openIdAutocomplete(this, '${datalistId}', '${safeFieldId}', '${fieldName}', '${autocompleteMode}')"
+                                   onclick="experimentForm.openIdAutocomplete(this, '${datalistId}', '${safeFieldId}', '${fieldName}', '${autocompleteMode}')">
+                            <button type="button" class="scan-index-folder-btn" title="Scan folder to index IDs &amp; Tags" onclick="experimentForm.scanFolderForIds('${safeFieldId}','${fieldName}')"
                                     style="background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;">
-                                    📂 Scan Folder
-                                </button>` : ''}
+                                📂 Scan Folder
+                            </button>
                         </div>
-                        ${datalistId ? `<datalist id="${datalistId}"></datalist>` : ''}
+                        <datalist id="${datalistId}" style="display:none;"></datalist>
                     </div>`;
                 break;
             }
@@ -1253,7 +1321,7 @@ const experimentForm = {
             if (fieldInfo.type === 'group') return; // Skip groups
 
             // FIX: Hide 'Detailed Metadata' field as requested by the user, because it's now in the OMERO sidebar menu
-            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' || 
+            if (fieldName === 'Detailed Metadata' || fieldInfo.label === 'Detailed Metadata' ||
                 fieldName === 'Detailed metadata format' || fieldInfo.label === 'Detailed metadata format') {
                 return;
             }
@@ -1307,6 +1375,309 @@ const experimentForm = {
         if (this.filenameState.selectedFields.includes(fieldName)) {
             this.updateFilenamePreview();
         }
+    },
+
+    // Toggle in-place Markdown preview for textarea fields in Create Project form
+    toggleTextareaPreview(fieldId) {
+        const ta = document.getElementById(fieldId);
+        const preview = document.getElementById(`${fieldId}_preview`);
+        const wrapper = ta?.closest('.form-textarea-wrapper') || ta?.parentElement;
+        const btn = wrapper?.querySelector('.form-textarea-preview-btn');
+        if (!ta || !preview) return;
+
+        if (ta.style.display === 'none') {
+            // Return to edit mode
+            ta.style.display = 'block';
+            preview.style.display = 'none';
+            if (btn) {
+                btn.innerHTML = '👁️ Preview';
+                btn.style.background = 'rgba(139, 92, 246, 0.15)';
+                btn.style.color = '#c4b5fd';
+            }
+            ta.focus();
+        } else {
+            // Switch to preview mode
+            const raw = ta.value || '';
+            if (window.markdownLite) {
+                preview.innerHTML = raw.trim()
+                    ? window.markdownLite.render(raw)
+                    : '<em style="color:#6b7280; font-style:italic;">Nothing to preview yet. Click to write...</em>';
+            } else {
+                preview.textContent = raw || 'Empty';
+            }
+            preview.style.minHeight = `${Math.max(48, ta.offsetHeight)}px`;
+            ta.style.display = 'none';
+            preview.style.display = 'block';
+            if (btn) {
+                btn.innerHTML = '✏️ Edit';
+                btn.style.background = '#8b5cf6';
+                btn.style.color = '#fff';
+            }
+        }
+    },
+
+    // Autocomplete & Live Shortcut support for Notes fields in Create Project form
+    _notesAcState: {
+        textarea: null,
+        dropdown: null,
+        tokenStart: 0,
+        mode: null, // 'tag' | 'link'
+        items: [],
+        activeIndex: -1
+    },
+
+    handleNotesTextareaInput(event, textarea) {
+        if (!textarea) return;
+        const text = textarea.value || '';
+        const cursor = textarea.selectionStart;
+        const beforeCursor = text.slice(0, cursor);
+
+        // Live shortcut: *[] + space -> - [ ]
+        if (beforeCursor.endsWith('*[] ')) {
+            const replaced = beforeCursor.slice(0, -4) + '- [ ] ';
+            textarea.value = replaced + text.slice(cursor);
+            const newPos = replaced.length;
+            textarea.setSelectionRange(newPos, newPos);
+            this._hideNotesAutocomplete(textarea);
+            return;
+        }
+
+        // Tag autocomplete: #...
+        const tagMatch = /(?:^|\s)#([a-zA-Z0-9_\-]{0,25})$/.exec(beforeCursor);
+        if (tagMatch) {
+            const query = tagMatch[1].toLowerCase();
+            const tokenStart = cursor - tagMatch[1].length - 1;
+            this._showNotesTagAutocomplete(textarea, query, tokenStart);
+            return;
+        }
+
+        // Link / Project autocomplete: [[... or [...
+        const linkMatch = /(?:\[\[|(?:\s|^)\[)([^\[\]\n]{0,35})$/.exec(beforeCursor);
+        if (linkMatch) {
+            const query = linkMatch[1].toLowerCase();
+            const isDouble = beforeCursor.endsWith('[[' + linkMatch[1]);
+            const prefixLen = isDouble ? 2 : 1;
+            const tokenStart = cursor - linkMatch[1].length - prefixLen;
+            this._showNotesLinkAutocomplete(textarea, query, tokenStart);
+            return;
+        }
+
+        this._hideNotesAutocomplete(textarea);
+    },
+
+    _showNotesTagAutocomplete(textarea, query, tokenStart) {
+        const dropdown = document.getElementById(textarea.id + '_ac');
+        if (!dropdown) return;
+
+        if (!Array.isArray(this._tagDictionaryItems)) {
+            this.loadIdAutocomplete('', false);
+        }
+
+        const tagSet = new Map();
+        if (Array.isArray(this._tagDictionaryItems)) {
+            this._tagDictionaryItems.forEach(t => {
+                if (t && t.id) tagSet.set(t.id.toLowerCase(), { id: t.id, count: t.count || 0 });
+            });
+        }
+        if (window.facetSearch && Array.isArray(window.facetSearch.masterData)) {
+            window.facetSearch.masterData.forEach(p => {
+                const flat = p.flatMeta || {};
+                for (const [k, v] of Object.entries(flat)) {
+                    if (k.toLowerCase().includes('tag') && v) {
+                        String(v).split(/[,;]/).forEach(raw => {
+                            const trimmed = raw.trim();
+                            if (trimmed) {
+                                const lower = trimmed.toLowerCase();
+                                const prev = tagSet.get(lower);
+                                tagSet.set(lower, { id: trimmed, count: (prev?.count || 0) + 1 });
+                            }
+                        });
+                    }
+                }
+                if (p.notes_markdown && window.markdownLite) {
+                    window.markdownLite.extractTags(p.notes_markdown).forEach(t => {
+                        const lower = t.toLowerCase();
+                        const prev = tagSet.get(lower);
+                        tagSet.set(lower, { id: t, count: (prev?.count || 0) + 1 });
+                    });
+                }
+            });
+        }
+
+        const matches = Array.from(tagSet.values())
+            .filter(t => !query || t.id.toLowerCase().includes(query))
+            .slice(0, 10);
+
+        if (matches.length === 0) {
+            this._hideNotesAutocomplete(textarea);
+            return;
+        }
+
+        this._notesAcState = {
+            textarea,
+            dropdown,
+            tokenStart,
+            mode: 'tag',
+            items: matches,
+            activeIndex: 0
+        };
+
+        this._renderNotesAutocompleteDropdown();
+    },
+
+    _showNotesLinkAutocomplete(textarea, query, tokenStart) {
+        const dropdown = document.getElementById(textarea.id + '_ac');
+        if (!dropdown) return;
+
+        if (!Array.isArray(this._idDictionaryItems)) {
+            this.loadIdAutocomplete('', false);
+        }
+
+        const itemMap = new Map();
+        if (Array.isArray(this._idDictionaryItems)) {
+            this._idDictionaryItems.forEach(item => {
+                if (item && item.id) {
+                    itemMap.set(item.id.toLowerCase(), {
+                        name: item.id,
+                        type: item.type === 'project' ? 'Project' : 'ID'
+                    });
+                }
+            });
+        }
+        if (window.facetSearch && Array.isArray(window.facetSearch.masterData)) {
+            window.facetSearch.masterData.forEach(p => {
+                if (p.name) {
+                    itemMap.set(p.name.toLowerCase(), {
+                        name: p.name,
+                        type: 'Project'
+                    });
+                }
+                if (p.metafold_project_id) {
+                    itemMap.set(p.metafold_project_id.toLowerCase(), {
+                        name: p.metafold_project_id,
+                        type: 'UUID'
+                    });
+                }
+            });
+        }
+
+        const matches = Array.from(itemMap.values())
+            .filter(item => !query || item.name.toLowerCase().includes(query))
+            .slice(0, 10);
+
+        if (matches.length === 0) {
+            this._hideNotesAutocomplete(textarea);
+            return;
+        }
+
+        this._notesAcState = {
+            textarea,
+            dropdown,
+            tokenStart,
+            mode: 'link',
+            items: matches,
+            activeIndex: 0
+        };
+
+        this._renderNotesAutocompleteDropdown();
+    },
+
+    _renderNotesAutocompleteDropdown() {
+        const { dropdown, mode, items, activeIndex } = this._notesAcState;
+        if (!dropdown) return;
+
+        let html = '';
+        items.forEach((item, idx) => {
+            const isActive = idx === activeIndex;
+            const bg = isActive ? 'rgba(139, 92, 246, 0.28)' : 'transparent';
+            if (mode === 'tag') {
+                html += `
+                    <div class="notes-ac-item" data-index="${idx}" style="padding: 6px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #c4b5fd; background: ${bg}; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseenter="experimentForm._setNotesAcActive(${idx})" onclick="experimentForm._selectNotesAutocompleteItem(${idx})">
+                        <span>🏷️ #${item.id}</span>
+                        ${item.count ? `<span style="font-size: 10px; color: #94a3b8;">(${item.count})</span>` : ''}
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="notes-ac-item" data-index="${idx}" style="padding: 6px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #93c5fd; background: ${bg}; border-bottom: 1px solid rgba(255,255,255,0.05);" onmouseenter="experimentForm._setNotesAcActive(${idx})" onclick="experimentForm._selectNotesAutocompleteItem(${idx})">
+                        <span>📁 ${item.name}</span>
+                        <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">${item.type || 'LINK'}</span>
+                    </div>
+                `;
+            }
+        });
+
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+    },
+
+    _setNotesAcActive(idx) {
+        this._notesAcState.activeIndex = idx;
+        const dropdown = this._notesAcState.dropdown;
+        if (!dropdown) return;
+        dropdown.querySelectorAll('.notes-ac-item').forEach((el, i) => {
+            el.style.background = i === idx ? 'rgba(139, 92, 246, 0.28)' : 'transparent';
+        });
+    },
+
+    handleNotesTextareaKeydown(event, textarea) {
+        const { dropdown, items, activeIndex } = this._notesAcState;
+        if (!dropdown || dropdown.style.display === 'none' || !items || items.length === 0) {
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            const next = (activeIndex + 1) % items.length;
+            this._setNotesAcActive(next);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            const prev = (activeIndex - 1 + items.length) % items.length;
+            this._setNotesAcActive(prev);
+        } else if (event.key === 'Enter' || event.key === 'Tab') {
+            if (activeIndex >= 0 && activeIndex < items.length) {
+                event.preventDefault();
+                this._selectNotesAutocompleteItem(activeIndex);
+            }
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            this._hideNotesAutocomplete(textarea);
+        }
+    },
+
+    _selectNotesAutocompleteItem(index) {
+        const { textarea, mode, items, tokenStart } = this._notesAcState;
+        if (!textarea || !items || !items[index]) return;
+
+        const item = items[index];
+        const text = textarea.value || '';
+        const end = textarea.selectionStart;
+
+        let insertText = '';
+        if (mode === 'tag') {
+            insertText = `#${item.id} `;
+        } else {
+            insertText = `[[${item.name}]] `;
+        }
+
+        textarea.value = text.slice(0, tokenStart) + insertText + text.slice(end);
+        const newPos = tokenStart + insertText.length;
+        textarea.focus();
+        textarea.setSelectionRange(newPos, newPos);
+        this._hideNotesAutocomplete(textarea);
+    },
+
+    _hideNotesAutocomplete(textarea) {
+        const dropdown = textarea ? document.getElementById(textarea.id + '_ac') : this._notesAcState?.dropdown;
+        if (dropdown) dropdown.style.display = 'none';
+        this._notesAcState = {
+            textarea: null,
+            dropdown: null,
+            tokenStart: 0,
+            mode: null,
+            items: [],
+            activeIndex: -1
+        };
     },
 
     // Toggle all checkboxes in a multi-checkbox group
@@ -1379,6 +1750,263 @@ const experimentForm = {
         }, 3000);
     },
 
+    // Populate form fields with existing metadata (e.g. loaded from JSON)
+    populateForm(metadata) {
+        if (!metadata || typeof metadata !== 'object') {
+            console.warn('⚠️ populateForm called with invalid metadata:', metadata);
+            return;
+        }
+
+        console.log('📝 Populating experimentForm with loaded metadata...', metadata);
+
+        // Helper to flatten nested metadata objects
+        const flatValues = {};
+        const extractValues = (obj, prefix = '') => {
+            if (!obj || typeof obj !== 'object') return;
+            for (const [key, val] of Object.entries(obj)) {
+                if (key === 'templateInfo' || key === 'integrations' || key === 'provenance' || 
+                    key === 'created_at' || key === 'updated_at' || key === 'previous_names') {
+                    continue;
+                }
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                if (val && typeof val === 'object' && !Array.isArray(val) && val.value === undefined && val.type === undefined) {
+                    // Category or nested group
+                    extractValues(val, fullKey);
+                } else {
+                    const actualValue = (val && typeof val === 'object' && val.value !== undefined) ? val.value : val;
+                    flatValues[key] = actualValue;
+                    if (prefix) flatValues[fullKey] = actualValue;
+                }
+            }
+        };
+
+        extractValues(metadata);
+        if (metadata.metadata) {
+            extractValues(metadata.metadata);
+        }
+
+        // Iterate over flatValues and populate matching inputs
+        for (const [fieldName, val] of Object.entries(flatValues)) {
+            const safeFieldId = 'field_' + this.createSafeId(fieldName);
+            const input = document.getElementById(safeFieldId);
+            if (!input) continue;
+
+            if (input.classList.contains('multicheckbox-group')) {
+                const arr = Array.isArray(val) ? val : [val];
+                input.querySelectorAll('.mc-item').forEach(cb => {
+                    cb.checked = arr.map(String).includes(String(cb.value));
+                });
+                this.saveFieldValue(fieldName, arr);
+            } else if (input.classList.contains('tags-form-container')) {
+                // Clear existing pills
+                const pillsRow = input.querySelector('.tags-pills-row');
+                if (pillsRow) {
+                    pillsRow.innerHTML = '';
+                }
+                const arr = Array.isArray(val) ? val : (typeof val === 'string' && val.trim() ? val.split(',').map(s => s.trim()) : []);
+                arr.forEach(item => {
+                    if (item) {
+                        this.addTagToField(safeFieldId, fieldName, item);
+                    }
+                });
+                this.saveFieldValue(fieldName, arr);
+            } else if (input.classList.contains('rating-container')) {
+                const numVal = parseInt(val) || 0;
+                input.setAttribute('data-value', numVal);
+                const stars = input.querySelectorAll('.star-icon');
+                stars.forEach(s => {
+                    const sVal = parseInt(s.getAttribute('data-value'));
+                    const isFilled = sVal <= numVal;
+                    s.setAttribute('fill', isFilled ? '#a855f7' : 'none');
+                    s.setAttribute('stroke', isFilled ? '#a855f7' : '#9ca3af');
+                });
+                this.saveFieldValue(fieldName, numVal);
+            } else if (input.type === 'checkbox') {
+                input.checked = !!val;
+                this.saveFieldValue(fieldName, input.checked);
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                input.value = (val !== undefined && val !== null) ? val : '';
+                this.saveFieldValue(fieldName, input.value);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Notes / Markdown support
+        if (metadata.notes_markdown) {
+            const notesEl = document.getElementById('field_notes_markdown') || document.querySelector('textarea[data-field-name="notes_markdown"]');
+            if (notesEl) {
+                notesEl.value = metadata.notes_markdown;
+                this.saveFieldValue('notes_markdown', metadata.notes_markdown);
+                notesEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+
+        if (typeof this.updateFilenamePreview === 'function') {
+            this.updateFilenamePreview();
+        }
+
+        console.log('✅ Form successfully populated with metadata');
+    },
+
+    // Render and activate form directly from an existing loaded metadata file
+    renderLoadedProject(rawMetadata, filePath, projectName) {
+        console.log('📂 Rendering loaded project in experimentForm:', projectName, filePath);
+
+        // Normalize raw metadata fields into form-compatible field definitions
+        const normalized = this.normalizeLoadedMetadata(rawMetadata);
+
+        // Set virtual template context so validation passes and fields can be collected
+        if (window.templateManager) {
+            window.templateManager.currentTemplate = {
+                name: projectName || 'Loaded Project',
+                type: 'experiment',
+                isLoadedProject: true,
+                metadata: normalized,
+                structure: '',
+                filePath: filePath
+            };
+            window.templateManager.selectedIndex = -1;
+            window.templateManager.renderList();
+            window.templateManager.updateTemplateInfo();
+        }
+
+        // Show templateDetails, hide placeholder
+        const detailsEl = document.getElementById('templateDetails');
+        const placeholderEl = document.getElementById('templatePlaceholder');
+        const formDiv = document.getElementById('experimentForm');
+
+        if (placeholderEl) placeholderEl.style.display = 'none';
+        if (detailsEl) detailsEl.style.display = 'block';
+        if (formDiv) formDiv.style.display = 'block';
+
+        // Set input fields
+        const projectNameInput = document.getElementById('projectName');
+        const targetPathInput = document.getElementById('targetPath');
+
+        if (projectNameInput) {
+            projectNameInput.value = projectName;
+        }
+
+        if (targetPathInput && filePath) {
+            const parts = filePath.split(/[/\\]/);
+            parts.pop();
+            targetPathInput.value = parts.join(window.electronAPI?.platform === 'win32' ? '\\' : '/');
+        }
+
+        // Render form structure with normalized fields
+        this.render(normalized);
+
+        // Populate fields with values
+        this.populateForm(rawMetadata.metadata || rawMetadata);
+
+        // Update previews
+        if (window.projectManager && window.projectManager.updatePathPreview) {
+            window.projectManager.updatePathPreview();
+        }
+
+        // Update footer buttons (Show Update & Send to Integrations buttons, hide Create Project)
+        if (typeof window.updateFooterVisibility === 'function') {
+            window.updateFooterVisibility();
+        }
+
+        // Pre-configure right sidebar integrations if present in metadata
+        if (rawMetadata.integrations) {
+            const elabToggle = document.getElementById('sendToElabFTW');
+            const omeroToggle = document.getElementById('sendToOMERO');
+            if (elabToggle && rawMetadata.integrations.elabftw) elabToggle.checked = true;
+            if (omeroToggle && rawMetadata.integrations.omero) omeroToggle.checked = true;
+        }
+
+        console.log('✅ Loaded project rendered successfully in center form');
+    },
+
+    // Normalize any metadata JSON format (flat, nested, rich) into fields + fieldOrder
+    normalizeLoadedMetadata(rawMetadata) {
+        const fields = {};
+        const fieldOrder = [];
+
+        const metaIgnore = new Set([
+            'projectName', 'name', 'projectId', 'metafold_project_id', 'id',
+            'templateInfo', 'integrations', 'metafold_integration',
+            'provenance', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
+            'previous_names', 'notes_log', 'changelog'
+        ]);
+
+        const sourceObj = rawMetadata.metadata || rawMetadata.fields || rawMetadata;
+
+        const processEntries = (obj, parentCategory = null) => {
+            if (!obj || typeof obj !== 'object') return;
+            for (const [key, rawVal] of Object.entries(obj)) {
+                if (metaIgnore.has(key)) continue;
+
+                const fullKey = parentCategory ? `${parentCategory}.${key}` : key;
+
+                // Check if rawVal is a category/nested group (plain object without value/type)
+                if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal) && rawVal.value === undefined && rawVal.type === undefined) {
+                    const groupKey = `group_${key}`;
+                    fields[groupKey] = {
+                        type: 'group',
+                        label: key.replace(/_/g, ' ')
+                    };
+                    fieldOrder.push(groupKey);
+                    processEntries(rawVal, key);
+                    continue;
+                }
+
+                let type = 'text';
+                let label = key.replace(/_/g, ' ');
+                let val = rawVal;
+                let unit = '';
+                let options = null;
+
+                if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal) && (rawVal.value !== undefined || rawVal.type !== undefined)) {
+                    val = rawVal.value !== undefined ? rawVal.value : '';
+                    type = rawVal.type || 'text';
+                    label = rawVal.label || label;
+                    unit = rawVal.unit || '';
+                    options = rawVal.options || null;
+                } else if (Array.isArray(rawVal)) {
+                    type = 'tags';
+                } else if (typeof rawVal === 'number') {
+                    type = 'number';
+                } else if (typeof rawVal === 'boolean') {
+                    type = 'checkbox';
+                } else if (typeof rawVal === 'string') {
+                    if (key.toLowerCase().includes('note') || key.toLowerCase().includes('markdown') || key.toLowerCase().includes('observation') || rawVal.length > 120 || rawVal.includes('\n')) {
+                        type = key.toLowerCase().includes('note') || key.toLowerCase().includes('markdown') ? 'notes' : 'textarea';
+                    }
+                }
+
+                fields[fullKey] = {
+                    type,
+                    label: label.charAt(0).toUpperCase() + label.slice(1),
+                    value: val,
+                    defaultValue: val,
+                    unit,
+                    options
+                };
+                fieldOrder.push(fullKey);
+            }
+        };
+
+        processEntries(sourceObj);
+
+        // Include notes_markdown if present and not already added
+        if (rawMetadata.notes_markdown && !fields['notes_markdown']) {
+            fields['notes_markdown'] = {
+                type: 'notes',
+                label: 'Notes & Observations (Markdown)',
+                value: rawMetadata.notes_markdown,
+                defaultValue: rawMetadata.notes_markdown
+            };
+            fieldOrder.push('notes_markdown');
+        }
+
+        return { fields, fieldOrder };
+    },
+
     // Enhanced collect experiment data with field order preservation
     collectData() {
         if (!templateManager.currentTemplate || !templateManager.currentTemplate.metadata) {
@@ -1406,13 +2034,13 @@ const experimentForm = {
         // Collect data in the specified field order
         fieldOrder.forEach(fieldName => {
             const fieldInfo = fieldsSource[fieldName];
-            
+
             if (fieldInfo && fieldInfo.type === 'group') {
                 currentGroupObj = {};
                 metadata[fieldInfo.label || fieldName] = currentGroupObj;
                 return;
             }
-            
+
             if (!fieldInfo) return; // Skip invalid
 
             let value;
@@ -1420,15 +2048,15 @@ const experimentForm = {
             // Handle multi-checkbox specifically
             if (fieldInfo.type === 'multicheckbox') {
                 value = this.getMultiCheckboxValues(fieldName);
-            } else if (fieldInfo.type === 'tags' || fieldInfo.type === 'derived_from') {
-                // Tags: read pills array from the DOM container
+            } else if (fieldInfo.type === 'tags' || fieldInfo.type === 'derived_from' || fieldInfo.type === 'related_to') {
+                // Tags & Links: read pills array from the DOM container
                 const safeFieldId = 'field_' + this.createSafeId(fieldName);
                 value = this.getTagValues(safeFieldId);
-                
+
                 // UX FIX: Capture pending text that the user typed but forgot to press 'Enter' for
                 const container = document.getElementById(safeFieldId);
                 if (container) {
-                    const inputEl = container.querySelector('.tag-input-form');
+                    const inputEl = container.querySelector('.tags-form-input, .tag-input-form');
                     if (inputEl && inputEl.value && inputEl.value.trim() !== '') {
                         const pendingValue = inputEl.value.trim();
                         if (!value.includes(pendingValue)) {
@@ -1466,6 +2094,7 @@ const experimentForm = {
             // Carry over additional properties
             if (fieldInfo.options) fieldData.options = fieldInfo.options;
             if (fieldInfo.unit !== undefined) fieldData.unit = fieldInfo.unit;
+            if (fieldInfo.displayInNotes !== undefined) fieldData.displayInNotes = fieldInfo.displayInNotes;
 
             if (currentGroupObj) {
                 currentGroupObj[fieldName] = fieldData;
@@ -1759,6 +2388,14 @@ const experimentForm = {
                         .join('+');
                     parts.push(value);
                 }
+            } else if (group && group.classList.contains('tags-form-container')) {
+                const tags = this.getTagValues(safeFieldId);
+                if (tags.length > 0) {
+                    const value = tags
+                        .map(v => String(v).replace(/[^a-zA-Z0-9-_]/g, '_'))
+                        .join('+');
+                    parts.push(value);
+                }
             } else if (group && group.value) {
                 let value = group.type === 'checkbox' ? (group.checked ? 'Yes' : 'No') : group.value;
                 if (value) {
@@ -1790,7 +2427,7 @@ const experimentForm = {
     async copyFilenameToClipboard() {
         const previewDiv = document.getElementById('filenamePreview');
         if (!previewDiv) return;
-        
+
         const filename = previewDiv.textContent;
         if (filename === '(No fields selected)' || !filename) {
             if (typeof showToast === 'function') showToast('⚠️ No filename generated yet');
@@ -1853,41 +2490,135 @@ const experimentForm = {
 
     // =================== TAGS FIELD HELPERS ===================
 
+    _idDictionaryItems: null,
+    _tagDictionaryItems: null,
+    _idAutocompleteState: {
+        inputEl: null,
+        containerId: null,
+        fieldName: null,
+        datalistId: null,
+        mode: 'derived_from',
+        activeIndex: -1,
+        filteredItems: [],
+        outsideClickHandler: null,
+        scrollResizeHandler: null
+    },
+
+    /**
+     * Add a single value as a pill/tag to a tags-form-container immediately.
+     * Supports either string tags or structured link objects { id, name, anchor, relation_note }.
+     */
+    addTagToField(containerId, fieldName, rawValue, inputEl = null, itemObj = null) {
+        let value = '';
+        let displayLabel = '';
+        let structuredData = null;
+
+        if (itemObj && typeof itemObj === 'object') {
+            value = String(itemObj.id || itemObj.name || '').trim();
+            displayLabel = String(itemObj.name || itemObj.id || '').trim();
+            structuredData = itemObj;
+        } else if (rawValue && typeof rawValue === 'object') {
+            value = String(rawValue.id || rawValue.name || '').trim();
+            displayLabel = String(rawValue.name || rawValue.id || '').trim();
+            structuredData = rawValue;
+        } else {
+            value = String(rawValue || '').trim().replace(/,$/, '');
+            displayLabel = value;
+        }
+
+        if (!value) return false;
+
+        const container = document.getElementById(containerId);
+        if (!container) return false;
+
+        const targetInput = inputEl || container.querySelector('.tags-form-input');
+
+        // Prevent duplicate pills
+        const existing = this.getTagValues(containerId);
+        if (existing.includes(value)) {
+            if (targetInput) targetInput.value = '';
+            return false;
+        }
+
+        const pillsRow = container.querySelector('.tags-pills-row');
+        if (pillsRow) {
+            const safeTagJs = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const pill = document.createElement('span');
+            pill.className = 'tag-pill-form';
+            pill.setAttribute('data-tag', value);
+            if (structuredData) {
+                try {
+                    pill.setAttribute('data-item-json', JSON.stringify(structuredData));
+                } catch (_) { }
+            }
+            pill.title = value !== displayLabel ? `${displayLabel} (ID: ${value})` : value;
+            pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;';
+            pill.innerHTML = `${displayLabel} <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;"
+                onclick="experimentForm.removeTagFromField('${containerId}','${fieldName}','${safeTagJs}')">×</span>`;
+            pillsRow.appendChild(pill);
+        }
+
+        if (targetInput) {
+            targetInput.value = '';
+        }
+
+        const updatedTags = this.getTagValues(containerId);
+        this.saveFieldValue(fieldName, updatedTags);
+        if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+            this.updateFilenamePreview();
+        }
+        return true;
+    },
+
     /**
      * Handle keydown in the tags form input field.
-     * Enter or comma confirms the current tag and adds a pill.
+     * Supports ArrowDown/ArrowUp/Enter/Escape in the autocomplete dropdown,
+     * as well as Enter or comma to confirm the current tag and add a pill.
      */
     handleFormTagInput(event, containerId, fieldName) {
+        const dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        const isDropdownOpen = dropdown && dropdown.style.display !== 'none' && this._idAutocompleteState.containerId === containerId;
+
+        if (isDropdownOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            const items = this._idAutocompleteState.filteredItems || [];
+            if (items.length === 0) return;
+            if (event.key === 'ArrowDown') {
+                this._idAutocompleteState.activeIndex = (this._idAutocompleteState.activeIndex + 1) % items.length;
+            } else {
+                this._idAutocompleteState.activeIndex = (this._idAutocompleteState.activeIndex - 1 + items.length) % items.length;
+            }
+            this._updateIdAutocompleteHighlight();
+            return;
+        }
+
+        if (event.key === 'Escape' && isDropdownOpen) {
+            event.preventDefault();
+            this.closeIdAutocompleteDropdown();
+            return;
+        }
+
         if (event.key === 'Enter' || event.key === ',') {
             event.preventDefault();
             const inputEl = event.target;
+
+            // If an autocomplete suggestion is highlighted with ArrowDown/ArrowUp, pick it
+            if (isDropdownOpen && event.key === 'Enter' && this._idAutocompleteState.activeIndex >= 0) {
+                const chosen = (this._idAutocompleteState.filteredItems || [])[this._idAutocompleteState.activeIndex];
+                if (chosen && chosen.id) {
+                    this.addTagToField(containerId, fieldName, chosen.id, inputEl);
+                    this.closeIdAutocompleteDropdown();
+                    return;
+                }
+            }
+
             const value = inputEl.value.trim().replace(/,$/, '');
             if (!value) return;
 
-            const container = document.getElementById(containerId);
-            if (!container) return;
-
-            // Check for duplicate
-            const existing = this.getTagValues(containerId);
-            if (existing.includes(value)) {
-                inputEl.value = '';
-                return;
+            this.addTagToField(containerId, fieldName, value, inputEl);
+            if (isDropdownOpen) {
+                this.closeIdAutocompleteDropdown();
             }
-
-            // Create pill
-            const pillsRow = container.querySelector('.tags-pills-row');
-            if (pillsRow) {
-                const pill = document.createElement('span');
-                pill.className = 'tag-pill-form';
-                pill.setAttribute('data-tag', value);
-                pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:20px;padding:2px 8px;font-size:12px;cursor:default;';
-                pill.innerHTML = `${value} <span style="cursor:pointer;opacity:0.7;font-size:13px;line-height:1;"
-                    onclick="experimentForm.removeTagFromField('${containerId}','${fieldName}','${value}')">×</span>`;
-                pillsRow.appendChild(pill);
-            }
-
-            inputEl.value = '';
-            this.saveFieldValue(fieldName, this.getTagValues(containerId));
         } else if (event.key === 'Backspace' && event.target.value === '') {
             const container = document.getElementById(containerId);
             const pillsRow = container?.querySelector('.tags-pills-row');
@@ -1896,9 +2627,38 @@ const experimentForm = {
                 if (lastPill) {
                     lastPill.remove();
                     this.saveFieldValue(fieldName, this.getTagValues(containerId));
+                    if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+                        this.updateFilenamePreview();
+                    }
+                    if (isDropdownOpen) {
+                        this.renderIdAutocompleteDropdown();
+                    }
                 }
             }
         }
+    },
+
+    /**
+     * Handle live typing or native datalist replacement in the tags input field.
+     */
+    handleFormTagChange(event, containerId, fieldName, datalistId = '', mode = '') {
+        const inputEl = event.target;
+        if (!inputEl) return;
+
+        // If triggered by native datalist replacement, immediately add as pill
+        if (event.inputType === 'insertReplacementText' || !(event instanceof InputEvent)) {
+            const val = inputEl.value.trim();
+            if (val) {
+                this.addTagToField(containerId, fieldName, val, inputEl);
+                this.closeIdAutocompleteDropdown();
+                return;
+            }
+        }
+
+        // Filter the custom dropdown live for both derived_from and tags fields
+        const container = document.getElementById(containerId);
+        const resolvedMode = mode || container?.dataset?.autocompleteMode || 'derived_from';
+        this.openIdAutocomplete(inputEl, datalistId, containerId, fieldName, resolvedMode);
     },
 
     /**
@@ -1907,49 +2667,408 @@ const experimentForm = {
     removeTagFromField(containerId, fieldName, tagValue) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        const pill = container.querySelector(`.tag-pill-form[data-tag="${tagValue}"]`);
-        if (pill) {
-            pill.remove();
+        const pills = container.querySelectorAll('.tag-pill-form');
+        let removed = false;
+        pills.forEach(p => {
+            if (p.getAttribute('data-tag') === tagValue) {
+                p.remove();
+                removed = true;
+            }
+        });
+        if (removed) {
             this.saveFieldValue(fieldName, this.getTagValues(containerId));
+            if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+                this.updateFilenamePreview();
+            }
+            if (this._idAutocompleteState.containerId === containerId) {
+                this.renderIdAutocompleteDropdown();
+            }
         }
     },
 
     /**
-     * Get all tag values from a tags-form-container as a string array
+     * Get all tag values from a tags-form-container (structured objects for link fields, or strings for tags)
      */
     getTagValues(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return [];
-        return [...container.querySelectorAll('.tag-pill-form')].map(p => p.getAttribute('data-tag'));
+        return [...container.querySelectorAll('.tag-pill-form')].map(p => {
+            const rawJson = p.getAttribute('data-item-json');
+            if (rawJson) {
+                try {
+                    const parsed = JSON.parse(rawJson);
+                    if (parsed && typeof parsed === 'object') return parsed;
+                } catch (_) { }
+            }
+            return p.getAttribute('data-tag');
+        });
     },
 
     /**
-     * Load id_dictionary.json for the current user and populate a <datalist>
+     * Load user_index IDs and Tags for the current user and cache the entries
      */
-    async loadIdAutocomplete(datalistId) {
-        if (!datalistId) return;
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return;
-        if (datalist.dataset.loaded === 'true') return; // Only load once per focus session
+    async loadIdAutocomplete(datalistId, forceReload = false) {
+        if (!forceReload && Array.isArray(this._idDictionaryItems) && Array.isArray(this._tagDictionaryItems)) {
+            return this._idDictionaryItems;
+        }
 
         try {
             const userInfo = window.userManager?.getCurrentUserInfo() || { username: 'Unknown' };
             if (window.electronAPI?.loadIdDictionary) {
                 const result = await window.electronAPI.loadIdDictionary(userInfo);
-                if (result?.success && Array.isArray(result.ids)) {
-                    datalist.innerHTML = result.ids.map(item => {
-                        const id = typeof item === 'string' ? item : item.id;
-                        const type = typeof item === 'string' ? 'id_anchor' : item.type;
-                        const label = type === 'project' ? `📁 Projekt` : `⚓ ID`;
-                        return `<option value="${id}">${label}</option>`;
-                    }).join('');
-                    datalist.dataset.loaded = 'true';
-                    console.log(`📋 Loaded ${result.ids.length} IDs into autocomplete`);
+                if (result?.success) {
+                    this._idDictionaryItems = Array.isArray(result.ids) ? result.ids.map(item => ({
+                        id: typeof item === 'string' ? item : item.id,
+                        type: typeof item === 'string' ? 'id_anchor' : (item.type || 'id_anchor')
+                    })).filter(item => item.id) : [];
+
+                    this._tagDictionaryItems = Array.isArray(result.tags) ? result.tags.map(item => ({
+                        id: typeof item === 'string' ? item : item.id,
+                        type: 'tag',
+                        count: typeof item === 'object' && item.count ? item.count : 0
+                    })).filter(item => item.id) : [];
+
+                    const datalist = datalistId ? document.getElementById(datalistId) : null;
+                    if (datalist) {
+                        datalist.innerHTML = this._idDictionaryItems.map(item => {
+                            const label = item.type === 'project' ? '📁 Project' : '⚓ ID';
+                            return `<option value="${item.id}">${label}</option>`;
+                        }).join('');
+                        datalist.dataset.loaded = 'true';
+                    }
+                    console.log(`📋 Loaded ${this._idDictionaryItems.length} IDs and ${this._tagDictionaryItems.length} Tags from User Index`);
+                    return this._idDictionaryItems;
                 }
             }
         } catch (err) {
-            console.warn('⚠️ Could not load ID dictionary for autocomplete:', err.message);
+            console.warn('⚠️ Could not load ID/Tag dictionary for autocomplete:', err.message);
         }
+        this._idDictionaryItems = [];
+        this._tagDictionaryItems = [];
+        return this._idDictionaryItems;
+    },
+
+    /**
+     * Open and render the custom scrollable autocomplete dropdown for derived_from IDs, Tags, or Own IDs.
+     */
+    async openIdAutocomplete(inputEl, datalistId, containerId, fieldName, mode = 'derived_from') {
+        if (!inputEl) return;
+        const container = containerId ? document.getElementById(containerId) : null;
+        const resolvedMode = mode || container?.dataset?.autocompleteMode || 'derived_from';
+        this._idAutocompleteState.inputEl = inputEl;
+        this._idAutocompleteState.datalistId = datalistId;
+        this._idAutocompleteState.containerId = containerId;
+        this._idAutocompleteState.fieldName = fieldName;
+        this._idAutocompleteState.mode = resolvedMode;
+        this._idAutocompleteState.activeIndex = -1;
+
+        await this.loadIdAutocomplete(datalistId, false);
+        this.renderIdAutocompleteDropdown();
+    },
+
+    /**
+     * Live check and autocomplete helper for 'id_anchor' (Own / Internal ID) fields
+     */
+    async handleOwnIdInput(inputEl, safeFieldId, fieldName) {
+        if (!inputEl) return;
+        const val = (inputEl.value || '').trim();
+        this.saveFieldValue(fieldName, inputEl.value);
+        if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+            this.updateFilenamePreview();
+        }
+
+        await this.loadIdAutocomplete('', false);
+        this.updateOwnIdStatusHint(val, safeFieldId);
+        this.openIdAutocomplete(inputEl, '', `${safeFieldId}_container`, fieldName, 'own_id');
+    },
+
+    async openOwnIdSuggestions(inputEl, safeFieldId, fieldName) {
+        if (!inputEl) return;
+        await this.loadIdAutocomplete('', false);
+        this.updateOwnIdStatusHint((inputEl.value || '').trim(), safeFieldId);
+        this.openIdAutocomplete(inputEl, '', `${safeFieldId}_container`, fieldName, 'own_id');
+    },
+
+    updateOwnIdStatusHint(val, safeFieldId) {
+        const hintEl = document.getElementById(`${safeFieldId}_hint`);
+        if (!hintEl) return;
+        if (!val) {
+            hintEl.style.display = 'none';
+            hintEl.textContent = '';
+            return;
+        }
+        const allIds = Array.isArray(this._idDictionaryItems) ? this._idDictionaryItems : [];
+        const duplicate = allIds.find(item => item.id && item.id.toLowerCase() === val.toLowerCase());
+        if (duplicate) {
+            hintEl.style.display = 'block';
+            hintEl.style.color = '#f59e0b';
+            hintEl.textContent = `⚠️ "${duplicate.id}" already exists in your User Index (${duplicate.type === 'project' ? 'Project' : 'Own ID'})`;
+        } else {
+            hintEl.style.display = 'none';
+            hintEl.textContent = '';
+        }
+    },
+
+    handleOwnIdKeydown(event, inputEl, safeFieldId, fieldName) {
+        const dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        const containerId = `${safeFieldId}_container`;
+        const isDropdownOpen = dropdown && dropdown.style.display !== 'none' && this._idAutocompleteState.containerId === containerId;
+
+        if (isDropdownOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            const items = this._idAutocompleteState.filteredItems || [];
+            if (items.length === 0) return;
+            if (event.key === 'ArrowDown') {
+                this._idAutocompleteState.activeIndex = (this._idAutocompleteState.activeIndex + 1) % items.length;
+            } else {
+                this._idAutocompleteState.activeIndex = (this._idAutocompleteState.activeIndex - 1 + items.length) % items.length;
+            }
+            this._updateIdAutocompleteHighlight();
+            return;
+        }
+
+        if (event.key === 'Escape' && isDropdownOpen) {
+            event.preventDefault();
+            this.closeIdAutocompleteDropdown();
+            return;
+        }
+
+        if (event.key === 'Enter' && isDropdownOpen && this._idAutocompleteState.activeIndex >= 0) {
+            event.preventDefault();
+            const chosen = (this._idAutocompleteState.filteredItems || [])[this._idAutocompleteState.activeIndex];
+            if (chosen && chosen.id) {
+                inputEl.value = chosen.id;
+                this.saveFieldValue(fieldName, chosen.id);
+                if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+                    this.updateFilenamePreview();
+                }
+                this.updateOwnIdStatusHint(chosen.id, safeFieldId);
+                this.closeIdAutocompleteDropdown();
+            }
+        }
+    },
+
+    positionIdAutocompleteDropdown() {
+        const dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        const inputEl = this._idAutocompleteState.inputEl;
+        if (!dropdown || !inputEl || dropdown.style.display === 'none') return;
+
+        const rect = inputEl.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+            this.closeIdAutocompleteDropdown();
+            return;
+        }
+
+        const maxHeight = 220;
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        const containerEl = this._idAutocompleteState.containerId ? document.getElementById(this._idAutocompleteState.containerId) : null;
+        const topAnchorRect = containerEl ? containerEl.getBoundingClientRect() : rect;
+        const spaceAbove = topAnchorRect.top - 8;
+
+        dropdown.style.left = `${Math.max(8, rect.left)}px`;
+        dropdown.style.width = `${Math.max(240, rect.width)}px`;
+
+        if (spaceBelow < 100 && spaceAbove > spaceBelow) {
+            // Flip upward above the entire tags container (so pills are never covered) when at very bottom of window
+            const availHeight = Math.min(maxHeight, Math.max(100, spaceAbove - 4));
+            dropdown.style.maxHeight = `${availHeight}px`;
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = `${window.innerHeight - topAnchorRect.top + 4}px`;
+        } else {
+            const availHeight = Math.min(maxHeight, Math.max(100, spaceBelow - 4));
+            dropdown.style.maxHeight = `${availHeight}px`;
+            dropdown.style.bottom = 'auto';
+            dropdown.style.top = `${rect.bottom + 4}px`;
+        }
+    },
+
+    renderIdAutocompleteDropdown() {
+        const { inputEl, containerId, fieldName, mode } = this._idAutocompleteState;
+        if (!inputEl || !containerId) return;
+
+        let dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        if (!dropdown) {
+            dropdown = document.createElement('div');
+            dropdown.id = 'metafoldIdAutocompleteDropdown';
+            dropdown.style.cssText = `
+                position: fixed;
+                z-index: 100000;
+                background: #1e293b;
+                border: 1px solid rgba(45, 212, 191, 0.45);
+                border-radius: 7px;
+                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+                max-height: 220px;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding: 4px 0;
+                display: none;
+            `;
+            document.body.appendChild(dropdown);
+        }
+
+        const query = (inputEl.value || '').trim().toLowerCase();
+        let sourceItems = [];
+        let existingSet = new Set();
+
+        if (mode === 'tags') {
+            const knownTags = (typeof window !== 'undefined' && window.getAllKnownTags)
+                ? window.getAllKnownTags().map(t => ({ id: t, type: 'tag' }))
+                : [];
+            const dictTags = Array.isArray(this._tagDictionaryItems) ? this._tagDictionaryItems : [];
+            const combined = new Map();
+            dictTags.forEach(item => { if (item?.id) combined.set(item.id.toLowerCase(), item); });
+            knownTags.forEach(item => { if (item?.id && !combined.has(item.id.toLowerCase())) combined.set(item.id.toLowerCase(), item); });
+            sourceItems = Array.from(combined.values());
+            existingSet = new Set(this.getTagValues(containerId).map(t => String(t).toLowerCase()));
+        } else if (mode === 'own_id') {
+            const allIds = Array.isArray(this._idDictionaryItems) ? this._idDictionaryItems : [];
+            const ownIds = allIds.filter(i => i.type === 'id_anchor');
+            sourceItems = ownIds.length > 0 ? ownIds : allIds;
+        } else {
+            sourceItems = Array.isArray(this._idDictionaryItems) ? this._idDictionaryItems : [];
+            existingSet = new Set(this.getTagValues(containerId).map(t => String(t).toLowerCase()));
+        }
+
+        const filtered = sourceItems.filter(item => {
+            if (!item || !item.id) return false;
+            if (mode !== 'own_id' && existingSet.has(item.id.toLowerCase())) return false;
+            if (!query) return true;
+            return item.id.toLowerCase().includes(query) || (item.type && item.type.toLowerCase().includes(query));
+        });
+
+        this._idAutocompleteState.filteredItems = filtered;
+        if (this._idAutocompleteState.activeIndex >= filtered.length) {
+            this._idAutocompleteState.activeIndex = -1;
+        }
+
+        if (filtered.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        dropdown.innerHTML = '';
+        if (mode === 'own_id') {
+            const header = document.createElement('div');
+            header.style.cssText = 'padding: 3px 10px 4px; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid rgba(255,255,255,0.06);';
+            header.textContent = 'Existing IDs in User Index (Reference)';
+            dropdown.appendChild(header);
+        }
+
+        filtered.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = 'id-autocomplete-item';
+            row.dataset.index = String(idx);
+            const isActive = idx === this._idAutocompleteState.activeIndex;
+            row.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #e2e8f0;
+                cursor: pointer;
+                background: ${isActive ? 'rgba(45, 212, 191, 0.22)' : 'transparent'};
+                transition: background 0.1s ease;
+            `;
+
+            const idSpan = document.createElement('span');
+            idSpan.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;';
+            idSpan.textContent = item.id;
+
+            const badgeSpan = document.createElement('span');
+            badgeSpan.style.cssText = 'font-size: 10.5px; color: #2dd4bf; opacity: 0.85; flex-shrink: 0; background: rgba(13, 148, 136, 0.18); padding: 1px 6px; border-radius: 999px;';
+            if (mode === 'tags') {
+                badgeSpan.textContent = item.count > 0 ? `🏷️ Tag (${item.count})` : '🏷️ Tag';
+            } else {
+                badgeSpan.textContent = item.type === 'project' ? '📁 Project' : '🔑 Own ID';
+            }
+
+            row.appendChild(idSpan);
+            row.appendChild(badgeSpan);
+
+            row.addEventListener('mouseenter', () => {
+                this._idAutocompleteState.activeIndex = idx;
+                this._updateIdAutocompleteHighlight(false);
+            });
+
+            // Use mousedown so it fires before input blur
+            row.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (mode === 'own_id') {
+                    inputEl.value = item.id;
+                    this.saveFieldValue(fieldName, item.id);
+                    if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName)) {
+                        this.updateFilenamePreview();
+                    }
+                    const safeFieldId = containerId.replace(/_container$/, '');
+                    this.updateOwnIdStatusHint(item.id, safeFieldId);
+                } else {
+                    this.addTagToField(containerId, fieldName, item.id, inputEl, item);
+                }
+                this.closeIdAutocompleteDropdown();
+            });
+
+            dropdown.appendChild(row);
+        });
+
+        dropdown.style.display = 'block';
+        this.positionIdAutocompleteDropdown();
+
+        // Register outside-click and scroll/resize listeners once while open
+        if (!this._idAutocompleteState.outsideClickHandler) {
+            this._idAutocompleteState.outsideClickHandler = (e) => {
+                const dd = document.getElementById('metafoldIdAutocompleteDropdown');
+                const inp = this._idAutocompleteState.inputEl;
+                if (dd && dd.contains(e.target)) return;
+                if (inp && (e.target === inp || inp.contains(e.target))) return;
+                this.closeIdAutocompleteDropdown();
+            };
+            document.addEventListener('mousedown', this._idAutocompleteState.outsideClickHandler, true);
+        }
+
+        if (!this._idAutocompleteState.scrollResizeHandler) {
+            this._idAutocompleteState.scrollResizeHandler = (e) => {
+                const dd = document.getElementById('metafoldIdAutocompleteDropdown');
+                if (dd && e && e.target && (e.target === dd || dd.contains(e.target))) {
+                    return; // scrolling inside the autocomplete dropdown itself
+                }
+                this.positionIdAutocompleteDropdown();
+            };
+            window.addEventListener('resize', this._idAutocompleteState.scrollResizeHandler, true);
+            window.addEventListener('scroll', this._idAutocompleteState.scrollResizeHandler, true);
+        }
+    },
+
+    _updateIdAutocompleteHighlight(scrollIntoView = true) {
+        const dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        if (!dropdown) return;
+        const rows = dropdown.querySelectorAll('.id-autocomplete-item');
+        rows.forEach((row, i) => {
+            const isActive = i === this._idAutocompleteState.activeIndex;
+            row.style.background = isActive ? 'rgba(45, 212, 191, 0.22)' : 'transparent';
+            if (isActive && scrollIntoView && typeof row.scrollIntoView === 'function') {
+                row.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    },
+
+    closeIdAutocompleteDropdown() {
+        const dropdown = document.getElementById('metafoldIdAutocompleteDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+        if (this._idAutocompleteState.outsideClickHandler) {
+            document.removeEventListener('mousedown', this._idAutocompleteState.outsideClickHandler, true);
+            this._idAutocompleteState.outsideClickHandler = null;
+        }
+        if (this._idAutocompleteState.scrollResizeHandler) {
+            window.removeEventListener('resize', this._idAutocompleteState.scrollResizeHandler, true);
+            window.removeEventListener('scroll', this._idAutocompleteState.scrollResizeHandler, true);
+            this._idAutocompleteState.scrollResizeHandler = null;
+        }
+        this._idAutocompleteState.activeIndex = -1;
     },
 
     /**
@@ -1964,7 +3083,7 @@ const experimentForm = {
 
             // Show inline recursive option
             const recursive = confirm(
-                `Scan folder for IDs:\n"${dirPath}"\n\n` +
+                `Scan folder to index MetaFold projects (IDs & Tags):\n"${dirPath}"\n\n` +
                 `Click OK to include ALL subfolders (recursive).\n` +
                 `Click Cancel to scan only this folder.`
             );
@@ -1977,21 +3096,35 @@ const experimentForm = {
             }
 
             if (result?.success) {
-                const msg = `✅ ${result.foundCount || 0} IDs found, ${result.newCount ?? 0} new IDs imported (total: ${result.total ?? '?'})`;
+                const container = document.getElementById(containerId);
+                const mode = container?.dataset?.autocompleteMode || 'derived_from';
+                const msg = mode === 'tags'
+                    ? `✅ ${result.foundCount || 0} projects scanned, ${result.newTagsCount ?? 0} new tags (total: ${result.totalTags ?? '?'})`
+                    : `✅ ${result.foundCount || 0} projects scanned, ${result.newCount ?? 0} new IDs (total: ${result.total ?? '?'})`;
                 console.log(msg);
                 if (result.debugInfo) {
                     console.log('🔍 Scanner Debug Info:', result.debugInfo);
                 }
-                // Refresh autocomplete datalist
-                const container = document.getElementById(containerId);
-                const datalist = document.getElementById('datalist_' + containerId) || 
-                               (container ? container.parentElement.querySelector('datalist') : null);
-                if (datalist) {
-                    datalist.dataset.loaded = ''; // Reset so next focus reloads
-                    await this.loadIdAutocomplete(datalist.id);
+                // Refresh autocomplete dictionary cache
+                const datalist = document.getElementById('datalist_' + containerId) ||
+                    (container ? container.parentElement.querySelector('datalist') : null);
+                this._idDictionaryItems = null;
+                this._tagDictionaryItems = null;
+                await this.loadIdAutocomplete(datalist ? datalist.id : '', true);
+
+                if (mode === 'own_id') {
+                    const safeFieldId = containerId.replace(/_container$/, '');
+                    const inputEl = document.getElementById(safeFieldId);
+                    if (inputEl) {
+                        this.updateOwnIdStatusHint((inputEl.value || '').trim(), safeFieldId);
+                    }
                 }
+                if (window.projectScanner && typeof window.projectScanner.updateIndexBadge === 'function') {
+                    window.projectScanner.updateIndexBadge();
+                }
+
                 // Show brief feedback next to the button
-                const btn = container?.querySelector('button[title="Scan folder for IDs"]');
+                const btn = container?.querySelector('.scan-index-folder-btn');
                 if (btn) {
                     const orig = btn.textContent;
                     btn.textContent = msg;

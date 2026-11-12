@@ -16,6 +16,7 @@
     <div id="experimentTab" class="tab-content" style="display: block;">
         <div class="tabs">
             <div class="tab active" data-tab="metadata" id="tabBtnMetadata" onclick="switchModalTab('metadata')">📋 Metadata Fields</div>
+            <div class="tab" data-tab="structure" id="tabBtnStructure" onclick="switchModalTab('structure')">📁 Folder Structure</div>
             <div class="tab" data-tab="community" id="tabBtnCommunity" onclick="switchModalTab('community')">🌐 Community &amp; Sharing</div>
         </div>
 
@@ -29,93 +30,182 @@
                 </div>
             </div>
 
-            <!-- Lineage Quick-Actions -->
-            <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
-                <div style="font-size: 11px; font-weight: 600; color: #a855f7; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;">🔗 Knowledge Graph – Lineage Fields</div>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="btn btn-small" onclick="metadataEditor.addLineageIdField()" title="Creates an anchor point for the Knowledge Graph"
-                            style="background: linear-gradient(135deg, #7c3aed, #6d28d9); border-color: #7c3aed; color: white; font-size: 12px;">
-                        🔑 Add Lineage ID (Anchor)
-                    </button>
-                    <button class="btn btn-small" onclick="metadataEditor.addDerivedFromField()" title="Link this experiment to previous IDs"
-                            style="background: linear-gradient(135deg, #0d9488, #0f766e); border-color: #0d9488; color: white; font-size: 12px;">
-                        🔗 Add 'Derived From' (Link)
-                    </button>
+            <div id="metadataFields"></div>
+        </div>
+
+        <!-- Tab 2: Folder Structure & Execution Mode (Optional) -->
+        <div id="structureContent" class="tab-content">
+            <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;">
+                <div style="font-size: 13px; font-weight: 600; color: #a855f7; margin-bottom: 4px;">
+                    📁 Folder Structure &amp; Execution Mode (Optional)
                 </div>
-                <div style="font-size: 11px; color: #6b7280; margin-top: 8px; line-height: 1.5;">
-                    <strong style="color: #9ca3af;">🔑 Lineage ID:</strong> Unique ID for this record (key ends with <code style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px;">_ID</code>) &nbsp;·&nbsp;
-                    <strong style="color: #9ca3af;">🔗 Derived From:</strong> Reference IDs of parent experiments
+                <div style="font-size: 12px; color: #9ca3af; line-height: 1.4;">
+                    Configure optional subfolder hierarchies and project creation modes for this template.
                 </div>
             </div>
 
-            <div id="metadataFields"></div>
-
-            <!-- Collapsible Folder Structure Section -->
-            <details id="folderStructureDetails" style="margin-top: 20px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px 16px;">
-                <summary style="cursor: pointer; font-weight: 600; color: #e0e0e0; user-select: none; display: flex; align-items: center; gap: 8px;">
-                    <span>📁</span> Folder Structure &amp; Execution Mode (Optional)
-                </summary>
-                <div style="margin-top: 15px;">
-                    <!-- Project behavior toggles -->
-                    <div class="form-group" style="padding: 15px; background: #2d2d2d; border-radius: 8px; margin-bottom: 15px; border: 1px solid #404040;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                            <div>
-                                <strong style="display: block; margin-bottom: 4px;">Write files only (Flag-File)</strong>
-                                <span style="font-size: 0.85em; color: #9ca3af;">These files are not treated as a Project with metadata</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="templateWriteFilesOnly">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <strong style="display: block; margin-bottom: 4px;">Multiple folders (Batch mode)</strong>
-                                <span style="font-size: 0.85em; color: #9ca3af;">Select existing folders to write to (disables Project Name)</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="templateMultipleFolders">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="experimentStructure">Folder Structure (optional):</label>
-                        <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
-data/
-  raw/
-  processed/
-analysis/
+            <div class="form-group">
+                <label for="experimentStructure">Folder Structure (optional):</label>
+                <textarea id="experimentStructure" placeholder="Experiment folder structure (optional - can be left empty):
+[User Name]/
+  Raw Data/
+  Processed Data/
+[Experiment Type]/
+  analysis/
 results/
   plots/
   reports/
 README.md
 experiment_log.md"></textarea>
-                        <small style="color: #6b7280; margin-top: 5px; display: block;">
-                            💡 Tip: End lines with <code>/</code> for folders. Use 2 spaces indentation for subfolders to create hierarchy. You can use <code>[FieldName]</code> for dynamic folders (e.g., <code>[userName]/Data</code>).
-                        </small>
+                <small style="color: #6b7280; margin-top: 5px; display: block;">
+                    💡 Tip: End lines with <code>/</code> for folders. Use 2 spaces indentation for subfolders to create hierarchy. You can use <code>[Field Label]</code> or <code>[Field Key]</code> for dynamic folders (e.g., <code>[User Name]/Raw Data</code>).
+                </small>
+
+                <!-- Helper: Available Dynamic Field Labels -->
+                <div id="dynamicFolderFieldsHelper" style="margin-top: 10px; padding: 10px 14px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: inline-flex; align-items: center; gap: 5px;">
+                            <span>🏷️</span> Dynamic Folder Tags (Field Labels &amp; Keys):
+                        </span>
+                        <span style="font-size: 0.75rem; color: #9ca3af;">Click a tag to insert into structure</span>
+                    </div>
+                    <div id="dynamicFolderChipsList" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                        <!-- Injected dynamically by templateModal.updateDynamicFieldsHelper() -->
+                    </div>
+                    <div style="font-size: 0.72rem; color: #9ca3af; margin-top: 8px; line-height: 1.4;">
+                        ℹ️ Every metadata field defined in <strong>📋 Metadata Fields</strong> (by its label or key), plus standard placeholders like <code>[User Name]</code>, <code>[Project Name]</code>, and <code>[Date]</code>, can be used as dynamic folders. When a project is created, MetaFold substitutes the tag with the actual entered value (or safely skips the folder if left empty).
                     </div>
                 </div>
-            </details>
+            </div>
+
+            <!-- Project behavior toggles -->
+            <div class="form-group" style="padding: 15px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; margin-bottom: 15px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div>
+                        <strong style="display: block; margin-bottom: 4px;">Write files only (Flag-File)</strong>
+                        <span style="font-size: 0.85em; color: #9ca3af;">These files are not treated as a Project with metadata</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="templateWriteFilesOnly">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong style="display: block; margin-bottom: 4px;">Multiple folders (Batch mode)</strong>
+                        <span style="font-size: 0.85em; color: #9ca3af;">Select existing folders to write to (disables Project Name)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="templateMultipleFolders">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
         </div>
 
-        <!-- Tab 2: Community & Sharing (Optional) -->
+        <!-- Tab 3: Community & Sharing (Optional) -->
         <div id="communityContent" class="tab-content">
             <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;">
                 <div style="font-size: 13px; font-weight: 600; color: #a855f7; margin-bottom: 4px;">
                     🌐 Publishing &amp; Community Hub Metadata (Optional)
                 </div>
                 <div style="font-size: 12px; color: #9ca3af; line-height: 1.4;">
-                    Configure standardized taxonomy categories for the MetaFold Community Hub and GitHub sharing.
-                    You can pick from curated suggestions or type custom free text.
+                    Configure standardized classification and tags for the MetaFold Community Hub and GitHub sharing.
+                    Keep it simple: choose one of the four fixed categories and add flexible tags.
                 </div>
             </div>
 
-            <!-- System / Device -->
-            <div class="form-group">
-                <label for="communitySystem">System / Device:</label>
-                <input type="text" id="communitySystem" list="communitySystemList" placeholder="e.g. Microscopy (Confocal / 2-Photon) or type custom...">
+            <!-- Primary Fixed Category -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="communityCategory" style="font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">
+                    Category (Fixed):
+                </label>
+                <select id="communityCategory" style="width: 100%; padding: 8px 10px; background: #202020; color: #fff; border: 1px solid #404040; border-radius: 6px;">
+                    <option value="Systems">Systems (Laboratory systems, equipment, microscopes, software)</option>
+                    <option value="Protocols">Protocols (Individual laboratory protocols and procedures)</option>
+                    <option value="Experiments" selected>Experiments (Complete experimental setups and experiment templates)</option>
+                    <option value="Workflows">Workflows (Multi-step workflows combining processes)</option>
+                </select>
+                <small style="color: #6b7280; margin-top: 4px; display: block;">
+                    Every community template belongs to exactly one fixed category.
+                </small>
+            </div>
+
+            <!-- Community Collection -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="communityCollection" style="font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">
+                    Community Collection:
+                </label>
+                <select id="communityCollection" onchange="window.templateModal?.onCollectionChange?.(this.value)" style="width: 100%; padding: 8px 10px; background: #202020; color: #fff; border: 1px solid #404040; border-radius: 6px;">
+                    <option value="General">General (Default Collection)</option>
+                    <option value="__propose_new__">➕ Propose new collection...</option>
+                </select>
+
+                <!-- Proposed Collection Container (collapsible) -->
+                <div id="communityProposedCollectionBox" style="display: none; background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 8px; padding: 12px; margin-top: 10px;">
+                    <div style="font-size: 0.85em; color: #c084fc; font-weight: 600; margin-bottom: 6px;">
+                        💡 Propose New Collection
+                    </div>
+                    <div style="font-size: 0.78em; color: #9ca3af; line-height: 1.4; margin-bottom: 10px;">
+                        New collections are reviewed by the MetaFold maintainers before being created. Your template will initially be uploaded to General. If your collection proposal is approved, your template may subsequently be moved into its own collection.
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                        <div>
+                            <label for="communityProposedName" style="font-size: 0.8em; color: #cbd5e1; display: block; margin-bottom: 4px;">Collection Name *:</label>
+                            <input type="text" id="communityProposedName" placeholder="e.g. BioImage-Munich" style="width: 100%; font-size: 0.85em; padding: 6px 8px;">
+                        </div>
+                        <div>
+                            <label for="communityProposedLab" style="font-size: 0.8em; color: #cbd5e1; display: block; margin-bottom: 4px;">Lab / Institution (optional):</label>
+                            <input type="text" id="communityProposedLab" placeholder="e.g. University of Münster" style="width: 100%; font-size: 0.85em; padding: 6px 8px;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px;">
+                        <div>
+                            <label for="communityProposedDesc" style="font-size: 0.8em; color: #cbd5e1; display: block; margin-bottom: 4px;">Description:</label>
+                            <input type="text" id="communityProposedDesc" placeholder="Short description of this community collection" style="width: 100%; font-size: 0.85em; padding: 6px 8px;">
+                        </div>
+                        <div>
+                            <label for="communityProposedWebsite" style="font-size: 0.8em; color: #cbd5e1; display: block; margin-bottom: 4px;">Website (optional):</label>
+                            <input type="text" id="communityProposedWebsite" placeholder="https://..." style="width: 100%; font-size: 0.85em; padding: 6px 8px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tags (Dynamic searchable picker with chips) -->
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label style="font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Tags:</label>
+                <div id="communityTagsContainer"></div>
+                <!-- Hidden input for backwards compatibility -->
+                <input type="hidden" id="communityTags" value="">
+            </div>
+
+            <!-- Author & Institution Row (Clean & Consistent) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="communityAuthor" style="font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Author:</label>
+                    <input type="text" id="communityAuthor" placeholder="e.g. Dr. Thomas Zobel" style="width: 100%; padding: 8px 10px; background: #202020; color: #fff; border: 1px solid #404040; border-radius: 6px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="communityInstitution" style="font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Institution / Lab:</label>
+                    <input type="text" id="communityInstitution" placeholder="e.g. University of Münster" style="width: 100%; padding: 8px 10px; background: #202020; color: #fff; border: 1px solid #404040; border-radius: 6px;">
+                </div>
+            </div>
+
+            <!-- Hidden compatibility container for legacy tests/readers -->
+            <div style="display: none;" aria-hidden="true">
+                <input type="text" id="communityOrcid" value="">
+                <input type="text" id="communityVersion" value="1.0.0">
+                <input type="text" id="communityLicense" list="communityLicenseList" value="CC-BY-4.0">
+                <datalist id="communityLicenseList">
+                    <option value="CC0-1.0">
+                    <option value="CC-BY-4.0">
+                    <option value="CC-BY-SA-4.0">
+                    <option value="MIT">
+                    <option value="Apache-2.0">
+                    <option value="Other">
+                </datalist>
+                <input type="text" id="communitySystem" list="communitySystemList">
                 <datalist id="communitySystemList">
                     <option value="Microscopy (Light / Widefield)">
                     <option value="Microscopy (Confocal / 2-Photon)">
@@ -136,12 +226,7 @@ experiment_log.md"></textarea>
                     <option value="Data Analysis / Bioimage Analysis">
                     <option value="Hardware / 3D Printing / Prototyping">
                 </datalist>
-            </div>
-
-            <!-- Discipline / Domain -->
-            <div class="form-group">
-                <label for="communityDiscipline">Discipline / Domain:</label>
-                <input type="text" id="communityDiscipline" list="communityDisciplineList" placeholder="e.g. Plant Biology / Botany or type custom...">
+                <input type="text" id="communityDiscipline" list="communityDisciplineList">
                 <datalist id="communityDisciplineList">
                     <option value="Plant Biology / Botany">
                     <option value="Cell Biology">
@@ -159,12 +244,7 @@ experiment_log.md"></textarea>
                     <option value="Chemistry & Synthesis">
                     <option value="Computer Science & Data Engineering">
                 </datalist>
-            </div>
-
-            <!-- Biological System / Model -->
-            <div class="form-group">
-                <label for="communityOrganism">Biological System / Specimen:</label>
-                <input type="text" id="communityOrganism" list="communityOrganismList" placeholder="e.g. Arabidopsis thaliana or type custom...">
+                <input type="text" id="communityOrganism" list="communityOrganismList">
                 <datalist id="communityOrganismList">
                     <option value="Arabidopsis thaliana">
                     <option value="Danio rerio">
@@ -179,51 +259,6 @@ experiment_log.md"></textarea>
                     <option value="Organoids / 3D Tissues">
                     <option value="Non-biological / In vitro / Synthetic">
                 </datalist>
-            </div>
-
-            <!-- Tags -->
-            <div class="form-group">
-                <label for="communityTags">Tags (comma-separated):</label>
-                <input type="text" id="communityTags" placeholder="e.g. Confocal, Live-cell, GFP, Time-Lapse, Root Growth">
-                <small style="color: #6b7280; margin-top: 4px; display: block;">
-                    Free-form keywords separated by commas for searching in the Community Hub.
-                </small>
-            </div>
-
-            <!-- Author & Institution Row -->
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <div style="flex: 1;">
-                    <label for="communityAuthor" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Author:</label>
-                    <input type="text" id="communityAuthor" placeholder="e.g. Dr. Thomas Zobel" style="width: 100%;">
-                </div>
-                <div style="flex: 1;">
-                    <label for="communityInstitution" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Institution / Lab:</label>
-                    <input type="text" id="communityInstitution" placeholder="e.g. University of Münster" style="width: 100%;">
-                </div>
-            </div>
-
-            <!-- ORCID, Version, License Row -->
-            <div style="display: flex; gap: 15px;">
-                <div style="flex: 1;">
-                    <label for="communityOrcid" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">ORCID (optional):</label>
-                    <input type="text" id="communityOrcid" placeholder="0000-0002-XXXX-XXXX" style="width: 100%;">
-                </div>
-                <div style="flex: 0.8;">
-                    <label for="communityVersion" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">Version:</label>
-                    <input type="text" id="communityVersion" placeholder="1.0.0" value="1.0.0" style="width: 100%;">
-                </div>
-                <div style="flex: 1.2;">
-                    <label for="communityLicense" style="display: block; margin-bottom: 8px; color: #a855f7; font-weight: 600;">License:</label>
-                    <input type="text" id="communityLicense" list="communityLicenseList" placeholder="CC-BY-4.0" value="CC-BY-4.0" style="width: 100%;">
-                    <datalist id="communityLicenseList">
-                        <option value="CC0-1.0">
-                        <option value="CC-BY-4.0">
-                        <option value="CC-BY-SA-4.0">
-                        <option value="MIT">
-                        <option value="Apache-2.0">
-                        <option value="Other">
-                    </datalist>
-                </div>
             </div>
         </div>
     </div>

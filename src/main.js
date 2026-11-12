@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, shell, safeStorage, Menu, clipboard } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
+const zlib = require('zlib');
 const OMEROProxyServer = require('./js/proxyManager.js');
 
 let mainWindow;
@@ -972,93 +973,143 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
         // ✅ FIX: Metadaten-JSON erstellen mit korrektem Dateinamen UND projectName
         if (metadata && Object.keys(metadata).length > 0) {
-            const metadataFilename = `${projectName}-metadata.json`;
-            const metadataPath = path.join(projectPath, metadataFilename);
+            let metadataFilename = `${projectName}-metadata.json`;
+            let metadataPath = path.join(projectPath, metadataFilename);
             
             let enhancedMetadata = { ...metadata, projectName: projectName };
             let isExtending = false;
 
             if (options.extend) {
                 try {
-                    const existingContent = await fs.readFile(metadataPath, 'utf8');
+                    let actualMetadataPath = metadataPath;
+                    let existingContent = null;
+                    try {
+                        existingContent = await fs.readFile(actualMetadataPath, 'utf8');
+                    } catch (_) {
+                        // Fallback: look for any *-metadata.json in projectPath
+                        const entries = await fs.readdir(projectPath);
+                        const metaFile = entries.find(f => f.endsWith('-metadata.json') && !f.startsWith('.'));
+                        if (metaFile) {
+                            actualMetadataPath = path.join(projectPath, metaFile);
+                            metadataPath = actualMetadataPath;
+                            metadataFilename = metaFile;
+                            existingContent = await fs.readFile(actualMetadataPath, 'utf8');
+                        }
+                    }
+
+                    if (!existingContent) {
+                        throw new Error(`No existing metadata file found at ${actualMetadataPath}`);
+                    }
+
                     const existingMetadata = JSON.parse(existingContent);
                     const currentUser = options.userInfo?.username || 'Unknown';
                     const currentDate = new Date().toISOString();
 
                     // Track updates and intelligently merge fields
                     const mergedMetadata = { ...existingMetadata };
-                    
-                    Object.keys(enhancedMetadata).forEach(key => {
-                        if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key.startsWith('System.')) return;
-                        
-                        const newField = enhancedMetadata[key];
-                        const oldField = existingMetadata[key];
-                        
-                        // Check if newField has a meaningful value
-                        const hasNewValue = newField && typeof newField === 'object' && 
-                                            newField.value !== undefined && newField.value !== null && 
-                                            (Array.isArray(newField.value) ? newField.value.length > 0 : newField.value !== '');
-                        
-                        if (!hasNewValue) {
-                            // If user left this field blank, keep the old one
-                            return; 
+                    const hasExtraFields = existingMetadata.extra_fields && typeof existingMetadata.extra_fields === 'object';
+                    const hasMetadataWrapper = existingMetadata.metadata && typeof existingMetadata.metadata === 'object';
+
+                    if (hasExtraFields) {
+                        mergedMetadata.extra_fields = { ...existingMetadata.extra_fields };
+                    }
+                    if (hasMetadataWrapper) {
+                        mergedMetadata.metadata = { ...existingMetadata.metadata };
+                    }
+
+                    // Helper to merge a single field or nested group
+                    const mergeField = (targetContainer, key, newField, oldFieldTarget = null) => {
+                        if (!newField || typeof newField !== 'object') return;
+
+                        // Check if group (object of fields without own .value)
+                        const isGroup = !('value' in newField) && Object.values(newField).some(v => v && typeof v === 'object' && 'value' in v);
+                        if (isGroup) {
+                            if (!targetContainer[key] || typeof targetContainer[key] !== 'object') {
+                                targetContainer[key] = {};
+                            }
+                            const oldGroup = (oldFieldTarget && oldFieldTarget[key] && typeof oldFieldTarget[key] === 'object') ? oldFieldTarget[key] : {};
+                            for (const [subKey, subField] of Object.entries(newField)) {
+                                mergeField(targetContainer[key], subKey, subField, oldGroup);
+                            }
+                            return;
                         }
-                        
+
+                        // Check if newField has a meaningful value
+                        const hasNewValue = newField.value !== undefined && newField.value !== null &&
+                                            (Array.isArray(newField.value) ? newField.value.length > 0 : newField.value !== '');
+                        if (!hasNewValue) {
+                            return; // Keep existing value if user left new field empty
+                        }
+
+                        const oldField = (oldFieldTarget && oldFieldTarget[key]) || targetContainer[key];
                         let isUpdated = false;
                         let isModified = false;
                         let mergedValue = newField.value;
-                        
+
                         if (!oldField) {
                             isUpdated = true;
-                            mergedMetadata[key] = { ...newField };
+                            targetContainer[key] = { ...newField };
                         } else {
-                            // Both exist, and new has value
                             const oldValue = oldField.value;
-                            
-                            // Array merge
                             if (Array.isArray(oldValue)) {
                                 const newArray = Array.isArray(mergedValue) ? mergedValue : [mergedValue];
                                 const mergedArray = [...new Set([...oldValue, ...newArray])];
-                                
-                                // Check if array changed
                                 if (mergedArray.length !== oldValue.length || !mergedArray.every(v => oldValue.includes(v))) {
                                     isUpdated = true;
                                     isModified = true;
                                     mergedValue = mergedArray;
                                 }
                             } else {
-                                // String/Primitive merge (overwrite)
                                 if (mergedValue !== oldValue) {
                                     isUpdated = true;
                                     isModified = true;
                                 }
                             }
-                            
                             if (isUpdated) {
-                                mergedMetadata[key] = { 
-                                    ...oldField, 
-                                    ...newField, 
-                                    value: mergedValue 
+                                targetContainer[key] = {
+                                    ...oldField,
+                                    ...newField,
+                                    value: mergedValue
                                 };
                             }
                         }
-                        
+
                         if (isUpdated) {
-                            mergedMetadata[key].lastUpdatedBy = currentUser;
-                            mergedMetadata[key].lastUpdatedAt = currentDate;
+                            targetContainer[key].lastUpdatedBy = currentUser;
+                            targetContainer[key].lastUpdatedAt = currentDate;
                             if (isModified) {
-                                mergedMetadata[key].isModified = true;
+                                targetContainer[key].isModified = true;
                             }
                             if (options.templateName) {
-                                mergedMetadata[key].templateName = options.templateName;
+                                targetContainer[key].templateName = options.templateName;
                             }
                         }
+                    };
+
+                    // Merge all incoming enhancedMetadata keys
+                    Object.keys(enhancedMetadata).forEach(key => {
+                        if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key.startsWith('System.')) return;
+
+                        const newField = enhancedMetadata[key];
+
+                        // 1. Merge into extra_fields if present
+                        if (hasExtraFields) {
+                            mergeField(mergedMetadata.extra_fields, key, newField, existingMetadata.extra_fields);
+                        }
+
+                        // 2. Merge into metadata wrapper if present
+                        if (hasMetadataWrapper) {
+                            mergeField(mergedMetadata.metadata, key, newField, existingMetadata.metadata);
+                        }
+
+                        // 3. Always merge into root level of mergedMetadata
+                        mergeField(mergedMetadata, key, newField, existingMetadata);
                     });
 
                     // Keep system keys updated
                     if (enhancedMetadata.provenance) mergedMetadata.provenance = enhancedMetadata.provenance;
                     if (enhancedMetadata.projectName) mergedMetadata.projectName = enhancedMetadata.projectName;
-                    
+
                     enhancedMetadata = mergedMetadata;
                     // Preserve original project ID if it exists
                     if (existingMetadata.metafold_project_id) {
@@ -1140,10 +1191,19 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
             // Erstelle README.html mit enhanced Metadaten
             const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName);
-            const readmeFilename = `${projectName}-README.html`;
+            const existingReadme = await findReadmeFile(projectPath);
+            const readmeFilename = existingReadme || `${projectName}-README.html`;
             const readmePath = path.join(projectPath, readmeFilename);
             await fs.writeFile(readmePath, readmeHtml, 'utf8');
-            console.log(`✅ README file created: ${readmeFilename}`);
+            console.log(`✅ README file ${isExtending ? 'updated' : 'created'}: ${readmeFilename}`);
+
+            // Update user_index.json so Scan & Search immediately sees the new/extended project
+            try {
+                await upsertSingleProjectInUserIndex(projectPath, basePath, options.userInfo);
+                console.log(`✅ Project indexed in user_index.json: ${projectPath}`);
+            } catch (indexErr) {
+                console.warn('⚠️ Could not update user_index.json for project:', indexErr.message);
+            }
         }
 
         // Adjust success message based on created content
@@ -2158,6 +2218,156 @@ ipcMain.handle('get-metafold-directory', async (event) => {
     }
 });
 
+// =================== LIVING USER INDEX APIS ===================
+
+ipcMain.handle('load-user-index', async (event, userInfo = null) => {
+    try {
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const indexPath = path.join(templatesDir, 'user_index.json');
+        try {
+            const content = await fs.readFile(indexPath, 'utf8');
+            const data = JSON.parse(content);
+            const projects = Array.isArray(data) ? data : (data.projects || []);
+            return {
+                success: true,
+                projects,
+                indexPath,
+                count: projects.length
+            };
+        } catch (readErr) {
+            // Index file does not exist yet: return empty list cleanly
+            return {
+                success: true,
+                projects: [],
+                indexPath,
+                count: 0
+            };
+        }
+    } catch (error) {
+        console.warn('⚠️ load-user-index warning:', error.message);
+        return {
+            success: true,
+            projects: [],
+            count: 0
+        };
+    }
+});
+
+ipcMain.handle('clear-user-index', async (event, userInfo = null) => {
+    try {
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const indexPath = path.join(templatesDir, 'user_index.json');
+        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: [] }, null, 2), 'utf8');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('merge-projects-into-user-index', async (event, newProjects, basePath = null, userInfo = null) => {
+    try {
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const indexPath = path.join(templatesDir, 'user_index.json');
+        let existing = [];
+        try {
+            const content = await fs.readFile(indexPath, 'utf8');
+            const data = JSON.parse(content);
+            existing = Array.isArray(data) ? data : (data.projects || []);
+        } catch (_) {}
+
+        const pathMap = new Map();
+        for (const p of existing) {
+            if (p && p.path) pathMap.set(path.resolve(p.path).toLowerCase(), p);
+        }
+        for (const p of (newProjects || [])) {
+            if (p && p.path) pathMap.set(path.resolve(p.path).toLowerCase(), p);
+        }
+
+        const merged = Array.from(pathMap.values());
+        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: merged }, null, 2), 'utf8');
+        return { success: true, count: merged.length };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('remove-from-user-index', async (event, projectPath, userInfo = null) => {
+    try {
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const indexPath = path.join(templatesDir, 'user_index.json');
+        const content = await fs.readFile(indexPath, 'utf8');
+        const data = JSON.parse(content);
+        let projects = Array.isArray(data) ? data : (data.projects || []);
+        const targetResolved = path.resolve(projectPath).toLowerCase();
+        projects = projects.filter(p => path.resolve(p.path).toLowerCase() !== targetResolved);
+        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects }, null, 2), 'utf8');
+        return { success: true, count: projects.length };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// =================== PROJECT METADATA UPDATE & UPSERT APIS ===================
+
+async function upsertSingleProjectInUserIndex(projectPath, basePath = null, userInfo = null) {
+    try {
+        const templatesDir = await ensureTemplatesDirectory(userInfo);
+        const indexPath = path.join(templatesDir, 'user_index.json');
+        let existing = [];
+        try {
+            const content = await fs.readFile(indexPath, 'utf8');
+            const data = JSON.parse(content);
+            existing = Array.isArray(data) ? data : (data.projects || []);
+        } catch (_) {}
+
+        // Find metadata file
+        const normPath = path.resolve(projectPath);
+        const entries = await fs.readdir(normPath, { withFileTypes: true });
+        let metadataFile = entries.find(e => e.isFile() && e.name.endsWith('-metadata.json') && !e.name.startsWith('.'));
+        if (!metadataFile) {
+            metadataFile = entries.find(e => e.isFile() && e.name === 'ReadyToImport.json');
+        }
+        if (!metadataFile) return { success: false, message: 'No metadata file found' };
+
+        const project = await parseMetaFoldProject(normPath, metadataFile.name);
+        if (!project) return { success: false, message: 'Could not parse project' };
+        project.hasMetadata = true;
+
+        const pathMap = new Map();
+        for (const p of existing) {
+            if (p && p.path) pathMap.set(path.resolve(p.path).toLowerCase(), p);
+        }
+        pathMap.set(path.resolve(project.path).toLowerCase(), project);
+
+        const merged = Array.from(pathMap.values());
+        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: merged }, null, 2), 'utf8');
+        return { success: true, project };
+    } catch (err) {
+        console.warn('⚠️ upsertSingleProjectInUserIndex error:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+ipcMain.handle('upsert-user-index-project', async (event, projectPath, basePath = null, userInfo = null) => {
+    return await upsertSingleProjectInUserIndex(projectPath, basePath, userInfo);
+});
+
+// Update project metadata, notes, changelog, history, README & user index
+const { createProjectMetadataStore } = require('./js/main/projectMetadataStore.js');
+const projectMetadataStore = createProjectMetadataStore({
+    generateReadmeHtmlWithMetadata,
+    upsertSingleProjectInUserIndex
+});
+
+ipcMain.handle('update-project-metadata', async (event, projectPath, patch, options = {}) => {
+    try {
+        return await projectMetadataStore.updateProjectMetadata(projectPath, patch, options);
+    } catch (error) {
+        console.error('❌ Error in update-project-metadata handler:', error);
+        return { success: false, message: error.message };
+    }
+});
+
 // Export templates to location - ERWEITERT um defaultPath Support
 ipcMain.handle('export-templates-to-location', async (event, templates, exportType = 'single', defaultPath = null) => {
     try {
@@ -2219,6 +2429,156 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
             error: error.message,
             message: `Export failed: ${error.message}`
         };
+    }
+});
+
+// =================== ZIP PACKAGING & BUNDLE HELPERS ===================
+function makeZipCrcTable() {
+    let c;
+    const table = [];
+    for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+            c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        table[n] = c >>> 0;
+    }
+    return table;
+}
+const zipCrcTable = makeZipCrcTable();
+function computeZipCrc32(buf) {
+    let crc = -1;
+    for (let i = 0; i < buf.length; i++) {
+        crc = (crc >>> 8) ^ zipCrcTable[(crc ^ buf[i]) & 0xFF];
+    }
+    return (crc ^ -1) >>> 0;
+}
+
+function createZipBuffer(files) {
+    const localHeaders = [];
+    const cdHeaders = [];
+    let offset = 0;
+    const now = new Date();
+    const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (Math.floor(now.getSeconds() / 2))) & 0xFFFF;
+    const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+    for (const f of files) {
+        const rawData = Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data, 'utf8');
+        const compressed = zlib.deflateRawSync(rawData);
+        const crc = computeZipCrc32(rawData);
+        const nameBuf = Buffer.from(f.path.replace(/\\/g, '/'), 'utf8');
+
+        // Local header (30 bytes)
+        const lfh = Buffer.alloc(30 + nameBuf.length);
+        lfh.writeUInt32LE(0x04034b50, 0);
+        lfh.writeUInt16LE(20, 4);
+        lfh.writeUInt16LE(0, 6);
+        lfh.writeUInt16LE(8, 8); // deflate
+        lfh.writeUInt16LE(dosTime, 10);
+        lfh.writeUInt16LE(dosDate, 12);
+        lfh.writeUInt32LE(crc, 14);
+        lfh.writeUInt32LE(compressed.length, 18);
+        lfh.writeUInt32LE(rawData.length, 22);
+        lfh.writeUInt16LE(nameBuf.length, 26);
+        lfh.writeUInt16LE(0, 28);
+        nameBuf.copy(lfh, 30);
+
+        localHeaders.push(lfh, compressed);
+
+        // Central Directory header (46 bytes)
+        const cdh = Buffer.alloc(46 + nameBuf.length);
+        cdh.writeUInt32LE(0x02014b50, 0);
+        cdh.writeUInt16LE(20, 4);
+        cdh.writeUInt16LE(20, 6);
+        cdh.writeUInt16LE(0, 8);
+        cdh.writeUInt16LE(8, 10);
+        cdh.writeUInt16LE(dosTime, 12);
+        cdh.writeUInt16LE(dosDate, 14);
+        cdh.writeUInt32LE(crc, 16);
+        cdh.writeUInt32LE(compressed.length, 20);
+        cdh.writeUInt32LE(rawData.length, 24);
+        cdh.writeUInt16LE(nameBuf.length, 28);
+        cdh.writeUInt16LE(0, 30);
+        cdh.writeUInt16LE(0, 32);
+        cdh.writeUInt16LE(0, 34);
+        cdh.writeUInt16LE(0, 36);
+        cdh.writeUInt32LE(0, 38);
+        cdh.writeUInt32LE(offset, 42);
+        nameBuf.copy(cdh, 46);
+
+        cdHeaders.push(cdh);
+        offset += lfh.length + compressed.length;
+    }
+
+    const cdOffset = offset;
+    let cdSize = 0;
+    for (const h of cdHeaders) cdSize += h.length;
+
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(0, 4);
+    eocd.writeUInt16LE(0, 6);
+    eocd.writeUInt16LE(files.length, 8);
+    eocd.writeUInt16LE(files.length, 10);
+    eocd.writeUInt32LE(cdSize, 12);
+    eocd.writeUInt32LE(cdOffset, 16);
+    eocd.writeUInt16LE(0, 20);
+
+    return Buffer.concat([...localHeaders, ...cdHeaders, eocd]);
+}
+
+function readZipBuffer(zipBuf) {
+    const files = [];
+    let offset = 0;
+    while (offset < zipBuf.length - 30) {
+        const sig = zipBuf.readUInt32LE(offset);
+        if (sig === 0x04034b50) {
+            const compression = zipBuf.readUInt16LE(offset + 8);
+            const compSize = zipBuf.readUInt32LE(offset + 18);
+            const uncompSize = zipBuf.readUInt32LE(offset + 22);
+            const nameLen = zipBuf.readUInt16LE(offset + 26);
+            const extraLen = zipBuf.readUInt16LE(offset + 28);
+            const fileName = zipBuf.toString('utf8', offset + 30, offset + 30 + nameLen);
+            const dataStart = offset + 30 + nameLen + extraLen;
+            const compData = zipBuf.subarray(dataStart, dataStart + compSize);
+            let uncompData;
+            if (compression === 0) {
+                uncompData = compData;
+            } else if (compression === 8) {
+                uncompData = zlib.inflateRawSync(compData);
+            } else {
+                uncompData = compData;
+            }
+            files.push({ path: fileName, content: uncompData.toString('utf8') });
+            offset = dataStart + compSize;
+        } else {
+            break;
+        }
+    }
+    return files;
+}
+
+// Write ZIP file bundle
+ipcMain.handle('write-zip-file', async (event, filePath, files) => {
+    try {
+        const zipBuf = createZipBuffer(files);
+        await fs.writeFile(filePath, zipBuf);
+        return { success: true, filePath };
+    } catch (error) {
+        console.error('❌ Failed to write ZIP file:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Read ZIP file bundle
+ipcMain.handle('read-zip-file', async (event, filePath) => {
+    try {
+        const zipBuf = await fs.readFile(filePath);
+        const files = readZipBuffer(zipBuf);
+        return { success: true, files };
+    } catch (error) {
+        console.error('❌ Failed to read ZIP file:', error);
+        return { success: false, error: error.message };
     }
 });
 
@@ -2813,14 +3173,64 @@ ipcMain.handle('load-id-dictionary', async (event, userInfo) => {
     try {
         const fsSync = require('fs');
         const filePath = getUserIdRegistryPath(userInfo);
+        let ids = [];
         if (fsSync.existsSync(filePath)) {
             const data = fsSync.readFileSync(filePath, 'utf8');
-            return { success: true, ids: JSON.parse(data) };
+            ids = JSON.parse(data);
         }
-        return { success: true, ids: [] };
+
+        // Also harvest tags from user_index.json
+        const tagsSet = new Set();
+        const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
+        try {
+            const templatesDir = getTemplatesDirectory(userInfo);
+            const userIndexPath = path.join(templatesDir, 'user_index.json');
+            if (fsSync.existsSync(userIndexPath)) {
+                const uIndex = JSON.parse(fsSync.readFileSync(userIndexPath, 'utf8'));
+                if (Array.isArray(uIndex.customTags)) {
+                    uIndex.customTags.forEach(t => {
+                        if (t && typeof t === 'string' && t !== '[object Object]') tagsSet.add(t.trim());
+                    });
+                }
+                const projs = Array.isArray(uIndex) ? uIndex : (uIndex.projects || []);
+                projs.forEach(p => {
+                    const harvestFromObj = (o) => {
+                        if (!o || typeof o !== 'object') return;
+                        for (const [k, v] of Object.entries(o)) {
+                            if (tagKeyRegex.test(k) || (v && v.type === 'tags')) {
+                                if (Array.isArray(v)) {
+                                    v.forEach(x => { if (typeof x === 'string' && x !== '[object Object]') tagsSet.add(x.trim()); });
+                                } else if (v && typeof v === 'object' && v.value) {
+                                    if (Array.isArray(v.value)) {
+                                        v.value.forEach(x => { if (typeof x === 'string' && x !== '[object Object]') tagsSet.add(x.trim()); });
+                                    } else if (typeof v.value === 'string' && v.value !== '[object Object]') {
+                                        v.value.split(',').forEach(x => tagsSet.add(x.trim()));
+                                    }
+                                } else if (typeof v === 'string' && v !== '[object Object]') {
+                                    v.split(',').forEach(x => tagsSet.add(x.trim()));
+                                }
+                            }
+                            if (typeof v === 'object' && v !== null && !Array.isArray(v) && !v.value) {
+                                harvestFromObj(v);
+                            }
+                        }
+                    };
+                    harvestFromObj(p.metadata);
+                    if (p.tags) {
+                        if (Array.isArray(p.tags)) p.tags.forEach(x => { if (typeof x === 'string' && x !== '[object Object]') tagsSet.add(x.trim()); });
+                        else if (typeof p.tags === 'string' && p.tags !== '[object Object]') p.tags.split(',').forEach(x => tagsSet.add(x.trim()));
+                    }
+                });
+            }
+        } catch (tErr) {
+            console.warn('⚠️ Could not harvest tags from user_index in load-id-dictionary:', tErr.message);
+        }
+
+        const tagsList = Array.from(tagsSet).filter(Boolean).sort().map(t => ({ id: t, type: 'tag' }));
+        return { success: true, ids, tags: tagsList };
     } catch (err) {
         console.error('Error loading ID dictionary:', err);
-        return { success: false, ids: [], error: err.message };
+        return { success: false, ids: [], tags: [], error: err.message };
     }
 });
 
@@ -4095,7 +4505,7 @@ function logProxyActivity(activity, details = {}) {
 }
 
 // Generate HTML README with metadata info instead of Markdown
-function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null) {
+function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null, options = {}) {
     const currentDate = new Date();
     const formattedDate = currentDate.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -4698,6 +5108,15 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
     </body>
     </html>`;
 
+    if (options && options.integrationLinks) {
+        try {
+            const integrationLinksModule = require('./js/main/integrationLinks.js');
+            htmlContent = integrationLinksModule.replaceIntegrationLinksInHtml(htmlContent, options.integrationLinks);
+        } catch (e) {
+            console.warn('⚠️ Error applying integrationLinks in generateReadmeHtmlWithMetadata:', e.message);
+        }
+    }
+
     return htmlContent;
 }
 
@@ -5010,16 +5429,38 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         // Extract project name from directory path
         const projectName = path.basename(projectPath);
 
-        // Extract metadata: support both old 'extra_fields' format and new flat format
-        const projectMetadata = metadata.extra_fields ? metadata.extra_fields : metadata;
+        // Extract metadata: support flat format, 'extra_fields' (elabFTW) format, and 'metadata' wrapper format.
+        // Safely combine all field containers so extended projects show all fields in Scan & Search.
+        let projectMetadata = {};
+        if (metadata.extra_fields && typeof metadata.extra_fields === 'object') {
+            Object.assign(projectMetadata, metadata.extra_fields);
+        }
+        if (metadata.metadata && typeof metadata.metadata === 'object') {
+            Object.assign(projectMetadata, metadata.metadata);
+        }
+        for (const [k, v] of Object.entries(metadata)) {
+            if (k !== 'extra_fields' && k !== 'metadata' && k !== 'elabftw' && typeof v === 'object' && v !== null) {
+                if (!projectMetadata[k]) {
+                    projectMetadata[k] = v;
+                } else if (v.value !== undefined && v.value !== null && v.value !== '') {
+                    const existingVal = projectMetadata[k]?.value;
+                    if (existingVal === undefined || existingVal === null || existingVal === '') {
+                        projectMetadata[k] = v;
+                    }
+                }
+            }
+        }
+        if (Object.keys(projectMetadata).length === 0) {
+            projectMetadata = { ...metadata };
+        }
         
         // Create a clean copy without internal system fields
         const cleanMetadata = { ...projectMetadata };
         // Extract integrations safely before deletion
-        const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || null;
+        const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || metadata.metafold_integration?.external_links || metadata.integrations || null;
         
         // Extract template category before deletion (for ISA / facet search)
-        const templateCategory = cleanMetadata.templateInfo?.category || null;
+        const templateCategory = cleanMetadata.templateInfo?.category || metadata.templateInfo?.category || null;
 
         // Extract stable project UUID before deletion (provenance anchor for the
         // File Sidecar Scanner; may be null for projects created before this field
@@ -5034,6 +5475,9 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         delete cleanMetadata.metafold_integration;
         delete cleanMetadata.integrations;
         delete cleanMetadata.metafold_project_id;
+        delete cleanMetadata.extra_fields;
+        delete cleanMetadata.metadata;
+        delete cleanMetadata.elabftw;
 
         // Add template category as system field if available
         if (templateCategory) {

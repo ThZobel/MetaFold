@@ -22,10 +22,27 @@ const userManagementModal = {
     /**
      * Show user management modal (main entry point)
      */
-    async show() {
-        console.log('👥 Opening user management modal');
+    async show(options = {}) {
+        console.log('👥 Opening user management modal', options);
+        if (options.initialTab) {
+            this.activeTab = options.initialTab;
+        }
         this.createModal();
         this.renderActiveTab();
+
+        if (options.openAddUser) {
+            setTimeout(() => {
+                this.toggleAddUserForm(true);
+                if (options.initialUsername) {
+                    const input = document.getElementById('newUserName');
+                    if (input) {
+                        input.value = options.initialUsername;
+                        const firstNameInput = document.getElementById('newUserFirstName');
+                        if (firstNameInput) firstNameInput.focus();
+                    }
+                }
+            }, 60);
+        }
     },
 
     // =================== UI CREATION ===================
@@ -77,8 +94,8 @@ const userManagementModal = {
                             <button onclick="userManagementModal.importProfiles()" class="btn btn-secondary btn-small">
                                 📥 Import
                             </button>
-                            <button onclick="userManagementModal.exportProfiles()" class="btn btn-secondary btn-small">
-                                📤 Export
+                            <button onclick="userManagementModal.openExportModal()" class="btn btn-secondary btn-small">
+                                📤 Export...
                             </button>
                         </div>
                         <button onclick="userManagementModal.close()" class="btn btn-secondary" style="padding: 0.75rem 2rem;">Close</button>
@@ -128,35 +145,23 @@ const userManagementModal = {
         const isAdmin = currentUser === 'Admin';
 
         container.innerHTML = `
-            <!-- Password Management Section -->
-            <div class="user-modal-section password-section">
-                <h3 class="section-title">🔑 Password Management</h3>
-                <p class="section-description">
-                    ${isAdmin ? 'As Admin, you can set/reset passwords for any user. Leave empty to remove password.' : 'You can change your own password below. Leave empty to remove password.'}
-                </p>
-                <div class="${isAdmin ? 'password-grid' : 'password-grid single-col'}">
-                    ${isAdmin ? `
-                        <div class="form-group">
-                            <label class="form-label">User:</label>
-                            <select id="passwordUser" class="form-select">
-                                <option value="">Select user...</option>
-                            </select>
-                        </div>
-                    ` : ''}
-                    <div class="form-group">
-                        <label class="form-label">
-                            New Password/PIN: 
-                            <span style="color: #9ca3af; font-weight: normal; font-size: 0.8rem;">(empty = no password)</span>
-                        </label>
-                        <input type="password" id="newPassword" placeholder="4+ chars or leave empty" class="form-input">
-                    </div>
-                    <button onclick="userManagementModal.setPassword()" class="btn btn-warning">🔑 Set/Clear</button>
+            <!-- Header with Title & Add User Toggle Button -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <h3 class="section-title" style="margin: 0;">📋 Existing Users</h3>
+                    <span id="userCountBadge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600;">0</span>
                 </div>
+                <button type="button" id="toggleAddUserBtn" onclick="userManagementModal.toggleAddUserForm()" class="btn btn-success btn-small" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>➕</span> Add New User
+                </button>
             </div>
-            
-            <!-- Add User Section -->
-            <div class="user-modal-section add-user-section">
-                <h3 class="section-title">➕ Add New User</h3>
+
+            <!-- Add User Section (Initially Hidden) -->
+            <div id="addUserSection" class="user-modal-section add-user-section" style="display: none; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <h3 class="section-title" style="margin: 0; font-size: 1.05rem;">➕ Add New User</h3>
+                    <button type="button" class="user-modal-close" style="font-size: 1.2rem; padding: 2px 6px;" onclick="userManagementModal.toggleAddUserForm(false)">×</button>
+                </div>
                 <div class="ugm-form-grid-2col">
                     <div class="form-group">
                         <label class="form-label">Username (Login): <span class="required-star">*</span></label>
@@ -197,13 +202,17 @@ const userManagementModal = {
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center;">
                     <button onclick="userManagementModal.addUser()" class="btn btn-success">➕ Add User</button>
-                    <small class="section-description" style="margin: 0;">Only name is required. All other fields are optional.</small>
+                    <button type="button" onclick="userManagementModal.toggleAddUserForm(false)" class="btn btn-secondary">Cancel</button>
+                    <small class="section-description" style="margin: 0; margin-left: 0.5rem;">Only username is required. All other fields are optional.</small>
                 </div>
             </div>
-            
+
             <!-- Edit User Section (Initially Hidden) -->
-            <div id="editUserSection" class="user-modal-section edit-user-section">
-                <h3 class="section-title" style="color: #f59e0b;">✏️ Edit User</h3>
+            <div id="editUserSection" class="user-modal-section edit-user-section" style="display: none; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <h3 class="section-title" style="margin: 0; color: #f59e0b; font-size: 1.05rem;">✏️ Edit User</h3>
+                    <button type="button" class="user-modal-close" style="font-size: 1.2rem; padding: 2px 6px;" onclick="userManagementModal.cancelUserEdit()">×</button>
+                </div>
                 <div class="ugm-form-grid-2col">
                     <div class="form-group">
                         <label class="form-label">Username:</label>
@@ -241,18 +250,41 @@ const userManagementModal = {
                         <label class="form-label">Role:</label>
                         ${this._buildRoleHybridSelect('editUserRole', true)}
                     </div>
+
+                    <!-- Password Management Sub-Section (Integrated into Edit User) -->
+                    <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-weight: 600; font-size: 0.95rem; color: #f59e0b;">🔑 Password</span>
+                                <span id="editUserPasswordStatus" style="font-size: 0.8rem; color: #9ca3af;"></span>
+                            </div>
+                            <button type="button" id="toggleEditPasswordBtn" class="btn btn-warning btn-small" onclick="userManagementModal.toggleEditPasswordForm()">
+                                🔑 Edit Password
+                            </button>
+                        </div>
+                        <div id="editUserPasswordContainer" style="display: none; margin-top: 0.75rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 12px;">
+                            <p class="section-description" style="margin-bottom: 0.5rem; font-size: 0.8rem;">
+                                Enter a new password / PIN (min. 4 characters). Leave empty to remove password protection.
+                            </p>
+                            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 220px;">
+                                    <input type="password" id="editUserPasswordInput" class="form-input" placeholder="New password or leave empty to clear">
+                                </div>
+                                <button type="button" class="btn btn-warning" onclick="userManagementModal.saveUserPasswordFromEdit()" style="white-space: nowrap;">
+                                    🔑 Set / Clear Password
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                    <button onclick="userManagementModal.saveUserEdit()" class="btn btn-success btn-small">💾 Save</button>
+                    <button onclick="userManagementModal.saveUserEdit()" class="btn btn-success btn-small">💾 Save User</button>
                     <button onclick="userManagementModal.cancelUserEdit()" class="btn btn-secondary btn-small">❌ Cancel</button>
                 </div>
             </div>
             
             <!-- User List -->
-            <div>
-                <h3 class="section-title">📋 Existing Users</h3>
-                <div id="userList"></div>
-            </div>
+            <div id="userList"></div>
         `;
 
         // Setup event listeners
@@ -264,9 +296,23 @@ const userManagementModal = {
 
     renderGroupsTab(container) {
         container.innerHTML = `
-            <!-- Add Group Section -->
-            <div class="user-modal-section add-user-section">
-                <h3 class="section-title">➕ Create New Group</h3>
+            <!-- Header with Title & Create Group Toggle Button -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <h3 class="section-title" style="margin: 0;">📋 Existing Groups</h3>
+                    <span id="groupCountBadge" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600;">0</span>
+                </div>
+                <button type="button" id="toggleAddGroupBtn" onclick="userManagementModal.toggleAddGroupForm()" class="btn btn-success btn-small" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>➕</span> Create New Group
+                </button>
+            </div>
+
+            <!-- Add Group Section (Initially Hidden) -->
+            <div id="addGroupSection" class="user-modal-section add-user-section" style="display: none; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <h3 class="section-title" style="margin: 0; font-size: 1.05rem;">➕ Create New Group</h3>
+                    <button type="button" class="user-modal-close" style="font-size: 1.2rem; padding: 2px 6px;" onclick="userManagementModal.toggleAddGroupForm(false)">×</button>
+                </div>
                 <div class="ugm-form-grid-2col">
                     <div class="form-group">
                         <label class="form-label">Group Name: <span class="required-star">*</span></label>
@@ -291,13 +337,17 @@ const userManagementModal = {
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center;">
                     <button onclick="userManagementModal.addGroup()" class="btn btn-success">➕ Create Group</button>
-                    <small class="section-description" style="margin: 0;">Only group name is required. All other fields are optional.</small>
+                    <button type="button" onclick="userManagementModal.toggleAddGroupForm(false)" class="btn btn-secondary">Cancel</button>
+                    <small class="section-description" style="margin: 0; margin-left: 0.5rem;">Only group name is required. All other fields are optional.</small>
                 </div>
             </div>
 
             <!-- Edit Group Section (Initially Hidden) -->
-            <div id="editGroupSection" class="user-modal-section edit-user-section">
-                <h3 class="section-title" style="color: #f59e0b;">✏️ Edit Group</h3>
+            <div id="editGroupSection" class="user-modal-section edit-user-section" style="display: none; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <h3 class="section-title" style="margin: 0; color: #f59e0b; font-size: 1.05rem;">✏️ Edit Group</h3>
+                    <button type="button" class="user-modal-close" style="font-size: 1.2rem; padding: 2px 6px;" onclick="userManagementModal.cancelGroupEdit()">×</button>
+                </div>
                 <div class="ugm-form-grid-2col">
                     <div class="form-group">
                         <label class="form-label">Group Name:</label>
@@ -327,10 +377,7 @@ const userManagementModal = {
             </div>
             
             <!-- Group List -->
-            <div>
-                <h3 class="section-title">📋 Existing Groups</h3>
-                <div id="groupList"></div>
-            </div>
+            <div id="groupList"></div>
         `;
 
         this._setupGroupTabListeners();
@@ -468,18 +515,12 @@ const userManagementModal = {
             });
         }
 
-        // Password enter key
-        const passwordInput = document.getElementById('newPassword');
+        // Password enter key in edit user password sub-section
+        const passwordInput = document.getElementById('editUserPasswordInput') || document.getElementById('newPassword');
         if (passwordInput) {
             passwordInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.setPassword();
+                if (e.key === 'Enter') this.saveUserPasswordFromEdit();
             });
-        }
-
-        // Populate password user select if admin
-        const currentUser = window.userManager?.currentUser;
-        if (currentUser === 'Admin') {
-            setTimeout(() => this.populatePasswordUserSelect(), 100);
         }
     },
 
@@ -489,6 +530,72 @@ const userManagementModal = {
             nameInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.addGroup();
             });
+        }
+    },
+
+    toggleAddUserForm(force = null) {
+        const section = document.getElementById('addUserSection');
+        const btn = document.getElementById('toggleAddUserBtn');
+        if (!section) return;
+
+        const willShow = force !== null ? force : (section.style.display === 'none' || !section.style.display);
+        section.style.display = willShow ? 'block' : 'none';
+
+        if (btn) {
+            btn.innerHTML = willShow ? '<span>✕</span> Close Form' : '<span>➕</span> Add New User';
+            btn.className = willShow ? 'btn btn-secondary btn-small' : 'btn btn-success btn-small';
+        }
+
+        if (willShow) {
+            this.cancelUserEdit();
+            setTimeout(() => document.getElementById('newUserName')?.focus(), 50);
+        }
+    },
+
+    toggleAddGroupForm(force = null) {
+        const section = document.getElementById('addGroupSection');
+        const btn = document.getElementById('toggleAddGroupBtn');
+        if (!section) return;
+
+        const willShow = force !== null ? force : (section.style.display === 'none' || !section.style.display);
+        section.style.display = willShow ? 'block' : 'none';
+
+        if (btn) {
+            btn.innerHTML = willShow ? '<span>✕</span> Close Form' : '<span>➕</span> Create New Group';
+            btn.className = willShow ? 'btn btn-secondary btn-small' : 'btn btn-success btn-small';
+        }
+
+        if (willShow) {
+            this.cancelGroupEdit();
+            setTimeout(() => document.getElementById('newGroupName')?.focus(), 50);
+        }
+    },
+
+    toggleEditPasswordForm() {
+        const container = document.getElementById('editUserPasswordContainer');
+        if (!container) return;
+        const isHidden = container.style.display === 'none' || !container.style.display;
+        container.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+            const input = document.getElementById('editUserPasswordInput');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+    },
+
+    _updateEditPasswordUI(username) {
+        const hasPassword = Boolean(this.isPasswordSystemEnabled() && window.secureStorage?.hasUserPassword?.(username));
+        const statusEl = document.getElementById('editUserPasswordStatus');
+        const toggleBtn = document.getElementById('toggleEditPasswordBtn');
+        if (statusEl) {
+            statusEl.innerHTML = hasPassword ?
+                '<span style="color: #10b981; font-weight: 500;">🔒 Password is set</span>' :
+                '<span style="color: #9ca3af; font-weight: 400;">🔓 No password configured</span>';
+        }
+        if (toggleBtn) {
+            toggleBtn.innerHTML = hasPassword ? '🔑 Change Password' : '🔑 Set Password';
         }
     },
 
@@ -579,11 +686,11 @@ const userManagementModal = {
             this._cancelCustomGroup('newUserGroup');
             this._cancelCustomRole('newUserRole');
 
+            this.lastCreatedUser = name;
+            this.toggleAddUserForm(false);
             this.renderUserList();
             this.populatePasswordUserSelect();
             this.showSuccess(`User "${name}" added to group "${group}"`);
-            
-            document.getElementById('newUserName')?.focus();
         } catch (error) {
             console.error('Error adding user:', error);
             this.showError('Failed to add user: ' + error.message);
@@ -596,6 +703,9 @@ const userManagementModal = {
             this.showError('You can only edit your own account.');
             return;
         }
+
+        // Close Add User form if open
+        this.toggleAddUserForm(false);
 
         this.editingUser = username;
 
@@ -622,7 +732,7 @@ const userManagementModal = {
             const groupSelect = document.getElementById('editUserGroup');
             if (groupSelect) {
                 // Check if group exists in options
-                const hasOption = Array.from(groupSelect.options).some(o => o.value === group);
+                const hasOption = groupSelect.options ? Array.from(groupSelect.options).some(o => o.value === group) : false;
                 if (hasOption) {
                     groupSelect.value = group;
                 } else {
@@ -637,7 +747,7 @@ const userManagementModal = {
             const roleSelect = document.getElementById('editUserRole');
             const roleValue = profile?.role || '';
             if (roleSelect) {
-                const hasRoleOption = Array.from(roleSelect.options).some(o => o.value === roleValue);
+                const hasRoleOption = roleSelect.options ? Array.from(roleSelect.options).some(o => o.value === roleValue) : false;
                 if (hasRoleOption) {
                     roleSelect.value = roleValue;
                 } else if (roleValue) {
@@ -646,6 +756,9 @@ const userManagementModal = {
                     if (customRoleInput) customRoleInput.value = roleValue;
                 }
             }
+
+            // Update password status and UI for this user
+            this._updateEditPasswordUI(username);
 
             setTimeout(() => document.getElementById('editUserName')?.focus(), 100);
         }
@@ -738,6 +851,12 @@ const userManagementModal = {
                 await this._migrateUserStorage(oldName, newName);
             }
 
+            // If a new password was entered in the edit password sub-form, update it as well
+            const passwordInput = document.getElementById('editUserPasswordInput');
+            if (passwordInput && passwordInput.value) {
+                await this.setPassword(newName, passwordInput.value);
+            }
+
             this.showSuccess(`User updated: "${newName}" (${newGroup})`);
             this.cancelUserEdit();
             this.renderUserList();
@@ -758,6 +877,10 @@ const userManagementModal = {
         this.editingUser = null;
         const editSection = document.getElementById('editUserSection');
         if (editSection) editSection.style.display = 'none';
+        const passwordContainer = document.getElementById('editUserPasswordContainer');
+        if (passwordContainer) passwordContainer.style.display = 'none';
+        const passwordInput = document.getElementById('editUserPasswordInput');
+        if (passwordInput) passwordInput.value = '';
         this.renderUserList();
     },
 
@@ -901,9 +1024,9 @@ const userManagementModal = {
                 if (el) el.value = '';
             });
 
+            this.toggleAddGroupForm(false);
             this.renderGroupList();
             this.showSuccess(`Group "${name}" created`);
-            document.getElementById('newGroupName')?.focus();
         } catch (error) {
             console.error('Error creating group:', error);
             this.showError('Failed to create group: ' + error.message);
@@ -913,6 +1036,9 @@ const userManagementModal = {
     startEditGroup(groupId) {
         const group = window.profileManager?.getGroupById(groupId);
         if (!group) return;
+
+        // Close Add Group form if open
+        this.toggleAddGroupForm(false);
 
         this.editingGroup = groupId;
 
@@ -1006,6 +1132,9 @@ const userManagementModal = {
         if (adminExists && !users.includes('Admin')) {
             users = ['Admin', ...users];
         }
+
+        const countBadge = document.getElementById('userCountBadge');
+        if (countBadge) countBadge.textContent = users.length;
         
         const currentUser = window.userManager?.currentUser;
 
@@ -1072,6 +1201,7 @@ const userManagementModal = {
                     
                     <!-- Actions -->
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex-shrink: 0;">
+                        <button type="button" onclick="userManagementModal.exportSingleUser('${user}')" class="btn btn-secondary btn-small" title="Export this user & templates">📤</button>
                         ${!isEditing && (currentUser === 'Admin' || currentUser === user) ? `
                             <button onclick="userManagementModal.startEditUser('${user}')" class="btn btn-warning btn-small">✏️</button>
                         ` : ''}
@@ -1098,6 +1228,9 @@ const userManagementModal = {
         const groups = window.profileManager ? window.profileManager.getAllGroups() : [];
         const currentUser = window.userManager?.currentUser;
         const isAdmin = currentUser === 'Admin';
+
+        const countBadge = document.getElementById('groupCountBadge');
+        if (countBadge) countBadge.textContent = groups.length;
 
         if (groups.length === 0) {
             listContainer.innerHTML = `
@@ -1138,6 +1271,7 @@ const userManagementModal = {
                     </div>
                     
                     <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                        <button type="button" onclick="userManagementModal.exportSingleGroup('${group.name}')" class="btn btn-secondary btn-small" title="Export this group & templates">📤</button>
                         ${!isEditing ? `
                             <button onclick="userManagementModal.startEditGroup('${group.id}')" class="btn btn-warning btn-small">✏️</button>
                         ` : ''}
@@ -1154,25 +1288,25 @@ const userManagementModal = {
 
     // =================== PASSWORD MANAGEMENT ===================
 
-    async setPassword() {
+    async setPassword(targetUserOverride = null, passwordOverride = null) {
         const currentUser = window.userManager?.currentUser;
-        const passwordInput = document.getElementById('newPassword');
+        const passwordInput = document.getElementById('editUserPasswordInput') || document.getElementById('newPassword');
         const userSelect = document.getElementById('passwordUser');
 
-        if (!passwordInput) return;
-
-        let targetUser;
-        if (currentUser === 'Admin') {
-            targetUser = userSelect?.value;
-            if (!targetUser) {
-                this.showError('Please select a user');
-                return;
+        let targetUser = targetUserOverride || this.editingUser;
+        if (!targetUser) {
+            if (currentUser === 'Admin') {
+                targetUser = userSelect?.value;
+                if (!targetUser) {
+                    this.showError('Please select a user');
+                    return;
+                }
+            } else {
+                targetUser = currentUser;
             }
-        } else {
-            targetUser = currentUser;
         }
 
-        const password = passwordInput.value;
+        const password = passwordOverride !== null ? passwordOverride : (passwordInput ? passwordInput.value : '');
 
         if (password === '') {
             if (targetUser === 'Admin') {
@@ -1189,8 +1323,11 @@ const userManagementModal = {
 
         try {
             await window.secureStorage.storeUserPassword(targetUser, password);
-            passwordInput.value = '';
+            if (passwordInput) passwordInput.value = '';
             if (userSelect) userSelect.value = '';
+            if (this.editingUser === targetUser) {
+                this._updateEditPasswordUI(targetUser);
+            }
             this.renderUserList();
             this.populatePasswordUserSelect();
             this.showSuccess(`🔑 Password set for "${targetUser}"`);
@@ -1199,12 +1336,20 @@ const userManagementModal = {
         }
     },
 
+    async saveUserPasswordFromEdit() {
+        if (!this.editingUser) return;
+        return this.setPassword(this.editingUser);
+    },
+
     async _removeUserPassword(targetUser, passwordInput, userSelect) {
         try {
             if (window.secureStorage?.removeUserPassword) {
-                window.secureStorage.removeUserPassword(targetUser);
-                passwordInput.value = '';
+                await window.secureStorage.removeUserPassword(targetUser);
+                if (passwordInput) passwordInput.value = '';
                 if (userSelect) userSelect.value = '';
+                if (this.editingUser === targetUser) {
+                    this._updateEditPasswordUI(targetUser);
+                }
                 this.renderUserList();
                 this.populatePasswordUserSelect();
                 this.showSuccess(`🔓 Password removed for "${targetUser}"`);
@@ -1225,9 +1370,17 @@ const userManagementModal = {
         try {
             const result = await window.profileManager.importProfiles('merge');
             
+            if (result && result.canceled) {
+                console.log('ℹ️ Profile import cancelled by user');
+                return;
+            }
+
             if (result.success) {
                 const stats = result.stats;
                 let message = `Import complete! ${stats.groupsAdded} groups, ${stats.usersAdded} users added.`;
+                if (stats.templatesImported > 0) {
+                    message += ` (${stats.templatesImported} template${stats.templatesImported !== 1 ? 's' : ''} imported)`;
+                }
                 
                 if (stats.groupsSkipped > 0 || stats.usersSkipped > 0) {
                     message += ` (${stats.groupsSkipped + stats.usersSkipped} skipped - already exist)`;
@@ -1266,22 +1419,258 @@ const userManagementModal = {
         }
     },
 
-    async exportProfiles() {
-        if (!window.profileManager) {
-            this.showError('Profile Manager not available');
-            return;
+    // =================== EXPORT MODAL & ACTIONS ===================
+
+    exportSingleUser(username) {
+        this.openExportModal({ scope: 'user', target: username });
+    },
+
+    exportSingleGroup(groupName) {
+        this.openExportModal({ scope: 'group', target: groupName });
+    },
+
+    openExportModal(options = {}) {
+        const existing = document.getElementById('ugmExportModal');
+        if (existing) existing.remove();
+
+        const allUsers = window.userManager?.users || [];
+        const allGroups = window.profileManager ? window.profileManager.getAllGroups() : [];
+
+        const initialScope = options.scope || 'all';
+        const initialTarget = options.target || (initialScope === 'user' ? allUsers[0] : allGroups[0]?.name);
+
+        const groupOptionsHtml = allGroups.map(g => `<option value="${g.name}" ${g.name === initialTarget ? 'selected' : ''}>${g.name}</option>`).join('');
+        const userOptionsHtml = allUsers.map(u => `<option value="${u}" ${u === initialTarget ? 'selected' : ''}>${u}</option>`).join('');
+
+        const modalHtml = `
+            <div id="ugmExportModal" class="modal-overlay" style="display: flex; z-index: 10001; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+                <div class="modal-content" style="max-width: 520px; width: 92%; background: linear-gradient(135deg, #1e1e2e, #2a2a40); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-radius: 16px; color: #e0e0e0; padding: 2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0; color: #a855f7; font-size: 1.3rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>📤</span> Export Profiles & Templates
+                        </h3>
+                        <button type="button" class="user-modal-close" onclick="userManagementModal.closeExportModal()" style="font-size: 1.3rem; padding: 2px 8px; cursor: pointer; background: transparent; border: none; color: #9ca3af;">×</button>
+                    </div>
+
+                    <!-- Scope Selection -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <label class="form-label" style="font-weight: 600; margin-bottom: 0.6rem; display: block; color: #cbd5e1;">Export Scope:</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportScope" value="all" ${initialScope === 'all' ? 'checked' : ''} onchange="userManagementModal.updateExportScopeUI()">
+                                <span>🌐 <strong>All Profiles</strong> (all users & groups)</span>
+                            </label>
+
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportScope" value="group" ${initialScope === 'group' ? 'checked' : ''} onchange="userManagementModal.updateExportScopeUI()">
+                                <span>📁 <strong>Specific Group</strong> (group profile & members)</span>
+                            </label>
+                            <div id="ugmExportGroupContainer" style="margin-left: 1.75rem; display: ${initialScope === 'group' ? 'block' : 'none'};">
+                                <select id="ugmExportGroupSelect" class="form-select" onchange="userManagementModal.updateExportSummary()" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                                    ${groupOptionsHtml}
+                                </select>
+                            </div>
+
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportScope" value="user" ${initialScope === 'user' ? 'checked' : ''} onchange="userManagementModal.updateExportScopeUI()">
+                                <span>👤 <strong>Specific User</strong> (profile, preferences & group)</span>
+                            </label>
+                            <div id="ugmExportUserContainer" style="margin-left: 1.75rem; display: ${initialScope === 'user' ? 'block' : 'none'};">
+                                <select id="ugmExportUserSelect" class="form-select" onchange="userManagementModal.updateExportSummary()" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                                    ${userOptionsHtml}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Format / Destination Selection -->
+                    <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
+                        <label class="form-label" style="font-weight: 600; margin-bottom: 0.6rem; display: block; color: #cbd5e1;">Export Format & Destination:</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 0.75rem;">
+                            <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportMode" value="zip" checked onchange="userManagementModal.updateExportSummary()" style="margin-top: 0.2rem;">
+                                <div>
+                                    <span>📦 <strong>ZIP Package (.zip)</strong> (Empfohlen)</span>
+                                    <small style="color: #9ca3af; display: block; font-size: 0.8rem;">Creates a portable <code>.zip</code> archive containing profile JSON files and a <code>templates/</code> subfolder. Opens natively in Windows Explorer & macOS.</small>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportMode" value="folder" onchange="userManagementModal.updateExportSummary()" style="margin-top: 0.2rem;">
+                                <div>
+                                    <span>📁 <strong>Export to Folder</strong></span>
+                                    <small style="color: #9ca3af; display: block; font-size: 0.8rem;">Creates an export directory with separate JSON files (<code>metafold-profiles.json</code>, <code>users.json</code>, <code>groups.json</code>) and a <code>templates/</code> subfolder.</small>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; color: #e0e0e0;">
+                                <input type="radio" name="ugmExportMode" value="file" onchange="userManagementModal.updateExportSummary()" style="margin-top: 0.2rem;">
+                                <div>
+                                    <span>📄 <strong>Single JSON File</strong></span>
+                                    <small style="color: #9ca3af; display: block; font-size: 0.8rem;">Saves all selected profiles, groups, and templates bundled together into a single <code>.json</code> file.</small>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.75rem;">
+                            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; color: #e0e0e0; font-weight: 500;">
+                                <input type="checkbox" id="ugmExportIncludeTemplates" checked onchange="userManagementModal.updateExportSummary()">
+                                <span>📑 Include associated templates</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Summary Box -->
+                    <div id="ugmExportSummaryBox" style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: #e9d5ff;">
+                        <!-- Updated by JS -->
+                    </div>
+
+                    <!-- Footer Buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                        <button type="button" onclick="userManagementModal.closeExportModal()" class="btn btn-secondary">Cancel</button>
+                        <button type="button" id="ugmExecuteExportBtn" onclick="userManagementModal.executeExport()" class="btn btn-success" style="padding: 0.6rem 1.5rem; font-weight: 600;">
+                            📦 Export ZIP Package
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        this.updateExportScopeUI();
+    },
+
+    closeExportModal() {
+        const modal = document.getElementById('ugmExportModal');
+        if (modal) modal.remove();
+    },
+
+    updateExportScopeUI() {
+        const radios = document.querySelectorAll('input[name="ugmExportScope"]');
+        let selectedScope = 'all';
+        radios.forEach(r => { if (r.checked) selectedScope = r.value; });
+
+        const groupContainer = document.getElementById('ugmExportGroupContainer');
+        const userContainer = document.getElementById('ugmExportUserContainer');
+
+        if (groupContainer) groupContainer.style.display = (selectedScope === 'group') ? 'block' : 'none';
+        if (userContainer) userContainer.style.display = (selectedScope === 'user') ? 'block' : 'none';
+
+        this.updateExportSummary();
+    },
+
+    async updateExportSummary() {
+        const scopeRadios = document.querySelectorAll('input[name="ugmExportScope"]');
+        let selectedScope = 'all';
+        scopeRadios.forEach(r => { if (r.checked) selectedScope = r.value; });
+
+        const modeRadios = document.querySelectorAll('input[name="ugmExportMode"]');
+        let selectedMode = 'zip';
+        modeRadios.forEach(r => { if (r.checked) selectedMode = r.value; });
+
+        const groupSelect = document.getElementById('ugmExportGroupSelect');
+        const userSelect = document.getElementById('ugmExportUserSelect');
+        const includeTemplates = document.getElementById('ugmExportIncludeTemplates')?.checked || false;
+
+        let targetName = null;
+        if (selectedScope === 'group') targetName = groupSelect?.value;
+        if (selectedScope === 'user') targetName = userSelect?.value;
+
+        const scope = { type: selectedScope, name: targetName };
+        const exportData = window.profileManager?.getExportData(scope) || { users: [], groups: [] };
+
+        let templateCount = 0;
+        if (includeTemplates && window.profileManager?.getTemplatesForScope) {
+            try {
+                const templates = await window.profileManager.getTemplatesForScope(scope);
+                templateCount = Array.isArray(templates) ? templates.length : 0;
+            } catch (e) {
+                templateCount = 0;
+            }
         }
 
-        try {
-            const result = await window.profileManager.exportProfiles();
-            if (result.success) {
-                this.showSuccess('📤 Profiles exported successfully');
+        const summaryBox = document.getElementById('ugmExportSummaryBox');
+        const executeBtn = document.getElementById('ugmExecuteExportBtn');
+
+        if (summaryBox) {
+            let details = '';
+            if (selectedScope === 'user') {
+                const grpName = exportData.groups[0]?.name || 'Default';
+                details = `User: <strong>${targetName || 'None'}</strong> (Group: <em>${grpName}</em>)`;
+            } else if (selectedScope === 'group') {
+                details = `Group: <strong>${targetName || 'None'}</strong> (${exportData.users.length} member${exportData.users.length !== 1 ? 's' : ''})`;
             } else {
-                this.showError('Export failed: ' + (result.error || 'Unknown error'));
+                details = `All Profiles: <strong>${exportData.users.length}</strong> user(s), <strong>${exportData.groups.length}</strong> group(s)`;
+            }
+
+            let formatDesc = '';
+            if (selectedMode === 'zip') {
+                formatDesc = `📦 ZIP Package (.zip Archiv mit Profilen & Templates)`;
+            } else if (selectedMode === 'folder') {
+                formatDesc = `📁 Export to Folder (Ordner mit separaten JSON-Dateien & Templates)`;
+            } else {
+                formatDesc = `📄 Single JSON Bundle (.json Datei mit eingebetteten Daten)`;
+            }
+
+            let templateText = includeTemplates
+                ? `<div>📑 Associated templates: <strong>${templateCount}</strong></div>`
+                : `<div>📄 Metadata only (no templates)</div>`;
+
+            summaryBox.innerHTML = `
+                <div style="margin-bottom: 0.35rem; font-weight: 600;">📊 Export Scope & Destination:</div>
+                <div style="margin-bottom: 0.25rem;">${details}</div>
+                <div style="margin-bottom: 0.25rem;">Format: <strong>${formatDesc}</strong></div>
+                ${templateText}
+            `;
+        }
+
+        if (executeBtn) {
+            if (selectedMode === 'zip') {
+                executeBtn.textContent = '📦 Export ZIP Package';
+            } else if (selectedMode === 'folder') {
+                executeBtn.textContent = '📁 Choose Folder & Export';
+            } else {
+                executeBtn.textContent = '📄 Save JSON File';
+            }
+        }
+    },
+
+    async executeExport() {
+        const scopeRadios = document.querySelectorAll('input[name="ugmExportScope"]');
+        let selectedScope = 'all';
+        scopeRadios.forEach(r => { if (r.checked) selectedScope = r.value; });
+
+        const modeRadios = document.querySelectorAll('input[name="ugmExportMode"]');
+        let selectedMode = 'zip';
+        modeRadios.forEach(r => { if (r.checked) selectedMode = r.value; });
+
+        const groupSelect = document.getElementById('ugmExportGroupSelect');
+        const userSelect = document.getElementById('ugmExportUserSelect');
+        const includeTemplates = document.getElementById('ugmExportIncludeTemplates')?.checked || false;
+
+        let targetName = null;
+        if (selectedScope === 'group') targetName = groupSelect?.value;
+        if (selectedScope === 'user') targetName = userSelect?.value;
+
+        this.closeExportModal();
+
+        try {
+            const scope = { type: selectedScope, name: targetName };
+            const result = await window.profileManager.exportProfiles(scope, selectedMode, includeTemplates);
+            if (result && result.canceled) {
+                return;
+            }
+            if (result && result.success) {
+                const modeLabel = selectedMode === 'zip' ? 'ZIP Package' : selectedMode === 'folder' ? 'Folder' : 'JSON';
+                this.showSuccess(`📤 Export completed successfully (${modeLabel})`);
+            } else if (result && result.error) {
+                this.showError('Export failed: ' + result.error);
             }
         } catch (error) {
             this.showError('Export failed: ' + error.message);
         }
+    },
+
+    exportProfiles() {
+        this.openExportModal();
     },
 
     // =================== UTILITY ===================

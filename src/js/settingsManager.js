@@ -69,7 +69,7 @@ const settingsManager = {
         'templates.category4_icon': '📋',
         'templates.category4_color': '#f59e0b',
         // =================== FILE SCANNER / BIOFORMATS PLUGIN ===================
-        'plugins.filescanner_enabled': false,
+        'plugins.filescanner_enabled': true,
         'plugins.filescanner_extensions': JSON.stringify([
             '.lif', '.czi', '.lsm', '.nd2',
             '.tif', '.tiff', '.ome.tif',
@@ -1268,58 +1268,97 @@ const settingsManager = {
             day: 'numeric'
         });
 
-        let body = `<h1>${projectName}</h1>\n\n`;
-        body += `<p><strong>Created:</strong> ${date}</p>\n\n`;
+        let body = `<h1>${projectName}</h1>\n`;
+        body += `<p><strong>Created with MetaFold:</strong> ${date}</p>\n\n`;
 
-        if (metadata && Object.keys(metadata).length > 0) {
-            body += `<h2>Experiment Metadata</h2>\n<ul>\n`;
-
-            const processFieldBody = (key, fieldInfo) => {
-                if (!fieldInfo || typeof fieldInfo !== 'object') return;
-
-                // Nested group object
-                if (!fieldInfo.type) {
-                    body += `</ul>\n<h3>${key}</h3>\n<ul>\n`;
-                    Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
-                        processFieldBody(subKey, subFieldInfo);
-                    });
-                    return;
-                }
-
-                // Group field
-                if (fieldInfo.type === 'group') {
-                    body += `</ul>\n<h3>${fieldInfo.label || key}</h3>\n<ul>\n`;
-                    return;
-                }
-
-                // Skip empty
-                const value = fieldInfo.value;
-                if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
-                    return;
-                }
-                
-                const label = fieldInfo.label || key;
-                if (fieldInfo.type === 'checkbox') {
-                    const checkValue = (value === true || value === 'true' || value === 'on') ? '✅ Yes' : '❌ No';
-                    body += `<li><strong>${label}:</strong> ${checkValue}</li>\n`;
-                } else if (Array.isArray(value)) {
-                    body += `<li><strong>${label}:</strong> ${value.join(', ')}</li>\n`;
-                } else {
-                    body += `<li><strong>${label}:</strong> ${value}</li>\n`;
-                }
+        if (metadata && typeof metadata === 'object') {
+            const esc = (s) => {
+                if (s === null || s === undefined) return '';
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
             };
 
-            Object.entries(metadata).forEach(([key, fieldInfo]) => {
-                if (key !== 'provenance' && key !== 'metafold_integration' && key !== 'metafold_project_id' && key !== 'projectName' && !key.startsWith('System.')) {
-                    processFieldBody(key, fieldInfo);
+            const renderMarkdownOrText = (rawText) => {
+                if (!rawText) return '';
+                if (window.markdownLite && typeof window.markdownLite.render === 'function') {
+                    return window.markdownLite.render(String(rawText), { mode: 'readme' });
                 }
+                return `<p>${esc(rawText).replace(/\n/g, '<br>')}</p>`;
+            };
+
+            // 1. Hypothesis / Goal
+            const hypothesis = metadata.hypothesis_or_goal || (metadata.hypothesis && metadata.hypothesis.value) || '';
+            if (hypothesis) {
+                body += `<h2>🎯 Hypothesis / Goal</h2>\n<div>${renderMarkdownOrText(hypothesis)}</div>\n\n`;
+            }
+
+            // 2. Primary Markdown Notes (notes_markdown)
+            const notesMd = metadata.notes_markdown || '';
+            if (notesMd) {
+                body += `<h2>📝 Notes &amp; Observations</h2>\n<div>${renderMarkdownOrText(notesMd)}</div>\n\n`;
+            }
+
+            // 3. Scan metadata for any textarea or notes/markdown fields
+            const seenTexts = new Set();
+            if (hypothesis) seenTexts.add(String(hypothesis).trim());
+            if (notesMd) seenTexts.add(String(notesMd).trim());
+
+            const collectTextAndMarkdownFields = (obj) => {
+                const results = [];
+                Object.entries(obj).forEach(([key, fieldInfo]) => {
+                    if (!fieldInfo || typeof fieldInfo !== 'object') return;
+                    if (key === 'provenance' || key === 'metafold_integration' || key === 'metafold_project_id' || key === 'projectName' || key.startsWith('System.')) return;
+                    if (key === 'notes_markdown' || key === 'hypothesis_or_goal' || key === 'changelog') return;
+
+                    // If nested group object
+                    if (!fieldInfo.type && typeof fieldInfo === 'object') {
+                        results.push(...collectTextAndMarkdownFields(fieldInfo));
+                        return;
+                    }
+
+                    const isTextAreaOrNotes = fieldInfo.type === 'notes' || fieldInfo.type === 'markdown' || fieldInfo.type === 'textarea' || fieldInfo.displayInNotes === true;
+                    if (isTextAreaOrNotes) {
+                        const val = String(fieldInfo.value || '').trim();
+                        if (val && !seenTexts.has(val)) {
+                            seenTexts.add(val);
+                            results.push({
+                                label: fieldInfo.label || key,
+                                value: val
+                            });
+                        }
+                    }
+                });
+                return results;
+            };
+
+            const textFields = collectTextAndMarkdownFields(metadata);
+            textFields.forEach(tf => {
+                body += `<h2>📝 ${esc(tf.label)}</h2>\n<div>${renderMarkdownOrText(tf.value)}</div>\n\n`;
             });
 
-            body += `</ul>\n\n`;
+            // 4. Structured Notes Log (notes_log)
+            if (Array.isArray(metadata.notes_log) && metadata.notes_log.length > 0) {
+                body += `<h2>📋 Observation Log</h2>\n<ul>\n`;
+                metadata.notes_log.forEach(note => {
+                    const catBadge = note.category ? `<strong>[${esc(note.category).toUpperCase()}]</strong> ` : '';
+                    const ts = note.timestamp ? `<em>${new Date(note.timestamp).toLocaleString()}</em>: ` : '';
+                    const user = note.user ? ` (${esc(note.user)})` : '';
+                    const text = renderMarkdownOrText(note.text || '');
+                    body += `<li>${catBadge}${ts}${user} ${text}</li>\n`;
+                });
+                body += `</ul>\n\n`;
+            }
+
+            // NOTE: Normal key-value fields are intentionally NOT listed here as bullets,
+            // because they are natively synced to elabFTW extra_fields!
         }
 
         if (structure && structure.trim() !== '') {
-            body += `<h2>Project Structure</h2>\n<pre>${structure}</pre>\n\n`;
+            body += `<h2>📁 Project Structure</h2>\n<pre>${structure}</pre>\n\n`;
         }
 
         return body;

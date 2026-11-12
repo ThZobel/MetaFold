@@ -499,7 +499,11 @@ const profileManager = {
      * Get users in a specific group
      */
     getUsersByGroup(groupId) {
-        return this.users.filter(u => u.groupIds.includes(groupId));
+        return this.users.filter(u => {
+            if (Array.isArray(u.groupIds) && u.groupIds.includes(groupId)) return true;
+            if (u.primaryGroupId === groupId) return true;
+            return false;
+        });
     },
 
     /**
@@ -613,90 +617,470 @@ const profileManager = {
     // =================== IMPORT / EXPORT ===================
 
     /**
-     * Export all profiles as a portable JSON (without passwords)
+     * Export profiles as a portable JSON (without passwords)
+     * Supports scoping by all, group, or user
+     * @param {Object} [scope={ type: 'all' }] - Export scope { type: 'all'|'group'|'user', name: string }
      * @returns {Object} - Export data
      */
-    getExportData() {
+    getExportData(scope = {}) {
+        let groupsToExport = [];
+        let usersToExport = [];
+
+        if (scope.type === 'user' && scope.name) {
+            const user = this.getUserByUsername(scope.name);
+            if (user) {
+                usersToExport.push({ ...user });
+                const groupIds = user.groupIds || (user.primaryGroupId ? [user.primaryGroupId] : []);
+                for (const gid of groupIds) {
+                    const grp = this.getGroupById(gid) || this.getGroupByName(gid);
+                    if (grp && !groupsToExport.some(g => g.id === grp.id)) {
+                        groupsToExport.push({ ...grp });
+                    }
+                }
+                if (groupsToExport.length === 0 && user.primaryGroup) {
+                    const grp = this.getGroupByName(user.primaryGroup) || this.getGroupById(user.primaryGroup);
+                    if (grp && !groupsToExport.some(g => g.id === grp.id)) {
+                        groupsToExport.push({ ...grp });
+                    }
+                }
+                if (groupsToExport.length === 0) {
+                    const grpName = this.getUserPrimaryGroupName(user.username);
+                    const grp = this.getGroupByName(grpName);
+                    if (grp && !groupsToExport.some(g => g.id === grp.id)) {
+                        groupsToExport.push({ ...grp });
+                    }
+                }
+            }
+        } else if (scope.type === 'group' && scope.name) {
+            const grp = this.getGroupByName(scope.name) || this.getGroupById(scope.name);
+            if (grp) {
+                groupsToExport.push({ ...grp });
+                const members = this.getUsersByGroup(grp.id);
+                for (const m of members) {
+                    usersToExport.push({ ...m });
+                }
+            }
+        } else {
+            groupsToExport = this.groups.map(g => ({ ...g }));
+            usersToExport = this.users.map(u => ({ ...u }));
+        }
+
         return {
             version: '1.0',
             exportedAt: new Date().toISOString(),
             exportedFrom: 'MetaFold Profile Manager',
-            groups: this.groups.map(g => ({ ...g })),
-            users: this.users.map(u => {
-                const exported = { ...u };
-                // Passwords are never included (they are in DPAPI secureStorage)
-                return exported;
-            })
+            scope: scope.type || 'all',
+            targetName: scope.name || null,
+            groups: groupsToExport,
+            users: usersToExport.map(u => ({ ...u }))
         };
     },
 
     /**
-     * Export profiles to file
+     * Get templates associated with a scope
+     * @param {Object} scope - { type: 'all'|'group'|'user', name: string }
+     * @returns {Array} - Array of template objects
      */
-    async exportProfiles() {
-        const exportData = this.getExportData();
-        const jsonStr = JSON.stringify(exportData, null, 2);
-
-        if (window.electronAPI && window.electronAPI.showSaveDialog) {
+    async getTemplatesForScope(scope = {}) {
+        let allTemplates = [];
+        if (window.templateManager) {
             try {
-                const result = await window.electronAPI.showSaveDialog({
-                    title: 'Export User & Group Profiles',
-                    defaultPath: 'metafold-profiles.json',
-                    filters: [{ name: 'JSON Files', extensions: ['json'] }]
-                });
-
-                if (result && result.filePath) {
-                    await window.electronAPI.writeFile(result.filePath, jsonStr);
-                    console.log('📤 Profiles exported to:', result.filePath);
-                    return { success: true, path: result.filePath };
+                if (typeof window.templateManager.getAllTemplates === 'function') {
+                    allTemplates = window.templateManager.getAllTemplates(true) || [];
                 }
-            } catch (error) {
-                console.error('❌ Export failed:', error);
-                return { success: false, error: error.message };
+            } catch (e) {}
+            if (allTemplates.length === 0 && Array.isArray(window.templateManager.templates)) {
+                allTemplates = [...window.templateManager.templates];
             }
         }
 
-        // Fallback: download via browser
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'metafold-profiles.json';
-        a.click();
-        URL.revokeObjectURL(url);
+        // If templateManager has none (e.g. before login), read templates from disk directly
+        if (allTemplates.length === 0 && this._dataDir && window.electronAPI?.listDirectory && window.electronAPI?.readFile) {
+            try {
+                const dirList = await window.electronAPI.listDirectory(this._dataDir);
+                if (dirList && Array.isArray(dirList)) {
+                    const sep = this._dataDir.includes('\\') ? '\\' : '/';
+                    for (const item of dirList) {
+                        const name = (typeof item === 'string') ? item : item.name;
+                        if (name && name.endsWith('.json') && name !== 'users.json' && name !== 'groups.json' && name !== 'user_index.json') {
+                            try {
+                                const content = await window.electronAPI.readFile(this._dataDir + sep + name);
+                                if (content) {
+                                    const parsed = JSON.parse(content);
+                                    if (parsed && (parsed.structure || parsed.metadata || parsed.type === 'experiment')) {
+                                        allTemplates.push(parsed);
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not read templates from disk:', e);
+            }
+        }
 
-        return { success: true, method: 'browser-download' };
+        if (scope.type === 'user' && scope.name) {
+            const targetLower = scope.name.toLowerCase();
+            return allTemplates.filter(t => (t.createdBy && t.createdBy.toLowerCase() === targetLower));
+        } else if (scope.type === 'group' && scope.name) {
+            const targetLower = scope.name.toLowerCase();
+            return allTemplates.filter(t => (t.createdByGroup && t.createdByGroup.toLowerCase() === targetLower));
+        } else {
+            return allTemplates.filter(t => {
+                if (t.isDefault === true || t.createdBy === 'System') return false;
+                if (window.storage?.isDefaultTemplate && window.storage.isDefaultTemplate(t)) return false;
+                return true;
+            });
+        }
     },
 
     /**
-     * Import profiles from JSON file
+     * Export profiles and templates as ZIP archive, folder, or JSON file
+     * @param {Object} [scope={ type: 'all' }] - Export scope { type: 'all'|'group'|'user', name: string }
+     * @param {string} [exportMode='zip'] - 'zip' (ZIP Archive), 'folder' (Folder with separate JSONs), or 'file' (Single JSON file)
+     * @param {boolean} [includeTemplates=true] - Whether to include associated templates
+     */
+    async exportProfiles(scope = { type: 'all' }, exportMode = 'zip', includeTemplates = true) {
+        const exportData = this.getExportData(scope);
+        const templates = includeTemplates ? await this.getTemplatesForScope(scope) : [];
+        if (includeTemplates) {
+            exportData.templates = templates;
+        }
+
+        const safeName = (scope.name ? scope.name : 'all').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+        const dateStr = new Date().toISOString().slice(0, 10);
+
+        if (exportMode === 'zip') {
+            const defaultFileName = `metafold-export-${safeName}-${dateStr}.zip`;
+            const filesToZip = [
+                {
+                    path: 'metafold-profiles.json',
+                    data: JSON.stringify(exportData, null, 2)
+                },
+                {
+                    path: 'users.json',
+                    data: JSON.stringify({ version: '1.0', users: exportData.users }, null, 2)
+                },
+                {
+                    path: 'groups.json',
+                    data: JSON.stringify({ version: '1.0', groups: exportData.groups }, null, 2)
+                }
+            ];
+
+            if (templates.length > 0) {
+                for (const t of templates) {
+                    const safeTName = (t.name || 'template').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() + '.json';
+                    filesToZip.push({
+                        path: `templates/${safeTName}`,
+                        data: JSON.stringify(t, null, 2)
+                    });
+                }
+            }
+
+            if (window.electronAPI && window.electronAPI.showSaveDialog && window.electronAPI.writeZipFile) {
+                const titleLabel = scope.type === 'user' ? `User "${scope.name}"` :
+                    scope.type === 'group' ? `Group "${scope.name}"` : 'All Profiles';
+
+                const result = await window.electronAPI.showSaveDialog({
+                    title: `Export ${titleLabel} Package`,
+                    defaultPath: defaultFileName,
+                    filters: [{ name: 'ZIP Archive (*.zip)', extensions: ['zip'] }]
+                });
+
+                const filePath = (typeof result === 'string') ? result : result?.filePath;
+                if (!filePath) {
+                    return { success: false, canceled: true };
+                }
+
+                try {
+                    const zipRes = await window.electronAPI.writeZipFile(filePath, filesToZip);
+                    if (!zipRes || !zipRes.success) {
+                        throw new Error(zipRes?.error || 'Failed to write ZIP file');
+                    }
+
+                    console.log('📦 Exported ZIP package to:', filePath);
+
+                    if (typeof window.showExportSuccessModal === 'function') {
+                        const folderPath = filePath.replace(/[\\/][^\\/]+$/, '');
+                        const fileName = filePath.split(/[\\/]/).pop();
+                        window.showExportSuccessModal({
+                            title: 'Export Completed',
+                            message: `Successfully exported profiles & ${templates.length} template(s) into ${fileName}.`,
+                            folderPath: folderPath,
+                            files: [{ name: fileName, path: filePath, icon: '📦', label: 'ZIP Package' }]
+                        });
+                    }
+
+                    return { success: true, path: filePath };
+                } catch (err) {
+                    console.error('❌ ZIP export failed:', err);
+                    return { success: false, error: err.message };
+                }
+            } else {
+                return { success: false, error: 'ZIP export is not supported in this environment' };
+            }
+
+        } else if (exportMode === 'folder') {
+            if (!window.electronAPI || !window.electronAPI.selectFolder || !window.electronAPI.writeFile) {
+                return { success: false, error: 'Folder selection is not available' };
+            }
+
+            const chosenFolder = await window.electronAPI.selectFolder();
+            if (!chosenFolder) {
+                return { success: false, canceled: true };
+            }
+
+            const sep = chosenFolder.includes('\\') ? '\\' : '/';
+            const subDirName = `MetaFold_Export_${safeName}_${dateStr}`;
+            const targetDir = chosenFolder + sep + subDirName;
+
+            if (window.electronAPI.ensureDir) {
+                await window.electronAPI.ensureDir(targetDir);
+            }
+
+            const exportedFiles = [];
+
+            // 1. Write bundle JSON
+            const bundlePath = targetDir + sep + 'metafold-profiles.json';
+            await window.electronAPI.writeFile(bundlePath, JSON.stringify(exportData, null, 2));
+            exportedFiles.push({ name: 'metafold-profiles.json', path: bundlePath, icon: '📋', label: 'Profiles & Data' });
+
+            // 2. Write users.json and groups.json
+            const usersPath = targetDir + sep + 'users.json';
+            await window.electronAPI.writeFile(usersPath, JSON.stringify({ version: '1.0', users: exportData.users }, null, 2));
+
+            const groupsPath = targetDir + sep + 'groups.json';
+            await window.electronAPI.writeFile(groupsPath, JSON.stringify({ version: '1.0', groups: exportData.groups }, null, 2));
+
+            // 3. Write individual template JSON files
+            if (templates.length > 0) {
+                const templatesDir = targetDir + sep + 'templates';
+                if (window.electronAPI.ensureDir) {
+                    await window.electronAPI.ensureDir(templatesDir);
+                }
+                for (const t of templates) {
+                    const safeTName = (t.name || 'template').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() + '.json';
+                    const tPath = templatesDir + sep + safeTName;
+                    await window.electronAPI.writeFile(tPath, JSON.stringify(t, null, 2));
+                    exportedFiles.push({ name: safeTName, path: tPath, icon: '📑', label: 'Template' });
+                }
+            }
+
+            console.log('📤 Export completed in folder:', targetDir);
+            if (typeof window.showExportSuccessModal === 'function') {
+                window.showExportSuccessModal({
+                    title: 'Export Completed',
+                    message: `Exported ${scope.type === 'user' ? `user "${scope.name}"` : scope.type === 'group' ? `group "${scope.name}"` : 'all profiles'} and ${templates.length} template(s) as JSON files.`,
+                    folderPath: targetDir,
+                    files: exportedFiles
+                });
+            }
+
+            return { success: true, folderPath: targetDir, filesCount: exportedFiles.length };
+
+        } else {
+            // Single JSON file export
+            const defaultFileName = `metafold-export-${safeName}.json`;
+            const jsonStr = JSON.stringify(exportData, null, 2);
+
+            if (window.electronAPI && window.electronAPI.showSaveDialog) {
+                const titleLabel = scope.type === 'user' ? `User "${scope.name}"` :
+                    scope.type === 'group' ? `Group "${scope.name}"` : 'All Profiles';
+
+                const result = await window.electronAPI.showSaveDialog({
+                    title: `Export ${titleLabel}`,
+                    defaultPath: defaultFileName,
+                    filters: [{ name: 'JSON Files (*.json)', extensions: ['json'] }]
+                });
+
+                const filePath = (typeof result === 'string') ? result : result?.filePath;
+                if (!filePath) {
+                    return { success: false, canceled: true };
+                }
+
+                await window.electronAPI.writeFile(filePath, jsonStr);
+                console.log('📤 Exported JSON file to:', filePath);
+
+                if (typeof window.showExportSuccessModal === 'function') {
+                    const folderPath = filePath.replace(/[\\/][^\\/]+$/, '');
+                    const fileName = filePath.split(/[\\/]/).pop();
+                    window.showExportSuccessModal({
+                        title: 'Export Completed',
+                        message: `Successfully exported profiles & templates to ${fileName}.`,
+                        folderPath: folderPath,
+                        files: [{ name: fileName, path: filePath, icon: '👤', label: 'Export JSON' }]
+                    });
+                }
+
+                return { success: true, path: filePath };
+            }
+
+            // Fallback: download via browser
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = defaultFileName;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            return { success: true, method: 'browser-download' };
+        }
+    },
+
+    /**
+     * Import profiles from JSON or ZIP file
      * @param {string} [mode='merge'] - 'merge' (add new, skip existing) or 'replace' (overwrite all)
      */
     async importProfiles(mode = 'merge') {
-        let jsonStr = null;
+        let filePath = null;
 
-        if (window.electronAPI && window.electronAPI.showOpenDialog) {
+        if (window.electronAPI && (window.electronAPI.selectFile || window.electronAPI.showOpenDialog)) {
             try {
-                const result = await window.electronAPI.showOpenDialog({
-                    title: 'Import User & Group Profiles',
-                    filters: [{ name: 'JSON Files', extensions: ['json'] }],
-                    properties: ['openFile']
-                });
+                const dialogFilters = [
+                    { name: 'Supported Files (*.zip, *.json)', extensions: ['zip', 'json'] },
+                    { name: 'ZIP Archives (*.zip)', extensions: ['zip'] },
+                    { name: 'JSON Files (*.json)', extensions: ['json'] }
+                ];
 
-                if (result && result.filePaths && result.filePaths.length > 0) {
-                    jsonStr = await window.electronAPI.readFile(result.filePaths[0]);
+                if (window.electronAPI.selectFile) {
+                    filePath = await window.electronAPI.selectFile({
+                        title: 'Import User & Group Profiles or ZIP Package',
+                        filters: dialogFilters
+                    });
+                } else if (window.electronAPI.showOpenDialog) {
+                    const result = await window.electronAPI.showOpenDialog({
+                        title: 'Import User & Group Profiles or ZIP Package',
+                        filters: dialogFilters,
+                        properties: ['openFile']
+                    });
+                    filePath = (typeof result === 'string') ? result : result?.filePaths?.[0] || result?.filePath;
                 }
             } catch (error) {
                 console.error('❌ Import dialog failed:', error);
                 return { success: false, error: error.message };
             }
+        } else if (typeof document !== 'undefined') {
+            const fileData = await new Promise((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return resolve(null);
+                    const reader = new FileReader();
+                    reader.onload = (re) => resolve(re.target.result);
+                    reader.onerror = () => resolve(null);
+                    reader.readAsText(file);
+                };
+                input.click();
+            });
+            if (!fileData) return { success: false, canceled: true, error: 'No file selected' };
+            return await this.importFromJson(fileData, mode);
+        }
+
+        if (!filePath) {
+            return { success: false, canceled: true, error: 'No file selected' };
+        }
+
+        // Handle ZIP archive import
+        if (filePath.toLowerCase().endsWith('.zip')) {
+            if (window.electronAPI && window.electronAPI.readZipFile) {
+                try {
+                    const zipRes = await window.electronAPI.readZipFile(filePath);
+                    if (!zipRes || !zipRes.success || !Array.isArray(zipRes.files)) {
+                        throw new Error(zipRes?.error || 'Failed to read ZIP archive');
+                    }
+                    return await this.importFromZipFiles(zipRes.files, mode);
+                } catch (err) {
+                    console.error('❌ ZIP import failed:', err);
+                    return { success: false, error: err.message };
+                }
+            } else {
+                return { success: false, error: 'ZIP extraction is not available' };
+            }
+        }
+
+        let jsonStr = null;
+        if (window.electronAPI && window.electronAPI.readFile) {
+            jsonStr = await window.electronAPI.readFile(filePath);
         }
 
         if (!jsonStr) {
-            return { success: false, error: 'No file selected' };
+            return { success: false, error: 'Could not read selected file' };
         }
 
         return await this.importFromJson(jsonStr, mode);
+    },
+
+    /**
+     * Import profiles and templates from extracted ZIP files
+     * @param {Array<{path: string, content: string}>} files - Extracted files
+     * @param {string} mode - 'merge' or 'replace'
+     */
+    async importFromZipFiles(files, mode = 'merge') {
+        try {
+            let bundleJson = null;
+            let usersJson = null;
+            let groupsJson = null;
+            const templateFiles = [];
+
+            for (const file of files) {
+                const normPath = file.path.replace(/\\/g, '/');
+                if (normPath === 'metafold-profiles.json' || normPath.endsWith('/metafold-profiles.json')) {
+                    bundleJson = file.content;
+                } else if (normPath === 'users.json' || normPath.endsWith('/users.json')) {
+                    usersJson = file.content;
+                } else if (normPath === 'groups.json' || normPath.endsWith('/groups.json')) {
+                    groupsJson = file.content;
+                } else if (normPath.startsWith('templates/') || normPath.includes('/templates/')) {
+                    if (normPath.endsWith('.json')) {
+                        templateFiles.push(file);
+                    }
+                }
+            }
+
+            let data = null;
+            if (bundleJson) {
+                data = JSON.parse(bundleJson);
+            } else {
+                data = {
+                    version: '1.0',
+                    groups: groupsJson ? (JSON.parse(groupsJson).groups || JSON.parse(groupsJson)) : [],
+                    users: usersJson ? (JSON.parse(usersJson).users || JSON.parse(usersJson)) : [],
+                    templates: []
+                };
+            }
+
+            // Extract templates to disk
+            let templatesExtracted = 0;
+            if (templateFiles.length > 0 && this._dataDir && window.electronAPI?.writeFile) {
+                const sep = this._dataDir.includes('\\') ? '\\' : '/';
+                for (const tf of templateFiles) {
+                    try {
+                        const parsedT = JSON.parse(tf.content);
+                        const fileName = (parsedT.name || tf.path.split('/').pop().replace('.json', ''))
+                            .replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() + '.json';
+                        const destPath = this._dataDir + sep + fileName;
+                        await window.electronAPI.writeFile(destPath, JSON.stringify(parsedT, null, 2));
+                        templatesExtracted++;
+                    } catch (e) {
+                        console.warn('Failed to parse template from ZIP:', tf.path, e);
+                    }
+                }
+            }
+
+            const result = await this.importFromJson(JSON.stringify(data), mode);
+            if (result && result.success && result.stats) {
+                result.stats.templatesImported = (result.stats.templatesImported || 0) + templatesExtracted;
+            }
+
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to process ZIP files:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
@@ -709,11 +1093,25 @@ const profileManager = {
         try {
             const data = JSON.parse(jsonStr);
 
-            if (!data.groups && !data.users) {
-                throw new Error('Invalid profile file: missing groups or users');
+            // Handle case where user selected an individual template file
+            if (!data.groups && !data.users && (data.structure || data.metadata || data.type === 'experiment')) {
+                if (this._dataDir && window.electronAPI?.writeFile && data.name) {
+                    const sep = this._dataDir.includes('\\') ? '\\' : '/';
+                    const safeName = data.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+                    const destPath = this._dataDir + sep + `${safeName}.json`;
+                    await window.electronAPI.writeFile(destPath, JSON.stringify(data, null, 2));
+                    if (window.templateManager?.init) {
+                        try { await window.templateManager.init(); } catch (e) {}
+                    }
+                    return { success: true, stats: { groupsAdded: 0, groupsSkipped: 0, usersAdded: 0, usersSkipped: 0, templatesImported: 1, usersNeedPassword: [] } };
+                }
             }
 
-            const stats = { groupsAdded: 0, groupsSkipped: 0, usersAdded: 0, usersSkipped: 0, usersNeedPassword: [] };
+            if (!data.groups && !data.users && !data.templates) {
+                throw new Error('Invalid export file: missing groups, users, or templates');
+            }
+
+            const stats = { groupsAdded: 0, groupsSkipped: 0, usersAdded: 0, usersSkipped: 0, templatesImported: 0, usersNeedPassword: [] };
 
             if (mode === 'replace') {
                 this.groups = [];
@@ -765,8 +1163,33 @@ const profileManager = {
                 }
             }
 
+            // Import templates (if bundled in the JSON file)
+            if (data.templates && Array.isArray(data.templates) && data.templates.length > 0) {
+                if (this._dataDir && window.electronAPI && window.electronAPI.writeFile) {
+                    const sep = this._dataDir.includes('\\') ? '\\' : '/';
+                    for (const t of data.templates) {
+                        if (t && t.name) {
+                            const safeTName = t.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+                            const destPath = this._dataDir + sep + `${safeTName}.json`;
+                            await window.electronAPI.writeFile(destPath, JSON.stringify(t, null, 2));
+                            stats.templatesImported++;
+                        }
+                    }
+                }
+            }
+
             await this._saveProfiles();
             this._syncGroupMappingToLocalStorage();
+
+            // Refresh templates if any were imported
+            if (stats.templatesImported > 0 && window.templateManager && typeof window.templateManager.init === 'function') {
+                try {
+                    await window.templateManager.init();
+                    console.log(`🔄 templateManager reloaded after importing ${stats.templatesImported} template(s)`);
+                } catch (e) {
+                    console.warn('⚠️ templateManager reload failed:', e);
+                }
+            }
 
             console.log(`📥 Import complete:`, stats);
             return { success: true, stats };
@@ -835,6 +1258,7 @@ const profileManager = {
      * This ensures userManager and loginModal still work with the old mapping
      */
     _syncGroupMappingToLocalStorage() {
+        if (typeof localStorage === 'undefined') return;
         try {
             const mapping = {};
             for (const user of this.users) {

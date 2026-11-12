@@ -119,12 +119,12 @@ const templateManager = {
         this.searchState.suggestionCache.clear();
     },
 
-    // Build search index
+    // Build search index (always indexes across ALL categories so search works globally)
     buildSearchIndex() {
-        console.log('🔍 Building search index...');
+        console.log('🔍 Building cross-category search index...');
         this.searchState.searchIndex.clear();
 
-        const allTemplates = this.getAllTemplates();
+        const allTemplates = this.getAllTemplates(true);
 
         allTemplates.forEach((template, index) => {
             const searchableContent = this.extractSearchableContent(template);
@@ -135,7 +135,7 @@ const templateManager = {
             });
         });
 
-        console.log(`✅ Search index built for ${allTemplates.length} templates`);
+        console.log(`✅ Search index built for ${allTemplates.length} templates across all categories`);
     },
 
     // Extract searchable content from template
@@ -146,6 +146,12 @@ const templateManager = {
         if (template.description) content.push(template.description);
         if (template.createdBy) content.push(template.createdBy);
         if (template.createdByGroup) content.push(template.createdByGroup);
+
+        const categoryId = template.category || 'category1';
+        if (window.templateTypeManager && typeof window.templateTypeManager.getCategoryConfig === 'function') {
+            const catCfg = window.templateTypeManager.getCategoryConfig(categoryId);
+            if (catCfg && catCfg.name) content.push(catCfg.name);
+        }
 
         content.push(template.type || 'folders');
 
@@ -320,13 +326,17 @@ const templateManager = {
         }
     },
 
-    // Perform search
+    // Perform search across all categories
     performSearch(query) {
         const startTime = performance.now();
 
         try {
             this.searchState.query = query;
             this.searchState.isSearching = true;
+
+            if (this.searchState.searchIndex.size === 0) {
+                this.buildSearchIndex();
+            }
 
             const cacheKey = `${query}_${this.searchState.showSharedTemplates}`;
             if (this.searchState.searchCache.has(cacheKey)) {
@@ -379,6 +389,9 @@ const templateManager = {
 
     // Generate search suggestions
     generateSearchSuggestionsAsync(query) {
+        if (this.searchState.searchIndex.size === 0) {
+            this.buildSearchIndex();
+        }
         if (this.searchState.suggestionCache.has(query)) {
             this.searchState.suggestions = this.searchState.suggestionCache.get(query);
             return;
@@ -430,18 +443,19 @@ const templateManager = {
 
         if (this.searchState.isSearching) {
             const resultCount = this.getFilteredTemplates().length;
-            const totalCount = this.getAllTemplates().length;
+            const allAcrossCategories = this.getAllTemplates(true);
+            const totalCount = this.searchState.showSharedTemplates
+                ? allAcrossCategories.length
+                : allAcrossCategories.filter(t => t.isOwn).length;
 
             if (resultCount === 0) {
-                statusDiv.textContent = `No templates found for "${this.searchState.query}"`;
+                statusDiv.textContent = `No templates found for "${this.searchState.query}" (all categories)`;
                 statusDiv.className = 'no-results';
                 statusDiv.style.display = 'block';
-            } else if (resultCount < totalCount) {
-                statusDiv.textContent = `${resultCount} of ${totalCount} templates shown`;
+            } else {
+                statusDiv.textContent = `${resultCount} of ${totalCount} templates shown (all categories)`;
                 statusDiv.className = 'results-found';
                 statusDiv.style.display = 'block';
-            } else {
-                statusDiv.style.display = 'none';
             }
         } else {
             statusDiv.style.display = 'none';
@@ -544,14 +558,13 @@ const templateManager = {
     },
 
 
-    // Get all templates (ENHANCED for better Group Template Loading)
-    getAllTemplates() {
+    // Get all templates (ENHANCED for better Group Template Loading; supports cross-category lookup)
+    getAllTemplates(includeAllCategories = false) {
         const currentType = this.getCurrentType();
 
-        if (this.allTemplates.length > 0) {
+        if (!includeAllCategories && this.allTemplates.length > 0) {
             const firstTemplate = this.allTemplates[0];
-            const cacheValidForType = (currentType === 'folders' && firstTemplate.type !== 'experiment') ||
-                (currentType === 'experiments' && firstTemplate.type === 'experiment');
+            const cacheValidForType = (firstTemplate.category || 'category1') === currentType;
 
             if (cacheValidForType) {
                 return this.allTemplates;
@@ -560,12 +573,14 @@ const templateManager = {
             }
         }
 
-        // 1. Get own templates first (ENHANCED: Filter by category)
-        const ownTemplates = this.templates.filter(t => {
-            // Templates without category field are treated as 'category1' for backward compatibility
-            const templateCategory = t.category || 'category1';
-            return templateCategory === currentType;
-        });
+        // 1. Get own templates first (Filter by category unless includeAllCategories is true)
+        const ownTemplates = includeAllCategories
+            ? [...this.templates]
+            : this.templates.filter(t => {
+                // Templates without category field are treated as 'category1' for backward compatibility
+                const templateCategory = t.category || 'category1';
+                return templateCategory === currentType;
+            });
 
         // 2. Load group templates with enhanced error handling
         let groupTemplates = [];
@@ -596,10 +611,12 @@ const templateManager = {
                             return false;
                         }
 
-                        // ENHANCED: Apply category filter
-                        const templateCategory = t.category || 'category1';
-                        if (templateCategory !== currentType) {
-                            return false;
+                        // ENHANCED: Apply category filter unless searching across all categories
+                        if (!includeAllCategories) {
+                            const templateCategory = t.category || 'category1';
+                            if (templateCategory !== currentType) {
+                                return false;
+                            }
                         }
 
                         return true;
@@ -637,8 +654,14 @@ const templateManager = {
             category: t.category || 'category1'  // Ensure category field exists
         }));
 
-        // 4. Combine and cache
-        this.allTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
+        const combinedTemplates = [...ownTemplatesMarked, ...groupTemplatesMarked];
+
+        if (includeAllCategories) {
+            return combinedTemplates;
+        }
+
+        // 4. Combine and cache for current category
+        this.allTemplates = combinedTemplates;
 
         console.log(`📂 Total templates loaded: ${this.allTemplates.length} (${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared)`);
 
@@ -678,10 +701,14 @@ const templateManager = {
     // NEW: Get category badge HTML for template list rendering
     getCategoryBadge(template) {
         const category = template.category || 'category1';
-        const categoryConfig = window.templateTypeManager.getCategoryConfig(category);
+        const categoryConfig = window.templateTypeManager
+            ? window.templateTypeManager.getCategoryConfig(category)
+            : { name: category, icon: '📋', color: '#6b7280' };
+        const showCategoryLabel = Boolean(this.searchState && this.searchState.isSearching);
+        const safeCatName = this.escapeHtml(categoryConfig.name || category);
 
-        return `<span class="template-badge ${category}" style="background: ${categoryConfig.color};">
-            ${categoryConfig.icon}
+        return `<span class="template-badge ${category}" style="background: ${categoryConfig.color};" title="Category: ${safeCatName}">
+            ${categoryConfig.icon}${showCategoryLabel ? ` <span style="font-size: 0.7rem; margin-left: 2px;">${safeCatName}</span>` : ''}
         </span>`;
     },
 
@@ -723,6 +750,12 @@ const templateManager = {
         if (!this.currentTemplate) {
             infoElement.textContent = 'No template selected';
             infoElement.className = 'template-info';
+            return;
+        }
+
+        if (this.currentTemplate.isLoadedProject) {
+            infoElement.textContent = `📂 Project: ${this.currentTemplate.name} (Loaded Metadata)`;
+            infoElement.className = 'template-info info';
             return;
         }
 
@@ -981,12 +1014,62 @@ const templateManager = {
         }
     },
 
+    // Deselect current template and return to placeholder/welcome view
+    deselectTemplate() {
+        console.log('🔄 Deselecting current template...');
+        this.selectedIndex = -1;
+        this.currentTemplate = null;
+
+        // Reset form completely
+        if (window.experimentForm && window.experimentForm.resetFormForNewTemplate) {
+            window.experimentForm.resetFormForNewTemplate();
+        }
+
+        const detailsElement = document.getElementById('templateDetails');
+        const placeholderElement = document.getElementById('templatePlaceholder');
+
+        if (detailsElement) {
+            detailsElement.style.display = 'none';
+        }
+        if (placeholderElement) {
+            placeholderElement.style.display = 'block';
+        }
+
+        const preview = document.getElementById('folderPreview');
+        if (preview) {
+            preview.innerHTML = '';
+        }
+
+        const experimentFormDiv = document.getElementById('experimentForm');
+        if (experimentFormDiv) {
+            experimentFormDiv.style.display = 'none';
+        }
+
+        this.renderList();
+        this.updateTemplateInfo();
+
+        if (typeof window.updateFooterVisibility === 'function') {
+            window.updateFooterVisibility();
+        } else {
+            const createProjectBtn = document.getElementById('createProjectBtn');
+            if (createProjectBtn) createProjectBtn.style.display = 'none';
+        }
+
+        window.dispatchEvent(new CustomEvent('templateDeselected'));
+    },
+
     // Select template
     select(index) {
         const filteredTemplates = this.getFilteredTemplates();
         const template = filteredTemplates[index];
 
         if (!template) return;
+
+        // If clicking the already-selected template, toggle deselect
+        if (this.selectedIndex === index && this.currentTemplate) {
+            this.deselectTemplate();
+            return;
+        }
 
         console.log(`🔄 Selecting template: ${template.name}`);
 
@@ -998,6 +1081,22 @@ const templateManager = {
 
         this.selectedIndex = index;
         this.currentTemplate = template;
+
+        // If selected template belongs to a different category (e.g. from cross-category search), sync the active category tab
+        const templateCategory = template.category || 'category1';
+        if (window.templateTypeManager && window.templateTypeManager.currentType !== templateCategory) {
+            window.templateTypeManager.currentType = templateCategory;
+            this.allTemplates = [];
+            if (window.settingsManager && window.settingsManager.set) {
+                window.settingsManager.set('templates.active_category', templateCategory);
+            }
+            if (typeof window.templateTypeManager.updateUI === 'function') {
+                window.templateTypeManager.updateUI();
+            }
+            if (typeof window.templateTypeManager.updateIntegrationVisibility === 'function') {
+                window.templateTypeManager.updateIntegrationVisibility();
+            }
+        }
 
         this.renderList();
         this.updateTemplateInfo();
@@ -1134,6 +1233,10 @@ const templateManager = {
         window.dispatchEvent(new CustomEvent('templateSelected', {
             detail: { template: this.currentTemplate }
         }));
+
+        if (typeof window.updateFooterVisibility === 'function') {
+            window.updateFooterVisibility();
+        }
 
         console.log('✅ Template selected:', template.name);
     },
@@ -1956,9 +2059,7 @@ const templateManager = {
 
         // CONTINUE with original renderList logic...
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
-            const badge = template.type === 'experiment' ?
-                '<span class="template-badge experiment">🧪</span>' :
-                '<span class="template-badge">📁</span>';
+            const badge = this.getCategoryBadge(template);
 
             const color = this.getUserColor(template.createdBy);
             const initials = this.getUserInitials(template.createdBy);
@@ -2409,6 +2510,7 @@ const templateManager = {
             this.filteredTemplates = [...this.templates];
             this.initializeSearchState();
             await this.loadSharedTemplatesPreference();
+            this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
             this.updateSharedToggleVisibility();

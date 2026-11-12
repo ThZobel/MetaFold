@@ -2,6 +2,52 @@
 
 const templateModal = {
     editingIndex: -1, // -1 = new template, >= 0 = editing existing
+    tagPicker: null,
+
+    // Initialize or refresh community metadata UI (Category, Collections, TagPicker)
+    ensureCommunityUI() {
+        const container = document.getElementById('communityTagsContainer');
+        if (container && !this.tagPicker && window.communityManager) {
+            this.tagPicker = window.communityManager.createTagPicker({
+                container: container,
+                onChange: (tags) => {
+                    const hidden = document.getElementById('communityTags');
+                    if (hidden) hidden.value = tags.join(', ');
+                }
+            });
+        }
+
+        // Populate collections dropdown if available
+        const colSelect = document.getElementById('communityCollection');
+        if (colSelect && window.communityManager) {
+            const currentVal = colSelect.value || 'General';
+            const collections = window.communityManager.getCollections();
+            colSelect.innerHTML = '';
+            collections.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col.id;
+                opt.textContent = col.name + (col.id === 'General' ? ' (Default Collection)' : '');
+                colSelect.appendChild(opt);
+            });
+            const proposeOpt = document.createElement('option');
+            proposeOpt.value = '__propose_new__';
+            proposeOpt.textContent = '➕ Propose new collection...';
+            colSelect.appendChild(proposeOpt);
+
+            if ([...colSelect.options].some(o => o.value === currentVal)) {
+                colSelect.value = currentVal;
+            } else {
+                colSelect.value = 'General';
+            }
+        }
+    },
+
+    onCollectionChange(val) {
+        const box = document.getElementById('communityProposedCollectionBox');
+        if (box) {
+            box.style.display = (val === '__propose_new__') ? 'block' : 'none';
+        }
+    },
 
     // Show modal for new template
     async show() {
@@ -98,6 +144,26 @@ const templateModal = {
         if (multipleFolders) multipleFolders.checked = false;
 
         // Clear community fields
+        this.ensureCommunityUI();
+        const catSelect = document.getElementById('communityCategory');
+        if (catSelect) catSelect.value = 'Experiments';
+        const colSelect = document.getElementById('communityCollection');
+        if (colSelect) colSelect.value = 'General';
+        this.onCollectionChange('General');
+
+        const pName = document.getElementById('communityProposedName');
+        const pLab = document.getElementById('communityProposedLab');
+        const pDesc = document.getElementById('communityProposedDesc');
+        const pWeb = document.getElementById('communityProposedWebsite');
+        if (pName) pName.value = '';
+        if (pLab) pLab.value = '';
+        if (pDesc) pDesc.value = '';
+        if (pWeb) pWeb.value = '';
+
+        if (this.tagPicker) {
+            this.tagPicker.clear();
+        }
+
         const systemInput = document.getElementById('communitySystem');
         const disciplineInput = document.getElementById('communityDiscipline');
         const organismInput = document.getElementById('communityOrganism');
@@ -126,7 +192,7 @@ const templateModal = {
         if (institutionInput) institutionInput.value = defaultInst;
         if (orcidInput) orcidInput.value = defaultOrcid;
         if (versionInput) versionInput.value = '1.0.0';
-        if (licenseInput) licenseInput.value = 'CC-BY-4.0';
+        if (licenseInput) licenseInput.value = 'CC0-1.0';
 
         // Reset collapsible folder structure
         const folderDetails = document.getElementById('folderStructureDetails');
@@ -157,7 +223,57 @@ const templateModal = {
         if (multipleFolders) multipleFolders.checked = template.options?.multipleFolders || false;
 
         // Populate Community taxonomy
+        this.ensureCommunityUI();
         const comm = template.community || {};
+
+        // Category (Fixed: Systems, Protocols, Experiments, Workflows)
+        const catSelect = document.getElementById('communityCategory');
+        if (catSelect) {
+            const rawCat = comm.category || comm.type || template.type || 'Experiments';
+            const matched = ['Systems', 'Protocols', 'Experiments', 'Workflows'].find(
+                c => c.toLowerCase() === String(rawCat).toLowerCase()
+            ) || 'Experiments';
+            catSelect.value = matched;
+        }
+
+        // Collection & Proposed collection
+        const colSelect = document.getElementById('communityCollection');
+        if (colSelect) {
+            if (comm.proposedCollection && comm.proposedCollection.name) {
+                colSelect.value = '__propose_new__';
+                this.onCollectionChange('__propose_new__');
+                const pName = document.getElementById('communityProposedName');
+                const pLab = document.getElementById('communityProposedLab');
+                const pDesc = document.getElementById('communityProposedDesc');
+                const pWeb = document.getElementById('communityProposedWebsite');
+                if (pName) pName.value = comm.proposedCollection.name || '';
+                if (pLab) pLab.value = comm.proposedCollection.institution || '';
+                if (pDesc) pDesc.value = comm.proposedCollection.description || '';
+                if (pWeb) pWeb.value = comm.proposedCollection.website || '';
+            } else {
+                const col = comm.collection || 'General';
+                if (![...colSelect.options].some(o => o.value === col)) {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    colSelect.insertBefore(opt, colSelect.lastElementChild);
+                }
+                colSelect.value = col;
+                this.onCollectionChange(col);
+            }
+        }
+
+        // Tags
+        let tags = [];
+        if (Array.isArray(comm.tags)) {
+            tags = comm.tags;
+        } else if (comm.tags) {
+            tags = String(comm.tags).split(',').map(t => t.trim()).filter(Boolean);
+        }
+        if (this.tagPicker) {
+            this.tagPicker.setTags(tags);
+        }
+
         const systemInput = document.getElementById('communitySystem');
         const disciplineInput = document.getElementById('communityDiscipline');
         const organismInput = document.getElementById('communityOrganism');
@@ -189,7 +305,7 @@ const templateModal = {
         if (institutionInput) institutionInput.value = comm.institution || defaultInst;
         if (orcidInput) orcidInput.value = comm.orcid || defaultOrcid;
         if (versionInput) versionInput.value = comm.version || '1.0.0';
-        if (licenseInput) licenseInput.value = comm.license || 'CC-BY-4.0';
+        if (licenseInput) licenseInput.value = comm.license || 'CC0-1.0';
 
         // Auto-expand folder structure if template has existing structure or options
         const folderDetails = document.getElementById('folderStructureDetails');
@@ -221,15 +337,8 @@ const templateModal = {
         }
     },
 
-    // Switch between metadata and community tabs
+    // Switch between metadata, structure, and community tabs
     switchTab(tabName) {
-        // Alias legacy 'structure' tab to 'metadata' and auto-expand folder structure
-        if (tabName === 'structure') {
-            tabName = 'metadata';
-            const details = document.getElementById('folderStructureDetails');
-            if (details) details.open = true;
-        }
-
         // Hide all tab contents
         document.querySelectorAll('#experimentTab .tab-content').forEach(content => {
             content.classList.remove('active');
@@ -247,6 +356,13 @@ const templateModal = {
             const tabBtn = document.getElementById('tabBtnMetadata') || 
                            document.querySelector('#experimentTab .tab[data-tab="metadata"]');
             if (tabBtn) tabBtn.classList.add('active');
+        } else if (tabName === 'structure') {
+            const content = document.getElementById('structureContent');
+            if (content) content.classList.add('active');
+            const tabBtn = document.getElementById('tabBtnStructure') || 
+                           document.querySelector('#experimentTab .tab[data-tab="structure"]');
+            if (tabBtn) tabBtn.classList.add('active');
+            this.updateDynamicFieldsHelper();
         } else if (tabName === 'community') {
             const content = document.getElementById('communityContent');
             if (content) content.classList.add('active');
@@ -256,32 +372,152 @@ const templateModal = {
         }
     },
 
+    // Update the dynamic folder fields helper chips in the Folder Structure tab
+    updateDynamicFieldsHelper() {
+        const container = document.getElementById('dynamicFolderChipsList');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const fieldTags = new Map();
+
+        // 1. Standard / System Tags (always available)
+        fieldTags.set('User Name', { label: 'User Name', source: 'system', desc: 'Current logged-in user' });
+        fieldTags.set('Project Name', { label: 'Project Name', source: 'system', desc: 'Project name from project form' });
+        fieldTags.set('Date', { label: 'Date', source: 'system', desc: 'Current creation date (YYYY-MM-DD)' });
+
+        // 2. Custom fields from Metadata Editor DOM
+        const fieldEls = document.querySelectorAll('#metadataFields .metadata-field');
+        fieldEls.forEach(fieldEl => {
+            const type = fieldEl.querySelector('.field-type-selector')?.value;
+            if (type === 'group') return;
+            const label = fieldEl.querySelector('.field-label-input')?.value.trim();
+            const name = fieldEl.querySelector('.field-name-input')?.value.trim();
+            const displayTag = label || name;
+            if (displayTag && !fieldTags.has(displayTag)) {
+                fieldTags.set(displayTag, { label: displayTag, source: 'template', desc: label && name ? `Key: ${name}` : '' });
+            }
+        });
+
+        // 3. Fallback from collectMetadata or template object
+        if (window.metadataEditor && typeof window.metadataEditor.collectMetadata === 'function') {
+            try {
+                const meta = window.metadataEditor.collectMetadata() || {};
+                const fields = meta.fields || meta;
+                for (const [key, f] of Object.entries(fields)) {
+                    if (f && f.type === 'group') continue;
+                    const label = f?.label ? f.label.trim() : key;
+                    if (label && !fieldTags.has(label)) {
+                        fieldTags.set(label, { label, source: 'template', desc: `Key: ${key}` });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Render chips
+        fieldTags.forEach((info, tag) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-secondary btn-small';
+            btn.style.cssText = `
+                padding: 3px 9px;
+                font-size: 0.78rem;
+                font-family: monospace;
+                background: ${info.source === 'system' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(168, 85, 247, 0.22)'};
+                border: 1px solid ${info.source === 'system' ? 'rgba(59, 130, 246, 0.45)' : 'rgba(168, 85, 247, 0.45)'};
+                color: ${info.source === 'system' ? '#93c5fd' : '#e9d5ff'};
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            `;
+            btn.title = `Click to insert [${tag}]/ into folder structure${info.desc ? ` (${info.desc})` : ''}`;
+            btn.innerHTML = `<span>[${tag}]</span>`;
+            btn.onmouseenter = () => {
+                btn.style.transform = 'translateY(-1px)';
+                btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+            };
+            btn.onmouseleave = () => {
+                btn.style.transform = 'none';
+                btn.style.boxShadow = 'none';
+            };
+            btn.onclick = () => this.insertPlaceholderIntoStructure(`[${tag}]`);
+            container.appendChild(btn);
+        });
+    },
+
+    // Insert dynamic tag placeholder into folder structure textarea at cursor position
+    insertPlaceholderIntoStructure(tag) {
+        const textarea = document.getElementById('experimentStructure');
+        if (!textarea) return;
+        const tagToInsert = tag.endsWith('/') ? tag : `${tag}/`;
+        const start = textarea.selectionStart !== undefined ? textarea.selectionStart : textarea.value.length;
+        const end = textarea.selectionEnd !== undefined ? textarea.selectionEnd : textarea.value.length;
+        const text = textarea.value;
+
+        textarea.value = text.substring(0, start) + tagToInsert + text.substring(end);
+        textarea.focus();
+        const newPos = start + tagToInsert.length;
+        textarea.setSelectionRange(newPos, newPos);
+    },
+
     // Collect Community & Sharing metadata
     collectCommunityData() {
-        const system = document.getElementById('communitySystem')?.value?.trim() || '';
-        const discipline = document.getElementById('communityDiscipline')?.value?.trim() || '';
-        const organism = document.getElementById('communityOrganism')?.value?.trim() || '';
-        const rawTags = document.getElementById('communityTags')?.value || '';
-        const tags = rawTags
-            .split(',')
-            .map(t => t.trim())
-            .filter(t => t.length > 0);
+        const category = document.getElementById('communityCategory')?.value || 'Experiments';
+        const colSelect = document.getElementById('communityCollection');
+        const collectionValue = colSelect?.value || 'General';
+        const isProposed = collectionValue === '__propose_new__';
+
+        let proposedCollection = null;
+        if (isProposed) {
+            proposedCollection = {
+                name: document.getElementById('communityProposedName')?.value?.trim() || '',
+                institution: document.getElementById('communityProposedLab')?.value?.trim() || '',
+                description: document.getElementById('communityProposedDesc')?.value?.trim() || '',
+                website: document.getElementById('communityProposedWebsite')?.value?.trim() || ''
+            };
+        }
+
+        let tags = [];
+        if (this.tagPicker) {
+            tags = this.tagPicker.getTags();
+        } else {
+            const rawTags = document.getElementById('communityTags')?.value || '';
+            tags = rawTags.split(',').map(t => t.trim()).filter(Boolean);
+        }
+
+        // Sync hidden tags input
+        const hiddenTags = document.getElementById('communityTags');
+        if (hiddenTags) {
+            hiddenTags.value = tags.join(', ');
+        }
+
         const author = document.getElementById('communityAuthor')?.value?.trim() || '';
         const institution = document.getElementById('communityInstitution')?.value?.trim() || '';
         const orcid = document.getElementById('communityOrcid')?.value?.trim() || '';
         const version = document.getElementById('communityVersion')?.value?.trim() || '1.0.0';
-        const license = document.getElementById('communityLicense')?.value?.trim() || 'CC-BY-4.0';
+        const license = document.getElementById('communityLicense')?.value?.trim() || 'CC0-1.0';
+
+        // Keep legacy fields populated for backward compatibility
+        const system = document.getElementById('communitySystem')?.value?.trim() || '';
+        const discipline = document.getElementById('communityDiscipline')?.value?.trim() || '';
+        const organism = document.getElementById('communityOrganism')?.value?.trim() || '';
 
         return {
-            system,
-            discipline,
-            organism,
+            category,
+            type: category.toLowerCase(),
+            collection: isProposed ? 'General' : collectionValue,
+            proposedCollection,
             tags,
             author,
             institution,
             orcid,
             version,
-            license
+            license,
+            system,
+            discipline,
+            organism
         };
     },
 

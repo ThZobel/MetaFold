@@ -1,3 +1,69 @@
+// =================== CENTRAL METADATA READER HELPERS ===================
+
+/**
+ * Checks if a value is a MetaFold metadata field object ({ value, type, label, unit, ... })
+ */
+window.isMetadataValueObject = function(obj) {
+    return Boolean(obj && typeof obj === 'object' && !Array.isArray(obj) && ('value' in obj || 'type' in obj));
+};
+
+/**
+ * Centrally formats any metadata value for display in Tabulator, Sidebar, Search, or Tooltips.
+ * Prevents [object Object] output and cleanly appends units (e.g. "488 nm").
+ */
+window.formatDisplayValue = function(rawFieldOrVal, options = {}) {
+    if (rawFieldOrVal === undefined || rawFieldOrVal === null) {
+        return options.emptyPlaceholder !== undefined ? options.emptyPlaceholder : '—';
+    }
+
+    let val = rawFieldOrVal;
+    let unit = options.unit || '';
+    let type = options.type || '';
+
+    if (window.isMetadataValueObject(rawFieldOrVal)) {
+        val = rawFieldOrVal.value;
+        unit = rawFieldOrVal.unit || unit;
+        type = rawFieldOrVal.type || type;
+    }
+
+    if (val === undefined || val === null || val === '') {
+        return options.emptyPlaceholder !== undefined ? options.emptyPlaceholder : '—';
+    }
+
+    if (type === 'checkbox' || typeof val === 'boolean') {
+        return val ? 'Yes' : 'No';
+    }
+
+    if (Array.isArray(val)) {
+        if (val.length === 0) return options.emptyPlaceholder !== undefined ? options.emptyPlaceholder : '—';
+        return val.map(item => {
+            if (item && typeof item === 'object') {
+                const label = item.name || item.id || 'Link';
+                const note = item.relation_note || item.anchor || '';
+                return note ? `${label} (${note})` : label;
+            }
+            return String(item);
+        }).join(', ');
+    }
+
+    if (val && typeof val === 'object') {
+        if (val.name || val.id) {
+            const label = val.name || val.id;
+            const note = val.relation_note || val.anchor || '';
+            return note ? `${label} (${note})` : label;
+        }
+        try {
+            return JSON.stringify(val);
+        } catch (_) {
+            return String(val);
+        }
+    }
+
+    const strVal = String(val);
+    const unitStr = unit ? ` ${unit}` : '';
+    return `${strVal}${unitStr}`;
+};
+
 // =================== TEMPLATE TYPE MANAGEMENT ===================
 
 window.switchTemplateType = function (type) {
@@ -64,27 +130,52 @@ window.switchMainTab = function (tabName) {
 
         // Tab-specific initialization
         if (tabName === 'discover') {
-            console.log('📁 Initializing Discovery tab...');
+            console.log('📁 Initializing Discovery tab (opening Facet Search directly)...');
             if (window.projectScanner) {
                 window.projectScanner.init();
+                window.projectScanner.updateIndexBadge?.();
             }
 
             // Update OMERO logout button visibility
             if (window.omeroUIIntegration && window.omeroUIIntegration.updateLogoutButtonVisibility) {
                 window.omeroUIIntegration.updateLogoutButtonVisibility();
             }
+
+            // Skip intermediate discovery tiles and open Facet Search directly (unless fileScanner wizard is actively displayed or being launched)
+            const fileScannerContainer = document.getElementById('fileScannerContainer');
+            const isFileScannerActive = fileScannerContainer && fileScannerContainer.style.display !== 'none' && fileScannerContainer.classList.contains('active');
+            if (!isFileScannerActive && !window._isLaunchingFileScanner && window.facetSearch && typeof window.facetSearch.openFromUserIndex === 'function') {
+                window.facetSearch.openFromUserIndex();
+            }
         } else if (tabName === 'visualize') {
             console.log('📊 Initializing Visualization tab...');
             if (window.visualizationManager) {
                 window.visualizationManager.init();
 
-                // Show/hide scanned projects button
+                // Show/hide scanned projects button (fallback to Living User Index if no manual scan yet)
                 const scannedBtn = document.getElementById('visualizeScannedBtn');
                 if (window.projectScanner && window.projectScanner.projects && window.projectScanner.projects.length > 0) {
                     if (scannedBtn) {
                         scannedBtn.style.display = 'inline-block';
                         scannedBtn.textContent = `📁 Projects (${window.projectScanner.projects.length})`;
                     }
+                } else if (window.electronAPI?.loadUserIndex) {
+                    const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+                    window.electronAPI.loadUserIndex(userInfo).then(res => {
+                        if (res && res.success && res.projects && res.projects.length > 0) {
+                            if (window.projectScanner && (!window.projectScanner.projects || window.projectScanner.projects.length === 0)) {
+                                window.projectScanner.projects = res.projects;
+                            }
+                            if (scannedBtn) {
+                                scannedBtn.style.display = 'inline-block';
+                                scannedBtn.textContent = `📚 Indexed Projects (${res.projects.length})`;
+                            }
+                        } else if (scannedBtn) {
+                            scannedBtn.style.display = 'none';
+                        }
+                    }).catch(() => {
+                        if (scannedBtn) scannedBtn.style.display = 'none';
+                    });
                 } else {
                     if (scannedBtn) scannedBtn.style.display = 'none';
                 }
@@ -670,7 +761,7 @@ window.pluginsSettingsInit = async function () {
     if (fse) fse.checked = (await sm.get('plugins.filescanner_enabled')) === true;
     if (bfe) bfe.checked = (await sm.get('plugins.bioformats_enabled')) === true;
     if (bfp) bfp.value  = (await sm.get('plugins.bioformats_path'))    || '';
-    if (bfStatus) { bfStatus.className = 'plugins-bf-status idle'; bfStatus.textContent = 'ℹ Noch nicht getestet'; }
+    if (bfStatus) { bfStatus.className = 'plugins-bf-status idle'; bfStatus.textContent = 'ℹ Not tested yet'; }
 
     // Render extension checkboxes
     const grid = document.getElementById('pluginsExtGrid');
@@ -730,7 +821,7 @@ window.pluginsTestBioFormats = async function () {
     if (!statusEl) return;
 
     statusEl.className = 'plugins-bf-status checking';
-    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Teste BioFormats…';
+    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Testing BioFormats…';
 
     try {
         const customPath = pathEl ? pathEl.value.trim() || undefined : undefined;
@@ -738,7 +829,7 @@ window.pluginsTestBioFormats = async function () {
 
         if (result.found) {
             statusEl.className = 'plugins-bf-status found';
-            statusEl.innerHTML = `✅ Gefunden: ${result.path} (${result.version || 'Version unbekannt'})`;
+            statusEl.innerHTML = `✅ Found: ${result.path} (${result.version || 'Unknown version'})`;
             if (pathEl) {
                 pathEl.value = result.path;
                 if (window.settingsManager) {
@@ -747,11 +838,41 @@ window.pluginsTestBioFormats = async function () {
             }
         } else {
             statusEl.className = 'plugins-bf-status not-found';
-            statusEl.innerHTML = `❌ Nicht gefunden. Bitte BioFormats CLI installieren und Pfad angeben.`;
+            statusEl.innerHTML = `❌ Not found. Please install BioFormats CLI and specify path.`;
         }
     } catch (err) {
         statusEl.className = 'plugins-bf-status not-found';
-        statusEl.textContent = `❌ Fehler: ${err.message}`;
+        statusEl.textContent = `❌ Error: ${err.message}`;
+    }
+};
+
+/**
+ * Browse for BioFormats CLI executable (showinf.bat / showinf)
+ */
+window.pluginsBrowseBioFormats = async function () {
+    try {
+        const pathEl = document.getElementById('bioformatsPath');
+        if (!window.electronAPI || !window.electronAPI.selectFile) return;
+
+        const selected = await window.electronAPI.selectFile({
+            title: 'Select showinf.bat or bftools folder/file',
+            filters: [
+                { name: 'BioFormats Executable', extensions: ['bat', 'sh', '*'] }
+            ]
+        });
+
+        if (selected) {
+            if (pathEl) {
+                pathEl.value = selected;
+                if (window.settingsManager) {
+                    await window.settingsManager.set('plugins.bioformats_path', selected);
+                }
+            }
+            // Automatically test and update status
+            await window.pluginsTestBioFormats();
+        }
+    } catch (err) {
+        console.error('Error browsing for BioFormats:', err);
     }
 };
 
@@ -764,7 +885,7 @@ window.pluginsAutoDetectBioFormats = async function () {
     if (!statusEl) return;
 
     statusEl.className = 'plugins-bf-status checking';
-    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Auto-Erkennung…';
+    statusEl.innerHTML = '<span class="fsc-spinner" style="display:inline-block; width:14px; height:14px; border-width:2px;"></span> Auto-detecting…';
 
     try {
         const result = await window.electronAPI.detectBioFormats(undefined);
@@ -774,14 +895,14 @@ window.pluginsAutoDetectBioFormats = async function () {
                 window.settingsManager && window.settingsManager.set('plugins.bioformats_path', result.path);
             }
             statusEl.className = 'plugins-bf-status found';
-            statusEl.innerHTML = `✅ Automatisch gefunden: ${result.path} (${result.version || ''})`;
+            statusEl.innerHTML = `✅ Automatically found: ${result.path} (${result.version || ''})`;
         } else {
             statusEl.className = 'plugins-bf-status not-found';
-            statusEl.textContent = '❌ Nicht gefunden. Pfad manuell eingeben.';
+            statusEl.textContent = '❌ Not found. Enter path manually.';
         }
     } catch (err) {
         statusEl.className = 'plugins-bf-status not-found';
-        statusEl.textContent = `❌ Fehler: ${err.message}`;
+        statusEl.textContent = `❌ Error: ${err.message}`;
     }
 };
 

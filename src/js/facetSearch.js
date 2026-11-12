@@ -7,74 +7,372 @@ const facetSearch = {
     allAvailableKeys: [],
     tabulatorInstance: null,   // Tabulator.js table instance
     _hasFileSidecars: false,   // true when any project has file sidecars
+    _showSidecarFacets: false, // toggle state for File/OME sidecar facets in the left sidebar (collapsed by default)
     hiddenKeys: [],            // Keys hidden by the user via context menu
     metadataTypes: {},
     isTemplateHub: false,
     _templateCache: {},         // Stores types of metadata fields (e.g. text, select)
-    
+    textSearchQuery: '',        // Free-text filter query
+    dataSource: 'user_index',   // 'user_index' | 'temp_scan' | 'external_json' | 'template_hub'
+    sourceLabel: '📚 User Index',
+    unsavedScan: null,          // { projects, basePath } when a temporary scan has not yet been saved to user_index.json
+    selectedProjectPath: null,
+    activeLayoutName: null,     // Name of currently applied saved layout (if any)
+    _customColumnOrder: [],     // Optional ordered list of movable column keys ('path', 'created', ...metadataKeys)
+    _customColumnWidths: {},    // Optional saved column widths per key/field
+    _customColumnSorters: [],   // Optional saved column sorters
+    _draggedColumnOrderKey: null,
+
 
     // Initialize the module
     init() {
         console.log('🏷️ Facet Search initialized');
 
-        // Close modal with ESC key
+        // Close modal with ESC key & navigate table rows with Up/Down arrow keys
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
+            const modal = document.getElementById('facetSearchModal');
+            if (!modal || modal.style.display === 'none') return;
 
-                const previewModal = document.getElementById('facetTemplatePreviewModal');
-                if (previewModal && previewModal.style.display !== 'none') {
-                    previewModal.style.display = 'none';
+            if (e.key === 'Escape') {
+                const ctxMenu = document.getElementById('facetContextMenu');
+                if (ctxMenu) {
+                    this.closeContextMenu();
                     e.stopPropagation();
                     return;
                 }
-                const modal = document.getElementById('facetSearchModal');
-
-                if (modal && modal.style.display !== 'none') {
-                    this.closeSearch();
+                const rightPanel = document.getElementById('facetRightPanel');
+                if (rightPanel && rightPanel.style.display !== 'none') {
+                    this.closeRightPanel();
+                    e.stopPropagation();
+                    return;
                 }
+                this.closeSearch();
+                return;
+            }
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+                // Do not hijack keys if the Manage Filters modal, Column Selector, or Layout dropdown is active
+                const manageModal = document.getElementById('facetManageCategoriesModal');
+                if (manageModal && manageModal.style.display !== 'none') return;
+
+                const colDropdown = document.getElementById('columnSelectorDropdown');
+                const layoutDropdown = document.getElementById('layoutSelectorDropdown');
+                const activeEl = document.activeElement;
+                if (colDropdown && colDropdown.style.display !== 'none' && activeEl && colDropdown.contains(activeEl)) {
+                    return;
+                }
+                if (layoutDropdown && layoutDropdown.style.display !== 'none' && activeEl && layoutDropdown.contains(activeEl)) {
+                    return;
+                }
+
+                const tag = activeEl && activeEl.tagName ? activeEl.tagName.toLowerCase() : '';
+                const isTextInput = tag === 'input' || tag === 'textarea' || tag === 'select' || (activeEl && activeEl.isContentEditable);
+
+                // Allow ArrowUp/ArrowDown even if the main text search input is focused,
+                // so users can type a filter query and immediately step through results with ↑/↓
+                const isMainSearchInput = activeEl && activeEl.id === 'facetTextSearchInput';
+                if (isTextInput && !isMainSearchInput) return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    if (isTextInput || !this._hasFileSidecars || !this.tabulatorInstance) return;
+                    const rows = this._getNavigableRows();
+                    const currentRow = this._findCurrentSelectedRow(rows);
+                    if (!currentRow) return;
+                    const children = typeof currentRow.getTreeChildren === 'function' ? currentRow.getTreeChildren() : [];
+                    if (children && children.length > 0) {
+                        e.preventDefault();
+                        if (e.key === 'ArrowRight' && typeof currentRow.isTreeExpanded === 'function' && !currentRow.isTreeExpanded()) {
+                            currentRow.treeExpand();
+                        } else if (e.key === 'ArrowLeft' && typeof currentRow.isTreeExpanded === 'function' && currentRow.isTreeExpanded()) {
+                            currentRow.treeCollapse();
+                        }
+                    }
+                    return;
+                }
+
+                // ArrowUp / ArrowDown row navigation
+                this.navigateTableByArrow(e.key === 'ArrowDown' ? 1 : -1, e);
             }
         });
 
-        // Close column-selector dropdown when clicking anywhere outside it
+        // Close column-selector, layout-selector, and scan-options dropdowns when clicking anywhere outside them
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById('columnSelectorDropdown');
             const btn = document.getElementById('columnSelectorBtn');
-            if (!dropdown || dropdown.style.display === 'none') return;
-            // If the click was NOT inside the dropdown and NOT on the toggle button, close it
-            if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-                dropdown.style.display = 'none';
+            if (dropdown && dropdown.style.display !== 'none') {
+                if (!dropdown.contains(e.target) && e.target !== btn && (!btn || !btn.contains(e.target))) {
+                    dropdown.style.display = 'none';
+                }
+            }
+            const layoutDropdown = document.getElementById('layoutSelectorDropdown');
+            const layoutBtn = document.getElementById('layoutSelectorBtn');
+            if (layoutDropdown && layoutDropdown.style.display !== 'none') {
+                if (!layoutDropdown.contains(e.target) && e.target !== layoutBtn && (!layoutBtn || !layoutBtn.contains(e.target))) {
+                    layoutDropdown.style.display = 'none';
+                }
+            }
+            const scanDropdown = document.getElementById('scanOptionsDropdown');
+            const scanBtn = document.getElementById('scanOptionsDropdownBtn');
+            if (scanDropdown && scanDropdown.style.display !== 'none') {
+                if (!scanDropdown.contains(e.target) && e.target !== scanBtn && (!scanBtn || !scanBtn.contains(e.target))) {
+                    scanDropdown.style.display = 'none';
+                }
+            }
+            const exportDropdown = document.getElementById('exportSelectorDropdown');
+            const exportBtn = document.getElementById('exportSelectorBtn');
+            if (exportDropdown && exportDropdown.style.display !== 'none') {
+                if (!exportDropdown.contains(e.target) && e.target !== exportBtn && (!exportBtn || !exportBtn.contains(e.target))) {
+                    exportDropdown.style.display = 'none';
+                }
             }
         }, true); // capture phase so it runs before stopPropagation in children
+
+        // Check sidecar scanner menu item visibility
+        this._updateSidecarScannerVisibility();
+        window.addEventListener('setting-changed', (e) => {
+            if (e.detail && e.detail.key === 'plugins.filescanner_enabled') {
+                this._updateSidecarScannerVisibility();
+            }
+        });
+
+        this._initColumnSplitters();
+    },
+
+    async _updateSidecarScannerVisibility() {
+        const sidecarBtn = document.getElementById('facetSidecarScannerBtn');
+        const section = document.getElementById('scanPluginsSection');
+        if (!sidecarBtn) return;
+        const enabled = (await window.settingsManager?.get('plugins.filescanner_enabled', true)) !== false;
+        sidecarBtn.style.display = enabled ? 'flex' : 'none';
+        if (section) section.style.display = enabled ? 'block' : 'none';
+    },
+
+    // Initialize flexible column splitters between sidebar, results table, and details panel
+    _initColumnSplitters() {
+        const leftSplitter = document.getElementById('facetLeftSplitter');
+        const rightSplitter = document.getElementById('facetRightSplitter');
+        const sidebar = document.getElementById('facetSidebar');
+        const rightPanel = document.getElementById('facetRightPanel');
+
+        if (!leftSplitter || !sidebar) return; // DOM not mounted yet
+
+        // Restore saved widths from localStorage
+        try {
+            const savedLeft = localStorage.getItem('metafold_facet_left_width');
+            if (savedLeft && sidebar) {
+                const w = parseInt(savedLeft, 10);
+                if (!isNaN(w) && w >= 180 && w <= 700) {
+                    sidebar.style.width = `${w}px`;
+                }
+            }
+            const savedRight = localStorage.getItem('metafold_facet_right_width');
+            if (savedRight && rightPanel) {
+                const w = parseInt(savedRight, 10);
+                if (!isNaN(w) && w >= 280 && w <= 950) {
+                    rightPanel.style.width = `${w}px`;
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not restore facet panel widths:', e);
+        }
+
+        if (this._splittersInitialized) return;
+        this._splittersInitialized = true;
+
+        let activeSplitter = null;
+        let isDragging = false;
+        let startX = 0;
+        let startWidth = 0;
+        let targetPanel = null;
+        let isLeft = false;
+
+        const onMouseMove = (e) => {
+            if (!isDragging || !targetPanel) return;
+            const delta = e.clientX - startX;
+            let newWidth;
+            if (isLeft) {
+                newWidth = startWidth + delta;
+                const maxW = Math.min(650, window.innerWidth - 350);
+                if (newWidth < 180) newWidth = 180;
+                if (newWidth > maxW) newWidth = maxW;
+            } else {
+                newWidth = startWidth - delta;
+                const maxW = Math.min(900, window.innerWidth - 300);
+                if (newWidth < 280) newWidth = 280;
+                if (newWidth > maxW) newWidth = maxW;
+            }
+            targetPanel.style.width = `${newWidth}px`;
+            if (this.tabulatorInstance && typeof this.tabulatorInstance.redraw === 'function') {
+                this.tabulatorInstance.redraw(true);
+            }
+        };
+
+        const onMouseUp = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            if (activeSplitter) activeSplitter.classList.remove('resizing');
+            document.body.classList.remove('facet-resizing');
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            try {
+                if (isLeft && sidebar) {
+                    const finalW = parseInt(sidebar.style.width, 10);
+                    if (!isNaN(finalW)) localStorage.setItem('metafold_facet_left_width', String(finalW));
+                } else if (!isLeft && rightPanel) {
+                    const finalW = parseInt(rightPanel.style.width, 10);
+                    if (!isNaN(finalW)) localStorage.setItem('metafold_facet_right_width', String(finalW));
+                }
+            } catch (err) { }
+
+            activeSplitter = null;
+            targetPanel = null;
+            this._safeRedrawTable();
+        };
+
+        leftSplitter.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            isLeft = true;
+            activeSplitter = leftSplitter;
+            targetPanel = sidebar;
+            startX = e.clientX;
+            startWidth = sidebar.getBoundingClientRect().width;
+            leftSplitter.classList.add('resizing');
+            document.body.classList.add('facet-resizing');
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+
+        if (rightSplitter && rightPanel) {
+            rightSplitter.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                isDragging = true;
+                isLeft = false;
+                activeSplitter = rightSplitter;
+                targetPanel = rightPanel;
+                startX = e.clientX;
+                startWidth = rightPanel.getBoundingClientRect().width;
+                rightSplitter.classList.add('resizing');
+                document.body.classList.add('facet-resizing');
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+        }
     },
 
     // Internal flatten function to be used by both loaders
+    // Uses the field's human-readable `label` when available so keys like `mode` (label: "Mode")
+    // and `Mode` unify into a single consistent key across different template versions.
     flattenObject(obj, prefix = '') {
         let flattened = {};
+        const ignoredKeys = ['metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration', 'System.UpdateHistory', 'changelog', 'notes_log', 'previous_names'];
         for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                if (ignoredKeys.includes(key)) continue;
                 const newKey = prefix ? `${prefix}.${key}` : key;
                 const value = obj[key];
-                
-                // Handle metadata field structure (value/type/description objects)
-                if (value && typeof value === 'object' && value.hasOwnProperty('value')) {
-                    flattened[key] = value.value;
+
+                // Handle metadata field structure (value/type/label/description objects)
+                if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')) {
+                    const canonicalKey = (!prefix && value.label && typeof value.label === 'string' && value.label.trim())
+                        ? value.label.trim()
+                        : key;
+                    const formatted = window.formatDisplayValue
+                        ? window.formatDisplayValue(value, { emptyPlaceholder: '' })
+                        : value.value;
+                    // Do not overwrite an existing non-empty value with an empty string when merging aliases
+                    if (flattened[canonicalKey] === undefined || flattened[canonicalKey] === '' || flattened[canonicalKey] === null) {
+                        flattened[canonicalKey] = formatted;
+                    }
                 } else if (value && typeof value === 'object' && !Array.isArray(value)) {
                     Object.assign(flattened, this.flattenObject(value, newKey));
                 } else {
-                    flattened[newKey] = value;
+                    const formatted = (window.formatDisplayValue && typeof value === 'object')
+                        ? window.formatDisplayValue(value, { emptyPlaceholder: '' })
+                        : value;
+                    flattened[newKey] = formatted;
                 }
             }
         }
         return flattened;
     },
 
-    // Extract metadata types for the Manage Categories modal
+    // Flatten OME-XML metadata object (sc.ome_metadata) into OME.* keys for facets & table columns
+    flattenOmeMetadata(omeData, prefix = 'OME') {
+        const result = {};
+        if (!omeData || typeof omeData !== 'object') return result;
+
+        for (const [key, value] of Object.entries(omeData)) {
+            if (key.startsWith('_')) continue; // skip internal markers like _parsed_at, _source_format
+            if (key === 'ID' && typeof value === 'string' && /^(Image|Pixels|Instrument|Objective|Detector|Channel|Microscope):\d+/i.test(value)) {
+                continue;
+            }
+            const fullKey = `${prefix}.${key}`;
+            if (value === null || value === undefined || value === '') continue;
+
+            if (Array.isArray(value)) {
+                value.forEach((item, idx) => {
+                    if (item && typeof item === 'object') {
+                        Object.assign(result, this.flattenOmeMetadata(item, `${fullKey}[${idx}]`));
+                    } else if (item !== null && item !== undefined && item !== '') {
+                        result[`${fullKey}[${idx}]`] = item;
+                    }
+                });
+            } else if (typeof value === 'object') {
+                Object.assign(result, this.flattenOmeMetadata(value, fullKey));
+            } else {
+                result[fullKey] = value;
+            }
+        }
+        return result;
+    },
+
+    // Format a metadata key into a concise, unambiguous human-readable label
+    // (especially for OME.* and File.* keys where the leaf name alone like "Name" or "Model" would be ambiguous)
+    _formatKeyLabel(key) {
+        if (!key) return '';
+        if (key.startsWith('OME.')) {
+            const rest = key.slice(4); // remove 'OME.'
+            const chMatch = rest.match(/^Channels?\[(\d+)\]\.(.+)$/);
+            if (chMatch) {
+                return `Ch${chMatch[1]} ${chMatch[2].replace(/_/g, ' ')}`;
+            }
+            const instMatch = rest.match(/^Instrument\.([^.]+)\.(.+)$/);
+            if (instMatch) {
+                return `${instMatch[1]} ${instMatch[2].replace(/_/g, ' ')}`;
+            }
+            const parts = rest.split('.');
+            if (parts.length >= 2) {
+                return `${parts[0].replace(/\[\d+\]/g, '')} ${parts.slice(1).join(' ').replace(/_/g, ' ')}`;
+            }
+            return rest.replace(/_/g, ' ');
+        }
+        if (key.startsWith('File.')) {
+            return `File ${key.slice(5).replace(/_/g, ' ')}`;
+        }
+        if (key.startsWith('Sidecar.')) {
+            return key.slice(8).replace(/\./g, ' ').replace(/_/g, ' ');
+        }
+        let label = key.split('.').pop().replace(/_/g, ' ');
+        return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
+    // Extract metadata types for the Manage Filter Keys modal
     _extractTypes(obj) {
+        const ignoredKeys = ['metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration'];
         for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                if (ignoredKeys.includes(key)) continue;
                 const value = obj[key];
-                if (value && typeof value === 'object' && value.hasOwnProperty('value')) {
+                if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')) {
+                    const canonicalKey = (value.label && typeof value.label === 'string' && value.label.trim())
+                        ? value.label.trim()
+                        : key;
                     if (value.type) {
+                        this.metadataTypes[canonicalKey] = value.type;
                         this.metadataTypes[key] = value.type;
                     }
                 } else if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -84,11 +382,204 @@ const facetSearch = {
         }
     },
 
+    // Ask user if they want to persist a temporary scan into user_index.json before discarding it
+    async promptUnsavedScanIfNeeded() {
+        if (!this.unsavedScan || !Array.isArray(this.unsavedScan.projects) || this.unsavedScan.projects.length === 0) {
+            this.unsavedScan = null;
+            return;
+        }
+        const scanProjects = this.unsavedScan.projects.filter(p => p.hasMetadata !== false);
+        const basePath = this.unsavedScan.basePath || '';
+        this.unsavedScan = null; // clear immediately to prevent re-entrant prompts
+
+        if (scanProjects.length === 0) return;
+
+        const wantSave = confirm(
+            `Add new scan to User Index?\n\n` +
+            `You scanned ${scanProjects.length} project(s) in "${basePath}".\n` +
+            `Would you like to permanently add them to your local User Index (user_index.json)?\n` +
+            `(Click "Cancel" to keep this scan temporary and leave your User Index unchanged.)`
+        );
+        if (wantSave && window.electronAPI?.mergeProjectsIntoUserIndex) {
+            const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+            await window.electronAPI.mergeProjectsIntoUserIndex(scanProjects, basePath, userInfo);
+            if (window.projectScanner?.updateIndexBadge) {
+                await window.projectScanner.updateIndexBadge();
+            }
+        }
+    },
+
+    async saveTemporaryScanToIndex() {
+        if (!this.unsavedScan || !Array.isArray(this.unsavedScan.projects)) return;
+        const scanProjects = this.unsavedScan.projects.filter(p => p.hasMetadata !== false);
+        const basePath = this.unsavedScan.basePath || '';
+        const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+
+        if (window.electronAPI?.mergeProjectsIntoUserIndex) {
+            const res = await window.electronAPI.mergeProjectsIntoUserIndex(scanProjects, basePath, userInfo);
+            if (res && res.success) {
+                this.unsavedScan = null;
+                if (window.projectScanner?.updateIndexBadge) {
+                    await window.projectScanner.updateIndexBadge();
+                }
+                await this.openFromUserIndex(true);
+            }
+        }
+    },
+
+    toggleScanOptionsDropdown(event) {
+        if (event) event.stopPropagation();
+        this._updateSidecarScannerVisibility();
+        const dropdown = document.getElementById('scanOptionsDropdown');
+        if (!dropdown) return;
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    },
+
+    closeScanOptionsDropdown() {
+        const dropdown = document.getElementById('scanOptionsDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    },
+
+    toggleExportDropdown(event) {
+        if (event) event.stopPropagation();
+        const dropdown = document.getElementById('exportSelectorDropdown');
+        if (!dropdown) return;
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    },
+
+    closeExportDropdown() {
+        const dropdown = document.getElementById('exportSelectorDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    },
+
+    async clearUserIndexFromSearch() {
+        const confirmed = confirm(
+            'Are you sure you want to reset your local User Index (user_index.json)?\n\n' +
+            'Note: Your actual project files and folders on disk will NOT be deleted — only the search index is cleared.'
+        );
+        if (!confirmed) return;
+        const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+        if (window.electronAPI?.clearUserIndex) {
+            await window.electronAPI.clearUserIndex(userInfo);
+            if (window.projectScanner?.updateIndexBadge) {
+                await window.projectScanner.updateIndexBadge();
+            }
+            this.unsavedScan = null;
+            await this.openFromUserIndex(true);
+        }
+    },
+
+    // Scan a folder directly inside the unified Search & Scan view (temporary by default)
+    async scanFolderFromSearch(directoryPath = null) {
+        try {
+            await this.promptUnsavedScanIfNeeded();
+
+            if (!directoryPath) {
+                directoryPath = await window.electronAPI.selectFolder();
+                if (!directoryPath) return false;
+            }
+
+            const inheritCheckbox = document.getElementById('inheritMetadataCheckbox');
+            const inheritMetadata = inheritCheckbox ? inheritCheckbox.checked : false;
+
+            const sidecarCheckbox = document.getElementById('includeFileSidecarsCheckbox');
+            const includeFileSidecars = sidecarCheckbox ? sidecarCheckbox.checked : false;
+
+            const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+            // IMPORTANT: updateUserIndex: false so scanning a colleague's folder stays temporary until confirmed!
+            const scanOptions = { inheritMetadata, includeFileSidecars, updateUserIndex: false, userInfo };
+
+            // Show loading state in table container if modal is open
+            this.openModal();
+            const container = document.getElementById('facetResultsContainer');
+            if (container) {
+                container.innerHTML = `<div style="padding:60px; text-align:center; color:#c4b5fd;"><h3>🔍 Scanning ${directoryPath}...</h3><p style="color:#9ca3af;">Looking for MetaFold projects...</p></div>`;
+            }
+
+            const result = await window.electronAPI.scanMetaFoldProjects(directoryPath, 5, scanOptions);
+            if (result && result.success) {
+                const realProjects = (result.projects || []).filter(p => p.hasMetadata !== false);
+                const folderName = directoryPath.split(/[\\/]/).filter(Boolean).pop() || directoryPath;
+                this.dataSource = 'temp_scan';
+                this.sourceLabel = `🔍 Temp Scan: ${folderName}`;
+                this.unsavedScan = {
+                    projects: realProjects,
+                    basePath: directoryPath
+                };
+                if (window.projectScanner) {
+                    window.projectScanner.projects = realProjects;
+                    window.projectScanner.isViewingUserIndex = false;
+                }
+                await this.loadFromProjects(realProjects, {
+                    dataSource: 'temp_scan',
+                    sourceLabel: `🔍 Temp Scan: ${folderName}`,
+                    allowEmpty: true
+                });
+                return true;
+            } else {
+                alert(`Scan failed: ${result?.message || 'Unknown error'}`);
+                return false;
+            }
+        } catch (err) {
+            console.error('Error in scanFolderFromSearch:', err);
+            alert(`Error scanning directory: ${err.message}`);
+            return false;
+        }
+    },
+
+    // 0. Open Facet Search directly from the Living User Index (user_index.json)
+    async openFromUserIndex(silentReload = false) {
+        try {
+            if (!silentReload) {
+                await this.promptUnsavedScanIfNeeded();
+            }
+
+            let projects = [];
+            if (window.electronAPI && typeof window.electronAPI.loadUserIndex === 'function') {
+                try {
+                    const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+                    const res = await window.electronAPI.loadUserIndex(userInfo);
+                    if (res && res.success && Array.isArray(res.projects)) {
+                        projects = res.projects;
+                    }
+                } catch (loadErr) {
+                    console.warn('⚠️ Could not load user index from backend, showing empty search table:', loadErr);
+                }
+            } else if (window.projectScanner && Array.isArray(window.projectScanner.projects)) {
+                projects = window.projectScanner.projects;
+            }
+
+            if (window.projectScanner) {
+                window.projectScanner.projects = projects;
+                window.projectScanner.isViewingUserIndex = true;
+                window.projectScanner.updateIndexBadge?.();
+            }
+
+            // Always open the search table directly (empty if no projects yet, never trigger loadJsonFile prompt)
+            await this.loadFromProjects(projects, {
+                dataSource: 'user_index',
+                sourceLabel: '📚 User Index',
+                allowEmpty: true
+            });
+            return true;
+        } catch (err) {
+            console.error('Error loading user index into Facet Search:', err);
+            // Gracefully open empty table instead of forcing a file-open dialog
+            await this.loadFromProjects([], {
+                dataSource: 'user_index',
+                sourceLabel: '📚 User Index',
+                allowEmpty: true
+            });
+            return false;
+        }
+    },
+
     // 1. Load from scanned projects directly (RAM)
-    async loadFromProjects(projects) {
+    async loadFromProjects(projects, options = {}) {
         try {
             console.log('Loading projects from RAM into facet search...');
-            if (!projects || projects.length === 0) {
+            const safeProjects = Array.isArray(projects) ? projects : [];
+            if (safeProjects.length === 0 && !options.allowEmpty) {
                 console.warn("No projects provided to loadFromProjects");
                 return;
             }
@@ -96,36 +587,69 @@ const facetSearch = {
             this._hasFileSidecars = false;
             this.metadataTypes = {};
             this.isTemplateHub = false;
-            
-            this.masterData = projects.map(p => {
-                let flatMeta = p.flattenedMetadata || {};
-                
-                if (Object.keys(flatMeta).length === 0 && p.metadata) {
+            this.dataSource = options.dataSource || 'user_index';
+            this.sourceLabel = options.sourceLabel || (this.dataSource === 'user_index' ? '📚 User Index' : '📁 Scanned Projects');
+            this.textSearchQuery = '';
+            const searchInput = document.getElementById('facetTextSearchInput');
+            if (searchInput) searchInput.value = '';
+            this.closeRightPanel();
+
+            if (window.projectScanner) {
+                window.projectScanner.projects = safeProjects;
+            }
+
+            this.masterData = safeProjects.map(p => {
+                // Always prefer flattening p.metadata with canonical label keys; merge any extra pre-flattened keys (e.g. ISA inherited)
+                let flatMeta = {};
+                if (p.metadata && Object.keys(p.metadata).length > 0) {
                     flatMeta = this.flattenObject(p.metadata);
                 }
-                
+                if (p.flattenedMetadata && Object.keys(p.flattenedMetadata).length > 0) {
+                    for (const [k, v] of Object.entries(p.flattenedMetadata)) {
+                        if (flatMeta[k] === undefined) {
+                            flatMeta[k] = v;
+                        }
+                    }
+                }
+
                 flatMeta['System.hasReadme'] = p.hasReadme ? 'Yes' : 'No';
-                
+
                 const entry = {
                     ...p,
                     id: p.path,
                     _type: 'project',
                     flatMeta: flatMeta
                 };
-                
+
                 if (p.fileSidecars && p.fileSidecars.length > 0) {
                     this._hasFileSidecars = true;
                     entry._sidecarChildren = p.fileSidecars.map(sc => {
-                        const scFlatMeta = { ...(sc.flattenedOmeMetadata || {}) };
+                        const flattenedFromOme = sc.ome_metadata ? this.flattenOmeMetadata(sc.ome_metadata) : {};
+                        const scFlatMeta = {
+                            ...flattenedFromOme,
+                            ...(sc.flattenedOmeMetadata || {})
+                        };
                         if (sc.file) {
                             if (sc.file.extension) scFlatMeta['File.Extension'] = sc.file.extension;
-                            if (sc.file.size_bytes) scFlatMeta['File.Size'] = sc.file.size_bytes;
+                            if (sc.file.size_bytes !== undefined && sc.file.size_bytes !== null) scFlatMeta['File.Size'] = sc.file.size_bytes;
                             if (sc.file.modified) scFlatMeta['File.Modified'] = sc.file.modified;
+                            if (sc.file.relativePath) scFlatMeta['File.RelativePath'] = sc.file.relativePath;
                         }
                         return {
-                            id: sc.sidecar_id || (sc.file && sc.file.path) || Math.random().toString(36),
-                            name: sc.file ? sc.file.name : 'Unknown File',
-                            path: sc.file ? sc.file.path : '',
+                            id: sc.sidecar_id || (sc.file && sc.file.path) || sc.sidecarPath || Math.random().toString(36),
+                            sidecar_id: sc.sidecar_id || null,
+                            name: (sc.file && sc.file.name) ? sc.file.name : 'Unknown File',
+                            path: (sc.file && sc.file.path) ? sc.file.path : '',
+                            sidecarPath: sc.sidecarPath || '',
+                            generated_at: sc.generated_at || null,
+                            generator: sc.generator || null,
+                            metafold_version: sc.metafold_version || null,
+                            created: (sc.file && sc.file.modified) || sc.generated_at || null,
+                            file: sc.file || {},
+                            ome_metadata: sc.ome_metadata || null,
+                            project_metadata: sc.project_metadata || null,
+                            inherited_from_summary: Array.isArray(sc.inherited_from_summary) ? sc.inherited_from_summary : [],
+                            nearest_project_id: sc.nearest_project_id || null,
                             _type: 'file_sidecar',
                             _parentProjectName: p.name,
                             _parentProjectPath: p.path,
@@ -136,52 +660,81 @@ const facetSearch = {
                 if (entry._type === 'project' && entry.metadata) {
                     this._extractTypes(entry.metadata);
                 }
-                
+
                 return entry;
             });
 
             console.log('✅ Facet Search initialized with', this.masterData.length, 'projects');
 
             this.activeFilters = {};
-            
-            // Determine all available keys from BOTH projects and sidecars
+
+            // Determine all available keys from BOTH projects and sidecars, ranking by non-empty value count
             let keyCounts = {};
+            let nonEmptyCounts = {};
+            let projectKeyNonEmptyCounts = {};
+            const isNonEmpty = (val) => {
+                if (val === undefined || val === null) return false;
+                if (Array.isArray(val)) return val.length > 0;
+                return String(val).trim() !== '';
+            };
+
             this.masterData.forEach(p => {
                 for (let key in p.flatMeta) {
                     if (key.startsWith('System.')) continue;
                     keyCounts[key] = (keyCounts[key] || 0) + 1;
+                    if (isNonEmpty(p.flatMeta[key])) {
+                        nonEmptyCounts[key] = (nonEmptyCounts[key] || 0) + 1;
+                        projectKeyNonEmptyCounts[key] = (projectKeyNonEmptyCounts[key] || 0) + 1;
+                    }
                 }
                 // Also count keys from sidecar children
                 if (p._sidecarChildren) {
                     p._sidecarChildren.forEach(sc => {
                         for (let key in sc.flatMeta) {
                             keyCounts[key] = (keyCounts[key] || 0) + 1;
+                            if (isNonEmpty(sc.flatMeta[key])) {
+                                nonEmptyCounts[key] = (nonEmptyCounts[key] || 0) + 1;
+                            }
                         }
                     });
                 }
             });
-            this.allAvailableKeys = Object.keys(keyCounts).sort((a,b) => keyCounts[b] - keyCounts[a]);
-            this.visibleColumns = this.allAvailableKeys.slice(0, 3);
-            
+            this._keyProjectCounts = nonEmptyCounts;
+            this.allAvailableKeys = Object.keys(keyCounts).sort((a, b) => {
+                const diff = (nonEmptyCounts[b] || 0) - (nonEmptyCounts[a] || 0);
+                if (diff !== 0) return diff;
+                return (keyCounts[b] || 0) - (keyCounts[a] || 0);
+            });
+            // Prioritize project-level metadata keys for the default 5 visible table columns
+            // so projects with many sidecars don't push project columns out of view by default
+            const populatedProjectKeys = this.allAvailableKeys
+                .filter(k => (projectKeyNonEmptyCounts[k] || 0) > 0 && !k.startsWith('OME.') && !k.startsWith('File.'))
+                .sort((a, b) => (projectKeyNonEmptyCounts[b] || 0) - (projectKeyNonEmptyCounts[a] || 0));
+            const populatedSidecarKeys = this.allAvailableKeys
+                .filter(k => (nonEmptyCounts[k] || 0) > 0 && !populatedProjectKeys.includes(k));
+            const combinedPopulated = [...populatedProjectKeys, ...populatedSidecarKeys];
+            const defaultTopColumns = (combinedPopulated.length > 0 ? combinedPopulated : this.allAvailableKeys).slice(0, 5);
+            await this._restoreSessionTableState(defaultTopColumns);
+
             if (this._hasFileSidecars) {
                 const totalSidecars = this.masterData.reduce((sum, p) => sum + (p._sidecarChildren ? p._sidecarChildren.length : 0), 0);
                 console.log(`📄 Loaded ${totalSidecars} file sidecars across ${this.masterData.filter(p => p._sidecarChildren).length} projects (tree mode enabled)`);
             }
 
             this.renderColumnSelector();
-            
+
             // Load hidden keys from settings
             const hiddenKeysStr = await window.settingsManager.get('facetSearch.hiddenKeys');
             if (hiddenKeysStr) {
                 try {
                     this.hiddenKeys = JSON.parse(hiddenKeysStr);
-                } catch(e) {
+                } catch (e) {
                     this.hiddenKeys = [];
                 }
             } else {
                 this.hiddenKeys = [];
             }
-            
+
             // Open the dedicated modal window
             this.openModal();
             this.updateUI();
@@ -191,28 +744,36 @@ const facetSearch = {
     },
 
     // 2. Visualize Selection
-    visualizeSelection() {
+    async visualizeSelection() {
         if (!window.visualizationManager) {
             console.error('visualizationManager is not available');
             return;
         }
-        
+
         const filteredData = this.getFilteredData();
         if (filteredData.length === 0) {
             alert("No projects to visualize. Please adjust your filters.");
             return;
         }
-        
-        // Map filtered flat data back to the full project objects
+
+        // Map filtered flat data back to the full project objects (fallback to item itself if opened from User Index / Summary JSON)
+        const scannerProjects = (window.projectScanner && Array.isArray(window.projectScanner.projects)) ? window.projectScanner.projects : [];
         const fullProjects = filteredData.map(item => {
-            return window.projectScanner.projects.find(p => p.path === item.path);
+            return scannerProjects.find(p => p.path === item.path) || item;
         }).filter(Boolean);
-        
-        // Pass to visualization manager
-        window.visualizationManager.visualizeFilteredProjects(fullProjects, this.activeFilters);
-        
-        // Close modal and switch tab
-        this.closeSearch();
+
+        if (window.projectScanner && (!window.projectScanner.projects || window.projectScanner.projects.length === 0)) {
+            window.projectScanner.projects = fullProjects;
+        }
+
+        const activeFiltersCopy = this.activeFilters ? { ...this.activeFilters } : {};
+
+        // Close modal without bouncing back to 'create' and switch tab to 'visualize'
+        await this.closeSearch({ targetTab: 'visualize' });
+
+        // Pass to visualization manager with tab already active
+        window.visualizationManager.visualizeFilteredProjects(fullProjects, activeFiltersCopy);
+
         if (window.switchMainTab) {
             window.switchMainTab('visualize');
         }
@@ -221,8 +782,9 @@ const facetSearch = {
     // 3. Load the exported Summary JSON from file
     async loadSummaryFile() {
         try {
+            await this.promptUnsavedScanIfNeeded();
             console.log('Loading summary file...');
-            
+
             const result = await window.electronAPI.loadJsonFile();
 
             if (!result || !result.success || !result.content) {
@@ -236,96 +798,12 @@ const facetSearch = {
                 throw new Error("Invalid summary file format. Missing 'projects' array.");
             }
 
-            this._hasFileSidecars = false;
-            this.isTemplateHub = false;
-
-            this.masterData = exportData.projects.map(p => {
-                let flatMeta = p.flattenedMetadata || {};
-                
-                if (Object.keys(flatMeta).length === 0 && p.metadata) {
-                    flatMeta = this.flattenObject(p.metadata);
-                }
-
-                flatMeta['System.hasReadme'] = p.hasReadme ? 'Yes' : 'No';
-
-                const entry = {
-                    ...p,
-                    id: p.path, // Use path as unique ID
-                    _type: 'project',
-                    flatMeta: flatMeta
-                };
-
-                // Build child entries for file sidecars
-                if (p.fileSidecars && p.fileSidecars.length > 0) {
-                    this._hasFileSidecars = true;
-                    entry._sidecarChildren = p.fileSidecars.map(sc => {
-                        // The flat metadata for a sidecar is its OME data + file info
-                        const scFlatMeta = { ...(sc.flattenedOmeMetadata || {}) };
-                        // Add file-level metadata with File. prefix
-                        if (sc.file) {
-                            if (sc.file.extension) scFlatMeta['File.Extension'] = sc.file.extension;
-                            if (sc.file.size_bytes) scFlatMeta['File.Size'] = sc.file.size_bytes;
-                            if (sc.file.modified) scFlatMeta['File.Modified'] = sc.file.modified;
-                        }
-                        return {
-                            id: sc.sidecar_id || (sc.file && sc.file.path) || Math.random().toString(36),
-                            name: sc.file ? sc.file.name : 'Unknown File',
-                            path: sc.file ? sc.file.path : '',
-                            _type: 'file_sidecar',
-                            _parentProjectName: p.name,
-                            _parentProjectPath: p.path,
-                            flatMeta: scFlatMeta
-                        };
-                    });
-                }
-
-                return entry;
+            const fileName = result.filePath ? result.filePath.split(/[\\/]/).pop() : 'External JSON';
+            await this.loadFromProjects(exportData.projects, {
+                dataSource: 'external_json',
+                sourceLabel: `📂 ${fileName}`,
+                allowEmpty: true
             });
-
-            this.activeFilters = {};
-            
-            // Determine all available keys from BOTH projects and sidecars
-            let keyCounts = {};
-            this.masterData.forEach(p => {
-                for (let key in p.flatMeta) {
-                    if (key.startsWith('System.')) continue;
-                    keyCounts[key] = (keyCounts[key] || 0) + 1;
-                }
-                // Also count keys from sidecar children
-                if (p._sidecarChildren) {
-                    p._sidecarChildren.forEach(sc => {
-                        for (let key in sc.flatMeta) {
-                            keyCounts[key] = (keyCounts[key] || 0) + 1;
-                        }
-                    });
-                }
-            });
-            this.allAvailableKeys = Object.keys(keyCounts).sort((a,b) => keyCounts[b] - keyCounts[a]);
-            this.visibleColumns = this.allAvailableKeys.slice(0, 3);
-            
-            if (this._hasFileSidecars) {
-                const totalSidecars = this.masterData.reduce((sum, p) => sum + (p._sidecarChildren ? p._sidecarChildren.length : 0), 0);
-                console.log(`📄 Loaded ${totalSidecars} file sidecars across ${this.masterData.filter(p => p._sidecarChildren).length} projects (tree mode enabled)`);
-            }
-
-            this.renderColumnSelector();
-            
-            // Load hidden keys from settings
-            const hiddenKeysStr = await window.settingsManager.get('facetSearch.hiddenKeys');
-            if (hiddenKeysStr) {
-                try {
-                    this.hiddenKeys = JSON.parse(hiddenKeysStr);
-                } catch(e) {
-                    this.hiddenKeys = [];
-                }
-            } else {
-                this.hiddenKeys = [];
-            }
-            
-            // Open the dedicated modal window
-            this.openModal();
-
-            this.updateUI();
 
         } catch (error) {
             console.error('❌ Error loading summary file:', error);
@@ -337,11 +815,48 @@ const facetSearch = {
         }
     },
 
-    // 2. Filter the data based on active filters
+    // Handle free-text filter input in the left sidebar
+    handleTextSearch(query) {
+        this.textSearchQuery = (query || '').trim().toLowerCase();
+        this.updateUI();
+    },
+
+    // 2. Filter the data based on active filters + free-text search
     // When file sidecars exist, a project matches if either the project itself
     // OR any of its sidecar children match the filter. Matching sidecar children
     // are preserved in _sidecarChildren so only relevant files appear in the tree.
     getFilteredData() {
+        const q = (this.textSearchQuery || '').trim().toLowerCase();
+
+        const matchesText = (item) => {
+            if (!q) return true;
+            if ((item.name || '').toLowerCase().includes(q)) return true;
+            if ((item.path || '').toLowerCase().includes(q)) return true;
+            if (item.flatMeta) {
+                for (let k in item.flatMeta) {
+                    const v = item.flatMeta[k];
+                    if (v !== undefined && v !== null && String(v).toLowerCase().includes(q)) {
+                        return true;
+                    }
+                }
+            }
+            if (item.lineage) {
+                if (Array.isArray(item.lineage.provides_ids) && item.lineage.provides_ids.some(id => String(id).toLowerCase().includes(q))) {
+                    return true;
+                }
+                if (Array.isArray(item.lineage.derived_from_ids) && item.lineage.derived_from_ids.some(id => String(id).toLowerCase().includes(q))) {
+                    return true;
+                }
+                if (Array.isArray(item.lineage.lineage_links) && item.lineage.lineage_links.some(l =>
+                    (l.id && String(l.id).toLowerCase().includes(q)) ||
+                    (l.source_path && String(l.source_path).toLowerCase().includes(q))
+                )) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
         const matchesFilters = (flatMeta) => {
             for (let key in this.activeFilters) {
                 const itemValue = flatMeta[key];
@@ -360,14 +875,14 @@ const facetSearch = {
         };
 
         return this.masterData.filter(item => {
-            const projectMatches = matchesFilters(item.flatMeta);
+            const projectMatches = matchesFilters(item.flatMeta) && matchesText(item);
 
             if (!item._sidecarChildren || item._sidecarChildren.length === 0) {
                 return projectMatches;
             }
 
             // Filter sidecar children that match
-            const matchingChildren = item._sidecarChildren.filter(sc => matchesFilters(sc.flatMeta));
+            const matchingChildren = item._sidecarChildren.filter(sc => matchesFilters(sc.flatMeta) && matchesText(sc));
 
             // Project is included if it matches OR any child matches
             if (projectMatches || matchingChildren.length > 0) {
@@ -405,7 +920,7 @@ const facetSearch = {
                 }
             }
         };
-        
+
         // Collect facets from projects AND their sidecar children
         filteredData.forEach(item => {
             addToFacets(item.flatMeta);
@@ -450,8 +965,62 @@ const facetSearch = {
         return sortedFacets;
     },
 
+    // Synchronize header title, source badge, and context-sensitive buttons
+    updateHeaderState() {
+        const iconEl = document.getElementById('facetModalIcon');
+        const headingEl = document.getElementById('facetModalHeading');
+        const subtitleEl = document.getElementById('facetModalSubtitle');
+        const sourceBadge = document.getElementById('facetSourceBadge');
+        const sourceGroup = document.getElementById('facetSourceToolbarGroup');
+        const exportGroup = document.getElementById('facetExportToolbarGroup');
+        const saveScanBtn = document.getElementById('facetSaveScanBtn');
+        const switchToIndexBtn = document.getElementById('facetSwitchToIndexBtn');
+
+        if (this.isTemplateHub) {
+            if (iconEl) iconEl.textContent = '🌐';
+            if (headingEl) headingEl.textContent = 'Community Templates Hub';
+            if (subtitleEl) subtitleEl.textContent = 'Click any template row or use ↑/↓ arrow keys to inspect fields, folder structure & install options on the right';
+            if (sourceBadge) {
+                sourceBadge.textContent = '🌐 GitHub Repository';
+                sourceBadge.className = 'facet-source-badge source-hub';
+            }
+            if (sourceGroup) sourceGroup.style.display = 'none';
+            if (exportGroup) exportGroup.style.display = 'none';
+        } else {
+            if (iconEl) iconEl.textContent = '🔍';
+            if (headingEl) headingEl.textContent = 'Search & Scan Projects';
+            if (subtitleEl) subtitleEl.textContent = 'Click any table row or use ↑/↓ arrow keys to inspect metadata & lineage on the right · Right-click filters on the left to hide or manage them';
+            if (sourceBadge) {
+                sourceBadge.textContent = this.sourceLabel || '📚 User Index';
+                sourceBadge.className = `facet-source-badge ${this.dataSource === 'temp_scan' ? 'source-temp' : 'source-index'}`;
+            }
+            if (sourceGroup) sourceGroup.style.display = 'inline-flex';
+            if (exportGroup) exportGroup.style.display = 'inline-flex';
+            if (saveScanBtn) {
+                saveScanBtn.style.display = (this.unsavedScan && this.unsavedScan.projects && this.unsavedScan.projects.length > 0) ? 'inline-flex' : 'none';
+            }
+            if (switchToIndexBtn) {
+                switchToIndexBtn.style.display = (this.dataSource !== 'user_index') ? 'inline-flex' : 'none';
+            }
+        }
+
+        // Update total active filter badge in sidebar
+        const activeCountBadge = document.getElementById('facetActiveCount');
+        if (activeCountBadge) {
+            let totalFilters = Object.values(this.activeFilters).reduce((s, arr) => s + (arr ? arr.length : 0), 0);
+            if (this.textSearchQuery) totalFilters += 1;
+            if (totalFilters > 0) {
+                activeCountBadge.textContent = `${totalFilters} active`;
+                activeCountBadge.style.display = 'inline-block';
+            } else {
+                activeCountBadge.style.display = 'none';
+            }
+        }
+    },
+
     // Update the entire UI
     updateUI() {
+        this.updateHeaderState();
         const currentResults = this.getFilteredData();
         const nextAvailableTags = this.getAvailableFacets(currentResults);
 
@@ -464,7 +1033,7 @@ const facetSearch = {
     // Map a metadata key (e.g. OME.Pixels.SizeX, File.Extension, Project.Condition, community taxonomy) to a category name
     _getCategoryForKey(key, isTemplateHub = this.isTemplateHub) {
         if (isTemplateHub) {
-            const communityKeys = ['collection', 'system', 'discipline', 'organism', 'tags', 'author', 'version'];
+            const communityKeys = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
             if (communityKeys.includes(key)) {
                 return '🌐 Community Taxonomy';
             }
@@ -480,6 +1049,9 @@ const facetSearch = {
         if (key.startsWith('File.')) {
             return '📄 File Properties';
         }
+        if (key.startsWith('Sidecar.')) {
+            return '📄 Sidecar Metadata';
+        }
         if (key.startsWith('integrations.') || key.toLowerCase().includes('omero') || key.toLowerCase().includes('elabftw') || key.toLowerCase().includes('rspace')) {
             return '🔗 Integrations';
         }
@@ -489,7 +1061,13 @@ const facetSearch = {
         if (key.startsWith('Project.') || key.startsWith('Sample.') || key.startsWith('ISA.')) {
             return '📁 Project & ISA';
         }
-        return '📋 Metadata Fields';
+        return '🏷️ Metadata Fields';
+    },
+
+    _isSidecarCategory(categoryName) {
+        return categoryName === '📄 File Properties' ||
+            categoryName === '📄 Sidecar Metadata' ||
+            (typeof categoryName === 'string' && categoryName.startsWith('🔬 OME'));
     },
 
     _isCategoryCollapsed(categoryName) {
@@ -501,6 +1079,11 @@ const facetSearch = {
 
     _toggleCategoryCollapse(categoryName) {
         this._collapsedCategories[categoryName] = !this._isCategoryCollapsed(categoryName);
+        this.updateUI();
+    },
+
+    toggleSidecarFacets() {
+        this._showSidecarFacets = !this._showSidecarFacets;
         this.updateUI();
     },
 
@@ -521,16 +1104,17 @@ const facetSearch = {
         // Preferred display order for categories
         const categoryOrder = [
             '🌐 Community Taxonomy',
-            '📋 Metadata Fields',
+            '🏷️ Metadata Fields',
             '📁 Project & ISA',
+            '🔗 Integrations',
+            '⚙️ System',
             '📄 File Properties',
             '🔬 OME Pixels',
+            '🔬 OME Channels',
             '🔬 OME Channel',
             '🔬 OME Instrument',
             '🔬 OME Image',
-            '🔬 OME Metadata',
-            '🔗 Integrations',
-            '⚙️ System'
+            '🔬 OME Metadata'
         ];
 
         const sortedCategories = Object.keys(categoryGroups).sort((a, b) => {
@@ -542,8 +1126,10 @@ const facetSearch = {
             return a.localeCompare(b);
         });
 
-        sortedCategories.forEach(catName => {
+        const buildCategorySection = (catName) => {
             const keys = categoryGroups[catName];
+            const visibleKeys = keys.filter(k => !this.hiddenKeys.includes(k));
+            if (visibleKeys.length === 0) return null;
 
             // Calculate active filters in this category
             let activeFilterCount = 0;
@@ -602,22 +1188,22 @@ const facetSearch = {
                 catBody.style.display = 'none';
             }
 
-            keys.forEach(key => {
-                if (this.hiddenKeys.includes(key)) return;
-
+            visibleKeys.forEach(key => {
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'facet-group';
+                groupDiv.dataset.facetKey = key;
 
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'facet-group-title';
-                titleDiv.title = 'Right-click to hide this category';
+                const displayTitle = this._formatKeyLabel(key);
+                titleDiv.title = `Right-click to hide filter "${displayTitle}" (${key})`;
 
                 titleDiv.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     this.showContextMenu(e.pageX, e.pageY, key);
                 });
 
-                let displayTitle = key.split('.').pop().replace(/_/g, ' ');
                 titleDiv.textContent = displayTitle;
 
                 if (this.activeFilters[key]) {
@@ -664,13 +1250,118 @@ const facetSearch = {
 
             catSection.appendChild(catHeader);
             catSection.appendChild(catBody);
-            container.appendChild(catSection);
+            return catSection;
+        };
+
+        const projectCategories = sortedCategories.filter(c => !this._isSidecarCategory(c));
+        const sidecarCategories = sortedCategories.filter(c => this._isSidecarCategory(c));
+
+        projectCategories.forEach(catName => {
+            const sec = buildCategorySection(catName);
+            if (sec) container.appendChild(sec);
         });
+
+        // Render collapsible / toggleable File Sidecar & OME Facets section so project facets stay clean
+        if (sidecarCategories.length > 0) {
+            let totalSidecarKeys = 0;
+            let activeSidecarFilterCount = 0;
+            sidecarCategories.forEach(catName => {
+                const keys = categoryGroups[catName] || [];
+                keys.forEach(k => {
+                    if (!this.hiddenKeys.includes(k)) totalSidecarKeys++;
+                    if (this.activeFilters[k] && this.activeFilters[k].length > 0) {
+                        activeSidecarFilterCount += this.activeFilters[k].length;
+                    }
+                });
+            });
+
+            if (totalSidecarKeys > 0 || activeSidecarFilterCount > 0) {
+                const isSidecarOpen = this._showSidecarFacets || activeSidecarFilterCount > 0;
+
+                const toggleWrapper = document.createElement('div');
+                toggleWrapper.style.cssText = 'margin: 12px 0 8px 0; padding-top: 10px; border-top: 1px dashed rgba(139, 92, 246, 0.35);';
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'btn btn-secondary facet-sidecar-toggle-btn';
+                toggleBtn.style.cssText = `
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 6px;
+                    padding: 7px 10px;
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    border-radius: 7px;
+                    cursor: pointer;
+                    background: ${isSidecarOpen ? 'rgba(139, 92, 246, 0.22)' : 'rgba(139, 92, 246, 0.1)'};
+                    border: 1px solid ${isSidecarOpen ? 'rgba(167, 139, 250, 0.5)' : 'rgba(139, 92, 246, 0.3)'};
+                    color: #ddd6fe;
+                    transition: all 0.15s ease;
+                `;
+                toggleBtn.onclick = () => {
+                    if (activeSidecarFilterCount > 0 && isSidecarOpen && !this._showSidecarFacets) {
+                        // Force-opened because of active filters; toggle explicit state
+                        this._showSidecarFacets = false;
+                    } else {
+                        this._showSidecarFacets = !isSidecarOpen;
+                    }
+                    this.updateUI();
+                };
+
+                const leftLabel = document.createElement('span');
+                leftLabel.textContent = `📄 ${isSidecarOpen ? 'Hide' : 'Show'} File Sidecar Facets`;
+
+                const rightBadge = document.createElement('span');
+                rightBadge.style.cssText = 'font-size: 0.72rem; background: rgba(0,0,0,0.28); padding: 1px 6px; border-radius: 999px; color: #c4b5fd;';
+                rightBadge.textContent = activeSidecarFilterCount > 0
+                    ? `${activeSidecarFilterCount} active · ${totalSidecarKeys}`
+                    : `${totalSidecarKeys} fields`;
+
+                toggleBtn.appendChild(leftLabel);
+                toggleBtn.appendChild(rightBadge);
+                toggleWrapper.appendChild(toggleBtn);
+                container.appendChild(toggleWrapper);
+
+                if (isSidecarOpen) {
+                    const sidecarGroupContainer = document.createElement('div');
+                    sidecarGroupContainer.className = 'facet-sidecar-categories-container';
+                    sidecarGroupContainer.style.cssText = 'padding-left: 4px; border-left: 2px solid rgba(139, 92, 246, 0.35); margin-bottom: 10px;';
+
+                    sidecarCategories.forEach(catName => {
+                        const sec = buildCategorySection(catName);
+                        if (sec) sidecarGroupContainer.appendChild(sec);
+                    });
+
+                    container.appendChild(sidecarGroupContainer);
+                }
+            }
+        }
+
+        if (container.children.length === 0) {
+            const emptyNotice = document.createElement('div');
+            emptyNotice.style.cssText = 'color: #94a3b8; font-size: 0.82rem; padding: 1.75rem 1rem; text-align: center; line-height: 1.5;';
+            emptyNotice.innerHTML = `
+                <div style="font-size: 1.6rem; margin-bottom: 0.5rem; opacity: 0.7;">🏷️</div>
+                <div style="color: #cbd5e1; font-weight: 500; margin-bottom: 0.25rem;">No filter tags yet</div>
+                <div style="font-size: 0.75rem; color: #64748b;">Scan project folders to extract metadata facets.</div>
+            `;
+            container.appendChild(emptyNotice);
+        }
     },
 
     // ─── Context Menu Helpers ─────────────────────────────────────────────
 
-    showContextMenu(x, y, targetKey) {
+    handleSidebarContextMenu(e) {
+        if (e.target && e.target.closest('input, textarea')) return;
+        e.preventDefault();
+        const groupEl = e.target ? e.target.closest('[data-facet-key]') : null;
+        const targetKey = groupEl ? groupEl.dataset.facetKey : null;
+        this.showContextMenu(e.pageX, e.pageY, targetKey);
+    },
+
+    showContextMenu(x, y, targetKey = null) {
         this.closeContextMenu();
 
         const menu = document.createElement('div');
@@ -679,21 +1370,28 @@ const facetSearch = {
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
 
-        const hideBtn = document.createElement('div');
-        hideBtn.className = 'facet-context-menu-item';
-        hideBtn.textContent = 'Hide Category';
-        hideBtn.onclick = async () => {
-            if (!this.hiddenKeys.includes(targetKey)) {
-                this.hiddenKeys.push(targetKey);
-                await window.settingsManager.set('facetSearch.hiddenKeys', JSON.stringify(this.hiddenKeys));
-            }
-            this.closeContextMenu();
-            this.updateUI();
-        };
+        if (targetKey) {
+            const displayTitle = this._formatKeyLabel(targetKey);
+            const hideBtn = document.createElement('div');
+            hideBtn.className = 'facet-context-menu-item';
+            hideBtn.textContent = `👁️‍🗨️ Hide Filter "${displayTitle}"`;
+            hideBtn.onclick = async () => {
+                if (!this.hiddenKeys.includes(targetKey)) {
+                    this.hiddenKeys.push(targetKey);
+                    await window.settingsManager.set('facetSearch.hiddenKeys', JSON.stringify(this.hiddenKeys));
+                }
+                this.closeContextMenu();
+                this.updateUI();
+            };
+            menu.appendChild(hideBtn);
+        }
 
         const showAllBtn = document.createElement('div');
         showAllBtn.className = 'facet-context-menu-item';
-        showAllBtn.textContent = 'Show all Categories';
+        const hiddenCount = Array.isArray(this.hiddenKeys) ? this.hiddenKeys.length : 0;
+        showAllBtn.textContent = hiddenCount > 0
+            ? `👁️ Show All Filters (${hiddenCount} hidden)`
+            : '👁️ Show All Filters';
         showAllBtn.onclick = async () => {
             this.hiddenKeys = [];
             await window.settingsManager.set('facetSearch.hiddenKeys', JSON.stringify(this.hiddenKeys));
@@ -703,28 +1401,22 @@ const facetSearch = {
 
         const manageBtn = document.createElement('div');
         manageBtn.className = 'facet-context-menu-item';
-        manageBtn.textContent = 'Manage Categories...';
+        manageBtn.textContent = '🏷️ Manage Filters...';
         manageBtn.onclick = () => {
             this.closeContextMenu();
             this.showManageCategoriesModal();
         };
 
-        const cancelBtn = document.createElement('div');
-        cancelBtn.className = 'facet-context-menu-item';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.onclick = () => {
-            this.closeContextMenu();
-        };
-
-        menu.appendChild(hideBtn);
         menu.appendChild(showAllBtn);
         menu.appendChild(manageBtn);
-        menu.appendChild(cancelBtn);
 
         document.body.appendChild(menu);
 
+        // Use capture phase (true) so clicks inside .facet-modal-window (which has onclick="event.stopPropagation()")
+        // still immediately dismiss the context menu!
         setTimeout(() => {
-            document.addEventListener('click', this._contextMenuListener);
+            document.addEventListener('mousedown', this._contextMenuListener, true);
+            document.addEventListener('click', this._contextMenuListener, true);
         }, 10);
     },
 
@@ -733,73 +1425,291 @@ const facetSearch = {
         if (menu) {
             menu.remove();
         }
-        document.removeEventListener('click', this._contextMenuListener);
+        document.removeEventListener('mousedown', this._contextMenuListener, true);
+        document.removeEventListener('click', this._contextMenuListener, true);
     },
 
-    // ─── Manage Categories Modal ──────────────────────────────────────────
+    showColumnContextMenu(x, y, column) {
+        this.closeContextMenu();
+        if (!column) return;
+
+        const field = typeof column.getField === 'function' ? column.getField() : column.field;
+        const colDef = typeof column.getDefinition === 'function' ? column.getDefinition() : {};
+        const title = colDef.title || field;
+
+        const menu = document.createElement('div');
+        menu.className = 'facet-context-menu';
+        menu.id = 'facetContextMenu';
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+
+        if (field === 'name' || field === '_actions') {
+            const lockedItem = document.createElement('div');
+            lockedItem.className = 'facet-context-menu-item';
+            lockedItem.style.opacity = '0.6';
+            lockedItem.style.cursor = 'default';
+            lockedItem.textContent = `🔒 Column "${title}" cannot be hidden`;
+            menu.appendChild(lockedItem);
+        } else {
+            // Find key if metadata
+            let metaKey = null;
+            if (field && field.startsWith('meta__')) {
+                metaKey = this.allAvailableKeys.find(k => this._keyToField(k) === field);
+            }
+
+            const hideItem = document.createElement('div');
+            hideItem.className = 'facet-context-menu-item';
+            hideItem.textContent = `👁️‍🗨️ Hide Column "${title}"`;
+            hideItem.onclick = () => {
+                this.closeContextMenu();
+                if (metaKey) {
+                    if (this.visibleColumns.includes(metaKey)) {
+                        this.toggleColumn(metaKey);
+                    }
+                } else {
+                    if (typeof column.hide === 'function') {
+                        column.hide();
+                    } else if (this.tabulatorInstance) {
+                        this.tabulatorInstance.hideColumn(field);
+                    }
+                    if (Array.isArray(this._customColumnOrder)) {
+                        const idx = this._customColumnOrder.indexOf(field);
+                        if (idx > -1) this._customColumnOrder.splice(idx, 1);
+                    }
+                    this._saveSessionTableState();
+                }
+            };
+            menu.appendChild(hideItem);
+        }
+
+        const manageItem = document.createElement('div');
+        manageItem.className = 'facet-context-menu-item';
+        manageItem.textContent = '⚙️ Manage Columns...';
+        manageItem.onclick = () => {
+            this.closeContextMenu();
+            this.toggleColumnSelector();
+        };
+        menu.appendChild(manageItem);
+
+        const resetItem = document.createElement('div');
+        resetItem.className = 'facet-context-menu-item';
+        resetItem.textContent = '🔄 Reset to Top 5 Columns';
+        resetItem.onclick = () => {
+            this.closeContextMenu();
+            this.setTopColumns(5);
+        };
+        menu.appendChild(resetItem);
+
+        document.body.appendChild(menu);
+
+        setTimeout(() => {
+            document.addEventListener('mousedown', this._contextMenuListener, true);
+            document.addEventListener('click', this._contextMenuListener, true);
+        }, 10);
+    },
+
+    // ─── Manage Filters Modal ─────────────────────────────────────────────
+
+    _syncManageCategoryGroupCheckboxes() {
+        const listContainer = document.getElementById('facetManageCategoriesList');
+        if (!listContainer) return;
+        listContainer.querySelectorAll('.manage-categories-group').forEach(group => {
+            const headerCb = group.querySelector('.manage-category-group-checkbox');
+            if (!headerCb) return;
+            const visibleItems = Array.from(group.querySelectorAll('.manage-categories-item'))
+                .filter(item => item.style.display !== 'none');
+            const itemCbs = visibleItems
+                .map(item => item.querySelector('input[type="checkbox"][data-key]'))
+                .filter(Boolean);
+            if (itemCbs.length === 0) {
+                headerCb.checked = false;
+                headerCb.indeterminate = false;
+                return;
+            }
+            const checkedCount = itemCbs.filter(cb => cb.checked).length;
+            headerCb.checked = checkedCount === itemCbs.length;
+            headerCb.indeterminate = checkedCount > 0 && checkedCount < itemCbs.length;
+        });
+    },
+
+    setAllManageCategories(checked) {
+        const listContainer = document.getElementById('facetManageCategoriesList');
+        if (!listContainer) return;
+        listContainer.querySelectorAll('.manage-categories-item').forEach(item => {
+            if (item.style.display === 'none') return; // only toggle currently visible items when search is active
+            const cb = item.querySelector('input[type="checkbox"][data-key]');
+            if (cb) cb.checked = checked;
+        });
+        this._syncManageCategoryGroupCheckboxes();
+    },
+
+    filterManageCategoriesList(query) {
+        const listContainer = document.getElementById('facetManageCategoriesList');
+        if (!listContainer) return;
+        const q = (query || '').trim().toLowerCase();
+
+        listContainer.querySelectorAll('.manage-categories-group').forEach(group => {
+            let visibleInGroup = 0;
+            group.querySelectorAll('.manage-categories-item').forEach(item => {
+                const labelText = (item.dataset.searchText || '').toLowerCase();
+                const matches = !q || labelText.includes(q);
+                item.style.display = matches ? '' : 'none';
+                if (matches) visibleInGroup++;
+            });
+            group.style.display = visibleInGroup > 0 ? '' : 'none';
+        });
+        this._syncManageCategoryGroupCheckboxes();
+    },
 
     showManageCategoriesModal() {
         const modal = document.getElementById('facetManageCategoriesModal');
         const listContainer = document.getElementById('facetManageCategoriesList');
+        const searchInput = document.getElementById('facetFilterKeysSearchInput');
         if (!modal || !listContainer) return;
 
+        if (searchInput) searchInput.value = '';
         listContainer.innerHTML = '';
-        
-        // Gather all unique keys from masterData
+
+        // Gather all unique keys from masterData that actually have facet values (plus any currently hidden keys)
         const allFacets = this.getAvailableFacets(this.masterData);
-        const allKeys = Object.keys(allFacets).sort((a, b) => {
-            if (a === '📋 Metadata Fields') return -1;
-            if (b === '📋 Metadata Fields') return 1;
+        const keySet = new Set(
+            Object.keys(allFacets).filter(k => Array.isArray(allFacets[k]) && allFacets[k].length > 0)
+        );
+        this.hiddenKeys.forEach(key => keySet.add(key));
+
+        // Group keys by category and sort alphabetically (A–Z) within each category
+        const categoryGroups = {};
+        Array.from(keySet).forEach(key => {
+            const cat = this._getCategoryForKey(key);
+            if (!categoryGroups[cat]) categoryGroups[cat] = [];
+            categoryGroups[cat].push(key);
+        });
+
+        const categoryOrder = [
+            '🌐 Community Taxonomy',
+            '🏷️ Metadata Fields',
+            '📁 Project & ISA',
+            '🔗 Integrations',
+            '⚙️ System',
+            '📄 File Properties',
+            '🔬 OME Pixels',
+            '🔬 OME Channels',
+            '🔬 OME Channel',
+            '🔬 OME Instrument',
+            '🔬 OME Image',
+            '🔬 OME Metadata'
+        ];
+
+        const sortedCategories = Object.keys(categoryGroups).sort((a, b) => {
+            let idxA = categoryOrder.indexOf(a);
+            let idxB = categoryOrder.indexOf(b);
+            if (idxA === -1) idxA = 999;
+            if (idxB === -1) idxB = 999;
+            if (idxA !== idxB) return idxA - idxB;
             return a.localeCompare(b);
         });
 
-        // Also add keys that are in hiddenKeys but might not be in current facetData
-        this.hiddenKeys.forEach(key => {
-            if (!allKeys.includes(key)) {
-                allKeys.push(key);
-            }
-        });
+        sortedCategories.forEach(catName => {
+            const groupWrapper = document.createElement('div');
+            groupWrapper.className = 'manage-categories-group';
 
-        allKeys.forEach(key => {
-            const isHidden = this.hiddenKeys.includes(key);
-            const isMissing = !allFacets[key];
-            let displayTitle = key.split('.').pop().replace(/_/g, ' ');
+            const sortedKeys = categoryGroups[catName].sort((a, b) => {
+                const titleA = this._formatKeyLabel(a);
+                const titleB = this._formatKeyLabel(b);
+                return titleA.localeCompare(titleB, undefined, { sensitivity: 'base' });
+            });
 
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'manage-categories-item';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = !isHidden;
-            checkbox.dataset.key = key;
+            const catHeader = document.createElement('div');
+            catHeader.style.cssText = 'display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; color: #a78bfa; margin: 10px 0 4px 0; border-bottom: 1px solid rgba(139,92,246,0.25); padding-bottom: 4px; cursor: pointer; user-select: none;';
+            catHeader.title = `Toggle all filters in "${catName}"`;
 
-            const label = document.createElement('label');
-            label.textContent = displayTitle;
-            label.style.flex = '1';
-            label.style.cursor = 'pointer';
-            
-            // Add type indicator if available
-            const baseKey = key.split('.').pop();
-            const type = this.metadataTypes[baseKey];
-            if (type) {
-                label.innerHTML += ` <span style="color:#9ca3af; font-size:0.85em; font-style:italic; margin-left:6px;">(${type})</span>`;
-            }
+            const catCheckbox = document.createElement('input');
+            catCheckbox.type = 'checkbox';
+            catCheckbox.className = 'manage-category-group-checkbox';
+            catCheckbox.style.cssText = 'width: 15px; height: 15px; accent-color: #8b5cf6; cursor: pointer; margin: 0;';
 
-            if (isMissing) {
-                label.innerHTML += ' <span style="color:#ef4444; font-size:0.85em; font-style:italic; margin-left:6px;">(Not in current scan)</span>';
-            }
+            const catTitleSpan = document.createElement('span');
+            catTitleSpan.textContent = `${catName} (${sortedKeys.length})`;
 
-            itemDiv.onclick = (e) => {
-                if (e.target !== checkbox) {
-                    checkbox.checked = !checkbox.checked;
+            catHeader.appendChild(catCheckbox);
+            catHeader.appendChild(catTitleSpan);
+
+            const toggleCategoryGroup = (targetChecked) => {
+                groupWrapper.querySelectorAll('.manage-categories-item').forEach(item => {
+                    if (item.style.display === 'none') return;
+                    const cb = item.querySelector('input[type="checkbox"][data-key]');
+                    if (cb) cb.checked = targetChecked;
+                });
+                this._syncManageCategoryGroupCheckboxes();
+            };
+
+            catCheckbox.onclick = (e) => {
+                e.stopPropagation();
+                toggleCategoryGroup(catCheckbox.checked);
+            };
+
+            catHeader.onclick = (e) => {
+                if (e.target !== catCheckbox) {
+                    catCheckbox.checked = !catCheckbox.checked;
+                    toggleCategoryGroup(catCheckbox.checked);
                 }
             };
 
-            itemDiv.appendChild(checkbox);
-            itemDiv.appendChild(label);
-            listContainer.appendChild(itemDiv);
+            groupWrapper.appendChild(catHeader);
+
+            sortedKeys.forEach(key => {
+                const isHidden = this.hiddenKeys.includes(key);
+                const isMissing = !allFacets[key] || allFacets[key].length === 0;
+                const displayTitle = this._formatKeyLabel(key);
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'manage-categories-item';
+                itemDiv.dataset.searchText = `${displayTitle} ${key} ${catName}`;
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = !isHidden;
+                checkbox.dataset.key = key;
+                checkbox.onchange = () => this._syncManageCategoryGroupCheckboxes();
+
+                const label = document.createElement('label');
+                label.textContent = displayTitle;
+                label.style.flex = '1';
+                label.style.cursor = 'pointer';
+
+                const baseKey = key.split('.').pop();
+                const type = this.metadataTypes[key] || this.metadataTypes[baseKey];
+                const projCount = (this._keyProjectCounts && this._keyProjectCounts[key]) || 0;
+                const valCount = allFacets[key] ? allFacets[key].length : 0;
+
+                const metaBadges = [];
+                if (type) metaBadges.push(type);
+                if (projCount > 0) metaBadges.push(`${projCount} proj`);
+                if (valCount > 0) metaBadges.push(`${valCount} val`);
+                if (metaBadges.length > 0) {
+                    label.innerHTML += ` <span style="color:#9ca3af; font-size:0.8em; font-style:italic; margin-left:6px;">(${metaBadges.join(' · ')})</span>`;
+                }
+
+                if (isMissing) {
+                    label.innerHTML += ' <span style="color:#ef4444; font-size:0.8em; font-style:italic; margin-left:6px;">(Not in current view)</span>';
+                }
+
+                itemDiv.onclick = (e) => {
+                    if (e.target !== checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        this._syncManageCategoryGroupCheckboxes();
+                    }
+                };
+
+                itemDiv.appendChild(checkbox);
+                itemDiv.appendChild(label);
+                groupWrapper.appendChild(itemDiv);
+            });
+
+            listContainer.appendChild(groupWrapper);
         });
 
+        this._syncManageCategoryGroupCheckboxes();
         modal.style.display = 'flex';
     },
 
@@ -818,25 +1728,25 @@ const facetSearch = {
         const listContainer = document.getElementById('facetManageCategoriesList');
         if (!listContainer) return;
 
-        const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
+        const checkboxes = listContainer.querySelectorAll('input[type="checkbox"][data-key]');
         const newHiddenKeys = [];
 
         checkboxes.forEach(cb => {
-            if (!cb.checked) {
+            if (!cb.checked && cb.dataset.key) {
                 newHiddenKeys.push(cb.dataset.key);
             }
         });
 
         this.hiddenKeys = newHiddenKeys;
         await window.settingsManager.set('facetSearch.hiddenKeys', JSON.stringify(this.hiddenKeys));
-        
+
         this.closeManageCategoriesModal();
         this.updateUI();
     },
 
     // ─── Data Flow ────────────────────────────────────────────────────────
 
-    _contextMenuListener: function(e) {
+    _contextMenuListener: function (e) {
         if (!e.target.closest('.facet-context-menu')) {
             if (window.facetSearch) window.facetSearch.closeContextMenu();
         }
@@ -852,7 +1762,7 @@ const facetSearch = {
     // Extract integration URLs from a project object (searches multiple locations)
     _extractUrls(project) {
         let omeroUrl = '';
-        let elabUrl  = '';
+        let elabUrl = '';
 
         // Primary source: integrations object
         if (project.integrations) {
@@ -889,13 +1799,16 @@ const facetSearch = {
                 : { omeroUrl: '', elabUrl: '' };
 
             const row = {
-                _path:    item.path  || '',
-                _type:    type,
-                name:     item.name  || (type === 'project' ? 'Unknown Project' : 'Unknown File'),
-                path:     item.path  || '',
-                created:  item.created || null,
+                _path: item.path || item.sidecarPath || '',
+                _sidecarPath: item.sidecarPath || '',
+                _parentProjectPath: item._parentProjectPath || '',
+                _sidecarId: item.id || '',
+                _type: type,
+                name: item.name || (type === 'project' ? 'Unknown Project' : 'Unknown File'),
+                path: item.path || item.sidecarPath || '',
+                created: item.created || (item.file && item.file.modified) || item.generated_at || null,
                 omero_url: omeroUrl,
-                elab_url:  elabUrl,
+                elab_url: elabUrl,
             };
 
             // All metadata keys → safe field names
@@ -926,15 +1839,187 @@ const facetSearch = {
         });
     },
 
+    // Return the active ordered list of movable columns ('path', 'created', and visible metadata keys)
+    _getEffectiveColumnOrder() {
+        const validVisibleMeta = this.visibleColumns.filter(k => this.allAvailableKeys.includes(k));
+        const baseItems = ['path', 'created', ...validVisibleMeta];
+        const baseSet = new Set(baseItems);
+
+        const ordered = [];
+        const seen = new Set();
+
+        if (Array.isArray(this._customColumnOrder)) {
+            this._customColumnOrder.forEach(item => {
+                if (baseSet.has(item) && !seen.has(item)) {
+                    ordered.push(item);
+                    seen.add(item);
+                }
+            });
+        }
+
+        baseItems.forEach(item => {
+            if (!seen.has(item)) {
+                ordered.push(item);
+                seen.add(item);
+            }
+        });
+
+        return ordered;
+    },
+
+    _getSessionStorageKey() {
+        const user = window.userManager?.currentUser || 'default';
+        return this.isTemplateHub
+            ? `metafold_facet_hub_table_state_${user}`
+            : `metafold_facet_table_state_${user}`;
+    },
+
+    _saveSessionTableState() {
+        try {
+            const state = {
+                visibleColumns: [...this.visibleColumns],
+                columnOrder: this._getEffectiveColumnOrder(),
+                columnWidths: { ...(this._customColumnWidths || {}) },
+                columnSorters: [...(this._customColumnSorters || [])],
+                activeLayoutName: this.activeLayoutName || null,
+                updatedAt: new Date().toISOString()
+            };
+            const jsonStr = JSON.stringify(state);
+            localStorage.setItem(this._getSessionStorageKey(), jsonStr);
+            if (!this.isTemplateHub && window.settingsManager && typeof window.settingsManager.set === 'function') {
+                window.settingsManager.set('facetSearch.sessionTableState', jsonStr);
+            }
+        } catch (e) {
+            console.warn('Could not save facet table session state:', e);
+        }
+    },
+
+    async _restoreSessionTableState(defaultTopColumns = []) {
+        try {
+            let raw = localStorage.getItem(this._getSessionStorageKey());
+            if (!raw && !this.isTemplateHub && window.settingsManager && typeof window.settingsManager.get === 'function') {
+                raw = await window.settingsManager.get('facetSearch.sessionTableState');
+            }
+            if (!raw) {
+                this.visibleColumns = [...defaultTopColumns];
+                this._customColumnOrder = ['path', 'created', ...this.visibleColumns];
+                return;
+            }
+            const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (!state || typeof state !== 'object') {
+                this.visibleColumns = [...defaultTopColumns];
+                this._customColumnOrder = ['path', 'created', ...this.visibleColumns];
+                return;
+            }
+
+            if (state.columnWidths && typeof state.columnWidths === 'object') {
+                this._customColumnWidths = { ...state.columnWidths };
+            }
+            if (Array.isArray(state.columnSorters)) {
+                this._customColumnSorters = [...state.columnSorters];
+            }
+            if (state.activeLayoutName !== undefined) {
+                this.activeLayoutName = state.activeLayoutName || null;
+                const btnLabel = document.getElementById('layoutSelectorBtnLabel');
+                if (btnLabel) {
+                    btnLabel.textContent = this.activeLayoutName ? `Layout: ${this.activeLayoutName}` : 'Save / Load Layout';
+                }
+            }
+
+            if (Array.isArray(state.visibleColumns)) {
+                if (state.visibleColumns.length === 0) {
+                    this.visibleColumns = [];
+                } else {
+                    const matched = state.visibleColumns.filter(k => this.allAvailableKeys.includes(k));
+                    this.visibleColumns = matched.length > 0 ? matched : [...defaultTopColumns];
+                }
+            } else {
+                this.visibleColumns = [...defaultTopColumns];
+            }
+
+            if (Array.isArray(state.columnOrder) && state.columnOrder.length > 0) {
+                this._customColumnOrder = [...state.columnOrder];
+            } else {
+                this._customColumnOrder = ['path', 'created', ...this.visibleColumns];
+            }
+        } catch (e) {
+            console.warn('Could not restore facet table session state:', e);
+            this.visibleColumns = [...defaultTopColumns];
+            this._customColumnOrder = ['path', 'created', ...this.visibleColumns];
+        }
+    },
+
+    _syncColumnStateFromTabulator(saveSession = true, resizedColumn = null) {
+        if (!this.tabulatorInstance) return;
+        try {
+            const fieldToKey = {};
+            this.allAvailableKeys.forEach(k => { fieldToKey[this._keyToField(k)] = k; });
+
+            if (resizedColumn && typeof resizedColumn.getField === 'function') {
+                const resizedField = resizedColumn.getField();
+                const resizedWidth = typeof resizedColumn.getWidth === 'function' ? resizedColumn.getWidth() : null;
+                if (resizedField && resizedWidth && resizedWidth > 0) {
+                    const metaKey = fieldToKey[resizedField];
+                    if (metaKey) {
+                        this._customColumnWidths[metaKey] = Math.round(resizedWidth);
+                    } else if (['name', 'path', 'created'].includes(resizedField)) {
+                        this._customColumnWidths[resizedField] = Math.round(resizedWidth);
+                    }
+                }
+            }
+
+            const cols = this.tabulatorInstance.getColumns();
+            const newOrder = [];
+            const newVisibleMeta = [];
+
+            cols.forEach(col => {
+                const field = typeof col.getField === 'function' ? col.getField() : null;
+                if (!field || field === 'name' || field === '_actions' || field === 'omero_url' || field === 'elab_url') return;
+                const isVis = typeof col.isVisible === 'function' ? col.isVisible() : true;
+                if (!isVis) return;
+
+                if (field === 'path' || field === 'created') {
+                    newOrder.push(field);
+                    return;
+                }
+                const metaKey = fieldToKey[field];
+                if (metaKey) {
+                    newOrder.push(metaKey);
+                    newVisibleMeta.push(metaKey);
+                }
+            });
+
+            if (newOrder.length > 0) {
+                this._customColumnOrder = newOrder;
+            }
+            if (newVisibleMeta.length > 0 || this.visibleColumns.length === 0) {
+                this.visibleColumns = newVisibleMeta;
+            }
+
+            if (typeof this.tabulatorInstance.getSorters === 'function') {
+                const sorters = this.tabulatorInstance.getSorters() || [];
+                this._customColumnSorters = sorters.map(s => ({ column: s.field || s.column, dir: s.dir })).filter(s => s.column);
+            }
+
+            if (saveSession) {
+                this._saveSessionTableState();
+            }
+        } catch (e) {
+            console.warn('Could not sync column state from Tabulator:', e);
+        }
+    },
+
     // Build Tabulator column definitions
     _buildColumns() {
         const self = this;
+        const customWidths = this._customColumnWidths || {};
 
         const cols = [
             {
                 title: 'Name',
                 field: 'name',
                 minWidth: 200,
+                ...(customWidths.name ? { width: customWidths.name } : {}),
                 sorter: 'string',
                 frozen: true,
                 formatter: (cell) => {
@@ -947,21 +2032,25 @@ const facetSearch = {
                     }
                     return `<strong>${icon} ${label}</strong>`;
                 },
-            },
-            {
+            }
+        ];
+
+        const movableDefs = {
+            path: {
                 title: 'Path',
                 field: 'path',
                 minWidth: 220,
+                ...(customWidths.path ? { width: customWidths.path } : {}),
                 sorter: 'string',
                 formatter: (cell) => {
                     const v = cell.getValue() || '';
                     return `<span title="${v}" style="font-size:0.8rem;font-family:monospace;color:#9ca3af;">${v}</span>`;
                 },
             },
-            {
+            created: {
                 title: 'Created',
                 field: 'created',
-                width: 105,
+                width: customWidths.created || 105,
                 sorter: 'alphanum',
                 formatter: (cell) => {
                     const v = cell.getValue();
@@ -969,20 +2058,54 @@ const facetSearch = {
                 },
                 // For CSV: export the formatted date string
                 accessorDownload: (val) => val ? new Date(val).toLocaleDateString() : '',
-            },
-        ];
+            }
+        };
 
-        // Dynamic metadata columns
         this.allAvailableKeys.forEach(key => {
-            let title = key.split('.').pop().replace(/_/g, ' ');
-            title = title.charAt(0).toUpperCase() + title.slice(1);
-            cols.push({
+            const title = this._formatKeyLabel(key);
+            movableDefs[key] = {
                 title,
                 field: this._keyToField(key),
                 visible: this.visibleColumns.includes(key),
                 minWidth: 120,
+                ...(customWidths[key] ? { width: customWidths[key] } : {}),
                 sorter: 'string',
-            });
+                formatter: (cell) => {
+                    const rawVal = cell.getValue();
+                    if (window.formatDisplayValue) {
+                        return window.formatDisplayValue(rawVal, { emptyPlaceholder: '—' });
+                    }
+                    if (rawVal === undefined || rawVal === null || rawVal === '') return '—';
+                    if (typeof rawVal === 'object') {
+                        try { return JSON.stringify(rawVal); } catch (_) { return String(rawVal); }
+                    }
+                    return String(rawVal);
+                },
+                accessorDownload: (val) => {
+                    if (window.formatDisplayValue) {
+                        return window.formatDisplayValue(val, { emptyPlaceholder: '' });
+                    }
+                    return val !== undefined && val !== null ? String(val) : '';
+                }
+            };
+        });
+
+        // 1. Add visible movable columns in the user's exact saved order
+        const effectiveOrder = this._getEffectiveColumnOrder();
+        const addedKeys = new Set();
+        effectiveOrder.forEach(colKey => {
+            if (movableDefs[colKey] && !addedKeys.has(colKey)) {
+                cols.push(movableDefs[colKey]);
+                addedKeys.add(colKey);
+            }
+        });
+
+        // 2. Append remaining hidden metadata columns so they can be toggled cleanly
+        this.allAvailableKeys.forEach(key => {
+            if (!addedKeys.has(key) && movableDefs[key]) {
+                cols.push(movableDefs[key]);
+                addedKeys.add(key);
+            }
         });
 
         // Hidden URL columns – visible: false but download: true → appear only in CSV
@@ -999,21 +2122,29 @@ const facetSearch = {
             download: true,
         });
 
-        // Actions column – shown in table, excluded from CSV
+        // Actions column – shown in table, excluded from CSV (clicking any row opens details on the right)
         cols.push({
             title: 'Actions',
             field: '_actions',
             download: false,
             headerSort: false,
-            width: 110,
+            width: 118,
             formatter: (cell) => {
                 const row = cell.getRow().getData();
                 const path = (row.path || '').replace(/"/g, '&quot;');
+                const sidecarPath = (row._sidecarPath || '').replace(/"/g, '&quot;');
                 let html = ``;
                 if (window.facetSearch.isTemplateHub) {
-                    html += `<button class="btn btn-small facet-act-preview" style="background:#7c3aed; color:white; border:none; border-radius:4px; padding:4px 8px; font-size:0.75rem; cursor:pointer;" title="Preview Template">👁️ Preview</button>`;
+                    html += `<button class="btn btn-small facet-act-install" data-path="${path}" style="background:#7c3aed; color:white; border:none; border-radius:4px; padding:4px 8px; font-size:0.75rem; cursor:pointer;" title="Install Template">📥 Install</button>`;
+                } else if (row._type === 'file_sidecar') {
+                    const targetFile = path || sidecarPath;
+                    html += `<button class="btn btn-small facet-act-show-file" data-path="${targetFile}" title="Show file in Explorer">📁</button>`;
+                    if (sidecarPath) {
+                        html += ` <button class="btn btn-small facet-act-open-sidecar" data-sidecar-path="${sidecarPath}" title="Open Sidecar JSON (${sidecarPath})">📄</button>`;
+                    }
                 } else {
-                    html += `<button class="btn btn-small facet-act-open" data-path="${path}" title="Open Folder">📁</button>`;
+                    html += `<button class="btn btn-small facet-act-open" data-path="${path}" title="Open Project Folder">📁</button>`;
+                    html += ` <button class="btn btn-small facet-act-add-note" data-path="${path}" title="Add Note / Observation">➕</button>`;
                 }
                 if (row.omero_url) {
                     const u = row.omero_url.replace(/"/g, '&quot;');
@@ -1026,17 +2157,52 @@ const facetSearch = {
                 return html;
             },
             cellClick: (e, cell) => {
-                const target = e.target.closest('.facet-act-open, .facet-act-link, .facet-act-preview');
+                const target = e.target.closest('.facet-act-open, .facet-act-add-note, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install');
                 if (!target) return;
                 e.preventDefault();
                 e.stopPropagation();
-                
-                if (target.classList.contains('facet-act-preview')) {
-                    const rowData = cell.getRow().getData();
-                    window.facetSearch.showTemplatePreview(rowData);
+
+                if (target.classList.contains('facet-act-add-note')) {
+                    const p = target.dataset.path;
+                    const proj = this.masterData.find(m => m.path === p);
+                    if (proj && window.noteComposer) {
+                        window.noteComposer.open(proj);
+                    }
                     return;
                 }
-                
+
+                if (target.classList.contains('facet-act-install')) {
+                    const repoPath = target.dataset.path;
+                    if (repoPath && window.app?.downloadAndInstallTemplate) {
+                        window.app.downloadAndInstallTemplate(repoPath);
+                    }
+                    return;
+                }
+
+                if (target.classList.contains('facet-act-show-file')) {
+                    const p = target.dataset.path;
+                    if (p) {
+                        if (window.electronAPI?.showItemInFolder) {
+                            window.electronAPI.showItemInFolder(p);
+                        } else if (window.electronAPI?.openFolder) {
+                            window.electronAPI.openFolder(p);
+                        }
+                    }
+                    return;
+                }
+
+                if (target.classList.contains('facet-act-open-sidecar')) {
+                    const sp = target.dataset.sidecarPath;
+                    if (sp) {
+                        if (window.electronAPI?.openFile) {
+                            window.electronAPI.openFile(sp);
+                        } else if (window.electronAPI?.showItemInFolder) {
+                            window.electronAPI.showItemInFolder(sp);
+                        }
+                    }
+                    return;
+                }
+
                 if (target.classList.contains('facet-act-open')) {
                     const p = target.dataset.path;
                     if (p && window.electronAPI?.openFolder) window.electronAPI.openFolder(p);
@@ -1071,8 +2237,9 @@ const facetSearch = {
 
         const data = this._buildTableData(results);
 
-        // Always destroy and recreate the Tabulator instance.
+        // Always sync column state before destroying and recreating the Tabulator instance.
         if (this.tabulatorInstance) {
+            this._syncColumnStateFromTabulator(false, null);
             this.tabulatorInstance.destroy();
             this.tabulatorInstance = null;
         }
@@ -1080,43 +2247,213 @@ const facetSearch = {
         container.innerHTML = '';
 
         // Build Tabulator options — enable dataTree when sidecars are present
+        const isMasterEmpty = !this.masterData || this.masterData.length === 0;
+        const emptyPlaceholder = this.isTemplateHub
+            ? '<div style="color:#9ca3af;padding:40px;text-align:center;">No templates match the selected filters.</div>'
+            : isMasterEmpty
+                ? '<div style="color:#cbd5e1;padding:60px 24px;text-align:center;max-width:560px;margin:0 auto;">' +
+                '<div style="font-size:3rem;margin-bottom:14px;filter:drop-shadow(0 4px 12px rgba(168,85,247,0.35));">🔍</div>' +
+                '<div style="font-size:1.25rem;font-weight:600;color:#f1f5f9;margin-bottom:8px;">Scan project folders to start</div>' +
+                '<div style="font-size:0.9rem;color:#94a3b8;line-height:1.5;margin-bottom:24px;">' +
+                'No indexed projects found yet. Scan any directory on your computer or storage drive to discover, analyze, and index your MetaFold experiments.' +
+                '</div>' +
+                '<div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">' +
+                '<button type="button" class="btn btn-primary" onclick="facetSearch.scanFolderFromSearch()" style="padding:0.6rem 1.4rem;font-size:0.9rem;font-weight:600;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(168,85,247,0.4);cursor:pointer;">' +
+                '📁 Scan Project Folder' +
+                '</button>' +
+                '<button type="button" class="btn btn-secondary" onclick="facetSearch.loadSummaryFile()" style="padding:0.6rem 1.2rem;font-size:0.9rem;display:inline-flex;align-items:center;gap:8px;cursor:pointer;">' +
+                '📂 Open Summary JSON' +
+                '</button>' +
+                '</div>' +
+                '</div>'
+                : '<div style="color:#9ca3af;padding:50px 20px;text-align:center;">' +
+                '<div style="font-size:2.2rem;margin-bottom:10px;">📁</div>' +
+                '<div style="font-size:1.05rem;color:#e2d9f3;margin-bottom:6px;font-weight:600;">No projects match current filters</div>' +
+                '<div style="font-size:0.85rem;margin-bottom:16px;color:#94a3b8;">Try clearing search filters or scan another folder to add more projects.</div>' +
+                '<button type="button" class="btn btn-secondary btn-small" onclick="facetSearch.resetFilters()" style="cursor:pointer;">Clear Filters</button>' +
+                '</div>';
+
         const tabulatorOptions = {
             data,
             columns: this._buildColumns(),
             layout: 'fitColumns',
             rowHeight: 38,
-            placeholder: '<div style="color:#9ca3af;padding:40px;text-align:center;">No projects match the selected filters.</div>',
+            placeholder: emptyPlaceholder,
             movableColumns: true,
             resizableColumns: 'header',
             columnHeaderSortMulti: true,
+            ...(Array.isArray(this._customColumnSorters) && this._customColumnSorters.length > 0
+                ? { initialSort: this._customColumnSorters }
+                : {}),
             downloadConfig: {
                 columnHeaders: true,
             },
             selectableRows: 1,
-            rowClick: (e, row) => {
-                row.getTable().deselectRow();
-                row.select();
-                if (window.facetSearch.isTemplateHub) {
-                    window.facetSearch.showTemplatePreview(row.getData());
-                }
-            },
-            rowSelectionChanged: (data, rows) => {
-                if (data.length > 0 && window.facetSearch.isTemplateHub) {
-                    window.facetSearch.showTemplatePreview(data[0]);
-                }
-            }
-
         };
 
-        // Enable tree mode when file sidecars exist
+        // Enable tree mode when file sidecars exist (start expanded so microscopy files are immediately visible)
         if (this._hasFileSidecars) {
             tabulatorOptions.dataTree = true;
-            tabulatorOptions.dataTreeStartExpanded = false;
+            tabulatorOptions.dataTreeStartExpanded = true;
             tabulatorOptions.dataTreeChildField = '_children';
             tabulatorOptions.dataTreeElementColumn = 'name';
         }
 
         this.tabulatorInstance = new Tabulator(container, tabulatorOptions);
+
+        // Tabulator 6.x requires registering event listeners via .on()
+        this.tabulatorInstance.on('rowClick', (e, row) => {
+            if (e.target && e.target.closest('.facet-act-open, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install, .tabulator-data-tree-control')) {
+                return;
+            }
+            this._activateRow(row, false);
+        });
+
+        this.tabulatorInstance.on('columnResized', (column) => {
+            this._syncColumnStateFromTabulator(true, column);
+        });
+
+        this.tabulatorInstance.on('columnMoved', () => {
+            this._syncColumnStateFromTabulator(true, null);
+            const colDropdown = document.getElementById('columnSelectorDropdown');
+            if (colDropdown && colDropdown.style.display !== 'none') {
+                this.renderColumnSelector();
+            }
+        });
+
+        this.tabulatorInstance.on('headerContext', (e, column) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showColumnContextMenu(e.pageX, e.pageY, column);
+        });
+
+        this.tabulatorInstance.on('dataSorted', (sorters) => {
+            if (Array.isArray(sorters)) {
+                this._customColumnSorters = sorters.map(s => ({ column: s.field || s.column, dir: s.dir })).filter(s => s.column);
+                this._saveSessionTableState();
+            }
+        });
+
+        // Re-select previously active row when table rebuilds (e.g. after toggling a filter)
+        this.tabulatorInstance.on('tableBuilt', () => {
+            if (!this.selectedProjectPath) return;
+            const rows = this._getNavigableRows();
+            const match = this._findCurrentSelectedRow(rows);
+            if (match && typeof match.select === 'function') {
+                match.select();
+            }
+        });
+    },
+
+    // Return all currently visible/navigable Tabulator rows in visual display order
+    // (including expanded file-sidecar child rows in tree mode)
+    _getNavigableRows() {
+        if (!this.tabulatorInstance) return [];
+        let topRows = [];
+        try {
+            topRows = this.tabulatorInstance.getRows('active');
+            if (!Array.isArray(topRows) || topRows.length === 0) {
+                topRows = this.tabulatorInstance.getRows() || [];
+            }
+        } catch (err) {
+            topRows = [];
+        }
+
+        const flatRows = [];
+        const collectRow = (row) => {
+            if (!row) return;
+            flatRows.push(row);
+            if (this._hasFileSidecars && typeof row.isTreeExpanded === 'function' && row.isTreeExpanded()) {
+                const children = typeof row.getTreeChildren === 'function' ? row.getTreeChildren() : [];
+                if (Array.isArray(children)) {
+                    children.forEach(collectRow);
+                }
+            }
+        };
+        topRows.forEach(collectRow);
+        return flatRows;
+    },
+
+    // Find currently selected row component (by Tabulator selection state or stored selectedProjectPath)
+    _findCurrentSelectedRow(rows = null) {
+        const list = Array.isArray(rows) ? rows : this._getNavigableRows();
+        if (list.length === 0) return null;
+
+        const byTabulator = list.find(r => typeof r.isSelected === 'function' && r.isSelected());
+        if (byTabulator) return byTabulator;
+
+        if (this.selectedProjectPath) {
+            return list.find(r => {
+                const d = typeof r.getData === 'function' ? r.getData() : null;
+                return d && (d._path === this.selectedProjectPath || d.path === this.selectedProjectPath);
+            }) || null;
+        }
+        return null;
+    },
+
+    // Select a row, optionally scroll it into view, and display its metadata/details in the right panel
+    _activateRow(row, shouldScroll = false) {
+        if (!row) return;
+
+        if (window.projectInlineEditor && typeof window.projectInlineEditor.confirmDiscardIfNeeded === 'function') {
+            if (!window.projectInlineEditor.confirmDiscardIfNeeded()) {
+                return;
+            }
+            window.projectInlineEditor.isEditing = false;
+            window.projectInlineEditor.isDirty = false;
+        }
+        const table = typeof row.getTable === 'function' ? row.getTable() : this.tabulatorInstance;
+        if (table && typeof table.deselectRow === 'function') {
+            table.deselectRow();
+        }
+        if (typeof row.select === 'function') {
+            row.select();
+        }
+
+        if (shouldScroll) {
+            try {
+                const el = typeof row.getElement === 'function' ? row.getElement() : null;
+                if (el && el.offsetParent !== null && typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ block: 'nearest' });
+                } else if (typeof row.scrollTo === 'function') {
+                    row.scrollTo();
+                }
+            } catch (e) { }
+        }
+
+        const rowData = typeof row.getData === 'function' ? row.getData() : null;
+        if (!rowData) return;
+
+        if (this.isTemplateHub) {
+            this.showTemplatePreview(rowData);
+        } else {
+            this.showProjectDetails(rowData);
+        }
+    },
+
+    // Step through visible table rows using Up (-1) or Down (+1) arrow keys
+    navigateTableByArrow(delta, event = null) {
+        const rows = this._getNavigableRows();
+        if (rows.length === 0) return;
+
+        if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
+
+        const currentRow = this._findCurrentSelectedRow(rows);
+        const currentIndex = currentRow ? rows.indexOf(currentRow) : -1;
+
+        let nextIndex;
+        if (currentIndex === -1) {
+            nextIndex = delta > 0 ? 0 : rows.length - 1;
+        } else {
+            nextIndex = Math.max(0, Math.min(rows.length - 1, currentIndex + delta));
+        }
+
+        const targetRow = rows[nextIndex];
+        if (targetRow) {
+            this._activateRow(targetRow, true);
+        }
     },
 
     // Column Selector functions
@@ -1127,15 +2464,85 @@ const facetSearch = {
         dropdown.style.display = isOpen ? 'none' : 'block';
     },
 
-    // Export current filtered view as CSV via Tabulator's built-in downloader
-    exportCsv() {
+    // Export current filtered view as CSV via Tabulator's built-in downloader or native save dialog
+    async exportCsv() {
         if (!this.tabulatorInstance) {
             alert('No data loaded. Please load a summary file first.');
             return;
         }
         const timestamp = new Date().toISOString().slice(0, 10);
-        // bom: true → UTF-8 BOM so Excel opens umlauts correctly
-        this.tabulatorInstance.download('csv', `metafold-export-${timestamp}.csv`, { bom: true });
+        const defaultFilename = `metafold-export-${timestamp}.csv`;
+
+        // If Electron save dialog is available, prompt user for save destination
+        if (window.electronAPI && typeof window.electronAPI.showSaveDialog === 'function' && typeof window.electronAPI.writeFile === 'function') {
+            try {
+                const savePath = await window.electronAPI.showSaveDialog({
+                    title: 'Export Filtered Projects as CSV',
+                    defaultPath: defaultFilename,
+                    filters: [
+                        { name: 'CSV Files', extensions: ['csv'] },
+                        { name: 'All Files', extensions: ['*'] }
+                    ]
+                });
+
+                if (!savePath) {
+                    console.log('CSV export cancelled by user.');
+                    return;
+                }
+
+                // Intercept Tabulator download to write directly via Electron
+                // Note: Tabulator 6 download signature is (type, filename, options, range, interceptCallback)
+                this.tabulatorInstance.download('csv', defaultFilename, { bom: true }, 'active', async (fileContents) => {
+                    try {
+                        let textContent = fileContents;
+                        if (typeof textContent !== 'string' && fileContents && typeof fileContents.text === 'function') {
+                            textContent = await fileContents.text();
+                        } else if (typeof textContent !== 'string' && fileContents instanceof ArrayBuffer) {
+                            textContent = new TextDecoder().decode(fileContents);
+                        }
+                        if (typeof textContent === 'string' && !textContent.startsWith('\uFEFF')) {
+                            textContent = '\uFEFF' + textContent;
+                        }
+
+                        const writeResult = await window.electronAPI.writeFile(savePath, textContent);
+                        if (writeResult && writeResult.success) {
+                            const targetFolder = savePath.replace(/[\\/][^\\/]+$/, '');
+                            const fileName = savePath.split(/[\\/]/).pop();
+                            const rowCount = (typeof this.tabulatorInstance.getDataCount === 'function') ?
+                                this.tabulatorInstance.getDataCount('active') :
+                                (this.filteredProjects || []).length;
+
+                            if (typeof window.showExportSuccessModal === 'function') {
+                                window.showExportSuccessModal({
+                                    title: 'CSV Export Completed',
+                                    message: 'Filtered project table exported to CSV successfully.',
+                                    folderPath: targetFolder,
+                                    files: [
+                                        { name: fileName, path: savePath, icon: '📥', label: 'CSV Spreadsheet' }
+                                    ],
+                                    stats: {
+                                        'Exported Rows': rowCount,
+                                        'Visible Columns': (this.visibleColumns || []).length
+                                    }
+                                });
+                            }
+                        } else {
+                            alert('Failed to save CSV file: ' + (writeResult?.message || 'Unknown error'));
+                        }
+                    } catch (writeErr) {
+                        console.error('Error saving CSV:', writeErr);
+                        alert('Error saving CSV: ' + writeErr.message);
+                    }
+                });
+                return;
+            } catch (err) {
+                console.error('Error in native CSV export dialog:', err);
+                // Fall back to default tabulator browser download below
+            }
+        }
+
+        // Fallback for browser mode: bom: true → UTF-8 BOM so Excel opens umlauts correctly
+        this.tabulatorInstance.download('csv', defaultFilename, { bom: true });
     },
 
     // Toggle a metadata column visibility in the Tabulator instance
@@ -1143,23 +2550,91 @@ const facetSearch = {
         const index = this.visibleColumns.indexOf(key);
         if (index > -1) {
             this.visibleColumns.splice(index, 1);
+            const orderIdx = (this._customColumnOrder || []).indexOf(key);
+            if (orderIdx > -1) {
+                this._customColumnOrder.splice(orderIdx, 1);
+            }
             if (this.tabulatorInstance) {
                 this.tabulatorInstance.hideColumn(this._keyToField(key));
             }
         } else {
             this.visibleColumns.push(key);
+            if (!Array.isArray(this._customColumnOrder) || this._customColumnOrder.length === 0) {
+                this._customColumnOrder = this._getEffectiveColumnOrder();
+            }
+            if (!this._customColumnOrder.includes(key)) {
+                this._customColumnOrder.push(key);
+            }
             if (this.tabulatorInstance) {
                 this.tabulatorInstance.showColumn(this._keyToField(key));
             }
         }
-        // No renderResults call needed – Tabulator updates instantly
+        this._saveSessionTableState();
+        this.renderColumnSelector();
+    },
+
+    setTopColumns(count = 5) {
+        const nextCols = count > 0 ? this.allAvailableKeys.slice(0, count) : [];
+        this.visibleColumns = [...nextCols];
+        const baseFixed = this.isTemplateHub ? [] : ['path', 'created'];
+        this._customColumnOrder = [...baseFixed, ...this.visibleColumns];
+        this._saveSessionTableState();
+        this.renderResults(this.getFilteredData());
+        this.renderColumnSelector();
+    },
+
+    resetColumnsAndWidths() {
+        this._customColumnWidths = {};
+        this._customColumnSorters = [];
+        this.activeLayoutName = null;
+        const btnLabel = document.getElementById('layoutSelectorBtnLabel');
+        if (btnLabel) btnLabel.textContent = 'Save / Load Layout';
+        const defaultCount = this.isTemplateHub ? 6 : 5;
+        this.visibleColumns = this.allAvailableKeys.slice(0, defaultCount);
+        const baseFixed = this.isTemplateHub ? [] : ['path', 'created'];
+        this._customColumnOrder = [...baseFixed, ...this.visibleColumns];
+        this._saveSessionTableState();
+        this.renderColumnSelector();
+        this.renderResults(this.getFilteredData());
+    },
+
+    filterColumnSelectorList(query) {
+        const container = document.getElementById('columnSelectorDropdown');
+        if (!container) return;
+        const q = (query || '').trim().toLowerCase();
+
+        container.querySelectorAll('.column-selector-group').forEach(group => {
+            let visibleInGroup = 0;
+            group.querySelectorAll('.column-selector-item').forEach(item => {
+                const text = (item.dataset.searchText || '').toLowerCase();
+                const matches = !q || text.includes(q);
+                item.style.display = matches ? 'flex' : 'none';
+                if (matches) visibleInGroup++;
+            });
+            group.style.display = visibleInGroup > 0 ? '' : 'none';
+        });
     },
 
     renderColumnSelector() {
         const container = document.getElementById('columnSelectorDropdown');
         if (!container) return;
 
-        container.innerHTML = '<div style="margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid rgba(139, 92, 246, 0.3); padding-bottom: 6px;">⚙️ Select Columns</div>';
+        const existingSearchInput = document.getElementById('facetColumnSearchInput');
+        const currentSearchQuery = existingSearchInput ? existingSearchInput.value : '';
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(139, 92, 246, 0.3); padding-bottom: 6px;">
+                <span style="font-weight: bold; font-size: 0.85rem;">📊 Table Columns (A–Z)</span>
+                <div style="display: flex; gap: 4px;">
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="facetSearch.setTopColumns(5)" title="Show top 5 columns">Top 5</button>
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="facetSearch.setTopColumns(0)" title="Hide all metadata columns">None</button>
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="facetSearch.resetColumnsAndWidths()" title="Reset column widths, order, and selection to defaults">↺ Reset</button>
+                </div>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <input type="text" id="facetColumnSearchInput" class="facet-text-search-input" style="padding: 5px 8px; font-size: 0.8rem;" placeholder="🔍 Search columns..." oninput="facetSearch.filterColumnSelectorList(this.value)">
+            </div>
+        `;
 
         const categoryGroups = {};
         this.allAvailableKeys.forEach(key => {
@@ -1168,31 +2643,423 @@ const facetSearch = {
             categoryGroups[cat].push(key);
         });
 
-        for (const catName in categoryGroups) {
-            const catHeader = document.createElement('div');
-            catHeader.style.cssText = 'font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: #a78bfa; margin: 10px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; opacity: 0.9;';
-            catHeader.textContent = catName;
-            container.appendChild(catHeader);
+        const categoryOrder = [
+            '🌐 Community Taxonomy',
+            '🏷️ Metadata Fields',
+            '📁 Project & ISA',
+            '🔗 Integrations',
+            '⚙️ System',
+            '📄 File Properties',
+            '🔬 OME Pixels',
+            '🔬 OME Channels',
+            '🔬 OME Channel',
+            '🔬 OME Instrument',
+            '🔬 OME Image',
+            '🔬 OME Metadata'
+        ];
 
-            categoryGroups[catName].forEach(key => {
+        const sortedCategories = Object.keys(categoryGroups).sort((a, b) => {
+            let idxA = categoryOrder.indexOf(a);
+            let idxB = categoryOrder.indexOf(b);
+            if (idxA === -1) idxA = 999;
+            if (idxB === -1) idxB = 999;
+            if (idxA !== idxB) return idxA - idxB;
+            return a.localeCompare(b);
+        });
+
+        const syncColumnGroupCheckboxes = () => {
+            container.querySelectorAll('.column-selector-group').forEach(grp => {
+                const headerCb = grp.querySelector('.column-category-group-checkbox');
+                if (!headerCb) return;
+                const visibleItems = Array.from(grp.querySelectorAll('.column-selector-item'))
+                    .filter(item => item.style.display !== 'none');
+                const itemCbs = visibleItems
+                    .map(item => item.querySelector('input[type="checkbox"][data-col-key]'))
+                    .filter(Boolean);
+                if (itemCbs.length === 0) {
+                    headerCb.checked = false;
+                    headerCb.indeterminate = false;
+                    return;
+                }
+                const checkedCount = itemCbs.filter(cb => cb.checked).length;
+                headerCb.checked = checkedCount === itemCbs.length;
+                headerCb.indeterminate = checkedCount > 0 && checkedCount < itemCbs.length;
+            });
+        };
+
+        sortedCategories.forEach(catName => {
+            const groupWrapper = document.createElement('div');
+            groupWrapper.className = 'column-selector-group';
+
+            const sortedKeys = [...categoryGroups[catName]].sort((a, b) => {
+                const titleA = this._formatKeyLabel(a);
+                const titleB = this._formatKeyLabel(b);
+                return titleA.localeCompare(titleB, undefined, { sensitivity: 'base' });
+            });
+
+            const catHeader = document.createElement('div');
+            catHeader.style.cssText = 'display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: #a78bfa; margin: 10px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 3px; opacity: 0.95; cursor: pointer; user-select: none;';
+            catHeader.title = `Toggle all columns in "${catName}"`;
+
+            const catCb = document.createElement('input');
+            catCb.type = 'checkbox';
+            catCb.className = 'column-category-group-checkbox';
+            catCb.style.cssText = 'width: 14px; height: 14px; accent-color: #8b5cf6; cursor: pointer; margin: 0;';
+
+            const catTitleSpan = document.createElement('span');
+            catTitleSpan.textContent = `${catName} (${sortedKeys.length})`;
+
+            catHeader.appendChild(catCb);
+            catHeader.appendChild(catTitleSpan);
+
+            const toggleColGroup = (targetChecked) => {
+                groupWrapper.querySelectorAll('.column-selector-item').forEach(item => {
+                    if (item.style.display === 'none') return;
+                    const cb = item.querySelector('input[type="checkbox"][data-col-key]');
+                    if (cb && cb.checked !== targetChecked) {
+                        cb.checked = targetChecked;
+                        this.toggleColumn(cb.dataset.colKey);
+                    }
+                });
+                syncColumnGroupCheckboxes();
+            };
+
+            catCb.onclick = (e) => {
+                e.stopPropagation();
+                toggleColGroup(catCb.checked);
+            };
+
+            catHeader.onclick = (e) => {
+                if (e.target !== catCb) {
+                    catCb.checked = !catCb.checked;
+                    toggleColGroup(catCb.checked);
+                }
+            };
+
+            groupWrapper.appendChild(catHeader);
+
+            sortedKeys.forEach(key => {
                 const isChecked = this.visibleColumns.includes(key);
-                let displayTitle = key.split('.').pop().replace(/_/g, ' ');
-                displayTitle = displayTitle.charAt(0).toUpperCase() + displayTitle.slice(1);
+                const displayTitle = this._formatKeyLabel(key);
+                const projCount = (this._keyProjectCounts && this._keyProjectCounts[key]) || 0;
 
                 const label = document.createElement('label');
-                label.style.cssText = 'display: flex; align-items: center; font-size: 0.85rem; margin-bottom: 4px; cursor: pointer; color: inherit;';
+                label.className = 'column-selector-item';
+                label.dataset.searchText = `${displayTitle} ${key} ${catName}`;
+                label.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.84rem; margin-bottom: 4px; cursor: pointer; color: inherit; gap: 6px;';
+
+                const leftSpan = document.createElement('span');
+                leftSpan.style.cssText = 'display: flex; align-items: center;';
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = isChecked;
+                checkbox.dataset.colKey = key;
                 checkbox.style.marginRight = '8px';
                 checkbox.style.accentColor = '#8b5cf6';
-                checkbox.onchange = () => this.toggleColumn(key);
+                checkbox.onchange = () => {
+                    this.toggleColumn(key);
+                    syncColumnGroupCheckboxes();
+                };
 
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(displayTitle));
-                container.appendChild(label);
+                leftSpan.appendChild(checkbox);
+                leftSpan.appendChild(document.createTextNode(displayTitle));
+                label.appendChild(leftSpan);
+
+                if (projCount > 0) {
+                    const countBadge = document.createElement('span');
+                    countBadge.style.cssText = 'font-size: 0.72rem; color: #9ca3af;';
+                    countBadge.textContent = `(${projCount})`;
+                    label.appendChild(countBadge);
+                }
+
+                groupWrapper.appendChild(label);
             });
+
+            container.appendChild(groupWrapper);
+        });
+
+        syncColumnGroupCheckboxes();
+
+        if (currentSearchQuery) {
+            const newSearchInput = document.getElementById('facetColumnSearchInput');
+            if (newSearchInput) {
+                newSearchInput.value = currentSearchQuery;
+                this.filterColumnSelectorList(currentSearchQuery);
+            }
+        }
+    },
+
+    // ─── Save & Load Table/Filter Layouts (in User Folder) ────────────────
+
+    async _getLayoutsDirectory() {
+        const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
+        let baseDir = '';
+        if (window.electronAPI?.getTemplatesDirectory) {
+            const res = await window.electronAPI.getTemplatesDirectory(userInfo);
+            if (res && res.success && res.directory) {
+                baseDir = res.directory;
+            }
+        }
+        if (!baseDir && window.electronAPI?.getMetaFoldDirectory) {
+            const res = await window.electronAPI.getMetaFoldDirectory();
+            if (res && res.success && res.directory) {
+                baseDir = res.directory;
+            }
+        }
+        if (!baseDir) return null;
+        const sep = baseDir.includes('\\') ? '\\' : '/';
+        const layoutsDir = `${baseDir.replace(/[\\/]+$/, '')}${sep}layouts`;
+        if (window.electronAPI?.ensureDir) {
+            await window.electronAPI.ensureDir(layoutsDir);
+        }
+        return layoutsDir;
+    },
+
+    async listSavedLayouts() {
+        try {
+            const layoutsDir = await this._getLayoutsDirectory();
+            if (!layoutsDir || !window.electronAPI?.listDirectory) return [];
+            const entries = await window.electronAPI.listDirectory(layoutsDir);
+            if (!Array.isArray(entries)) return [];
+
+            const sep = layoutsDir.includes('\\') ? '\\' : '/';
+            const layouts = [];
+            for (const entry of entries) {
+                if (!entry.isFile || !entry.name.endsWith('.json')) continue;
+                const filePath = `${layoutsDir}${sep}${entry.name}`;
+                try {
+                    const raw = await window.electronAPI.readFile(filePath);
+                    if (!raw) continue;
+                    const parsed = JSON.parse(raw);
+                    layouts.push({
+                        name: parsed.name || entry.name.replace(/\.json$/i, ''),
+                        filePath,
+                        fileName: entry.name,
+                        savedAt: parsed.savedAt || null,
+                        visibleColumnsCount: Array.isArray(parsed.visibleColumns) ? parsed.visibleColumns.length : 0,
+                        hiddenKeysCount: Array.isArray(parsed.hiddenKeys) ? parsed.hiddenKeys.length : 0,
+                        data: parsed
+                    });
+                } catch (e) { }
+            }
+            layouts.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+            return layouts;
+        } catch (err) {
+            console.warn('Could not list saved layouts:', err);
+            return [];
+        }
+    },
+
+    async toggleLayoutDropdown() {
+        const dropdown = document.getElementById('layoutSelectorDropdown');
+        if (!dropdown) return;
+        const isOpen = dropdown.style.display !== 'none';
+        if (isOpen) {
+            dropdown.style.display = 'none';
+        } else {
+            dropdown.style.display = 'block';
+            await this.renderLayoutDropdown();
+            const input = document.getElementById('facetLayoutNameInput');
+            if (input) input.focus();
+        }
+    },
+
+    async renderLayoutDropdown() {
+        const dropdown = document.getElementById('layoutSelectorDropdown');
+        if (!dropdown) return;
+
+        const layoutsDir = await this._getLayoutsDirectory();
+        const savedLayouts = await this.listSavedLayouts();
+        const currentName = this.activeLayoutName || '';
+        const safeCurrentName = currentName.replace(/"/g, '&quot;');
+
+        let listHtml = '';
+        if (savedLayouts.length === 0) {
+            listHtml = `<div style="color:#9ca3af; font-size:0.78rem; font-style:italic; padding:8px 2px;">No saved layouts yet. Enter a name above and click Save.</div>`;
+        } else {
+            savedLayouts.forEach(layout => {
+                const isActive = this.activeLayoutName && this.activeLayoutName.toLowerCase() === layout.name.toLowerCase();
+                const safePath = layout.filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const safeName = layout.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const dateStr = layout.savedAt ? new Date(layout.savedAt).toLocaleDateString() : '';
+
+                listHtml += `
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 8px; border-radius:6px; background:${isActive ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)'}; border:1px solid ${isActive ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.08)'}; margin-bottom:5px; cursor:pointer;"
+                         onclick="facetSearch.applySavedLayout('${safePath}')"
+                         title="Click to load layout '${layout.name}'">
+                        <div style="overflow:hidden; flex:1;">
+                            <div style="font-size:0.82rem; font-weight:600; color:${isActive ? '#ddd6fe' : '#e5e7eb'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${isActive ? '✓ ' : '📐 '}${layout.name}
+                            </div>
+                            <div style="font-size:0.7rem; color:#9ca3af;">
+                                ${layout.visibleColumnsCount} cols${dateStr ? ` · ${dateStr}` : ''}
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                            <button type="button" class="btn btn-secondary" style="padding:2px 6px; font-size:0.72rem;"
+                                onclick="event.stopPropagation(); window.electronAPI.showItemInFolder('${safePath}')"
+                                title="Show layout JSON file in Explorer">📁</button>
+                            <button type="button" class="btn btn-secondary" style="padding:2px 6px; font-size:0.72rem; color:#f87171;"
+                                onclick="event.stopPropagation(); facetSearch.deleteSavedLayout('${safePath}', '${safeName}')"
+                                title="Delete layout '${layout.name}'">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        const escapedDir = (layoutsDir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        dropdown.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(139,92,246,0.3); padding-bottom:6px;">
+                <span style="font-weight:bold; font-size:0.85rem;">💾 Save / Load Table Layout</span>
+                ${layoutsDir ? `<button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:2px 6px;" onclick="window.electronAPI.openFolder('${escapedDir}')" title="Open User Layouts folder (${layoutsDir})">📂 Folder</button>` : ''}
+            </div>
+            <div style="display:flex; gap:6px; margin-bottom:6px;">
+                <input type="text" id="facetLayoutNameInput" class="facet-text-search-input"
+                    style="flex:1; padding:6px 8px; font-size:0.8rem;"
+                    placeholder="Layout name (e.g. Microscopy)..."
+                    value="${safeCurrentName}"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault(); facetSearch.saveCurrentLayout();}">
+                <button type="button" class="btn btn-primary" style="padding:6px 10px; font-size:0.78rem; white-space:nowrap;"
+                    onclick="facetSearch.saveCurrentLayout()">💾 Save</button>
+            </div>
+            <div style="font-size:0.7rem; color:#9ca3af; margin-bottom:10px;">
+                Saves visible columns, column order &amp; widths, and sidebar filter settings into your User Folder.
+            </div>
+            <div style="font-size:0.74rem; font-weight:600; text-transform:uppercase; color:#a78bfa; margin-bottom:6px;">
+                Saved Layouts (${savedLayouts.length})
+            </div>
+            <div style="max-height:220px; overflow-y:auto;">
+                ${listHtml}
+            </div>
+        `;
+    },
+
+    async saveCurrentLayout(customName = null) {
+        const input = document.getElementById('facetLayoutNameInput');
+        const rawName = (customName !== null ? customName : (input ? input.value : '')).trim();
+        if (!rawName) {
+            if (input) {
+                input.focus();
+                input.style.borderColor = '#ef4444';
+                setTimeout(() => { input.style.borderColor = ''; }, 1500);
+            }
+            return;
+        }
+
+        const layoutsDir = await this._getLayoutsDirectory();
+        if (!layoutsDir) {
+            alert('Could not resolve User Folder for saving layout.');
+            return;
+        }
+
+        // Capture current Tabulator column order, widths, and sorters
+        this._syncColumnStateFromTabulator(false, null);
+        const orderedVisibleColumns = [...this.visibleColumns];
+        const columnOrder = this._getEffectiveColumnOrder();
+        const columnWidths = { ...(this._customColumnWidths || {}) };
+        const columnSorters = Array.isArray(this._customColumnSorters) ? [...this._customColumnSorters] : [];
+
+        const layoutData = {
+            name: rawName,
+            type: 'metafold_facet_layout',
+            version: '1.1',
+            savedAt: new Date().toISOString(),
+            visibleColumns: orderedVisibleColumns,
+            columnOrder,
+            columnWidths,
+            columnSorters,
+            hiddenKeys: [...(this.hiddenKeys || [])],
+            showSidecarFacets: Boolean(this._showSidecarFacets),
+            collapsedCategories: { ...(this._collapsedCategories || {}) }
+        };
+
+        const safeFile = rawName.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').toLowerCase().substring(0, 80) || 'layout';
+        const sep = layoutsDir.includes('\\') ? '\\' : '/';
+        const filePath = `${layoutsDir}${sep}${safeFile}.json`;
+
+        const writeRes = await window.electronAPI.writeFile(filePath, JSON.stringify(layoutData, null, 2));
+        if (writeRes && writeRes.success) {
+            this.activeLayoutName = rawName;
+            this.visibleColumns = orderedVisibleColumns;
+            this._customColumnOrder = columnOrder;
+            this._customColumnWidths = columnWidths;
+            this._customColumnSorters = columnSorters;
+            this._saveSessionTableState();
+            const btnLabel = document.getElementById('layoutSelectorBtnLabel');
+            if (btnLabel) btnLabel.textContent = `Layout: ${rawName}`;
+            await this.renderLayoutDropdown();
+            if (window.showSuccess) {
+                window.showSuccess(`Layout "${rawName}" saved in User Folder`);
+            }
+        } else {
+            alert(`Could not save layout: ${writeRes?.message || 'Unknown error'}`);
+        }
+    },
+
+    async applySavedLayout(filePath) {
+        try {
+            const raw = await window.electronAPI.readFile(filePath);
+            if (!raw) return;
+            const layoutData = JSON.parse(raw);
+
+            if (Array.isArray(layoutData.visibleColumns)) {
+                this.visibleColumns = [...layoutData.visibleColumns];
+            }
+            if (Array.isArray(layoutData.columnOrder) && layoutData.columnOrder.length > 0) {
+                this._customColumnOrder = [...layoutData.columnOrder];
+            } else {
+                const baseFixed = this.isTemplateHub ? [] : ['path', 'created'];
+                this._customColumnOrder = [...baseFixed, ...this.visibleColumns];
+            }
+            this._customColumnWidths = (layoutData.columnWidths && typeof layoutData.columnWidths === 'object')
+                ? { ...layoutData.columnWidths }
+                : {};
+            this._customColumnSorters = Array.isArray(layoutData.columnSorters)
+                ? [...layoutData.columnSorters]
+                : [];
+            if (Array.isArray(layoutData.hiddenKeys)) {
+                this.hiddenKeys = [...layoutData.hiddenKeys];
+                await window.settingsManager.set('facetSearch.hiddenKeys', JSON.stringify(this.hiddenKeys));
+            }
+            if (typeof layoutData.showSidecarFacets === 'boolean') {
+                this._showSidecarFacets = layoutData.showSidecarFacets;
+            }
+            if (layoutData.collapsedCategories && typeof layoutData.collapsedCategories === 'object') {
+                this._collapsedCategories = { ...layoutData.collapsedCategories };
+            }
+
+            this.activeLayoutName = layoutData.name || 'Saved Layout';
+            const btnLabel = document.getElementById('layoutSelectorBtnLabel');
+            if (btnLabel) btnLabel.textContent = `Layout: ${this.activeLayoutName}`;
+
+            this._saveSessionTableState();
+            this.renderColumnSelector();
+            this.updateUI();
+            await this.renderLayoutDropdown();
+        } catch (err) {
+            console.error('Error applying saved layout:', err);
+            alert(`Could not load layout: ${err.message}`);
+        }
+    },
+
+    async deleteSavedLayout(filePath, layoutName) {
+        if (!confirm(`Delete saved layout "${layoutName}"?`)) return;
+        try {
+            if (window.electronAPI?.deleteTemplateFile) {
+                await window.electronAPI.deleteTemplateFile(filePath);
+            }
+            if (this.activeLayoutName && this.activeLayoutName.toLowerCase() === (layoutName || '').toLowerCase()) {
+                this.activeLayoutName = null;
+                const btnLabel = document.getElementById('layoutSelectorBtnLabel');
+                if (btnLabel) btnLabel.textContent = 'Save / Load Layout';
+                this._saveSessionTableState();
+            }
+            await this.renderLayoutDropdown();
+        } catch (err) {
+            console.error('Error deleting layout:', err);
         }
     },
 
@@ -1205,7 +3072,7 @@ const facetSearch = {
             if (!this.activeFilters[key]) {
                 this.activeFilters[key] = [];
             }
-            
+
             const index = this.activeFilters[key].indexOf(value);
             if (index > -1) {
                 // If already selected, toggle it off
@@ -1219,63 +3086,1152 @@ const facetSearch = {
                 this.activeFilters[key].push(value);
             }
         }
-        
+
         this.updateUI();
     },
 
-    // Reset all filters
+    // Reset all filters and free-text search
     resetFilters() {
         this.activeFilters = {};
+        this.textSearchQuery = '';
+        const searchInput = document.getElementById('facetTextSearchInput');
+        if (searchInput) searchInput.value = '';
         this.updateUI();
     },
 
+    _safeRedrawTable() {
+        requestAnimationFrame(() => {
+            try {
+                const modal = document.getElementById('facetSearchModal');
+                if (!modal || modal.style.display === 'none') return;
+                if (this.tabulatorInstance && this.tabulatorInstance.element && this.tabulatorInstance.element.offsetParent !== null) {
+                    this.tabulatorInstance.redraw(true);
+                }
+            } catch (err) {
+                // Ignore Tabulator redraw timing errors when container is hidden or rebuilding
+            }
+        });
+    },
 
-    async showTemplatePreview(data) {
-        if (!this.isTemplateHub) return;
-        
-        let previewModal = document.getElementById('facetTemplatePreviewModal');
-        if (!previewModal) {
-            previewModal = document.createElement('div');
-            previewModal.id = 'facetTemplatePreviewModal';
-            previewModal.style.cssText = 'position: fixed; top: 0; right: 0; width: 400px; height: 100%; background: var(--bg-secondary, #1e1e2e); z-index: 2000; box-shadow: -5px 0 25px rgba(0,0,0,0.5); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; border-left: 1px solid rgba(255,255,255,0.1); color: #e5e7eb; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateX(100%);';
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.innerHTML = '✖';
-            closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;';
-            closeBtn.onclick = () => {
-                previewModal.style.transform = 'translateX(100%)';
-            };
-            
-            const content = document.createElement('div');
-            content.id = 'facetTemplatePreviewContent';
-            
-            previewModal.appendChild(closeBtn);
-            previewModal.appendChild(content);
-            document.body.appendChild(previewModal);
-            
-            // Close when clicking outside of the preview modal
-            document.addEventListener('mousedown', (e) => {
-                const isPanelOpen = previewModal.style.transform === 'translateX(0px)' || previewModal.style.transform === 'translateX(0%)';
-                if (isPanelOpen && !previewModal.contains(e.target)) {
-                    // If the user clicks on a preview button, let the preview button logic handle it.
-                    if (!e.target.closest('.facet-act-preview')) {
-                        previewModal.style.transform = 'translateX(100%)';
+    openRightPanel(headingText) {
+        const panel = document.getElementById('facetRightPanel');
+        const splitter = document.getElementById('facetRightSplitter');
+        const heading = document.getElementById('facetRightPanelHeading');
+        const content = document.getElementById('facetRightPanelContent');
+        if (heading && headingText) heading.textContent = headingText;
+        if (splitter) splitter.style.display = 'block';
+        if (panel && panel.style.display === 'none') {
+            panel.style.display = 'flex';
+            this._safeRedrawTable();
+        }
+        return content;
+    },
+
+    closeRightPanel() {
+        if (window.projectInlineEditor && typeof window.projectInlineEditor.confirmDiscardIfNeeded === 'function') {
+            if (!window.projectInlineEditor.confirmDiscardIfNeeded()) {
+                return;
+            }
+            window.projectInlineEditor.isEditing = false;
+            window.projectInlineEditor.isDirty = false;
+        }
+
+        const panel = document.getElementById('facetRightPanel');
+        const splitter = document.getElementById('facetRightSplitter');
+        if (splitter) splitter.style.display = 'none';
+        this.selectedProjectPath = null;
+        if (this.tabulatorInstance && typeof this.tabulatorInstance.deselectRow === 'function') {
+            try { this.tabulatorInstance.deselectRow(); } catch (e) { }
+        }
+        if (panel && panel.style.display !== 'none') {
+            panel.style.display = 'none';
+            this._safeRedrawTable();
+        }
+    },
+
+    // Header button: Export RO-Crate (uses selected project's lineage wizard if a row is selected, or collection wizard otherwise)
+    exportRoCrateFromHeader() {
+        if (!window.roCrateManager) {
+            alert('RO-Crate Manager is not loaded.');
+            return;
+        }
+        if (window.projectScanner) {
+            window.projectScanner.projects = this.masterData;
+            window.projectScanner.selectedProjectPath = this.selectedProjectPath || null;
+        }
+        if (this.selectedProjectPath) {
+            window.roCrateManager.exportLineageRoCrate(this.selectedProjectPath);
+        } else {
+            const filtered = this.getFilteredData();
+            if (filtered.length === 0) {
+                alert('No projects available to export.');
+                return;
+            }
+            if (filtered.length === 1) {
+                window.roCrateManager.exportLineageRoCrate(filtered[0].path);
+                return;
+            }
+            if (window.projectScanner) {
+                window.projectScanner.projects = filtered;
+            }
+            window.roCrateManager.openScanExportWizard(null);
+        }
+    },
+
+    // Header button: Export Lineage HTML/JSON (asks for Direct Lineage vs. Full Graph & Metadata vs. Harvest)
+    exportLineageFromHeader() {
+        if (typeof window.exportLineage !== 'function') {
+            alert('Lineage Export function is not loaded.');
+            return;
+        }
+        if (window.projectScanner) {
+            window.projectScanner.projects = this.masterData;
+        }
+        if (this.selectedProjectPath) {
+            window.exportLineage(this.selectedProjectPath);
+        } else {
+            const filtered = this.getFilteredData();
+            if (filtered.length === 1) {
+                window.exportLineage(filtered[0].path);
+                return;
+            }
+            alert('Please click a project row in the table first to export its lineage (Direct vs. Full Graph).');
+        }
+    },
+
+    // Header button: Export Scan Summary (HTML Navigator + JSON summary)
+    async exportScanSummary() {
+        if (!window.projectScanner || typeof window.projectScanner.exportScanResults !== 'function') {
+            alert('Project Scanner export function is not available.');
+            return;
+        }
+
+        if (!this.masterData || this.masterData.length === 0) {
+            alert('No projects loaded to export. Please scan a folder or load projects first.');
+            return;
+        }
+
+        const safeAll = this.masterData.filter(p => p && p.path && p._type !== 'file_sidecar');
+        const filtered = typeof this.getFilteredData === 'function' ? this.getFilteredData() : safeAll;
+        const safeFiltered = filtered.filter(p => p && p.path && p._type !== 'file_sidecar');
+
+        if (safeFiltered.length === 0) {
+            alert('No projects match your current filters.');
+            return;
+        }
+
+        let projectsToExport = safeFiltered;
+
+        // If a subset of projects is currently filtered, give the user the choice between filtered vs all projects
+        if (safeFiltered.length < safeAll.length) {
+            if (window.electronAPI && typeof window.electronAPI.showMessageBox === 'function') {
+                const res = await window.electronAPI.showMessageBox({
+                    type: 'question',
+                    buttons: [
+                        `Filtered Projects (${safeFiltered.length})`,
+                        `All Projects (${safeAll.length})`,
+                        'Cancel'
+                    ],
+                    defaultId: 0,
+                    cancelId: 2,
+                    title: 'Export Scan Summary',
+                    message: `You have active filters (${safeFiltered.length} of ${safeAll.length} projects shown).\n\nWhich projects would you like to include in the HTML Navigator & JSON summary export?`
+                });
+
+                if (res && res.response === 2) return; // Cancelled
+                projectsToExport = (res && res.response === 0) ? safeFiltered : safeAll;
+            } else {
+                const useFiltered = confirm(
+                    `You have active filters (${safeFiltered.length} of ${safeAll.length} projects shown).\n\n` +
+                    `Click OK to export only the ${safeFiltered.length} filtered projects.\n` +
+                    `Click Cancel to export ALL ${safeAll.length} projects.`
+                );
+                projectsToExport = useFiltered ? safeFiltered : safeAll;
+            }
+        }
+
+        const scannedPath = this.unsavedScan?.basePath ||
+            window.projectScanner.currentScannedPath ||
+            (typeof window.projectScanner._inferCommonRoot === 'function' ? window.projectScanner._inferCommonRoot(projectsToExport) : '');
+
+        await window.projectScanner.exportScanResults(projectsToExport, scannedPath);
+    },
+
+    // Jump to a linked project when clicked inside the right panel's Lineage Accordion
+    selectAndInspectProjectByPath(targetPath) {
+        if (!targetPath) return;
+        const found = this.masterData.find(p => p.path === targetPath);
+        if (found) {
+            if (this.tabulatorInstance) {
+                try {
+                    const rows = this.tabulatorInstance.getRows();
+                    const matchingRow = rows.find(r => {
+                        const d = r.getData();
+                        return d && (d.path === targetPath || d._path === targetPath);
+                    });
+                    if (matchingRow) {
+                        this.tabulatorInstance.deselectRow();
+                        matchingRow.select();
+                        matchingRow.scrollTo();
+                    }
+                } catch (e) { }
+            }
+            this.showProjectDetails(found);
+        } else if (window.electronAPI?.openFolder) {
+            window.electronAPI.openFolder(targetPath);
+        }
+    },
+
+    // Filter the table for all projects referencing or providing a given Lineage ID / Project Name
+    filterByLineageId(rawId) {
+        if (!rawId) return;
+        const searchInput = document.getElementById('facetTextSearchInput');
+        if (searchInput) {
+            searchInput.value = rawId;
+        }
+        this.handleTextSearch(rawId);
+    },
+
+    // Backwards-compatible alias for external ID click
+    handleExternalIdClick(rawId) {
+        this.filterByLineageId(rawId);
+    },
+
+    // Select and inspect a specific file sidecar child row inside a project
+    inspectSidecarById(projectPath, sidecarId) {
+        const proj = this.masterData.find(p => p.path === projectPath);
+        if (!proj || !Array.isArray(proj._sidecarChildren)) return;
+        const sc = proj._sidecarChildren.find(c => c.id === sidecarId || c.path === sidecarId || c.sidecarPath === sidecarId);
+        if (!sc) return;
+
+        if (this.tabulatorInstance) {
+            try {
+                const rows = this._getNavigableRows();
+                const matchingRow = rows.find(r => {
+                    const d = typeof r.getData === 'function' ? r.getData() : null;
+                    return d && d._type === 'file_sidecar' && (d._sidecarId === sc.id || d.path === sc.path || d._sidecarPath === sc.sidecarPath);
+                });
+                if (matchingRow) {
+                    this.tabulatorInstance.deselectRow();
+                    matchingRow.select();
+                    matchingRow.scrollTo();
+                }
+            } catch (e) { }
+        }
+        this.showProjectDetails(sc);
+    },
+
+    // Show full Project Metadata, Quick Actions & Collapsible Lineage Accordion inside the docked right panel on row click
+    showProjectDetails(rowData) {
+        if (!rowData) return;
+        const targetPath = rowData._path || rowData.path;
+        this.selectedProjectPath = targetPath;
+
+        const isSidecar = rowData._type === 'file_sidecar';
+
+        // Find full project in masterData (or sidecar parent if a file_sidecar row was clicked)
+        let project = null;
+        let sidecarEntry = null;
+
+        if (isSidecar) {
+            project = this.masterData.find(p =>
+                (rowData._parentProjectPath && p.path === rowData._parentProjectPath) ||
+                (p._sidecarChildren && p._sidecarChildren.some(sc =>
+                    (rowData._sidecarId && sc.id === rowData._sidecarId) ||
+                    (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
+                    (targetPath && sc.path === targetPath)
+                ))
+            );
+            if (project && Array.isArray(project._sidecarChildren)) {
+                sidecarEntry = project._sidecarChildren.find(sc =>
+                    (rowData._sidecarId && sc.id === rowData._sidecarId) ||
+                    (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
+                    (targetPath && sc.path === targetPath) ||
+                    (rowData.name && sc.name === rowData.name)
+                );
+            }
+            if (!sidecarEntry) sidecarEntry = rowData;
+            if (!project) project = { name: sidecarEntry._parentProjectName || 'Project', path: sidecarEntry._parentProjectPath || '', metadata: sidecarEntry.project_metadata || {} };
+        } else {
+            project = this.masterData.find(p => p.path === targetPath) || rowData;
+        }
+
+        const contentArea = this.openRightPanel(isSidecar ? '📄 File Sidecar Details' : '📋 Project Details');
+        if (!contentArea) return;
+
+        // Keep projectScanner.projects synced so RO-Crate & Lineage exports have full graph context
+        if (window.projectScanner) {
+            window.projectScanner.projects = this.masterData;
+            window.projectScanner.selectedProjectPath = project.path;
+        }
+
+        // Pre-extract notes for display and deduplication
+        let notesMd = project.notes_markdown || (project.metadata && project.metadata.notes_markdown) || '';
+        if (!notesMd && project.metadata) {
+            const findNotesVal = (obj) => {
+                for (const [k, v] of Object.entries(obj)) {
+                    if (v && typeof v === 'object') {
+                        if ((v.type === 'notes' || v.type === 'markdown' || v.displayInNotes === true) && v.value) {
+                            return String(v.value);
+                        }
+                        if (typeof v === 'object' && v.value === undefined && v.type === undefined) {
+                            const res = findNotesVal(v);
+                            if (res) return res;
+                        }
                     }
                 }
-            });
+                return '';
+            };
+            notesMd = findNotesVal(project.metadata);
         }
-        
-        // Use timeout to ensure CSS transition works when element is first added
-        setTimeout(() => {
-            previewModal.style.transform = 'translateX(0%)';
-        }, 10);
-        const contentArea = document.getElementById('facetTemplatePreviewContent');
-        contentArea.innerHTML = '<div style="text-align: center; margin-top: 50px;">Loading Template Details...</div>';
-        
+        const notesLog = Array.isArray(project.notes_log) ? project.notes_log : (Array.isArray(project.metadata && project.metadata.notes_log) ? project.metadata.notes_log : []);
+        const hypothesis = project.hypothesis_or_goal || (project.metadata && project.metadata.hypothesis_or_goal) || '';
+
+        const formatBytes = (bytes) => {
+            if (bytes === undefined || bytes === null || isNaN(Number(bytes))) return '—';
+            const n = Number(bytes);
+            if (n < 1024) return `${n} B`;
+            if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB (${n.toLocaleString()} B)`;
+            if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB (${n.toLocaleString()} B)`;
+            return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB (${n.toLocaleString()} B)`;
+        };
+
+        const renderCompactField = (label, val) => {
+            if (val === undefined || val === null || val === '') return '';
+            return `
+                <div style="background: rgba(255,255,255,0.04); padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px;">
+                    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${label}</div>
+                    <div style="font-size: 0.84rem; color: #e5e7eb; word-break: break-word;">${val}</div>
+                </div>
+            `;
+        };
+
+        const renderMetadataField = (key, field) => {
+            if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level', 'System.hasReadme', 'changelog', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'previous_names'].includes(key)) return '';
+
+            // Skip fields displayed under Notes & Observations to avoid duplication
+            if (field && typeof field === 'object') {
+                if (field.type === 'notes' || field.type === 'markdown' || field.displayInNotes === true) return '';
+                if (field.type === 'textarea' && notesMd && String(field.value || '').trim() === String(notesMd).trim()) {
+                    return '';
+                }
+            }
+
+            if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
+                let catHtml = `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; border-left: 3px solid #8b5cf6;">`;
+                catHtml += `<div style="font-size: 0.76rem; color: #c4b5fd; margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">📁 ${key.replace(/_/g, ' ')}</div>`;
+                catHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
+                for (const [subKey, subField] of Object.entries(field)) {
+                    catHtml += renderMetadataField(subKey, subField);
+                }
+                catHtml += `</div></div>`;
+                return catHtml;
+            }
+
+            const value = (field && field.value !== undefined) ? field.value : field;
+            const type = (field && field.type) ? field.type : 'text';
+            let label = (field && field.label) ? field.label : key.replace(/_/g, ' ');
+            label = label.charAt(0).toUpperCase() + label.slice(1);
+
+            let displayValue = value;
+            const lowerKey = key.toLowerCase();
+            const lowerLabel = label.toLowerCase();
+            const isDerived = lowerKey.includes('derived_from') || lowerKey.includes('related_to') ||
+                lowerKey.replace(/[\s_-]+/g, '') === 'derivedfrom' || lowerKey.replace(/[\s_-]+/g, '') === 'relatedto' ||
+                lowerLabel.includes('derived from') || lowerLabel.includes('related to') || lowerLabel.includes('related project') ||
+                type === 'derived_from' || type === 'related_to';
+            const isTags = !isDerived && (lowerKey === 'tags' || lowerKey.endsWith('_tags') || type === 'tags' || type === 'array');
+
+            if (displayValue === null || displayValue === undefined || displayValue === '') {
+                displayValue = '<em style="color: #6c7086;">Empty</em>';
+            } else if (isDerived) {
+                let items = [];
+                if (Array.isArray(displayValue)) {
+                    items = displayValue;
+                } else if (typeof displayValue === 'string') {
+                    items = displayValue.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                if (items.length === 0) {
+                    displayValue = '<em style="color: #6c7086;">Empty</em>';
+                } else {
+                    displayValue = items.map(item => {
+                        const rawId = typeof item === 'object' && item !== null ? (item.id || item.name || '') : String(item || '').trim();
+                        const title = typeof item === 'object' && item !== null ? (item.name || item.id || '') : rawId;
+                        const note = (typeof item === 'object' && item !== null) ? (item.relation_note || item.anchor || '') : '';
+                        const linkedProj = this.masterData.find(p => p.name === rawId || p.path === rawId || (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(rawId)));
+                        if (linkedProj && linkedProj.path) {
+                            const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Linked Project: ${linkedProj.name}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer; font-weight:500;">📁 ${linkedProj.name || title} ↗</span>`;
+                        }
+                        const safeRawId = rawId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        return `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeRawId}')" title="Filter table for '${rawId}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">⚓ ${title}${note ? ` <em style="color:#a78bfa;">(${note})</em>` : ''} 🔍</span>`;
+                    }).join(' ');
+                }
+            } else if (isTags) {
+                let items = [];
+                if (Array.isArray(displayValue)) {
+                    items = displayValue;
+                } else if (typeof displayValue === 'string') {
+                    items = displayValue.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                if (items.length === 0) {
+                    displayValue = '<em style="color: #6c7086;">Empty</em>';
+                } else {
+                    displayValue = items.map(tag => {
+                        const tagStr = typeof tag === 'object' && tag !== null ? (tag.name || tag.id || '') : String(tag || '').trim();
+                        const safeTag = tagStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        return `<span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag: '${tagStr}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">🏷️ ${tagStr}</span>`;
+                    }).join(' ');
+                }
+            } else if (type === 'url' || (typeof displayValue === 'string' && (displayValue.startsWith('http://') || displayValue.startsWith('https://')))) {
+                const safeUrl = String(displayValue).replace(/'/g, "\\'");
+                displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${displayValue}</span> <span style="font-size:0.8rem;">↗</span></a>`;
+            } else if (Array.isArray(displayValue)) {
+                if (displayValue.length === 0) {
+                    displayValue = '<em style="color: #6c7086;">Empty</em>';
+                } else {
+                    displayValue = displayValue.map(item => {
+                        if (item && typeof item === 'object') {
+                            const title = item.name || item.id || 'Link';
+                            const note = item.relation_note || item.anchor || '';
+                            return `<span style="display:inline-block; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem;">${title}${note ? ` <em style="color:#c4b5fd;">(${note})</em>` : ''}</span>`;
+                        }
+                        return `<span style="display:inline-block; background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem;">${item}</span>`;
+                    }).join(' ');
+                }
+            } else if (typeof displayValue === 'object') {
+                if (window.formatDisplayValue) {
+                    displayValue = window.formatDisplayValue(field);
+                } else {
+                    displayValue = '<pre style="margin: 0; font-size: 0.76rem; white-space: pre-wrap;">' + JSON.stringify(displayValue, null, 2) + '</pre>';
+                }
+            } else {
+                const unitStr = (field && field.unit) ? ` ${field.unit}` : '';
+                displayValue = `${displayValue}${unitStr}`;
+            }
+
+            return `
+                <div style="background: rgba(255,255,255,0.04); padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px;">
+                    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${label}</div>
+                    <div style="font-size: 0.84rem; word-break: break-word;">${displayValue}</div>
+                </div>
+            `;
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // VIEW A: FILE SIDECAR ROW
+        // Order: 1. Project Metadata (collapsible), 2. Sidecar Metadata (flat), 3. Project & Sidecar Info (collapsible)
+        // ═══════════════════════════════════════════════════════════════════════
+        if (isSidecar) {
+            const fileObj = sidecarEntry.file || {};
+            const filePath = sidecarEntry.path || fileObj.path || '';
+            const sidecarPath = sidecarEntry.sidecarPath || rowData._sidecarPath || '';
+            const escapedFilePath = (filePath || sidecarPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escapedSidecarPath = sidecarPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escapedProjPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const fileModStr = fileObj.modified ? new Date(fileObj.modified).toLocaleString() : (sidecarEntry.created ? new Date(sidecarEntry.created).toLocaleString() : '—');
+            const flatMeta = sidecarEntry.flatMeta || {};
+
+            // 1. Top: Collapsible Project Metadata
+            let projMetaHtml = '';
+            const projMetaSource = (project && project.metadata && Object.keys(project.metadata).length > 0)
+                ? project.metadata
+                : ((sidecarEntry.project_metadata && Object.keys(sidecarEntry.project_metadata).length > 0)
+                    ? sidecarEntry.project_metadata
+                    : (project && project.flatMeta ? project.flatMeta : {}));
+
+            if (!projMetaSource || Object.keys(projMetaSource).length === 0) {
+                projMetaHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No project metadata fields found.</div>`;
+            } else {
+                for (const [key, field] of Object.entries(projMetaSource)) {
+                    projMetaHtml += renderMetadataField(key, field);
+                }
+            }
+
+            // 2. Middle: Sidecar Metadata (flat, compact list like Project Metadata Fields)
+            let sidecarFieldsHtml = '';
+            const sidecarEntries = Object.entries(flatMeta).filter(([k, v]) =>
+                !k.startsWith('File.') &&
+                !k.startsWith('System.') &&
+                v !== undefined && v !== null && String(v).trim() !== ''
+            );
+
+            if (sidecarEntries.length > 0) {
+                // Combine *Unit fields onto their corresponding value (e.g. PhysicalSizeX + PhysicalSizeXUnit -> "0.108 µm")
+                const unitMap = new Map();
+                sidecarEntries.forEach(([k, v]) => {
+                    if (k.endsWith('Unit')) {
+                        unitMap.set(k.slice(0, -4), String(v));
+                    }
+                });
+
+                sidecarEntries.forEach(([k, v]) => {
+                    if (k.endsWith('Unit') && flatMeta[k.slice(0, -4)] !== undefined) {
+                        return; // already appended to the base key
+                    }
+                    const label = this._formatKeyLabel(k);
+                    let valStr = Array.isArray(v) ? v.join(', ') : String(v);
+                    if (unitMap.has(k)) {
+                        valStr = `${valStr} ${unitMap.get(k)}`;
+                    }
+                    sidecarFieldsHtml += renderCompactField(label, valStr);
+                });
+            } else {
+                sidecarFieldsHtml = `<div style="color: #9ca3af; font-style: italic; padding: 8px 0;">No extracted sidecar metadata fields found.</div>`;
+            }
+
+            // 3. Bottom: Collapsible Project & Sidecar Info
+            let sidecarInfoHtml = '';
+            sidecarInfoHtml += renderCompactField('File Name', fileObj.name || sidecarEntry.name || '—');
+            sidecarInfoHtml += renderCompactField('Extension', fileObj.extension || flatMeta['File.Extension'] || '—');
+            sidecarInfoHtml += renderCompactField('File Size', formatBytes(fileObj.size_bytes ?? flatMeta['File.Size']));
+            sidecarInfoHtml += renderCompactField('Modified', fileModStr);
+            if (fileObj.relativePath || flatMeta['File.RelativePath']) {
+                sidecarInfoHtml += renderCompactField('Relative Path', `<span style="font-family:monospace;">${fileObj.relativePath || flatMeta['File.RelativePath']}</span>`);
+            }
+            if (filePath) {
+                sidecarInfoHtml += renderCompactField('File Path', `<span style="font-family:monospace; font-size:0.78rem;">${filePath}</span>`);
+            }
+            if (sidecarPath) {
+                sidecarInfoHtml += renderCompactField('Sidecar JSON Path', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarPath}</span>`);
+            }
+            if (project && project.path) {
+                sidecarInfoHtml += renderCompactField('Project Path', `<span style="font-family:monospace; font-size:0.78rem;">${project.path}</span>`);
+            }
+            const parentProjId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
+            if (parentProjId) {
+                sidecarInfoHtml += renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${parentProjId}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`);
+            }
+            if (sidecarEntry.sidecar_id) {
+                sidecarInfoHtml += renderCompactField('Sidecar ID', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarEntry.sidecar_id}</span>`);
+            }
+            if (sidecarEntry.generated_at) {
+                sidecarInfoHtml += renderCompactField('Generated At', new Date(sidecarEntry.generated_at).toLocaleString());
+            }
+            if (sidecarEntry.generator) {
+                sidecarInfoHtml += renderCompactField('Generator', `${sidecarEntry.generator}${sidecarEntry.metafold_version ? ` (v${sidecarEntry.metafold_version})` : ''}`);
+            }
+            if (Array.isArray(sidecarEntry.inherited_from_summary) && sidecarEntry.inherited_from_summary.length > 0) {
+                const levelsStr = sidecarEntry.inherited_from_summary.map(lvl => `${lvl.folder || `Level ${lvl.level}`}`).join(' → ');
+                sidecarInfoHtml += renderCompactField('Inherited Levels (ISA)', levelsStr);
+            }
+
+            const html = `
+                <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
+                    <h3 style="margin: 0 0 5px 0; color: #38bdf8; font-size: 1.05rem; word-break: break-word;">📄 ${sidecarEntry.name || 'File Sidecar'}</h3>
+                    ${parentProjId ? `
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 0.74rem;">
+                        <span style="color: #9ca3af;">Project ID:</span>
+                        <code style="font-family: monospace; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem;">${parentProjId}</code>
+                        <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 1px 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>
+                    </div>` : ''}
+                    <div style="font-size: 0.76rem; font-family: monospace; color: #9ca3af; word-break: break-all; margin-bottom: 5px;">${filePath || sidecarPath || ''}</div>
+                    <div style="font-size: 0.78rem; color: #c4b5fd;">📁 Project: <strong>${project.name || 'Project'}</strong> · 📅 ${fileModStr}</div>
+                </div>
+
+                <!-- Quick File & Sidecar Actions -->
+                <div class="facet-quick-actions" style="margin-bottom: 12px;">
+                    ${(filePath || sidecarPath) ? `
+                    <button class="facet-detail-action-btn facet-action-folder" onclick="window.electronAPI.showItemInFolder('${escapedFilePath}')" title="Show and highlight file in Explorer">
+                        <span class="btn-icon">📂</span> Show in Explorer
+                    </button>` : ''}
+                    ${sidecarPath ? `
+                    <button class="facet-detail-action-btn facet-action-edit" onclick="window.electronAPI.openFile('${escapedSidecarPath}')" title="Open Sidecar JSON (${escapedSidecarPath})">
+                        <span class="btn-icon">📄</span> Open Sidecar JSON
+                    </button>` : ''}
+                    ${project && project.path ? `
+                    <button class="facet-detail-action-btn facet-action-folder" onclick="facetSearch.selectAndInspectProjectByPath('${escapedProjPath}')" title="Switch to parent project details">
+                        <span class="btn-icon">📁</span> Project Details
+                    </button>` : ''}
+                </div>
+
+                <!-- 1. Collapsible Project Metadata -->
+                <details class="facet-lineage-accordion" style="margin-bottom: 10px;">
+                    <summary title="Click to expand or collapse project metadata">
+                        <span><span class="accordion-arrow">▶</span>📋 Project Metadata (${project.name || 'Project'})</span>
+                    </summary>
+                    <div class="facet-lineage-accordion-body" style="gap: 0; padding: 8px;">
+                        ${projMetaHtml}
+                    </div>
+                </details>
+
+                <!-- 2. Collapsible Sidecar Metadata -->
+                <details class="facet-lineage-accordion" open style="margin-bottom: 10px;">
+                    <summary title="Click to expand or collapse extracted sidecar metadata">
+                        <span><span class="accordion-arrow">▶</span>📄 Sidecar Metadata</span>
+                    </summary>
+                    <div class="facet-lineage-accordion-body" style="gap: 0; padding: 8px;">
+                        ${sidecarFieldsHtml}
+                    </div>
+                </details>
+
+                <!-- 3. Collapsible Project & Sidecar Info -->
+                <details class="facet-lineage-accordion" style="margin-bottom: 10px;">
+                    <summary title="Click to expand or collapse general project and sidecar file info">
+                        <span><span class="accordion-arrow">▶</span>ℹ️ Project &amp; Sidecar Info</span>
+                    </summary>
+                    <div class="facet-lineage-accordion-body" style="gap: 0; padding: 8px;">
+                        ${sidecarInfoHtml}
+                    </div>
+                </details>
+            `;
+
+            contentArea.innerHTML = html;
+            return;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // VIEW B: PROJECT ROW
+        // ═══════════════════════════════════════════════════════════════════════
+        const escapedPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedName = (project.name || 'Project').replace(/'/g, "\\'");
+        const createdStr = project.created ? new Date(project.created).toLocaleString() : '—';
+
+        // Calculate direct lineage connections (upstream & downstream) across masterData
+        const upstreamLinks = (project.lineage && Array.isArray(project.lineage.lineage_links))
+            ? project.lineage.lineage_links
+            : [];
+        const unresolvedDerivedIds = (project.lineage && Array.isArray(project.lineage.derived_from_ids))
+            ? project.lineage.derived_from_ids.filter(id => !upstreamLinks.some(l => l.id === id))
+            : [];
+        const downstreamProjects = this.masterData.filter(other =>
+            other.path !== project.path &&
+            other.lineage &&
+            Array.isArray(other.lineage.lineage_links) &&
+            other.lineage.lineage_links.some(l => l.source_path === project.path)
+        );
+        const totalUpstreamCount = upstreamLinks.length + unresolvedDerivedIds.length;
+        const totalDownstreamCount = downstreamProjects.length;
+        const hasAnyLineage = totalUpstreamCount > 0 || totalDownstreamCount > 0;
+
+        // Extract integration links
+        const { omeroUrl, elabUrl } = this._extractUrls(project);
+        let rspaceUrl = '';
+        if (project.integrations && (project.integrations.rspace || project.integrations.RSpace)) {
+            const r = project.integrations.rspace || project.integrations.RSpace;
+            rspaceUrl = r.url || r.link || '';
+        }
+
+        // Build Lineage Accordion body HTML
+        let lineageBodyHtml = '';
+        if (!hasAnyLineage) {
+            lineageBodyHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No incoming or outgoing project links found.</div>`;
+        } else {
+            if (totalUpstreamCount > 0) {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em;">⬆️ Incoming / Derived From (${totalUpstreamCount})</div>`;
+                upstreamLinks.forEach(link => {
+                    const srcProj = this.masterData.find(p => p.path === link.source_path);
+                    const targetPath = (srcProj && srcProj.path) || link.source_path || '';
+                    const canOpen = Boolean(targetPath);
+                    const srcName = srcProj ? srcProj.name : (link.source_path ? link.source_path.split(/[\\/]/).pop() : link.id);
+                    const filterQuery = link.id || srcName || '';
+                    const safeSrcPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const usageCount = this.masterData.filter(p =>
+                        (p.lineage && Array.isArray(p.lineage.lineage_links) && p.lineage.lineage_links.some(l =>
+                            (targetPath && l.source_path === targetPath) ||
+                            (link.id && l.id === link.id)
+                        )) ||
+                        (link.id && p.lineage && Array.isArray(p.lineage.derived_from_ids) && p.lineage.derived_from_ids.includes(link.id))
+                    ).length;
+                    const rowClickAction = canOpen
+                        ? `facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')`
+                        : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
+
+                    lineageBodyHtml += `
+                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Linked project (${targetPath})` : `Filter by '${filterQuery}'`}">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <strong>📁 ${srcName}</strong>
+                                ${link.id && link.id !== srcName ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(ID: ${link.id})</span>` : ''}
+                            </div>
+                            <span class="facet-lineage-actions">
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table for all projects using '${filterQuery}'${usageCount > 0 ? ` (${usageCount} project${usageCount === 1 ? '' : 's'})` : ''}">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')" title="Open / inspect project '${srcName}'">↗ Open</span>` : ''}
+                            </span>
+                        </div>
+                    `;
+                });
+                unresolvedDerivedIds.forEach(rawId => {
+                    const providerProj = this.masterData.find(p =>
+                        p.name === rawId ||
+                        (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(rawId))
+                    );
+                    const targetPath = providerProj ? providerProj.path : '';
+                    const canOpen = Boolean(targetPath);
+                    const safeTargetPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const safeRawId = String(rawId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const sharedCount = this.masterData.filter(p =>
+                        p.lineage && Array.isArray(p.lineage.derived_from_ids) && p.lineage.derived_from_ids.includes(rawId)
+                    ).length;
+                    const rowClickAction = canOpen
+                        ? `facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')`
+                        : `facetSearch.filterByLineageId('${safeRawId}')`;
+
+                    lineageBodyHtml += `
+                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Linked project (${targetPath})` : `No local project folder found for '${rawId}'. Click to filter all projects referencing '${rawId}' in the table.`}">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                🔗 <strong>${rawId}</strong>
+                                <span style="color:#9ca3af; font-size:0.73rem; margin-left:4px;">(${canOpen ? providerProj.name : 'External ID'}${sharedCount > 1 ? ` · ${sharedCount} projects` : ''})</span>
+                            </div>
+                            <span class="facet-lineage-actions">
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeRawId}')" title="Filter table for all projects referencing '${rawId}'${sharedCount > 0 ? ` (${sharedCount} project${sharedCount === 1 ? '' : 's'})` : ''}">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')" title="Open / inspect project '${providerProj.name}'">↗ Open</span>` : ''}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            if (totalDownstreamCount > 0) {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${totalUpstreamCount > 0 ? '6px' : '0'};">⬇️ Outgoing / Derived Projects (${totalDownstreamCount})</div>`;
+                downstreamProjects.forEach(childProj => {
+                    const targetPath = childProj.path || '';
+                    const canOpen = Boolean(targetPath);
+                    const safeChildPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const matchedLinks = (childProj.lineage?.lineage_links || []).filter(l => l.source_path === project.path);
+                    const viaId = matchedLinks.map(l => l.id).filter(Boolean).join(', ');
+                    const filterQuery = childProj.name || viaId || '';
+                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+                    lineageBodyHtml += `
+                        <div class="facet-lineage-link-item" onclick="${canOpen ? `facetSearch.selectAndInspectProjectByPath('${safeChildPath}')` : `facetSearch.filterByLineageId('${safeFilterQuery}')`}" title="Derived project (${targetPath})">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <strong>📁 ${childProj.name}</strong>
+                                ${viaId && viaId !== project.name ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(via ${viaId})</span>` : ''}
+                            </div>
+                            <span class="facet-lineage-actions">
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table by '${filterQuery}'">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeChildPath}')" title="Open / inspect derived project '${childProj.name}'">↘ Open</span>` : ''}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Subtle, compact export bar inside the right-hand Lineage section (in addition to the main header buttons)
+        lineageBodyHtml += `
+            <div style="display: flex; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(139, 92, 246, 0.18);">
+                <button class="btn btn-secondary" style="flex: 1; font-size: 0.74rem; padding: 4px 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.32); color: #6ee7b7;" onclick="window.roCrateManager.exportLineageRoCrate('${escapedPath}')" title="Export this project &amp; its lineage as a FAIR RO-Crate (Direct vs. Full Graph &amp; Metadata vs. Harvest)">
+                    📦 RO-Crate...
+                </button>
+                <button class="btn btn-secondary" style="flex: 1; font-size: 0.74rem; padding: 4px 8px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.32); color: #c4b5fd;" onclick="window.exportLineage('${escapedPath}')" title="Export Lineage (HTML/JSON) for this project (Direct vs. Full Graph &amp; Metadata vs. Harvest)">
+                    🕸️ Lineage...
+                </button>
+            </div>
+        `;
+
+        // Build optional collapsible Sidecar Files list at the bottom of Project Details
+        let projectSidecarsHtml = '';
+        const sidecarList = project._sidecarChildren || [];
+        if (sidecarList.length > 0) {
+            let itemsHtml = '';
+            sidecarList.forEach(sc => {
+                const scIdSafe = String(sc.id || sc.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const scFileSafe = String(sc.path || sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const scJsonSafe = String(sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+                itemsHtml += `
+                    <div class="facet-lineage-link-item" onclick="facetSearch.inspectSidecarById('${escapedPath}', '${scIdSafe}')" title="Click to inspect sidecar metadata for '${sc.name}'">
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <strong>📄 ${sc.name}</strong>
+                        </div>
+                        <span class="facet-lineage-actions">
+                            ${scFileSafe ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); window.electronAPI.showItemInFolder('${scFileSafe}')" title="Show file in Explorer">📁</span>` : ''}
+                            ${scJsonSafe ? `<span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); window.electronAPI.openFile('${scJsonSafe}')" title="Open Sidecar JSON">📄</span>` : ''}
+                        </span>
+                    </div>
+                `;
+            });
+
+            projectSidecarsHtml = `
+                <details class="facet-lineage-accordion" style="margin-top: 12px;">
+                    <summary title="Sidecar files in this project">
+                        <span><span class="accordion-arrow">▶</span>📄 Sidecar Files (${sidecarList.length})</span>
+                    </summary>
+                    <div class="facet-lineage-accordion-body" style="max-height: 220px; overflow-y: auto;">
+                        ${itemsHtml}
+                    </div>
+                </details>
+            `;
+        }
+
+        const projectId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
+
+        let html = `
+            <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
+                <h3 style="margin: 0 0 6px 0; color: #a78bfa; font-size: 1.1rem; word-break: break-word;">📁 ${project.name || 'Project'}</h3>
+                ${projectId ? `
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 0.76rem;">
+                    <span style="color: #9ca3af;">Project ID:</span>
+                    <code style="font-family: monospace; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; padding: 1px 6px; border-radius: 4px; font-size: 0.74rem;">${projectId}</code>
+                    <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${projectId}" style="padding: 1px 5px; font-size: 0.7rem; line-height: 1; color: #c4b5fd;" title="Copy Project ID">📋</button>
+                </div>` : ''}
+                <div style="font-size: 0.78rem; font-family: monospace; color: #9ca3af; word-break: break-all; margin-bottom: 6px;">${project.path || ''}</div>
+                <div style="font-size: 0.78rem; color: #9ca3af;">📅 Created: ${createdStr}</div>
+            </div>
+
+            <!-- Quick Project Actions -->
+            <div class="facet-quick-actions" style="margin-bottom: 14px;">
+                <button class="facet-detail-action-btn facet-action-folder" onclick="window.electronAPI.openFolder('${escapedPath}')" title="Open project folder in file explorer">
+                    <span class="btn-icon">📂</span> Open Folder
+                </button>
+                <button class="facet-detail-action-btn facet-action-edit" id="facetBtnEditMetadata" title="Edit project metadata in-place">
+                    <span class="btn-icon">✏️</span> Edit Metadata
+                </button>
+                <button class="facet-detail-action-btn facet-action-note" id="facetBtnAddNote" title="Add a structured observation or note">
+                    <span class="btn-icon">➕</span> Add Note
+                </button>
+                ${project.hasReadme ? `
+                <button class="facet-detail-action-btn facet-action-readme" onclick="window.projectScanner.openReadme('${escapedPath}', '${escapedName}')" title="Open formatted README.html">
+                    <span class="btn-icon">📖</span> README.html
+                </button>` : ''}
+                ${omeroUrl ? `
+                <button class="facet-detail-action-btn facet-action-omero" onclick="window.electronAPI.openExternal('${omeroUrl.replace(/'/g, "\\'")}')" title="Open linked dataset in OMERO">
+                    <span class="btn-icon">🔵</span> OMERO
+                </button>` : ''}
+                ${elabUrl ? `
+                <button class="facet-detail-action-btn facet-action-elab" onclick="window.electronAPI.openExternal('${elabUrl.replace(/'/g, "\\'")}')" title="Open linked experiment in eLabFTW">
+                    <span class="btn-icon">🟢</span> eLabFTW
+                </button>` : ''}
+                ${rspaceUrl ? `
+                <button class="facet-detail-action-btn facet-action-rspace" onclick="window.electronAPI.openExternal('${rspaceUrl.replace(/'/g, "\\'")}')" title="Open linked document in RSpace">
+                    <span class="btn-icon">🟠</span> RSpace
+                </button>` : ''}
+            </div>
+
+            <!-- Collapsible Lineage Accordion (Incoming ↑ & Outgoing ↓ Linked Projects + Subtle Export Buttons) -->
+            <details class="facet-lineage-accordion" ${hasAnyLineage ? 'open' : ''}>
+                <summary title="Click to expand or collapse incoming (↑) and outgoing (↓) project links">
+                    <span><span class="accordion-arrow">▶</span>🕸️ Linked Projects (Lineage)</span>
+                    <span style="font-size: 0.76rem; color: ${hasAnyLineage ? '#ddd6fe' : '#9ca3af'}; font-weight: 600; background: rgba(139, 92, 246, 0.2); padding: 2px 8px; border-radius: 999px;">
+                        ${totalUpstreamCount} ↑ · ${totalDownstreamCount} ↓
+                    </span>
+                </summary>
+                <div class="facet-lineage-accordion-body">
+                    ${lineageBodyHtml}
+                </div>
+            </details>
+        `;
+
+        // Render Notes & Observations
+        // Extract links from all notes (Phase 4)
+        const allNotesForLinks = [notesMd, ...notesLog.map(n => n.text || '')].join('\n');
+        const extractedLinks = (window.markdownLite && window.markdownLite.extractLinks) ? window.markdownLite.extractLinks(allNotesForLinks) : [];
+
+        if (notesMd || notesLog.length > 0 || hypothesis) {
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px 0;">
+                    <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa;">📝 Notes &amp; Observations</div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="facetBtnAddNoteInline" style="padding: 1px 7px; font-size: 0.72rem; color: #34d399;">➕ Add Note</button>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px;">
+            `;
+            if (hypothesis) {
+                html += `
+                    <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                        <strong style="color: #c4b5fd; font-size: 0.76rem; text-transform: uppercase;">🎯 Goal:</strong>
+                        <div style="font-size: 0.84rem; color: #e5e7eb; margin-top: 2px;">${window.markdownLite ? window.markdownLite.escapeHtml(hypothesis) : hypothesis}</div>
+                    </div>
+                `;
+            }
+            if (notesMd) {
+                const renderedMd = window.markdownLite
+                    ? window.markdownLite.render(notesMd, { interactiveTasks: true, taskScope: 'notes_markdown' })
+                    : notesMd;
+                html += `
+                    <div style="font-size: 0.84rem; color: #e5e7eb; margin-bottom: 8px;">${renderedMd}</div>
+                `;
+            }
+            if (notesLog.length > 0) {
+                html += `<div style="display: flex; flex-direction: column; gap: 6px;">`;
+                notesLog.forEach(note => {
+                    const catIcons = { general: '📝', observation: '🔍', deviation: '⚠️', retrospective: '🔁' };
+                    const icon = catIcons[note.category] || '📝';
+                    const catLabel = note.category ? `${icon} ${note.category}` : '';
+                    const catBadge = catLabel ? `<span style="font-size: 0.68rem; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 1px 6px; border-radius: 10px; margin-right: 6px; text-transform: uppercase;">${catLabel}</span>` : '';
+                    const ts = note.timestamp ? new Date(note.timestamp).toLocaleDateString() : '';
+                    const user = note.user ? ` · ${note.user}` : '';
+                    const renderedNote = window.markdownLite
+                        ? window.markdownLite.render(note.text || '', { interactiveTasks: true, taskScope: `note:${note.id}` })
+                        : (note.text || '');
+                    html += `
+                        <div class="mf-note-item" style="font-size: 0.82rem; background: rgba(0,0,0,0.22); border-left: 3px solid #8b5cf6; padding: 6px 8px; border-radius: 4px; position: relative;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <div style="font-size: 0.7rem; color: #9ca3af;">${catBadge}${ts}${user}</div>
+                                <div style="display: flex; gap: 4px;">
+                                    <button type="button" class="btn btn-secondary btn-sm mf-btn-edit-note" data-note-id="${note.id}" style="padding: 0 4px; font-size: 0.65rem;" title="Edit Note">✏️</button>
+                                    <button type="button" class="btn btn-secondary btn-sm mf-btn-delete-note" data-note-id="${note.id}" style="padding: 0 4px; font-size: 0.65rem; color: #f87171;" title="Delete Note">🗑️</button>
+                                </div>
+                            </div>
+                            <div>${renderedNote}</div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+            html += `</div>`;
+        } else {
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px 0;">
+                    <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa;">📝 Notes &amp; Observations</div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="facetBtnAddNoteInline" style="padding: 1px 7px; font-size: 0.72rem; color: #34d399;">➕ Add Note</button>
+                </div>
+                <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; font-size: 0.78rem; color: #9ca3af; font-style: italic;">
+                    No notes or observations documented yet.
+                </div>
+            `;
+        }
+
+        // Render Links Found in Notes (Phase 4)
+        if (extractedLinks.length > 0) {
+            html += `
+                <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; margin: 12px 0 6px 0;">
+                    🔗 Links found in notes (${extractedLinks.length})
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
+            `;
+            extractedLinks.forEach(link => {
+                if (link.type === 'mention') {
+                    html += `
+                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                            <span>🧬</span>
+                            <a href="#" class="mf-extracted-mention-link" data-project-name="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #93c5fd; text-decoration: underline;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
+                        </div>
+                    `;
+                } else if (link.type === 'path') {
+                    html += `
+                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                            <span>📁</span>
+                            <a href="#" class="mf-extracted-path-link" data-project-path="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #34d399; text-decoration: underline; word-break: break-all;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                            <span>↗️</span>
+                            <a href="#" class="mf-extracted-url-link" data-url="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #c4b5fd; text-decoration: underline; word-break: break-all;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
+                        </div>
+                    `;
+                }
+            });
+            html += `</div>`;
+        }
+
+        // Render Metadata Fields
+        html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; margin-bottom: 8px;">📋 Metadata Fields</div>`;
+
+        const metaSource = project.metadata || project.flatMeta || {};
+        if (!metaSource || Object.keys(metaSource).length === 0) {
+            html += `<div style="color: #9ca3af; font-style: italic; padding: 12px;">No metadata fields found.</div>`;
+        } else {
+            for (const [key, field] of Object.entries(metaSource)) {
+                html += renderMetadataField(key, field);
+            }
+        }
+
+        html += projectSidecarsHtml;
+
+        // Render System Information Accordion (Project ID, Paths, Level, etc.)
+        const absPath = project.path || (project.metadata && project.metadata['System.ProjectAbsolutePath']?.value) || '';
+        const relPath = (project.metadata && project.metadata['System.ProjectRelativePath']?.value) || project.relativePath || '';
+        const sysLevel = (project.metadata && project.metadata['System.Level']?.value) || project.level || '';
+        const prevNames = Array.isArray(project.previous_names) && project.previous_names.length > 0 ? project.previous_names.join(', ') : '';
+        const modifiedStr = project.modified || project.updated_at ? new Date(project.modified || project.updated_at).toLocaleString() : '';
+
+        html += `
+            <details class="facet-lineage-accordion" style="margin-top: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px;">
+                <summary style="font-size: 0.8rem; font-weight: 600; color: #9ca3af; cursor: pointer; user-select: none;">
+                    <span><span class="accordion-arrow">▶</span>⚙️ System Information</span>
+                </summary>
+                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
+                    ${projectId ? renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${projectId}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${projectId}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`) : ''}
+                    ${absPath ? renderCompactField('Absolute Path', `<span style="font-family:monospace; font-size:0.75rem;">${absPath}</span>`) : ''}
+                    ${relPath ? renderCompactField('Relative Path', `<span style="font-family:monospace; font-size:0.75rem;">${relPath}</span>`) : ''}
+                    ${sysLevel ? renderCompactField('ISA Level', sysLevel) : ''}
+                    ${prevNames ? renderCompactField('Previous Names', prevNames) : ''}
+                    ${modifiedStr ? renderCompactField('Last Updated', modifiedStr) : ''}
+                </div>
+            </details>
+        `;
+
+        // Render Changelog Accordion at the very bottom
+        const changelog = Array.isArray(project.changelog) ? project.changelog : (Array.isArray(project.metadata && project.metadata.changelog) ? project.metadata.changelog : []);
+        if (changelog.length > 0) {
+            html += `
+                <details class="facet-lineage-accordion" style="margin-top: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px;">
+                    <summary style="font-size: 0.8rem; font-weight: 600; color: #9ca3af; cursor: pointer; user-select: none;">
+                        <span><span class="accordion-arrow">▶</span>🕒 Changelog (${changelog.length})</span>
+                    </summary>
+                    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
+            `;
+            changelog.forEach(entry => {
+                const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+                const user = entry.user ? ` · ${window.markdownLite ? window.markdownLite.escapeHtml(entry.user) : entry.user}` : '';
+                let details = '';
+                if (Array.isArray(entry.changes)) {
+                    details = entry.changes.map(c => {
+                        const esc = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
+                        if (c.field === 'notes_log') {
+                            const cat = c.category ? `<span style="font-size:0.68rem; background:rgba(139,92,246,0.25); color:#c4b5fd; padding:1px 6px; border-radius:10px; margin-right:4px; text-transform:uppercase;">${esc(c.category)}</span>` : '';
+                            const textVal = esc(c.text || c.to || '');
+                            if (c.op === 'added' || c.action?.startsWith('Note Added')) {
+                                return `➕ <strong>Note added:</strong> ${cat}"${textVal}"`;
+                            } else if (c.op === 'removed' || c.action === 'Note Removed') {
+                                return `🗑️ <strong>Note removed</strong>${textVal ? `: "${textVal}"` : ''}`;
+                            } else if (c.op === 'modified' || c.action === 'Note Edited') {
+                                const fromVal = esc(c.from || '');
+                                return `✏️ <strong>Note edited:</strong> <s>"${fromVal}"</s> → <strong>"${textVal}"</strong>`;
+                            }
+                            return `📝 <strong>Note:</strong> ${esc(c.action || 'Updated')}`;
+                        }
+                        if (c.op === 'removed' || c.op === 'deleted') {
+                            return `🗑️ <code>${esc(c.field)}</code> removed`;
+                        }
+                        if (c.op === 'added') {
+                            return `➕ <code>${esc(c.field)}</code> added: <strong>${esc(c.to !== undefined ? c.to : '')}</strong>`;
+                        }
+                        if (c.from !== undefined || c.to !== undefined) {
+                            return `<code>${esc(c.field)}</code>: <s>${esc(c.from !== null && c.from !== undefined ? c.from : 'empty')}</s> → <strong>${esc(c.to !== null && c.to !== undefined ? c.to : 'empty')}</strong>`;
+                        }
+                        if (c.action) {
+                            return `<code>${esc(c.field || 'Field')}</code>: ${esc(c.action)}`;
+                        }
+                        return `<code>${esc(c.field || 'Field')}</code> updated`;
+                    }).join(', ');
+                } else if (entry.action) {
+                    details = window.markdownLite ? window.markdownLite.escapeHtml(entry.action) : entry.action;
+                }
+                html += `
+                    <div style="font-size: 0.78rem; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,0.2);">
+                        <div style="font-size: 0.68rem; color: #9ca3af;">${ts}${user}</div>
+                        <div>${details}</div>
+                    </div>
+                `;
+            });
+            html += `</div></details>`;
+        }
+
+        contentArea.innerHTML = html;
+
+        // Bind Edit Metadata button
+        const editMetaBtn = document.getElementById('facetBtnEditMetadata');
+        if (editMetaBtn) {
+            editMetaBtn.onclick = () => {
+                if (window.projectInlineEditor) {
+                    window.projectInlineEditor.startEdit(project);
+                }
+            };
+        }
+
+        // Bind Add Note buttons
+        const addNoteBtn = document.getElementById('facetBtnAddNote');
+        const addNoteInlineBtn = document.getElementById('facetBtnAddNoteInline');
+        const openAddNote = () => {
+            if (window.noteComposer) {
+                window.noteComposer.open(project);
+            }
+        };
+        if (addNoteBtn) addNoteBtn.onclick = openAddNote;
+        if (addNoteInlineBtn) addNoteInlineBtn.onclick = openAddNote;
+
+        // Bind note edit/delete buttons
+        contentArea.querySelectorAll('.mf-btn-edit-note').forEach(btn => {
+            btn.onclick = () => {
+                const noteId = btn.dataset.noteId;
+                const note = notesLog.find(n => n.id === noteId);
+                if (note && window.noteComposer) {
+                    window.noteComposer.editNote(project, note);
+                }
+            };
+        });
+        contentArea.querySelectorAll('.mf-btn-delete-note').forEach(btn => {
+            btn.onclick = () => {
+                const noteId = btn.dataset.noteId;
+                if (noteId && window.noteComposer) {
+                    window.noteComposer.deleteNote(project, noteId);
+                }
+            };
+        });
+
+        // Bind extracted links
+        contentArea.querySelectorAll('.mf-extracted-mention-link, .mf-md-mention').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                const targetName = a.dataset.projectName || a.dataset.mfProject;
+                if (targetName) {
+                    const found = this.masterData.find(p => p.name === targetName || (p.metadata && p.metadata.projectName === targetName));
+                    if (found) {
+                        this.showProjectDetails(found);
+                    } else {
+                        alert(`Project "${targetName}" is not currently in the loaded projects index.`);
+                    }
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-extracted-path-link, .mf-md-path').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                const p = a.dataset.projectPath || a.dataset.mfPath;
+                if (p && window.electronAPI?.showItemInFolder) {
+                    window.electronAPI.showItemInFolder(p);
+                } else if (p && window.electronAPI?.openFolder) {
+                    window.electronAPI.openFolder(p);
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-extracted-url-link, .mf-md-link').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                const u = a.dataset.url || a.dataset.mfUrl;
+                if (u && window.electronAPI?.openExternal) {
+                    window.electronAPI.openExternal(u);
+                }
+            };
+        });
+
+        // Bind copy buttons (e.g. Project ID copy)
+        contentArea.querySelectorAll('.mf-copy-btn').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const text = btn.dataset.copyText;
+                if (!text) return;
+                try {
+                    if (window.electronAPI?.writeToClipboard) {
+                        await window.electronAPI.writeToClipboard(text);
+                    } else if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(text);
+                    }
+                    const origHtml = btn.innerHTML;
+                    btn.textContent = '✓';
+                    btn.style.color = '#34d399';
+                    setTimeout(() => {
+                        btn.innerHTML = origHtml;
+                        btn.style.color = '';
+                    }, 1200);
+                } catch (err) {
+                    console.error('Copy to clipboard failed:', err);
+                }
+            };
+        });
+    },
+
+    // Show Community Template details inside the exact same docked right panel on row click
+    async showTemplatePreview(data) {
+        if (!this.isTemplateHub || !data) return;
+        this.selectedProjectPath = data.path || data._path || null;
+
+        const contentArea = this.openRightPanel('📦 Template Details');
+        if (!contentArea) return;
+        contentArea.innerHTML = '<div style="text-align: center; margin-top: 40px; color: #9ca3af;">Loading Template Details...</div>';
+
         try {
             const repoPath = data.path || data._path;
             let templateData = this._templateCache[repoPath];
-            
+
             if (!templateData) {
                 const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
                 const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
@@ -1284,66 +4240,63 @@ const facetSearch = {
                 templateData = await response.json();
                 this._templateCache[repoPath] = templateData;
             }
-            
-            let html = `<h2 style="margin-top:0; color:#a855f7; padding-right: 20px;">${templateData.name}</h2>`;
+
+            let html = `<h3 style="margin: 0 0 8px 0; color: #a855f7;">${templateData.name}</h3>`;
             if (templateData.description) {
-                html += `<p style="color:#d1d5db; line-height:1.4; margin-bottom: 20px;">${templateData.description}</p>`;
+                html += `<p style="color: #9ca3af; font-size: 0.86rem; line-height: 1.4; margin-bottom: 14px;">${templateData.description}</p>`;
             }
-            
-            html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 20px;">📥 Install Template</button>`;
-            
-            html += `<h3 style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom:15px;">Fields & Options</h3>`;
-            
+
+            html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 18px;">📥 Install Template</button>`;
+
+            html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 12px;">Fields &amp; Options</div>`;
+
             const metadata = templateData.metadata || {};
             const fieldsObj = metadata.fields || {};
             const fieldOrder = metadata.fieldOrder || Object.keys(fieldsObj);
-            
+
             if (fieldOrder.length > 0) {
                 fieldOrder.forEach(fieldId => {
                     const field = fieldsObj[fieldId];
                     if (!field) return;
-                    
-                    // Skip 'group' fields if desired, or render them differently
+
                     if (field.type === 'group') {
-                        html += `<div style="margin-top: 20px; margin-bottom: 10px; font-weight:bold; color:#a855f7; border-bottom:1px solid rgba(168,85,247,0.3); padding-bottom:5px;">${field.label || fieldId}</div>`;
+                        html += `<div style="margin-top: 14px; margin-bottom: 8px; font-weight:bold; color:#a855f7; border-bottom:1px solid rgba(168,85,247,0.3); padding-bottom:4px; font-size:0.84rem;">📁 ${field.label || fieldId}</div>`;
                         return;
                     }
-                    
-                    html += `<div style="margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">`;
-                    html += `<div style="font-weight:bold; color:#e2e8f0;">${field.label || fieldId} <span style="font-size:0.75rem; color:#9ca3af; font-weight:normal; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:5px;">${field.type}</span></div>`;
-                    
+
+                    html += `<div style="margin-bottom: 10px; background: rgba(0,0,0,0.18); padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">`;
+                    html += `<div style="font-weight:600; font-size:0.85rem;">${field.label || fieldId} <span style="font-size:0.72rem; color:#9ca3af; font-weight:normal; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:5px;">${field.type}</span></div>`;
+
                     if (field.description) {
-                        html += `<div style="font-size:0.85rem; color:#9ca3af; margin-top:4px;">${field.description}</div>`;
+                        html += `<div style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">${field.description}</div>`;
                     }
-                    
+
                     if (field.options && Array.isArray(field.options)) {
-                        html += `<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">`;
+                        html += `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">`;
                         field.options.forEach(opt => {
-                            html += `<span style="font-size:0.8rem; background:rgba(124,58,237,0.2); color:#d8b4fe; border:1px solid rgba(124,58,237,0.4); padding:2px 8px; border-radius:12px;">${opt}</span>`;
+                            html += `<span style="font-size:0.75rem; background:rgba(124,58,237,0.2); color:#d8b4fe; border:1px solid rgba(124,58,237,0.4); padding:2px 8px; border-radius:12px;">${opt}</span>`;
                         });
                         html += `</div>`;
                     }
-                    
+
                     html += `</div>`;
                 });
             } else {
                 html += `<div style="color:#9ca3af; font-style:italic;">No fields defined.</div>`;
             }
-            
-            // Add Folder Structure if available
-              if (templateData.structure) {
-                  html += `<h3 style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top:25px; margin-bottom:15px;">Folder Structure</h3>`;
-                  if (window.templateManager && window.templateManager.parseAndRenderFolderTree) {
-                      html += `<div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); overflow-x: auto;">`;
-                      html += window.templateManager.parseAndRenderFolderTree(templateData.structure);
-                      html += `</div>`;
-                  } else {
-                      html += `<pre style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); font-family: monospace; font-size: 0.85rem; color:#d1d5db; white-space: pre-wrap; word-break: break-all;">${templateData.structure}</pre>`;
-                  }
-              }
-              
-              contentArea.innerHTML = html;
-            
+
+            if (templateData.structure) {
+                html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top: 20px; margin-bottom: 12px;">Folder Structure</div>`;
+                if (window.templateManager && window.templateManager.parseAndRenderFolderTree) {
+                    html += `<div style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); overflow-x: auto;">`;
+                    html += window.templateManager.parseAndRenderFolderTree(templateData.structure);
+                    html += `</div>`;
+                } else {
+                    html += `<pre style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;">${templateData.structure}</pre>`;
+                }
+            }
+
+            contentArea.innerHTML = html;
         } catch (error) {
             contentArea.innerHTML = `<div style="color:#ef4444; padding:20px;">Error loading template details: ${error.message}</div>`;
         }
@@ -1355,30 +4308,77 @@ const facetSearch = {
         if (modal) {
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
+            this._initColumnSplitters();
         }
     },
 
-    // Close the facet search modal and clean up Tabulator
-    closeSearch() {
+    // Launch File Sidecar Scanner Wizard directly from Facet Search
+    openFileScanner() {
+        this.closeScanOptionsDropdown();
+        this.closeRightPanel();
+        this.closeExportDropdown();
+
+        // Flag to prevent switchMainTab('discover') from re-opening facet search table
+        window._isLaunchingFileScanner = true;
+
         const modal = document.getElementById('facetSearchModal');
         if (modal) {
             modal.style.display = 'none';
             document.body.style.overflow = '';
         }
-        // Destroy Tabulator instance so it rebuilds fresh on next open
         if (this.tabulatorInstance) {
+            this._syncColumnStateFromTabulator(true, null);
             this.tabulatorInstance.destroy();
             this.tabulatorInstance = null;
         }
         this.masterData = [];
         this.activeFilters = {};
+        this.textSearchQuery = '';
         this._hasFileSidecars = false;
         this.isTemplateHub = false;
 
-        const previewModal = document.getElementById('facetTemplatePreviewModal');
-        if (previewModal) {
-            previewModal.style.transform = 'translateX(100%)';
-            previewModal.style.display = 'none';
+        // Switch main tab to discover and launch wizard
+        if (typeof window.switchMainTab === 'function') {
+            window.switchMainTab('discover');
+        }
+
+        if (window.fileScanner && typeof window.fileScanner.startWizard === 'function') {
+            window.fileScanner.startWizard();
+        }
+
+        setTimeout(() => {
+            window._isLaunchingFileScanner = false;
+        }, 600);
+    },
+
+    // Close the facet search modal and clean up Tabulator (prompting to save temporary scan if needed)
+    async closeSearch(options = {}) {
+        await this.promptUnsavedScanIfNeeded();
+        this.closeRightPanel();
+        this.closeScanOptionsDropdown();
+        this.closeExportDropdown();
+
+        const modal = document.getElementById('facetSearchModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+        // Persist current column order, widths, and sorters before destroying Tabulator
+        if (this.tabulatorInstance) {
+            this._syncColumnStateFromTabulator(true, null);
+            this.tabulatorInstance.destroy();
+            this.tabulatorInstance = null;
+        }
+        this.masterData = [];
+        this.activeFilters = {};
+        this.textSearchQuery = '';
+        this._hasFileSidecars = false;
+        this.isTemplateHub = false;
+
+        // Return to Create Project tab (unless an explicit action like launching fileScanner or switching to another tab is active)
+        if (!window._isLaunchingFileScanner && !options.skipTabSwitch && typeof window.switchMainTab === 'function') {
+            const targetTab = options.targetTab || 'create';
+            window.switchMainTab(targetTab);
         }
     },
 

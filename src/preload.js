@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Open folder dialog
     selectFolder: () => ipcRenderer.invoke('select-folder'),
     selectFolders: () => ipcRenderer.invoke('select-folders'),
+    selectFile: (options) => ipcRenderer.invoke('select-file', options),
+    showOpenDialog: (options) => ipcRenderer.invoke('select-file', options),
     showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
     showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
     getSubfolders: (projectPaths) => ipcRenderer.invoke('get-subfolders', projectPaths),
@@ -26,9 +28,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createFolders: (targetPath, structure) =>
         ipcRenderer.invoke('create-folders', targetPath, structure),
 
-    // Open folder in explorer
-    openFolder: (folderPath) =>
-        ipcRenderer.invoke('open-folder', folderPath),
+    // Open folder in explorer (with on-demand missing path relocation dialog)
+    openFolder: (folderPath, userInfo = null) =>
+        ipcRenderer.invoke('open-folder', folderPath, userInfo),
+
+    // Show file/item highlighted in its parent folder in Explorer (does NOT launch associated app like ZEN)
+    showItemInFolder: (itemPath) =>
+        ipcRenderer.invoke('show-item-in-folder', itemPath),
+
+    // Open a file (e.g. .metafold-sidecar.json) with its default application
+    openFile: (filePath) =>
+        ipcRenderer.invoke('open-file', filePath),
 
     // Platform info
     platform: process.platform,
@@ -57,6 +67,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // File reading
     readFile: (filePath) => ipcRenderer.invoke('readFile', filePath),
+
+    // ZIP archive bundle writing and reading
+    writeZipFile: (filePath, files) => ipcRenderer.invoke('write-zip-file', filePath, files),
+    readZipFile: (filePath) => ipcRenderer.invoke('read-zip-file', filePath),
 
     // Copy file from source to destination
     copyFile: (srcPath, destPath) => ipcRenderer.invoke('copyFile', srcPath, destPath),
@@ -119,10 +133,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('insert-links-into-readme', projectPath, elabftwUrl, omeroUrl, projectName, rspaceUrl, omeroGroupName);
     },
 
+    // Upload project metadata and README.html to elabFTW experiment as attachments
+    uploadProjectFilesToElabFTW: (params) => ipcRenderer.invoke('upload-project-files-to-elabftw', params),
+
     // Regenerate README.html with metadata and integration links
     regenerateReadmeHtml: async (projectPath, metadata, projectName, elabftwUrl = null, omeroUrl = null) => {
         return await ipcRenderer.invoke('regenerate-readme-html', projectPath, metadata, projectName, elabftwUrl, omeroUrl);
     },
+
+    // Update project metadata, notes, changelog, history, README & user index
+    updateProjectMetadata: (projectPath, patch, options = {}) =>
+        ipcRenderer.invoke('update-project-metadata', projectPath, patch, options),
 
     // Generate README HTML content without saving (for metadataLoader)
     generateReadmeHtmlContent: (metadata, projectName, elabftwUrl, omeroUrl) =>
@@ -162,7 +183,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getProjectsStatistics: (projects) =>
         ipcRenderer.invoke('get-projects-statistics', projects),
 
-    // =================== ID DICTIONARY / HARVESTER APIS ===================
+    // =================== LIVING USER INDEX & ID DICTIONARY APIS ===================
+
+    loadUserIndex: (userInfo = null) => ipcRenderer.invoke('load-user-index', userInfo),
+
+    upsertUserIndexProject: (projectPath, baseRoot = null, userInfo = null) =>
+        ipcRenderer.invoke('upsert-user-index-project', projectPath, baseRoot, userInfo),
+
+    mergeProjectsIntoUserIndex: (projects, basePath = null, userInfo = null) =>
+        ipcRenderer.invoke('merge-projects-into-user-index', projects, basePath, userInfo),
+
+    removeFromUserIndex: (projectPath, userInfo = null) =>
+        ipcRenderer.invoke('remove-from-user-index', projectPath, userInfo),
+
+    clearUserIndex: (userInfo = null) => ipcRenderer.invoke('clear-user-index', userInfo),
+
+    onUserIndexUpdated: (callback) => {
+        ipcRenderer.on('user-index-updated', (event, data) => callback(data));
+    },
 
     saveIdValues: (metadata, username) => ipcRenderer.invoke('save-id-values', metadata, username),
     

@@ -1,58 +1,255 @@
-<!-- Facet Search Modal -->
-<div id="facetSearchModal" class="facet-modal-overlay" style="display: none;" onclick="facetSearch.handleOverlayClick(event)">
+<!-- Unified Full-Screen Facet Search & Project Discovery Modal -->
+<div id="facetSearchModal" class="facet-modal-overlay" style="display: none;"
+    onclick="facetSearch.handleOverlayClick(event)">
     <div class="facet-modal-window" onclick="event.stopPropagation()">
 
-        <!-- Modal Header -->
+        <!-- Unified Single-Row Modal Header -->
         <div class="facet-modal-header">
             <div class="facet-modal-title">
-                <span class="facet-modal-icon">🏷️</span>
+                <span id="facetModalIcon" class="facet-modal-icon">🔍</span>
                 <div>
-                    <h2>Metadata Search</h2>
-                    <p id="facetModalSubtitle">Faceted search across your MetaFold projects <span style="color:#9ca3af; font-size:0.85em; font-style:italic;">(Right-click category headers to hide them)</span></p>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h2 id="facetModalHeading">Search &amp; Scan Projects</h2>
+                        <span id="facetSourceBadge" class="facet-source-badge">📚 User Index</span>
+                        <span id="facetResultsCount" class="facet-count-pill">0 Projects</span>
+                    </div>
+                    <p id="facetModalSubtitle">Click any row to inspect metadata &amp; lineage on the right ·
+                        Right-click filters on the left to hide or manage them</p>
                 </div>
             </div>
+
             <div class="facet-modal-header-actions">
-                <div style="position: relative;">
-                    <button class="btn btn-secondary" onclick="facetSearch.toggleColumnSelector()" id="columnSelectorBtn">⚙️ Columns</button>
-                    <div id="columnSelectorDropdown" class="column-selector-dropdown" style="display: none; position: absolute; top: 100%; right: 0; border-radius: 6px; padding: 12px; z-index: 200; max-height: 320px; overflow-y: auto; width: 260px; margin-top: 4px;">
-                        <!-- Checkboxes will be injected here -->
+                <!-- Group 1: Data Source & Folder Scan (hidden in Template Hub mode) -->
+                <div id="facetSourceToolbarGroup" class="facet-toolbar-group">
+                    <button id="facetSaveScanBtn" class="btn btn-primary facet-toolbar-btn"
+                        style="display: none; background: #10b981; border-color: #10b981;"
+                        onclick="facetSearch.saveTemporaryScanToIndex()"
+                        title="Add the newly scanned projects to your permanent User Index">
+                        <span class="btn-icon">➕</span> Add Scan to Index
+                    </button>
+                    <button id="facetSwitchToIndexBtn" class="btn btn-secondary facet-toolbar-btn"
+                        style="display: none;" onclick="facetSearch.openFromUserIndex()"
+                        title="Switch back to your local User Index">
+                        <span class="btn-icon">📚</span> My Index
+                    </button>
+                    <div style="position: relative; display: inline-flex; align-items: center;">
+                        <button class="btn btn-primary facet-toolbar-btn"
+                            style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
+                            onclick="facetSearch.scanFolderFromSearch()"
+                            title="Scan a directory (loaded temporarily; asks on close if you want to save to your User Index)">
+                            <span class="btn-icon">📁</span> Scan / Load Metadata
+                        </button>
+                        <button class="btn btn-primary facet-toolbar-btn"
+                            style="border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,0.2); padding: 6px 8px;"
+                            onclick="facetSearch.toggleScanOptionsDropdown(event)" id="scanOptionsDropdownBtn"
+                            title="Scan &amp; Load Options (Folder Scan, Load JSON into Form, File Sidecar Scanner, ISA Inheritance)">
+                            ▾
+                        </button>
+                        <div id="scanOptionsDropdown" class="column-selector-dropdown"
+                            style="display: none; position: absolute; top: 100%; left: 0; border-radius: 8px; padding: 12px; z-index: 220; width: 290px; margin-top: 6px;">
+                            <div
+                                style="margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid rgba(139, 92, 246, 0.3); padding-bottom: 6px;">
+                                📁 Actions</div>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 6px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeScanOptionsDropdown(); facetSearch.scanFolderFromSearch();"
+                                    title="Scan a directory temporarily (RAM)">
+                                    📁 Scan Folder...
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 6px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeScanOptionsDropdown(); facetSearch.closeSearch(); metadataLoader.loadMetadataForCreation();"
+                                    title="Load existing metadata JSON into the Create Project form to edit and sync with integrations">
+                                    📂 Load Metadata JSON into Form...
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 6px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeScanOptionsDropdown(); facetSearch.loadSummaryFile();"
+                                    title="Load an external JSON summary file into the table">
+                                    📄 Load Summary JSON into Table...
+                                </button>
+                            </div>
+
+                            <div
+                                style="margin-bottom: 8px; font-weight: bold; border-top: 1px solid rgba(139, 92, 246, 0.25); border-bottom: 1px solid rgba(139, 92, 246, 0.25); padding: 6px 0; font-size: 0.78rem; color: #c4b5fd;">
+                                ⚙️ Scan &amp; Index Options</div>
+
+                            <label for="inheritMetadataCheckbox"
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.84rem; margin-bottom: 8px;">
+                                <input type="checkbox" id="inheritMetadataCheckbox"
+                                    style="width: 15px; height: 15px; accent-color: #8b5cf6; cursor: pointer;">
+                                <span>🧬 Inherit parent metadata (ISA)</span>
+                            </label>
+                            <label for="includeFileSidecarsCheckbox" id="includeFileSidecarsLabel"
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.84rem; margin-bottom: 10px;">
+                                <input type="checkbox" id="includeFileSidecarsCheckbox" checked
+                                    style="width: 15px; height: 15px; accent-color: #10b981; cursor: pointer;">
+                                <span>📄 Include file sidecar metadata</span>
+                            </label>
+                            <div
+                                style="border-top: 1px solid rgba(139, 92, 246, 0.25); padding-top: 8px; margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.8rem; padding: 6px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeScanOptionsDropdown(); facetSearch.openFromUserIndex();">
+                                    📚 Reload My User Index
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.8rem; padding: 6px 10px; justify-content: flex-start; color: #f87171;"
+                                    onclick="facetSearch.closeScanOptionsDropdown(); facetSearch.clearUserIndexFromSearch();">
+                                    🗑️ Reset User Index...
+                                </button>
+                            </div>
+
+                            <!-- Dedicated Plugins Section at Bottom -->
+                            <div id="scanPluginsSection" style="border-top: 1px solid rgba(139, 92, 246, 0.25); padding-top: 8px; margin-top: 8px;">
+                                <div style="margin-bottom: 6px; font-weight: bold; font-size: 0.78rem; color: #c4b5fd;">
+                                    🧩 Plugins</div>
+                                <button type="button" class="btn btn-secondary" id="facetSidecarScannerBtn"
+                                    style="display: flex; width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: flex-start; align-items: center; gap: 8px; color: #f3f4f6; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(139, 92, 246, 0.35);"
+                                    onclick="facetSearch.openFileScanner();"
+                                    title="File Sidecar Scanner Plugin: Scans folders and generates .json sidecars for raw data files">
+                                    <span>🔬</span> Create File Sidecars...
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <button class="btn btn-secondary" onclick="facetSearch.exportCsv()" title="Export filtered results with selected columns as CSV">📥 Export CSV</button>
-                <button class="btn btn-secondary" onclick="facetSearch.resetFilters()">🔄 Reset</button>
+
+                <!-- Group 2: Facet Filters, Table Columns, Save/Load Layout & Filter Reset -->
+                <div class="facet-toolbar-group">
+                    <button class="btn btn-secondary facet-toolbar-btn"
+                        onclick="facetSearch.showManageCategoriesModal()"
+                        title="Facet Search (left sidebar): Choose which metadata fields are shown as filters">
+                        <span class="btn-icon">🏷️</span> Filters
+                    </button>
+                    <div style="position: relative;">
+                        <button class="btn btn-secondary facet-toolbar-btn" onclick="facetSearch.toggleColumnSelector()"
+                            id="columnSelectorBtn"
+                            title="Table View (center): Choose which metadata keys are shown as columns in the project table">
+                            <span class="btn-icon">📊</span> Table Columns
+                        </button>
+                        <div id="columnSelectorDropdown" class="column-selector-dropdown"
+                            style="display: none; position: absolute; top: 100%; right: 0; border-radius: 8px; padding: 12px; z-index: 220; max-height: 380px; overflow-y: auto; width: 290px; margin-top: 6px;">
+                            <!-- Search input + checkboxes will be injected here -->
+                        </div>
+                    </div>
+                    <div style="position: relative;">
+                        <button class="btn btn-secondary facet-toolbar-btn" onclick="facetSearch.toggleLayoutDropdown()"
+                            id="layoutSelectorBtn"
+                            title="Save current table &amp; filter layout or load a saved layout from your User Folder">
+                            <span class="btn-icon">💾</span> <span id="layoutSelectorBtnLabel">Save / Load Layout</span> <span style="opacity: 0.75; font-size: 0.75em; margin-left: 2px;">▾</span>
+                        </button>
+                        <div id="layoutSelectorDropdown" class="column-selector-dropdown"
+                            style="display: none; position: absolute; top: 100%; right: 0; border-radius: 8px; padding: 12px; z-index: 220; max-height: 400px; overflow-y: auto; width: 310px; margin-top: 6px;">
+                            <!-- Save layout input + saved layouts list injected here -->
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary facet-toolbar-btn" onclick="facetSearch.resetFilters()"
+                        title="Reset all active filters and search text">
+                        <span class="btn-icon">🔄</span> Reset
+                    </button>
+                </div>
+
+                <!-- Group 3: Consolidated Export Dropdown & Graph Visualization (hidden in Template Hub mode) -->
+                <div id="facetExportToolbarGroup" class="facet-toolbar-group">
+                    <div style="position: relative;">
+                        <button class="btn btn-primary facet-toolbar-btn"
+                            style="background: #10b981; border-color: #10b981;"
+                            onclick="facetSearch.toggleExportDropdown(event)"
+                            id="exportSelectorBtn"
+                            title="Export options: FAIR RO-Crate, Lineage Graph, Scan Summary, CSV table">
+                            <span class="btn-icon">📤</span> Export <span style="opacity: 0.8; font-size: 0.8em; margin-left: 2px;">▾</span>
+                        </button>
+                        <div id="exportSelectorDropdown" class="column-selector-dropdown"
+                            style="display: none; position: absolute; top: 100%; right: 0; border-radius: 8px; padding: 10px; z-index: 220; width: 250px; margin-top: 6px;">
+                            <div style="margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid rgba(16, 185, 129, 0.3); padding-bottom: 6px; color: #6ee7b7; font-size: 0.85rem;">
+                                📤 Export Options
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeExportDropdown(); facetSearch.exportRoCrateFromHeader();"
+                                    title="FAIR RO-Crate Export: Export selected project or all filtered projects">
+                                    <span class="btn-icon">📦</span> FAIR RO-Crate...
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeExportDropdown(); facetSearch.exportLineageFromHeader();"
+                                    title="Lineage Export: Export project lineage as HTML or JSON">
+                                    <span class="btn-icon">🕸️</span> Lineage Graph...
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeExportDropdown(); facetSearch.exportScanSummary();"
+                                    title="Scan Summary Export: Export scanned projects as standalone HTML Navigator and JSON summary">
+                                    <span class="btn-icon">📊</span> Scan Summary (HTML/JSON)
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.82rem; padding: 7px 10px; justify-content: flex-start;"
+                                    onclick="facetSearch.closeExportDropdown(); facetSearch.exportCsv();"
+                                    title="Export filtered projects with active table columns as CSV">
+                                    <span class="btn-icon">📥</span> CSV Table Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary facet-toolbar-btn" onclick="facetSearch.visualizeSelection()"
+                        title="Open filtered projects in the interactive Lineage &amp; Knowledge Graph visualizer">
+                        <span class="btn-icon">🌌</span> Visualize
+                    </button>
+                </div>
+
                 <button class="facet-modal-close-btn" onclick="facetSearch.closeSearch()" title="Close">✕</button>
             </div>
         </div>
 
-        <!-- Modal Body: Sidebar + Results -->
+        <!-- Modal Body: Left Facet Sidebar + Center Table + Right Details Inspector -->
         <div class="facet-modal-body">
 
-            <!-- Filter Sidebar -->
-            <div class="facet-modal-sidebar" id="facetSidebar">
-                <div class="facet-modal-sidebar-header">
-                    <h3>Filters</h3>
-                    <span id="facetActiveCount" class="facet-active-badge" style="display:none;"></span>
+            <!-- Column 1: Filter Sidebar -->
+            <div class="facet-modal-sidebar" id="facetSidebar"
+                oncontextmenu="facetSearch.handleSidebarContextMenu(event)">
+                <div class="facet-modal-sidebar-header"
+                    style="flex-direction: column; align-items: stretch; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h3>🏷️ Filters</h3>
+                        <span id="facetActiveCount" class="facet-active-badge" style="display:none;"></span>
+                    </div>
+                    <div class="facet-search-input-wrapper">
+                        <input type="text" id="facetTextSearchInput" class="facet-text-search-input"
+                            placeholder="🔍 Filter by name, path, value..."
+                            oninput="facetSearch.handleTextSearch(this.value)">
+                    </div>
                 </div>
                 <div id="facetGroupsContainer" class="facet-groups-container">
                     <!-- Facet chips will be injected here -->
                 </div>
             </div>
 
-            <!-- Results Panel -->
+            <!-- Vertical Splitter: Resize Filter Sidebar -->
+            <div id="facetLeftSplitter" class="facet-splitter-v" title="Drag to resize filter sidebar"></div>
+
+            <!-- Column 2: Main Tabulator Results Panel -->
             <div class="facet-modal-main">
-                <div class="facet-modal-results-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 id="facetResultsCount">0 Projects</h3>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="facetSearch.showManageCategoriesModal()" title="Manage hidden categories" style="padding: 6px 12px; font-size: 13px;">
-                            👁️ Manage Categories
-                        </button>
-                        <button class="btn btn-primary" onclick="facetSearch.visualizeSelection()" title="Visualize the currently filtered projects" style="padding: 6px 12px; font-size: 13px;">
-                            🌌 Visualize Selection
-                        </button>
-                    </div>
-                </div>
                 <div id="facetResultsContainer" class="facet-results-table-container">
                     <!-- Table will be injected here -->
+                </div>
+            </div>
+
+            <!-- Vertical Splitter: Resize Right Details Panel -->
+            <div id="facetRightSplitter" class="facet-splitter-v" style="display: none;" title="Drag to resize details panel"></div>
+
+            <!-- Column 3: Right Docked Inspector Panel (opens immediately on row click for both Projects & Community Templates) -->
+            <div id="facetRightPanel" class="facet-right-panel" style="display: none;">
+                <div class="facet-right-panel-header">
+                    <span id="facetRightPanelHeading" class="facet-right-panel-title">📋 Project Details</span>
+                    <button class="facet-right-panel-close" onclick="facetSearch.closeRightPanel()"
+                        title="Close Details Panel">✕</button>
+                </div>
+                <div id="facetRightPanelContent" class="facet-right-panel-content">
+                    <!-- Project metadata & lineage actions OR Community Template details injected here -->
                 </div>
             </div>
 
@@ -60,26 +257,46 @@
     </div>
 </div>
 
-<!-- Manage Categories Modal -->
-<div id="facetManageCategoriesModal" class="facet-modal-overlay" style="display: none; z-index: 10003;" onclick="facetSearch.handleManageCategoriesOverlayClick(event)">
-    <div class="facet-modal-window" style="max-width: 500px;" onclick="event.stopPropagation()">
+<!-- Manage Facet Filters Modal -->
+<div id="facetManageCategoriesModal" class="facet-modal-overlay" style="display: none; z-index: 10003;"
+    onclick="facetSearch.handleManageCategoriesOverlayClick(event)">
+    <div class="facet-modal-window" style="max-width: 540px; height: auto; max-height: 82vh;"
+        onclick="event.stopPropagation()">
         <div class="facet-modal-header">
             <div class="facet-modal-title">
-                <span class="facet-modal-icon">👁️</span>
+                <span class="facet-modal-icon">🏷️</span>
                 <div>
-                    <h2>Manage Categories</h2>
-                    <p>Select which metadata categories should be visible.</p>
+                    <h2>Manage Filters</h2>
+                    <p>Select which metadata fields are displayed as filters in the left Facet Search sidebar.
+                    </p>
                 </div>
             </div>
             <div class="facet-modal-header-actions">
-                <button class="facet-modal-close-btn" onclick="facetSearch.closeManageCategoriesModal()" title="Close">✕</button>
+                <button class="facet-modal-close-btn" onclick="facetSearch.closeManageCategoriesModal()"
+                    title="Close">✕</button>
             </div>
         </div>
-        <div class="facet-modal-body" style="padding: 20px; display: flex; flex-direction: column;">
-            <div id="facetManageCategoriesList" style="flex: 1; overflow-y: auto; max-height: 400px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="facet-modal-body" style="padding: 16px 20px; display: flex; flex-direction: column;">
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="facetFilterKeysSearchInput" class="facet-text-search-input"
+                    placeholder="🔍 Search filters..." oninput="facetSearch.filterManageCategoriesList(this.value)">
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
+                <span style="font-size: 0.8rem; color: #9ca3af;">Available filters (sorted A–Z):</span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;"
+                        onclick="facetSearch.setAllManageCategories(true)">Select All</button>
+                    <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;"
+                        onclick="facetSearch.setAllManageCategories(false)">Deselect All</button>
+                </div>
+            </div>
+            <div id="facetManageCategoriesList"
+                style="flex: 1; overflow-y: auto; max-height: 400px; display: flex; flex-direction: column; gap: 6px;">
                 <!-- Checkboxes will be injected here -->
             </div>
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 15px;">
+            <div
+                style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 14px;">
                 <button class="btn btn-secondary" onclick="facetSearch.closeManageCategoriesModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="facetSearch.saveManageCategories()">Save Changes</button>
             </div>

@@ -47,9 +47,9 @@
     position: relative;
     background: linear-gradient(135deg, #1e1e2e, #2a2a40);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
     transition: all 0.3s ease;
     cursor: default;
 }
@@ -62,8 +62,20 @@
 .metadata-field-header {
     display: flex;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     gap: 8px;
+}
+
+.metadata-field-header .field-label-input {
+    flex: 0 1 250px;
+    max-width: 270px;
+    min-width: 140px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
 }
 
 /* =================== DRAG STATE STYLING =================== */
@@ -177,21 +189,77 @@
 .metadata-field-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.metadata-field-controls .required-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    font-size: 12px;
+    color: #d1d5db;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.metadata-field-controls .required-checkbox {
+    width: auto !important;
+    margin: 0;
+    cursor: pointer;
 }
 
 .field-type-selector {
-    min-width: 100px;
-    padding: 4px 8px;
-    border-radius: 4px;
+    width: auto !important;
+    min-width: 135px;
+    max-width: 175px;
+    padding: 5px 10px;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     background: rgba(255, 255, 255, 0.1);
     color: #e0e0e0;
     font-size: 12px;
 }
 
+.field-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin-left: 2px;
+    margin-top: -10px;
+    margin-right: -6px;
+    align-self: flex-start;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+}
+
+.field-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #f87171;
+    transform: scale(1.06);
+}
+
 .field-options {
+    margin-top: 6px;
+}
+
+.field-specific-options:not(:empty) {
     margin-top: 8px;
 }
 
@@ -201,7 +269,8 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #e0e0e0;
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 7px 10px;
+    font-size: 13px;
 }
 
 .field-options input:focus,

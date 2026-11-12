@@ -24,6 +24,10 @@
         const clearTemplateBtn = document.getElementById('clearTemplateBtn');
         const saveTemplateBtn = document.getElementById('saveTemplateBtn');
 
+        // Additional dynamic buttons
+        const updateProjectBtn = document.getElementById('updateProjectBtn');
+        const updateAndSendBtn = document.getElementById('updateAndSendBtn');
+
         if (!footerActionsContainer) {
             console.warn('⚠️ Footer actions container not found');
             return;
@@ -33,34 +37,46 @@
         const isDiscoverTabActive = discoverTab && discoverTab.classList.contains('active');
         const isCreateTabActive = createTab && createTab.classList.contains('active');
 
-        // Ensure container is visible
-        footerActionsContainer.style.display = 'block';
+        if (isCreateTabActive) {
+            console.log('🎯 Create Tab active: Updating Create Project footer');
 
-        if (isDiscoverTabActive) {
-            console.log('📁 Discover Tab active: Showing Send to Integrations');
+            footerActionsContainer.style.display = 'block';
 
-            // Show Send to Integrations
-            if (sendToIntegrationsBtn) sendToIntegrationsBtn.style.display = 'inline-block';
+            const currentTmpl = window.templateManager?.currentTemplate;
+            const isLoadedProject = currentTmpl?.isLoadedProject === true;
+            const hasTemplate = !!currentTmpl && !isLoadedProject;
 
-            // Hide Create Project specific buttons
+            // Show Create Project specific buttons only when a normal template is active
+            if (createProjectBtn) createProjectBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+            if (editTemplateBtn) editTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+            if (clearTemplateBtn) clearTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+            if (saveTemplateBtn) saveTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+
+            // Show Update / Send buttons when an existing project is loaded
+            if (updateProjectBtn) updateProjectBtn.style.display = isLoadedProject ? 'inline-block' : 'none';
+            if (updateAndSendBtn) updateAndSendBtn.style.display = isLoadedProject ? 'inline-block' : 'none';
+
+            // Hide standalone Send to Integrations button
+            if (sendToIntegrationsBtn) sendToIntegrationsBtn.style.display = 'none';
+
+        } else {
+            // For Discover Tab, Visualize Tab, Settings Tab, etc.: hide footer action buttons
+            console.log('📁 Non-Create Tab active: Hiding footer actions container');
+
+            footerActionsContainer.style.display = 'none';
+
+            if (sendToIntegrationsBtn) sendToIntegrationsBtn.style.display = 'none';
             if (createProjectBtn) createProjectBtn.style.display = 'none';
             if (editTemplateBtn) editTemplateBtn.style.display = 'none';
             if (clearTemplateBtn) clearTemplateBtn.style.display = 'none';
             if (saveTemplateBtn) saveTemplateBtn.style.display = 'none';
-
-        } else if (isCreateTabActive) {
-            console.log('🎯 Create Tab active: Showing Create Project');
-
-            // Show Create Project specific buttons
-            if (createProjectBtn) createProjectBtn.style.display = 'inline-block';
-            if (editTemplateBtn) editTemplateBtn.style.display = 'inline-block';
-            if (clearTemplateBtn) clearTemplateBtn.style.display = 'inline-block';
-            if (saveTemplateBtn) saveTemplateBtn.style.display = 'inline-block';
-
-            // Hide Send to Integrations
-            if (sendToIntegrationsBtn) sendToIntegrationsBtn.style.display = 'none';
+            if (updateProjectBtn) updateProjectBtn.style.display = 'none';
+            if (updateAndSendBtn) updateAndSendBtn.style.display = 'none';
         }
     }
+
+    // Expose updateFooterVisibility globally
+    window.updateFooterVisibility = updateFooterVisibility;
 
     /**
      * Hook into existing switchMainTab function

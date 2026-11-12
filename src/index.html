@@ -118,6 +118,20 @@
                             🚀 Send to Integrations
                         </button>
 
+                        <!-- Update Project Button for Loaded Existing Projects -->
+                        <button id="updateProjectBtn" class="btn btn-primary"
+                            onclick="metadataLoader.saveLoadedProject(false)"
+                            style="display: none; background: #8b5cf6; border-color: #8b5cf6;">
+                            💾 Update Project
+                        </button>
+
+                        <!-- Update & Send to Integrations Button -->
+                        <button id="updateAndSendBtn" class="btn btn-primary"
+                            onclick="metadataLoader.saveLoadedProject(true)"
+                            style="display: none; background: linear-gradient(135deg, #059669, #047857); border-color: #059669;">
+                            🚀 Update &amp; Send to Integrations
+                        </button>
+
                         <button id="editTemplateBtn" class="btn btn-secondary" onclick="editCurrentTemplate()">✏️
                             Edit</button>
 
@@ -214,6 +228,7 @@
         <script src="js/templateTypeManager.js"></script>
         <script src="js/metadataEditor.js"></script>
         <script src="js/experimentForm.js"></script>
+        <script src="js/communityManager.js"></script>
         <script src="js/templateModal.js"></script>
         <script src="js/uploadModal.js"></script>
         <script src="js/projectManager.js"></script>
@@ -230,6 +245,10 @@
         <script src="js/sidebarIntegration.js"></script>
         <!-- Tabulator.js - loaded before facetSearch.js -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.0/js/tabulator.min.js" defer></script>
+        <!-- NEW: Markdown-Lite, Inline Metadata Editor & Note Composer -->
+        <script src="js/shared/markdownLite.js"></script>
+        <script src="js/projectInlineEditor.js"></script>
+        <script src="js/noteComposer.js"></script>
         <!-- NEW: Facet Search Logic -->
         <script src="js/facetSearch.js"></script>
         <!-- NEW: RO-Crate Export and Validation -->

@@ -731,7 +731,18 @@ window.exportCurrentTemplate = async function () {
 
             // Show success message with file path and name
             if (window.app && window.app.showSuccess) {
-                window.app.showSuccess(`Template "${template.name}" exported to: ${result.fileName || path.basename(result.filePath)}`);
+                window.app.showSuccess(`Template "${template.name}" exported to: ${result.fileName || (result.filePath ? result.filePath.split(/[\\/]/).pop() : '')}`);
+            }
+
+            if (result.filePath && typeof window.showExportSuccessModal === 'function') {
+                const folderPath = result.filePath.replace(/[\\/][^\\/]+$/, '');
+                const fileName = result.fileName || result.filePath.split(/[\\/]/).pop();
+                window.showExportSuccessModal({
+                    title: 'Template Export Completed',
+                    message: `Template "<strong>${template.name}</strong>" was exported successfully.`,
+                    folderPath: folderPath,
+                    files: [{ name: fileName, path: result.filePath, icon: '📋', label: 'Template JSON' }]
+                });
             }
 
             setTimeout(() => {
