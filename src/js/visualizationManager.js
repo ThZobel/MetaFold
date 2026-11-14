@@ -383,11 +383,13 @@ const visualizationManager = {
         console.log('🔗 Creating project network data structure...');
         
         const networkData = {
+            schemaVersion: '0.1',
+            schemaType: 'metafold-visualization-export',
             overview: {
                 totalProjects: projects.length,
                 scannedPath: window.projectScanner.currentScannedPath,
                 scanTimestamp: new Date().toISOString(),
-                metafoldVersion: '1.1.0'
+                metafoldVersion: '0.1'
             },
             projects: projects.map(project => this.transformProjectForVisualization(project)),
             statistics: statistics || {},
@@ -2158,7 +2160,7 @@ ${mermaidGraph}
 
         if (proj.metadata) {
             for (const [k, v] of Object.entries(proj.metadata)) {
-                if (k === 'provenance' || k === 'System.UpdateHistory' || k === 'System.Level' || k === 'metafold_project_id' || k === 'projectName') continue;
+                if (k === 'schemaVersion' || k === 'schemaType' || k === 'template' || k === 'templateInfo' || k === 'provenance' || k === 'System.UpdateHistory' || k === 'System.Level' || k === 'metafold_project_id' || k === 'projectName' || k === 'created_at' || k === 'updated_at' || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(k))) continue;
                 
                 let label = k;
                 if (v !== null && typeof v === 'object' && v.label) {
@@ -2544,6 +2546,8 @@ window.exportLineage = async (projectPath) => {
         if (basePath.toLowerCase().endsWith('.html')) basePath = basePath.substring(0, basePath.length - 5);
 
         const exportData = {
+            schemaVersion: '0.1',
+            schemaType: 'metafold-lineage-export',
             exportType: 'Lineage',
             isHarvest: isHarvestMode,
             rootProject: rootProject.name,

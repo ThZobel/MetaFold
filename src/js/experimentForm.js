@@ -1764,8 +1764,10 @@ const experimentForm = {
         const extractValues = (obj, prefix = '') => {
             if (!obj || typeof obj !== 'object') return;
             for (const [key, val] of Object.entries(obj)) {
-                if (key === 'templateInfo' || key === 'integrations' || key === 'provenance' || 
-                    key === 'created_at' || key === 'updated_at' || key === 'previous_names') {
+                if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' ||
+                    key === 'templateInfo' || key === 'integrations' || key === 'provenance' || 
+                    key === 'created_at' || key === 'updated_at' || key === 'previous_names' ||
+                    (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
                     continue;
                 }
                 const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -1928,6 +1930,7 @@ const experimentForm = {
         const fieldOrder = [];
 
         const metaIgnore = new Set([
+            'schemaVersion', 'schemaType', 'template',
             'projectName', 'name', 'projectId', 'metafold_project_id', 'id',
             'templateInfo', 'integrations', 'metafold_integration',
             'provenance', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
@@ -2095,6 +2098,9 @@ const experimentForm = {
             if (fieldInfo.options) fieldData.options = fieldInfo.options;
             if (fieldInfo.unit !== undefined) fieldData.unit = fieldInfo.unit;
             if (fieldInfo.displayInNotes !== undefined) fieldData.displayInNotes = fieldInfo.displayInNotes;
+            if (fieldInfo.term) fieldData.term = fieldInfo.term;
+            if (fieldInfo.valueTerm) fieldData.valueTerm = fieldInfo.valueTerm;
+            if (fieldInfo.description) fieldData.description = fieldInfo.description;
 
             if (currentGroupObj) {
                 currentGroupObj[fieldName] = fieldData;

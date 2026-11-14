@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/user-index.schema.json",
+  "title": "MetaFold User Index Schema (v0.1)",
+  "description": "Schema for user_index.json (reconstructible local project cache).",
+  "type": "object",
+  "required": [
+    "projects"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "default": "0.1"
+    },
+    "schemaType": {
+      "type": "string",
+      "const": "metafold-user-index"
+    },
+    "version": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "customTags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "projectId": { "type": ["string", "null"] },
+          "metadata": { "type": "object" },
+          "integrations": { "type": ["object", "null"] },
+          "metadataFieldCount": { "type": "number" },
+          "created": { "type": "string" },
+          "modified": { "type": "string" },
+          "size": { "type": "number" },
+          "hasReadme": { "type": "boolean" },
+          "hasMetadata": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

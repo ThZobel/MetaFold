@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/sidecar.schema.json",
+  "title": "MetaFold File Sidecar Schema (v0.1)",
+  "description": "Schema for <File>.metafold-sidecar.json files stored in <Project>/.metafold/sidecars/.",
+  "type": "object",
+  "required": [
+    "sidecar_id",
+    "sidecar_type",
+    "generated_at",
+    "file"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "default": "0.1"
+    },
+    "schemaType": {
+      "type": "string",
+      "const": "metafold-sidecar"
+    },
+    "metafold_version": {
+      "type": "string",
+      "description": "Legacy version key retained for backward compatibility."
+    },
+    "sidecar_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sidecar_type": {
+      "type": "string",
+      "const": "file"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "generator": {
+      "type": "string"
+    },
+    "file": {
+      "type": "object",
+      "required": ["name", "path"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "relativePath": { "type": ["string", "null"] },
+        "extension": { "type": "string" },
+        "size_bytes": { "type": "number" },
+        "modified": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "nearest_project_id": {
+      "type": ["string", "null"]
+    },
+    "project_metadata": {
+      "type": "object",
+      "properties": {
+        "inherited_from": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level": { "type": "number" },
+              "folder": { "type": "string" },
+              "path": { "type": "string" },
+              "relativePath": { "type": ["string", "null"] },
+              "projectId": { "type": ["string", "null"] },
+              "metadata": { "type": "object" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "merged": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ome_metadata": {
+      "type": ["object", "null"],
+      "description": "Extracted BioFormats OME-XML metadata (Image, Pixels, Channels, Instrument)."
+    }
+  },
+  "additionalProperties": true
+}

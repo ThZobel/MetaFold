@@ -138,6 +138,12 @@ const omeroAnnotations = {
         
         Object.entries(metadata).forEach(([key, fieldInfo]) => {
             try {
+                if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' ||
+                    key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' ||
+                    key === 'metafold_integration' || key.startsWith('System.') || key.startsWith('_') ||
+                    (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
+                    return;
+                }
                 if (!fieldInfo || typeof fieldInfo !== 'object') {
                     console.warn(`🔬 Invalid field info for key: ${key}`);
                     return;
@@ -650,6 +656,12 @@ const omeroAnnotations = {
             totalFields++;
             
             try {
+                if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' ||
+                    key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' ||
+                    key === 'metafold_integration' || key.startsWith('System.') || key.startsWith('_') ||
+                    (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
+                    return;
+                }
                 if (!fieldInfo || typeof fieldInfo !== 'object') {
                     console.warn(`🔄 Invalid field info for key: ${key}`);
                     return;

@@ -1150,10 +1150,12 @@ ${project.hasNestedProjects ? '\nContains nested projects' : ''}
         console.log('📊 Preparing export data structure...');
 
         const exportData = {
+            schemaVersion: '0.1',
+            schemaType: 'metafold-scan-summary',
             exportInfo: {
                 timestamp: new Date().toISOString(),
                 exportedBy: 'MetaFold Project Scanner',
-                version: '1.1.0',
+                version: '0.1',
                 scannedPath: this.currentScannedPath,
                 totalProjects: this.projects.length
             },

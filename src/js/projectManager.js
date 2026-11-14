@@ -424,8 +424,6 @@ const projectManager = {
             }
         }
 
-        const metadataStr = JSON.stringify(experimentMetadata, null, 2);
-
         if (!window.electronAPI || !window.electronAPI.writeFile) {
             this.showError('File writing is not available in browser mode.');
             return;
@@ -454,6 +452,17 @@ const projectManager = {
             customFileName = 'ReadyToImport.json';
         }
 
+        const derivedProjectName = customFileName
+            ? customFileName.replace(/-metadata\.json$|\.json$/i, '') || 'ReadyToImport'
+            : 'BatchProject';
+        const templateRef = window.metafoldSchema
+            ? window.metafoldSchema.buildTemplateRef(template)
+            : {
+                id: template?.id || null,
+                name: template?.name || 'Unknown Template',
+                category: template?.category || null
+            };
+
         for (const targetPath of targetPaths) {
             try {
                 if (shouldOnlyCreateFolders) {
@@ -465,6 +474,24 @@ const projectManager = {
                     }
                 } else {
                     console.log(`📄 Writing metadata JSON to ${targetPath}...`);
+                    const nowIso = new Date().toISOString();
+                    const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                        ? crypto.randomUUID()
+                        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                            const r = Math.random() * 16 | 0;
+                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                        });
+                    const payload = {
+                        schemaVersion: '0.1',
+                        schemaType: 'metafold-project-metadata',
+                        metafold_project_id: uuid,
+                        projectName: derivedProjectName,
+                        created_at: nowIso,
+                        updated_at: nowIso,
+                        template: templateRef,
+                        ...experimentMetadata
+                    };
+                    const metadataStr = JSON.stringify(payload, null, 2);
                     const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
                     await window.electronAPI.writeFile(filePath, metadataStr);
                     if (window.electronAPI.upsertUserIndexProject) {
@@ -696,11 +723,19 @@ const projectManager = {
                 console.log(skipFolder ? '📄 Creating local project file (Skipping Folder)...' : '🚀 Creating local project folder...');
                 
                 const userInfo = window.userManager ? { username: window.userManager.currentUser, groupname: window.userManager.currentGroup } : null;
+                const templateRef = window.metafoldSchema
+                    ? window.metafoldSchema.buildTemplateRef(template)
+                    : {
+                        id: template ? (template.id || null) : null,
+                        name: template ? (template.name || 'Unknown Template') : 'Unknown Template',
+                        category: template ? (template.category || null) : null
+                    };
                 const options = {
                     extend: conflictResolution.extend || false,
                     skipFolder: skipFolder,
                     userInfo: userInfo,
-                    templateName: template ? template.name : 'Unknown Template'
+                    templateName: template ? template.name : 'Unknown Template',
+                    templateInfo: templateRef
                 };
 
                 const projectNameToUse = (conflictResolution.extend && conflictResolution.existingProjectName) 
@@ -885,7 +920,8 @@ const projectManager = {
                             contentHtml += '<thead><tr style="background-color: #f2f2f2;"><th>Field</th><th>Value</th></tr></thead><tbody>';
 
                             for (const [key, value] of Object.entries(experimentMetadata || {})) {
-                                if (['projectName', 'templateInfo', 'metafold_integration'].includes(key)) continue;
+                                if (['schemaVersion', 'schemaType', 'template', 'projectName', 'templateInfo', 'metafold_integration', 'metafold_project_id', 'provenance', 'created_at', 'updated_at'].includes(key)) continue;
+                                if (key.startsWith('System.') || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) continue;
                                 const displayValue = (typeof value === 'object' && value !== null && value.value !== undefined) ? value.value : value;
                                 contentHtml += `<tr><td><strong>${key}</strong></td><td>${displayValue}</td></tr>`;
                             }

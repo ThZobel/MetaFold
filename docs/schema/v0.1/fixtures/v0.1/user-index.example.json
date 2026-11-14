@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "0.1",
+  "schemaType": "metafold-user-index",
+  "version": "0.1",
+  "updatedAt": "2026-11-14T11:05:00.000Z",
+  "customTags": ["confocal", "live-imaging"],
+  "projects": [
+    {
+      "name": "2026-11-14_HeLa_DrugScreen",
+      "path": "D:/Data/2026-11-14_HeLa_DrugScreen",
+      "projectId": "9f8c2b10-4e3a-4d91-8a7c-123456789abc",
+      "metadata": {
+        "Sample_ID": {
+          "label": "Sample ID (Own ID)",
+          "type": "id_anchor",
+          "value": "HeLa-Batch-07"
+        }
+      },
+      "integrations": null,
+      "metadataFieldCount": 1,
+      "created": "2026-11-14T09:15:00.000Z",
+      "modified": "2026-11-14T10:30:00.000Z",
+      "size": 104857600,
+      "hasReadme": true,
+      "hasMetadata": true
+    }
+  ]
+}

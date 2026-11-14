@@ -16,8 +16,8 @@ window.roCrateManager = {
 
         Object.entries(metadata).forEach(([key, value]) => {
             // Skip internal keys
-            if (key.startsWith('_') || key === 'provenance' || key === 'projectName' || key === 'derived_from') return;
-            if (key.startsWith('System.')) return;
+            if (key.startsWith('_') || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'created_at' || key === 'updated_at' || key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key === 'derived_from') return;
+            if (key.startsWith('System.') || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) return;
 
             const valStr = (Array.isArray(value)) ? value.join(', ') : String(value);
 

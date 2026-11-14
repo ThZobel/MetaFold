@@ -131,7 +131,12 @@ const metaFoldOMEROIntegration = {
                     // Split metadata into flat fields and groups
                     Object.entries(metadata || {}).forEach(([key, fieldData]) => {
                         // Skip internal metadata injected by projectManager
-                        if (key === 'provenance' || key === '_metafold' || key.startsWith('_')) {
+                        if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' ||
+                            key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' ||
+                            key === 'metafold_integration' || key === 'integrations' || key === 'created_at' ||
+                            key === 'updated_at' || key === 'previous_names' || key === '_metafold' ||
+                            key.startsWith('_') || key.startsWith('System.') ||
+                            (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
                             return;
                         }
                         

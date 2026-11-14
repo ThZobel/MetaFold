@@ -558,7 +558,9 @@ const fileScanner = {
             : null;
 
         return {
-            metafold_version: '0.0.3',
+            schemaVersion: '0.1',
+            schemaType: 'metafold-sidecar',
+            metafold_version: '0.1',
             sidecar_id: this._generateUuid(),
             sidecar_type: 'file',
             generated_at: new Date().toISOString(),

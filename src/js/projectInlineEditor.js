@@ -16,6 +16,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 
     const IGNORED_SYSTEM_KEYS = new Set([
+        'schemaVersion', 'schemaType', 'template', 'created_at', 'updated_at',
         'metafold_project_id', 'projectName', 'provenance', 'templateInfo',
         'metafold_integration', 'integrations', 'System.UpdateHistory', 'System.Level',
         'System.hasReadme', 'System.TemplateCategory', 'changelog', 'notes_log',

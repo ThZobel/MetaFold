@@ -11,6 +11,7 @@ const fsSync = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const markdownLite = require('../shared/markdownLite.js');
+const metafoldSchema = require('../shared/schemaVersion.js');
 const integrationLinks = require('./integrationLinks.js');
 
 // Mutex queues per project path to serialize concurrent writes (e.g. rapid task checkbox clicks)
@@ -68,6 +69,7 @@ async function readProjectMetadataFromDisk(projectPath) {
 
     const updatedAt = rawDoc.updated_at || metadata.updated_at || null;
     const createdAt = rawDoc.created_at || metadata.created_at || null;
+    const schemaVersion = metafoldSchema.getSchemaVersion(rawDoc);
 
     return {
         projectPath,
@@ -78,7 +80,8 @@ async function readProjectMetadataFromDisk(projectPath) {
         metadata,
         projectName,
         updatedAt,
-        createdAt
+        createdAt,
+        schemaVersion
     };
 }
 
@@ -532,8 +535,11 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
         // 8. Prepare full JSON document for writing
         let fullDocument;
         if (isEnvelope) {
+            rawDoc.schemaVersion = metafoldSchema.SCHEMA_VERSION;
+            rawDoc.schemaType = metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA;
             rawDoc.extra_fields = metadata;
             rawDoc.updated_at = nowIso;
+            if (!rawDoc.created_at) rawDoc.created_at = metadata.created_at;
             if (metadata.previous_names) rawDoc.previous_names = metadata.previous_names;
             if (metadata.notes_markdown !== undefined) rawDoc.notes_markdown = metadata.notes_markdown;
             if (metadata.notes_log !== undefined) rawDoc.notes_log = metadata.notes_log;
@@ -541,6 +547,8 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
             if (metadata.changelog) rawDoc.changelog = metadata.changelog;
             fullDocument = rawDoc;
         } else {
+            metadata.schemaVersion = metafoldSchema.SCHEMA_VERSION;
+            metadata.schemaType = metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA;
             fullDocument = metadata;
         }
 

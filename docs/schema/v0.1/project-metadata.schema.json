@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/project-metadata.schema.json",
+  "title": "MetaFold Project Metadata Envelope (v0.1)",
+  "description": "Schema for <ProjectName>-metadata.json and ReadyToImport.json. Validates the fixed MetaFold envelope while allowing arbitrary self-describing user fields and nested groups.",
+  "type": "object",
+  "required": [
+    "metafold_project_id",
+    "projectName"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Version of the MetaFold JSON envelope. Files without this field are treated as '0.0' (legacy).",
+      "default": "0.1"
+    },
+    "schemaType": {
+      "type": "string",
+      "const": "metafold-project-metadata"
+    },
+    "metafold_project_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable UUID v4 uniquely identifying this project across folder moves and renames."
+    },
+    "projectName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name of the project."
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO 8601 timestamp when the project metadata was initially created."
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "ISO 8601 timestamp when the project metadata was last updated."
+    },
+    "previous_names": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Historical project names recorded on rename for silent lineage self-healing."
+    },
+    "template": {
+      "type": "object",
+      "description": "Reference to the template used to capture this project.",
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "name": { "type": "string" },
+        "category": { "type": ["string", "null"] },
+        "derivedFromTemplateId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "description": "ISA/RDM-compliant creator and group provenance block.",
+      "properties": {
+        "creator": {
+          "type": "object",
+          "required": ["username"],
+          "properties": {
+            "username": { "type": "string" },
+            "title": { "type": "string" },
+            "firstName": { "type": "string" },
+            "lastName": { "type": "string" },
+            "email": { "type": "string" },
+            "orcid": { "type": "string" },
+            "affiliation": { "type": "string" },
+            "role": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "group": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "principalInvestigator": { "type": "string" },
+            "piEmail": { "type": "string" },
+            "piOrcid": { "type": "string" },
+            "institution": { "type": "string" },
+            "department": { "type": "string" },
+            "description": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "createdAt": { "type": "string" },
+        "metafoldVersion": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "metafold_integration": {
+      "type": "object",
+      "description": "External system links and synchronization status.",
+      "properties": {
+        "created_at": { "type": "string" },
+        "local_path": { "type": "string" },
+        "external_links": {
+          "type": "object",
+          "properties": {
+            "elabftw": { "$ref": "#/$defs/externalLink" },
+            "omero": { "$ref": "#/$defs/externalLink" },
+            "rspace": { "$ref": "#/$defs/externalLink" },
+            "n8n": { "$ref": "#/$defs/externalLink" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "integrations": {
+      "type": "object",
+      "description": "Legacy/shorthand integration references.",
+      "additionalProperties": true
+    },
+    "notes_markdown": {
+      "type": "string",
+      "description": "Consolidated Markdown notes for the project."
+    },
+    "notes_log": {
+      "type": "array",
+      "description": "Structured array of timestamped project notes.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "timestamp"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string" },
+          "text": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "user": { "type": "string" },
+          "edited_at": { "type": "string" },
+          "edited_by": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "hypothesis_or_goal": {
+      "type": "string"
+    },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string" },
+          "user": { "type": "string" },
+          "action": { "type": "string" },
+          "changes": { "type": "array" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "extra_fields": {
+      "type": "object",
+      "description": "Optional eLabFTW envelope container for user fields.",
+      "additionalProperties": true
+    },
+    "elabftw": {
+      "type": "object",
+      "description": "Optional eLabFTW display configuration when using the eLabFTW envelope.",
+      "additionalProperties": true
+    },
+    "System.ProjectAbsolutePath": { "$ref": "#/$defs/systemField" },
+    "System.ProjectRelativePath": { "$ref": "#/$defs/systemField" },
+    "System.UpdateHistory": { "$ref": "#/$defs/systemField" },
+    "System.LastUpdatedBy": { "$ref": "#/$defs/systemField" },
+    "System.LastUpdatedAt": { "$ref": "#/$defs/systemField" },
+    "System.Level": { "$ref": "#/$defs/systemField" },
+    "System.TemplateCategory": { "$ref": "#/$defs/systemField" }
+  },
+  "additionalProperties": {
+    "oneOf": [
+      { "$ref": "#/$defs/userFieldObject" },
+      { "$ref": "#/$defs/fieldGroupObject" },
+      { "type": ["string", "number", "boolean", "array", "null"] }
+    ]
+  },
+  "$defs": {
+    "ontologyTerm": {
+      "type": "object",
+      "description": "Optional ontology reference for a field or value.",
+      "required": ["uri"],
+      "properties": {
+        "label": { "type": "string" },
+        "uri": { "type": "string" },
+        "ontology": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "userFieldObject": {
+      "type": "object",
+      "description": "Self-describing metadata field object.",
+      "required": ["type", "value"],
+      "properties": {
+        "label": { "type": "string" },
+        "type": { "type": "string" },
+        "value": {},
+        "unit": { "type": "string" },
+        "required": { "type": "boolean" },
+        "position": { "type": "number" },
+        "description": { "type": "string" },
+        "options": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "templateName": { "type": "string" },
+        "term": { "$ref": "#/$defs/ontologyTerm" },
+        "valueTerm": {
+          "oneOf": [
+            { "$ref": "#/$defs/ontologyTerm" },
+            { "type": "array", "items": { "$ref": "#/$defs/ontologyTerm" } }
+          ]
+        },
+        "isModified": { "type": "boolean" },
+        "lastUpdatedBy": { "type": "string" },
+        "lastUpdatedAt": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "fieldGroupObject": {
+      "type": "object",
+      "description": "Nested group of userFieldObjects (maps to an OMERO namespace).",
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/$defs/userFieldObject" },
+          { "type": ["string", "number", "boolean", "array", "null"] }
+        ]
+      }
+    },
+    "systemField": {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "label": { "type": "string" },
+        "type": { "type": "string" },
+        "value": {},
+        "position": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "externalLink": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "status": { "type": "string" },
+        "uploaded_at": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

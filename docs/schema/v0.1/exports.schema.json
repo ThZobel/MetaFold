@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/exports.schema.json",
+  "title": "MetaFold Scanner Summary, Lineage Export & ID Dictionary Schema (v0.1)",
+  "description": "Schema covering scanner summary exports, lineage exports, and autocomplete ID dictionaries.",
+  "oneOf": [
+    {
+      "title": "ID Dictionary Array (Legacy or Direct Array)",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    {
+      "title": "Envelope Export Object (Summary, Lineage, or ID Dictionary v0.1)",
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "type": "string", "default": "0.1" },
+        "schemaType": {
+          "type": "string",
+          "enum": [
+            "metafold-scan-summary",
+            "metafold-lineage-export",
+            "metafold-visualization-export",
+            "metafold-id-dictionary"
+          ]
+        },
+        "exportInfo": { "type": "object" },
+        "overview": { "type": "object" },
+        "projects": { "type": "array" },
+        "entries": { "type": "array" }
+      },
+      "additionalProperties": true
+    }
+  ]
+}

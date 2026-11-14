@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/template.schema.json",
+  "title": "MetaFold Template Schema (v0.1)",
+  "description": "Schema for MetaFold template JSON files stored in ~/MetaFold/Templates/.",
+  "type": "object",
+  "required": [
+    "name",
+    "type"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "default": "0.1"
+    },
+    "schemaType": {
+      "type": "string",
+      "const": "metafold-template"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier of the template."
+    },
+    "derivedFromTemplateId": {
+      "type": ["string", "null"],
+      "description": "If this template was duplicated from another template, stores the source template ID."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": ["experiment", "folders"]
+    },
+    "category": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "structure": {
+      "type": ["string", "array"]
+    },
+    "folderStructure": {
+      "type": ["string", "array"]
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "writeFilesOnly": { "type": "boolean" },
+        "multipleFolders": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string" },
+              "label": { "type": "string" },
+              "value": {},
+              "defaultValue": {},
+              "unit": { "type": "string" },
+              "required": { "type": "boolean" },
+              "description": { "type": "string" },
+              "options": { "type": ["array", "null"] },
+              "term": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string" },
+                  "uri": { "type": "string" },
+                  "ontology": { "type": "string" }
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "fieldOrder": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "community": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "createdBy": { "type": "string" },
+    "createdByGroup": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "_fileInfo": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

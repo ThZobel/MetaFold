@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "0.1",
+  "schemaType": "metafold-template",
+  "id": "template_confocal_01",
+  "derivedFromTemplateId": null,
+  "name": "Confocal Microscopy",
+  "type": "experiment",
+  "category": "category1",
+  "description": "Standard template for confocal fluorescence microscopy sessions.",
+  "structure": "01_Raw_Data/\n02_Processed/\n03_Analysis/",
+  "metadata": {
+    "fields": {
+      "Sample_ID": {
+        "type": "id_anchor",
+        "label": "Sample ID (Own ID)",
+        "required": true
+      },
+      "group_Microscopy": {
+        "type": "group",
+        "label": "Microscopy"
+      },
+      "Excitation_Wavelength": {
+        "type": "number",
+        "label": "Excitation Wavelength",
+        "unit": "nm",
+        "defaultValue": 488,
+        "required": true,
+        "term": {
+          "label": "excitation wavelength",
+          "uri": "http://purl.obolibrary.org/obo/OBI_0000001",
+          "ontology": "OBI"
+        }
+      }
+    },
+    "fieldOrder": [
+      "Sample_ID",
+      "group_Microscopy",
+      "Excitation_Wavelength"
+    ]
+  },
+  "createdBy": "tzobel",
+  "createdByGroup": "BioImaging Facility",
+  "createdAt": "2026-11-14T08:00:00.000Z",
+  "updatedAt": "2026-11-14T08:00:00.000Z"
+}

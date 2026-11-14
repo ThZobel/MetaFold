@@ -145,7 +145,9 @@ const profileManager = {
 
             const groupsPath = this._dataDir + sep + 'groups.json';
             const groupsContent = JSON.stringify({ 
-                version: '1.0',
+                schemaVersion: '0.1',
+                schemaType: 'metafold-groups',
+                version: '0.1',
                 exportedAt: new Date().toISOString(),
                 groups: this.groups 
             }, null, 2);
@@ -157,7 +159,9 @@ const profileManager = {
 
             const usersPath = this._dataDir + sep + 'users.json';
             const usersContent = JSON.stringify({ 
-                version: '1.0',
+                schemaVersion: '0.1',
+                schemaType: 'metafold-users',
+                version: '0.1',
                 exportedAt: new Date().toISOString(),
                 users: this.users 
             }, null, 2);
@@ -567,7 +571,7 @@ const profileManager = {
             },
             group: {},
             createdAt: new Date().toISOString(),
-            metafoldVersion: '1.0.0'
+            metafoldVersion: '0.1'
         };
 
         if (user) {

@@ -268,10 +268,10 @@ const facetSearch = {
     // and `Mode` unify into a single consistent key across different template versions.
     flattenObject(obj, prefix = '') {
         let flattened = {};
-        const ignoredKeys = ['metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration', 'System.UpdateHistory', 'changelog', 'notes_log', 'previous_names'];
+        const ignoredKeys = ['schemaVersion', 'schemaType', 'template', 'metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration', 'System.UpdateHistory', 'changelog', 'notes_log', 'previous_names', 'created_at', 'updated_at'];
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                if (ignoredKeys.includes(key)) continue;
+                if (ignoredKeys.includes(key) || ( !prefix && window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key) && key !== 'notes_markdown' && key !== 'hypothesis_or_goal' )) continue;
                 const newKey = prefix ? `${prefix}.${key}` : key;
                 const value = obj[key];
 
@@ -362,7 +362,7 @@ const facetSearch = {
 
     // Extract metadata types for the Manage Filter Keys modal
     _extractTypes(obj) {
-        const ignoredKeys = ['metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration'];
+        const ignoredKeys = ['schemaVersion', 'schemaType', 'template', 'metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration', 'created_at', 'updated_at'];
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 if (ignoredKeys.includes(key)) continue;

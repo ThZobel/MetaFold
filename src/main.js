@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const zlib = require('zlib');
 const OMEROProxyServer = require('./js/proxyManager.js');
+const metafoldSchema = require('./js/shared/schemaVersion.js');
 
 let mainWindow;
 
@@ -691,6 +692,8 @@ function cleanTemplateForFileStorage(template) {
 
     // Ensure essential fields exist
     return {
+        schemaVersion: metafoldSchema.SCHEMA_VERSION,
+        schemaType: metafoldSchema.SCHEMA_TYPES.TEMPLATE,
         ...clean,
         id: clean.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: clean.name || 'Unnamed Template',
@@ -975,8 +978,20 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
         if (metadata && Object.keys(metadata).length > 0) {
             let metadataFilename = `${projectName}-metadata.json`;
             let metadataPath = path.join(projectPath, metadataFilename);
-            
-            let enhancedMetadata = { ...metadata, projectName: projectName };
+            const nowIso = new Date().toISOString();
+            const templateRef = options.templateInfo
+                ? metafoldSchema.buildTemplateRef(options.templateInfo, options.templateName)
+                : (options.templateName ? metafoldSchema.buildTemplateRef(null, options.templateName) : null);
+
+            let enhancedMetadata = {
+                schemaVersion: metafoldSchema.SCHEMA_VERSION,
+                schemaType: metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA,
+                ...metadata,
+                projectName: projectName,
+                created_at: metadata.created_at || nowIso,
+                updated_at: nowIso,
+                ...(templateRef ? { template: templateRef } : {})
+            };
             let isExtending = false;
 
             if (options.extend) {
@@ -1088,7 +1103,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
                     // Merge all incoming enhancedMetadata keys
                     Object.keys(enhancedMetadata).forEach(key => {
-                        if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key.startsWith('System.')) return;
+                        if (metafoldSchema.isReservedProjectKey(key)) return;
 
                         const newField = enhancedMetadata[key];
 
@@ -1107,8 +1122,15 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     });
 
                     // Keep system keys updated
+                    mergedMetadata.schemaVersion = metafoldSchema.SCHEMA_VERSION;
+                    mergedMetadata.schemaType = metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA;
                     if (enhancedMetadata.provenance) mergedMetadata.provenance = enhancedMetadata.provenance;
                     if (enhancedMetadata.projectName) mergedMetadata.projectName = enhancedMetadata.projectName;
+                    mergedMetadata.created_at = existingMetadata.created_at || enhancedMetadata.created_at || nowIso;
+                    mergedMetadata.updated_at = nowIso;
+                    if (enhancedMetadata.template && !existingMetadata.template) {
+                        mergedMetadata.template = enhancedMetadata.template;
+                    }
 
                     enhancedMetadata = mergedMetadata;
                     // Preserve original project ID if it exists
@@ -1170,7 +1192,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     return;
                 }
                 // Keep special internal fields
-                if (key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
+                if (metafoldSchema.isReservedProjectKey(key)) {
                     return;
                 }
                 const field = enhancedMetadata[key];
@@ -1827,7 +1849,7 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
             source: 'file',
             directory: templatesDir,
             stable: true,
-            version: '2.0',
+            version: metafoldSchema.SCHEMA_VERSION,
             isUpdate: isUpdate // Track whether this was an update or new file
         };
 
@@ -1996,6 +2018,7 @@ ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
 
                 // _fileInfo hinzufügen/aktualisieren
                 const stats = await fs.stat(filePath);
+                template.schemaVersion = template.schemaVersion || metafoldSchema.LEGACY_SCHEMA_VERSION;
                 template._fileInfo = {
                     ...(template._fileInfo || {}),
                     filename: file,
@@ -2005,7 +2028,7 @@ ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
                     source: 'file',
                     directory: templatesDir,
                     stable: isStableFilename(file),
-                    version: '2.0' // Version for tracking improvements
+                    version: metafoldSchema.SCHEMA_VERSION // Version for tracking improvements
                 };
 
                 // ENTFERNE NUR ÜBERFLÜSSIGE FELDER - metadata.fields bleibt unverändert!
@@ -2257,7 +2280,13 @@ ipcMain.handle('clear-user-index', async (event, userInfo = null) => {
     try {
         const templatesDir = await ensureTemplatesDirectory(userInfo);
         const indexPath = path.join(templatesDir, 'user_index.json');
-        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: [] }, null, 2), 'utf8');
+        await fs.writeFile(indexPath, JSON.stringify({
+            schemaVersion: metafoldSchema.SCHEMA_VERSION,
+            schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
+            version: metafoldSchema.SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            projects: []
+        }, null, 2), 'utf8');
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -2284,7 +2313,13 @@ ipcMain.handle('merge-projects-into-user-index', async (event, newProjects, base
         }
 
         const merged = Array.from(pathMap.values());
-        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: merged }, null, 2), 'utf8');
+        await fs.writeFile(indexPath, JSON.stringify({
+            schemaVersion: metafoldSchema.SCHEMA_VERSION,
+            schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
+            version: metafoldSchema.SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            projects: merged
+        }, null, 2), 'utf8');
         return { success: true, count: merged.length };
     } catch (error) {
         return { success: false, error: error.message };
@@ -2300,7 +2335,13 @@ ipcMain.handle('remove-from-user-index', async (event, projectPath, userInfo = n
         let projects = Array.isArray(data) ? data : (data.projects || []);
         const targetResolved = path.resolve(projectPath).toLowerCase();
         projects = projects.filter(p => path.resolve(p.path).toLowerCase() !== targetResolved);
-        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects }, null, 2), 'utf8');
+        await fs.writeFile(indexPath, JSON.stringify({
+            schemaVersion: metafoldSchema.SCHEMA_VERSION,
+            schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
+            version: metafoldSchema.SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            projects
+        }, null, 2), 'utf8');
         return { success: true, count: projects.length };
     } catch (error) {
         return { success: false, error: error.message };
@@ -2340,7 +2381,13 @@ async function upsertSingleProjectInUserIndex(projectPath, basePath = null, user
         pathMap.set(path.resolve(project.path).toLowerCase(), project);
 
         const merged = Array.from(pathMap.values());
-        await fs.writeFile(indexPath, JSON.stringify({ version: '1.0', updatedAt: new Date().toISOString(), projects: merged }, null, 2), 'utf8');
+        await fs.writeFile(indexPath, JSON.stringify({
+            schemaVersion: metafoldSchema.SCHEMA_VERSION,
+            schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
+            version: metafoldSchema.SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            projects: merged
+        }, null, 2), 'utf8');
         return { success: true, project };
     } catch (err) {
         console.warn('⚠️ upsertSingleProjectInUserIndex error:', err.message);
@@ -2405,7 +2452,11 @@ ipcMain.handle('export-templates-to-location', async (event, templates, exportTy
         });
 
         if (!result.canceled && result.filePath) {
-            const dataToExport = exportType === 'bulk' ? { templates, exportDate: new Date().toISOString() } : templates;
+            const dataToExport = exportType === 'bulk'
+                ? { schemaVersion: metafoldSchema.SCHEMA_VERSION, schemaType: metafoldSchema.SCHEMA_TYPES.TEMPLATE, templates, exportDate: new Date().toISOString() }
+                : (templates && typeof templates === 'object' && !Array.isArray(templates)
+                    ? { schemaVersion: metafoldSchema.SCHEMA_VERSION, schemaType: metafoldSchema.SCHEMA_TYPES.TEMPLATE, ...templates }
+                    : templates);
             await fs.writeFile(result.filePath, JSON.stringify(dataToExport, null, 2), 'utf8');
 
             console.log(`✅ Template exported successfully to: ${result.filePath}`);
@@ -2668,7 +2719,9 @@ ipcMain.handle('bulk-export-templates', async (event, templates, options = {}) =
 
         if (!result.canceled && result.filePath) {
             const exportData = {
-                version: '1.0',
+                schemaVersion: metafoldSchema.SCHEMA_VERSION,
+                schemaType: metafoldSchema.SCHEMA_TYPES.TEMPLATE,
+                version: metafoldSchema.SCHEMA_VERSION,
                 exportDate: new Date().toISOString(),
                 templateCount: templates.length,
                 templates: templates,
@@ -3136,7 +3189,7 @@ function extractIdValues(obj, result = []) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     for (const [key, val] of Object.entries(obj || {})) {
         const lowerKey = key.toLowerCase();
-        if (lowerKey === 'metafold_project_id') continue;
+        if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
         const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
         const isProjectName = lowerKey === 'projectname';
         
@@ -3382,7 +3435,7 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, o
                 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                 for (const [key, val] of Object.entries(obj || {})) {
                     const lowerKey = key.toLowerCase();
-                    if (lowerKey === 'metafold_project_id') continue;
+                    if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
                     
                     const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
                     
@@ -4741,7 +4794,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
         Object.entries(metadata).forEach(([key, fieldInfo]) => {
             // Skip special internal fields from being rendered as normal fields
-            if (key === 'community' || key === 'provenance' || key === 'projectName' || key === 'metafold_project_id' || key === 'metafold_integration' || key.startsWith('System.')) {
+            if (metafoldSchema.isReservedProjectKey(key)) {
                 return;
             }
             if (fieldInfo && typeof fieldInfo === 'object') {
@@ -5130,10 +5183,16 @@ async function createMetadataFiles(projectPath, metadata, projectName = null) {
     // 1. <Project Name>-metadata.json (elabFTW-compatible format)
     const metadataFilename = `${sanitizedProjectName}-metadata.json`;
     const metadataPath = path.join(projectPath, metadataFilename);
+    const nowIso = new Date().toISOString();
     const metadataContent = convertToElabFTWFormat(metadata);
+    metadataContent.schemaVersion = metafoldSchema.SCHEMA_VERSION;
+    metadataContent.schemaType = metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA;
     // Same provenance UUID as the primary create-project path, added as a
     // sibling of extra_fields (see parseMetaFoldProject's lookup for this format).
     metadataContent.metafold_project_id = require('crypto').randomUUID();
+    metadataContent.projectName = sanitizedProjectName;
+    metadataContent.created_at = nowIso;
+    metadataContent.updated_at = nowIso;
 
     await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2), 'utf8');
     console.log(`📄 Metadata file created: ${metadataPath}`);
@@ -5304,7 +5363,7 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
 
     let hasMetadata = false;
     Object.entries(metadata).forEach(([key, fieldInfo]) => {
-        if (key === 'community' || key === 'provenance' || key === 'projectName' || key.startsWith('_')) {
+        if (metafoldSchema.isReservedProjectKey(key)) {
             return;
         }
         if (fieldInfo.type !== 'group') {
@@ -5460,7 +5519,13 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || metadata.metafold_integration?.external_links || metadata.integrations || null;
         
         // Extract template category before deletion (for ISA / facet search)
-        const templateCategory = cleanMetadata.templateInfo?.category || metadata.templateInfo?.category || null;
+        const templateCategory =
+            cleanMetadata.template?.category ||
+            metadata.template?.category ||
+            cleanMetadata.templateInfo?.category ||
+            metadata.templateInfo?.category ||
+            null;
+        const schemaVersion = metafoldSchema.getSchemaVersion(metadata);
 
         // Extract stable project UUID before deletion (provenance anchor for the
         // File Sidecar Scanner; may be null for projects created before this field
@@ -5470,7 +5535,10 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         // where the ID sits as a sibling of extra_fields, not inside it.
         const projectId = cleanMetadata.metafold_project_id || metadata.metafold_project_id || null;
         
+        delete cleanMetadata.schemaVersion;
+        delete cleanMetadata.schemaType;
         delete cleanMetadata.projectName;
+        delete cleanMetadata.template;
         delete cleanMetadata.templateInfo;
         delete cleanMetadata.metafold_integration;
         delete cleanMetadata.integrations;
@@ -5489,6 +5557,7 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         return {
             name: projectName,
             path: projectPath,
+            schemaVersion: schemaVersion,
             projectId: projectId,  // NEW: stable UUID, null for legacy projects without one
             metadata: cleanMetadata,
             integrations: integrations,

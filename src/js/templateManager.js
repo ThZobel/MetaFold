@@ -970,6 +970,10 @@ const templateManager = {
 
             const copiedTemplate = {
                 ...template,
+                schemaVersion: '0.1',
+                schemaType: 'metafold-template',
+                id: 'template_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                derivedFromTemplateId: template.id || null,
                 name: `${template.name} (Copy)`,
                 description: `${template.description || ''} (Copied from ${template.createdBy})`.trim(),
                 createdBy: window.userManager?.currentUser || 'Unknown',

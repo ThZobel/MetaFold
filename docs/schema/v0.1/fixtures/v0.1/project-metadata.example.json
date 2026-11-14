@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "0.1",
+  "schemaType": "metafold-project-metadata",
+  "metafold_project_id": "9f8c2b10-4e3a-4d91-8a7c-123456789abc",
+  "projectName": "2026-11-14_HeLa_DrugScreen",
+  "created_at": "2026-11-14T09:15:00.000Z",
+  "updated_at": "2026-11-14T10:30:00.000Z",
+  "template": {
+    "id": "template_confocal_01",
+    "name": "Confocal Microscopy",
+    "category": "category1"
+  },
+  "provenance": {
+    "creator": {
+      "username": "tzobel",
+      "firstName": "Thomas",
+      "lastName": "Zobel",
+      "orcid": "0000-0002-1825-0097",
+      "affiliation": "University of Münster"
+    },
+    "group": {
+      "name": "BioImaging Facility",
+      "institution": "University of Münster"
+    },
+    "createdAt": "2026-11-14T09:15:00.000Z",
+    "metafoldVersion": "0.1"
+  },
+  "Sample_ID": {
+    "label": "Sample ID (Own ID)",
+    "type": "id_anchor",
+    "value": "HeLa-Batch-07",
+    "required": true,
+    "position": 1
+  },
+  "derived_from": {
+    "label": "Derived From",
+    "type": "derived_from",
+    "value": [
+      {
+        "id": "3a1b4c5d-0000-4000-8000-000000000001",
+        "name": "2026-11-10_HeLa_Passage12",
+        "anchor": "HeLa-P12"
+      }
+    ],
+    "position": 2
+  },
+  "Microscopy": {
+    "Excitation_Wavelength": {
+      "label": "Excitation Wavelength",
+      "type": "number",
+      "value": 488,
+      "unit": "nm",
+      "required": true,
+      "position": 3,
+      "term": {
+        "label": "excitation wavelength",
+        "uri": "http://purl.obolibrary.org/obo/OBI_0000001",
+        "ontology": "OBI"
+      }
+    },
+    "Quality_Rating": {
+      "label": "Image Quality",
+      "type": "rating",
+      "value": 5,
+      "position": 4
+    }
+  },
+  "notes_markdown": "### 2026-11-14 10:30\nCells showed strong membrane signal after 30 min incubation with [[2026-11-10_HeLa_Passage12]]. #confocal #live-imaging",
+  "notes_log": [
+    {
+      "id": "note_1731580200_a1b2c3d4",
+      "category": "observation",
+      "text": "Cells showed strong membrane signal after 30 min incubation with [[2026-11-10_HeLa_Passage12]]. #confocal #live-imaging",
+      "timestamp": "2026-11-14T10:30:00.000Z",
+      "user": "tzobel"
+    }
+  ],
+  "metafold_integration": {
+    "created_at": "2026-11-14T09:16:00.000Z",
+    "local_path": "D:/Data/2026-11-14_HeLa_DrugScreen",
+    "external_links": {
+      "omero": {
+        "url": "https://omero.example.org/webclient/?show=dataset-421",
+        "dataset_id": "421",
+        "object_type": "dataset",
+        "group_name": "BioImaging",
+        "uploaded_at": "2026-11-14T09:16:05.000Z",
+        "status": "uploaded"
+      }
+    }
+  },
+  "System.ProjectAbsolutePath": {
+    "label": "Project Absolute Path",
+    "type": "text",
+    "value": "D:/Data/2026-11-14_HeLa_DrugScreen",
+    "position": 900
+  },
+  "System.ProjectRelativePath": {
+    "label": "Project Relative Path",
+    "type": "text",
+    "value": "2026-11-14_HeLa_DrugScreen",
+    "position": 901
+  }
+}

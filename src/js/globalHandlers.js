@@ -2103,7 +2103,7 @@ window.showProjectMetadataInSidebar = function(projectPath) {
         html += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
         
         const renderMetadataField = (key, field) => {
-            if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level'].includes(key)) return '';
+            if (['schemaVersion', 'schemaType', 'template', 'templateInfo', 'created_at', 'updated_at', 'metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level'].includes(key) || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) return '';
 
             // If field is an object but doesn't have 'value' and 'type', it's likely a nested category
             if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {

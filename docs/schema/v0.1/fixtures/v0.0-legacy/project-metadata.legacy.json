@@ -1,0 +1,27 @@
+{
+  "metafold_project_id": "11111111-2222-4333-8444-555555555555",
+  "projectName": "2025-10-01_Legacy_Experiment",
+  "provenance": {
+    "creator": {
+      "username": "Admin"
+    },
+    "group": {
+      "name": "Default"
+    },
+    "createdAt": "2025-10-01T12:00:00.000Z",
+    "metafoldVersion": "1.0.0"
+  },
+  "Organism": {
+    "label": "Organism",
+    "type": "dropdown",
+    "value": "Mouse",
+    "options": ["Mouse", "Human", "Zebrafish"],
+    "position": 1
+  },
+  "System.ProjectAbsolutePath": {
+    "label": "Project Absolute Path",
+    "type": "text",
+    "value": "C:/Projects/2025-10-01_Legacy_Experiment",
+    "position": 900
+  }
+}

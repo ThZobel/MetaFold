@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metafold.org/schema/v0.1/profiles.schema.json",
+  "title": "MetaFold RDM User & Group Profiles Schema (v0.1)",
+  "description": "Schema for users.json and groups.json managed by profileManager.js.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "default": "0.1"
+    },
+    "schemaType": {
+      "type": "string",
+      "enum": ["metafold-users", "metafold-groups"]
+    },
+    "version": {
+      "type": "string"
+    },
+    "exportedAt": {
+      "type": "string"
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "username"],
+        "properties": {
+          "id": { "type": "string" },
+          "username": { "type": "string" },
+          "title": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "email": { "type": "string" },
+          "orcid": { "type": "string" },
+          "affiliation": { "type": "string" },
+          "role": { "type": "string" },
+          "groupIds": { "type": "array", "items": { "type": "string" } },
+          "primaryGroupId": { "type": ["string", "null"] },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "principalInvestigator": { "type": "string" },
+          "email": { "type": "string" },
+          "piEmail": { "type": "string" },
+          "piOrcid": { "type": "string" },
+          "institution": { "type": "string" },
+          "department": { "type": "string" },
+          "description": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
