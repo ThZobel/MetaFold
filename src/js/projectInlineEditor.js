@@ -313,7 +313,8 @@
                 inputHtml = `
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <span style="background: rgba(245,158,11,0.18); border: 1px solid rgba(245,158,11,0.4); color: #fbbf24; border-radius: 4px; padding: 4px 7px; font-size: 0.78rem; font-weight: 600; white-space: nowrap;">⚓ ID</span>
-                        <input type="text" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="id_anchor" value="${value !== null && value !== undefined ? esc(value) : ''}" placeholder="e.g. SAMPLE-001, EXP-2026-X" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <input type="text" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="id_anchor" value="${value !== null && value !== undefined ? esc(value) : ''}" placeholder="e.g. SAMPLE-001, EXP-2026-X" onkeydown="if(event.key==='Enter'){event.preventDefault();}" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="id_anchor" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen (Handscanner funktioniert direkt im Feld)" style="padding: 4px 8px; font-size: 0.78rem; color: #c4b5fd; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.38); border-radius: 4px; cursor: pointer; flex-shrink: 0;">📷</button>
                     </div>
                     <div style="font-size: 0.68rem; color: #fbbf24; margin-top: 3px; font-style: italic;">
                         🔑 Own / Internal ID indexed in User Index for lineage and "Derived From" tracking.
@@ -339,16 +340,32 @@
                     <textarea class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="textarea" rows="3" style="width: 100%; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; resize: vertical;">${esc(value || '')}</textarea>
                 `;
             } else if (type === 'number') {
+                const hasMin = field && field.min !== undefined && field.min !== null && field.min !== '' && !isNaN(Number(field.min));
+                const hasMax = field && field.max !== undefined && field.max !== null && field.max !== '' && !isNaN(Number(field.max));
+                const minAttr = hasMin ? `min="${esc(field.min)}"` : '';
+                const maxAttr = hasMax ? `max="${esc(field.max)}"` : '';
+                const rangeHint = (hasMin && hasMax)
+                    ? `Min: ${field.min} · Max: ${field.max}`
+                    : (hasMin ? `Min: ${field.min}` : (hasMax ? `Max: ${field.max}` : ''));
                 inputHtml = `
                     <div style="display: flex; gap: 6px; align-items: center;">
-                        <input type="number" step="any" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="number" value="${value !== null && value !== undefined ? esc(value) : ''}" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <input type="number" step="any" ${minAttr} ${maxAttr} class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="number" value="${value !== null && value !== undefined ? esc(value) : ''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="if(this.value!==''){const n=Number(this.value),mn=this.getAttribute('min'),mx=this.getAttribute('max');let c=n;if(!isNaN(n)){if(mn!==null&&mn!==''&&c<Number(mn))c=Number(mn);if(mx!==null&&mx!==''&&c>Number(mx))c=Number(mx);if(c!==n){this.value=String(c);this.dispatchEvent(new Event('input',{bubbles:true}));}}}" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
                         ${unit ? `<span style="font-size: 0.78rem; color: #9ca3af; white-space: nowrap;">${esc(unit)}</span>` : ''}
+                        <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="number" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen (Handscanner funktioniert direkt im Feld)" style="padding: 4px 8px; font-size: 0.78rem; color: #c4b5fd; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.38); border-radius: 4px; cursor: pointer; flex-shrink: 0;">📷</button>
+                    </div>
+                    ${rangeHint ? `<div style="font-size: 0.68rem; color: #9ca3af; margin-top: 2px;">${esc(rangeHint)}</div>` : ''}
+                `;
+            } else if (type === 'date' || type === 'time') {
+                inputHtml = `<input type="${esc(type)}" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="${esc(type)}" value="${value !== null && value !== undefined ? esc(value) : ''}" onclick="try { if (typeof this.showPicker === 'function') this.showPicker(); } catch (_) {}" style="width: 100%; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; cursor: pointer;">`;
+            } else if (type === 'email') {
+                inputHtml = `<input type="email" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="email" value="${value !== null && value !== undefined ? esc(value) : ''}" style="width: 100%; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">`;
+            } else {
+                inputHtml = `
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <input type="text" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="${esc(type)}" value="${value !== null && value !== undefined ? esc(value) : ''}" onkeydown="if(event.key==='Enter'){event.preventDefault();}" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="text" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen (Handscanner funktioniert direkt im Feld)" style="padding: 4px 8px; font-size: 0.78rem; color: #c4b5fd; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.38); border-radius: 4px; cursor: pointer; flex-shrink: 0;">📷</button>
                     </div>
                 `;
-            } else if (type === 'date' || type === 'time' || type === 'email') {
-                inputHtml = `<input type="${esc(type)}" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="${esc(type)}" value="${value !== null && value !== undefined ? esc(value) : ''}" style="width: 100%; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">`;
-            } else {
-                inputHtml = `<input type="text" class="form-control mf-editor-input" data-field-path="${esc(pathStr)}" data-field-type="${esc(type)}" value="${value !== null && value !== undefined ? esc(value) : ''}" style="width: 100%; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">`;
             }
 
             return `
@@ -358,6 +375,11 @@
                             ${esc(label)} ${unit ? `<span style="color:#c4b5fd;">(${esc(unit)})</span>` : ''}
                         </div>
                         <div style="display: flex; gap: 4px; align-items: center;">
+                            ${type === 'notes' || type === 'markdown' || type === 'textarea' ? `
+                                <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="${type === 'textarea' ? 'textarea' : 'notes'}" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen" style="padding: 0 6px; font-size: 0.68rem; line-height: 1.3; color: #c4b5fd;">
+                                    📷
+                                </button>
+                            ` : ''}
                             ${type === 'notes' || type === 'markdown' ? `
                                 <button type="button" class="btn btn-secondary btn-sm mf-editor-preview-btn" style="padding: 0 6px; font-size: 0.68rem; line-height: 1.3; color: #c4b5fd;" title="Toggle Preview">
                                     👁️ Preview
@@ -412,7 +434,20 @@
 
                 let linkedProj = null;
                 if (isLink) {
-                    linkedProj = masterData.find(p => p.name === rawId || p.path === rawId || (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(rawId)));
+                    const rawLower = rawId.toLowerCase();
+                    linkedProj = (typeof window !== 'undefined' && window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function')
+                        ? window.facetSearch._resolveProjectByRef(rawId)
+                        : null;
+                    if (!linkedProj) {
+                        linkedProj = masterData.find(p =>
+                            p.name === rawId ||
+                            p.path === rawId ||
+                            (p.metafold_project_id && String(p.metafold_project_id).toLowerCase() === rawLower) ||
+                            (p.projectId && String(p.projectId).toLowerCase() === rawLower) ||
+                            (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).toLowerCase() === rawLower) ||
+                            (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.some(id => String(id).toLowerCase() === rawLower))
+                        );
+                    }
                 }
 
                 if (isDerived) {
@@ -421,7 +456,8 @@
                         <span class="mf-pill-item mf-pill-derived" data-field-path="${esc(pathStr)}" data-item-id="${esc(rawId)}" style="display:inline-flex; align-items:center; gap:5px; background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd; border-radius:14px; padding:2px 8px; font-size:0.75rem;">
                             <span>${linkedProj ? '📁' : '⚓'} <strong>${esc(linkedProj ? linkedProj.name : title)}</strong></span>
                             ${linkedProj ? `<a href="#" class="mf-pill-open-link" data-project-path="${esc(safePath)}" title="Open / inspect linked project: ${esc(linkedProj.name)}" style="color:#60a5fa; text-decoration:none; font-size:0.78rem; font-weight:bold; margin-left:2px;">↗</a>` : ''}
-                            <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:3px; line-height:1;" title="Remove link">×</span>
+                            <button type="button" class="mf-pill-switch-relation-btn" data-target-mode="related_to" title="Switch to Related To (Associative Link)" style="background:none; border:none; color:#7dd3fc; cursor:pointer; padding:0 2px; font-size:0.75rem; line-height:1; opacity:0.9;">🔀</button>
+                            <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:2px; line-height:1;" title="Remove link">×</span>
                         </span>
                     `;
                 } else if (isRelated) {
@@ -430,7 +466,8 @@
                         <span class="mf-pill-item mf-pill-related" data-field-path="${esc(pathStr)}" data-item-id="${esc(rawId)}" style="display:inline-flex; align-items:center; gap:5px; background:rgba(56,189,248,0.2); border:1px solid rgba(56,189,248,0.45); color:#7dd3fc; border-radius:14px; padding:2px 8px; font-size:0.75rem;">
                             <span>${linkedProj ? '📁' : '🔀'} <strong>${esc(linkedProj ? linkedProj.name : title)}</strong></span>
                             ${linkedProj ? `<a href="#" class="mf-pill-open-link" data-project-path="${esc(safePath)}" title="Open / inspect linked project: ${esc(linkedProj.name)}" style="color:#38bdf8; text-decoration:none; font-size:0.78rem; font-weight:bold; margin-left:2px;">↗</a>` : ''}
-                            <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:3px; line-height:1;" title="Remove link">×</span>
+                            <button type="button" class="mf-pill-switch-relation-btn" data-target-mode="derived_from" title="Switch to Derived From (Parent Lineage)" style="background:none; border:none; color:#c4b5fd; cursor:pointer; padding:0 2px; font-size:0.75rem; line-height:1; opacity:0.9;">⬆️</button>
+                            <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:2px; line-height:1;" title="Remove link">×</span>
                         </span>
                     `;
                 } else {
@@ -478,15 +515,24 @@
                             <button type="button" class="btn btn-secondary btn-sm mf-editor-add-pill-btn" data-field-path="${esc(pathStr)}" style="padding:3px 10px; font-size:0.75rem; white-space:nowrap; color:#2dd4bf; border:1px solid rgba(13,148,136,0.4); background:rgba(13,148,136,0.15); border-radius:4px; cursor:pointer;" title="Add tag">
                                 ➕ Add
                             </button>`}
+                            <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="${esc(mode)}" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen (Handscanner funktioniert direkt im Feld)" style="padding: 3px 8px; font-size: 0.75rem; color: #c4b5fd; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.38); border-radius: 4px; cursor: pointer; flex-shrink: 0;">📷</button>
                             <div class="mf-autocomplete-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:1000; max-height:180px; overflow-y:auto; background:#1e1e2e; border:1px solid rgba(139,92,246,0.4); border-radius:5px; box-shadow:0 4px 14px rgba(0,0,0,0.6);"></div>
                         </div>
                     </div>
 
-                    ${isLink ? `
+                    ${isDerived ? `
+                        <div style="font-size: 0.68rem; color: #c4b5fd; margin-top: 3px; font-style: italic; line-height: 1.35;">
+                            ⬆️ <strong>Causal Parent (Lineage Tree):</strong> Strictly for parent experiments/samples this project was derived from. Use 🔀 on any link to move it to Related To.
+                        </div>
+                    ` : (isRelated ? `
+                        <div style="font-size: 0.68rem; color: #7dd3fc; margin-top: 3px; font-style: italic; line-height: 1.35;">
+                            🔀 <strong>Associative Link (incl. [[Project]] links from notes):</strong> General relation without parent-child hierarchy. Use ⬆️ on any link to promote it to Derived From.
+                        </div>
+                    ` : (isLink ? `
                         <div style="font-size: 0.68rem; color: #fbbf24; margin-top: 3px; font-style: italic;">
                             ⚠️ Changing IDs or links affects lineage graph connections.
                         </div>
-                    ` : ''}
+                    ` : ''))}
                 </div>
             `;
         }
@@ -508,7 +554,8 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 6px; align-items: center;">
-                        <input type="url" class="form-control mf-editor-input mf-editor-url-input" data-field-path="${esc(pathStr)}" data-field-type="url" value="${esc(currentVal)}" placeholder="https://..." style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <input type="url" class="form-control mf-editor-input mf-editor-url-input" data-field-path="${esc(pathStr)}" data-field-type="url" value="${esc(currentVal)}" placeholder="https://..." onkeydown="if(event.key==='Enter'){event.preventDefault();}" style="flex: 1; padding: 5px 8px; font-size: 0.84rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                        <button type="button" class="btn btn-secondary btn-sm mf-editor-scan-btn" data-field-path="${esc(pathStr)}" data-scan-mode="url" data-field-label="${esc(label)}" title="QR-/Barcode oder DataMatrix per Kamera scannen" style="padding: 4px 8px; font-size: 0.76rem; color: #c4b5fd; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.38); border-radius: 4px; cursor: pointer; flex-shrink: 0;">📷</button>
                         <button type="button" class="btn btn-secondary btn-sm mf-editor-open-url-btn" data-field-path="${esc(pathStr)}" style="padding: 4px 9px; font-size: 0.76rem; color: #34d399; white-space: nowrap; ${hasUrl ? '' : 'display:none;'}" title="Open link in default browser">
                             ↗ Open
                         </button>
@@ -541,12 +588,28 @@
             const masterData = (typeof window !== 'undefined' && window.facetSearch && Array.isArray(window.facetSearch.masterData)) ? window.facetSearch.masterData : [];
             let linkedProj = null;
             if (isLink) {
-                linkedProj = masterData.find(p => p.name === cleanId || p.path === cleanId || (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(cleanId)));
+                const cleanLower = String(cleanId).toLowerCase();
+                linkedProj = (typeof window !== 'undefined' && window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function')
+                    ? window.facetSearch._resolveProjectByRef(cleanId)
+                    : null;
+                if (!linkedProj) {
+                    linkedProj = masterData.find(p =>
+                        p.name === cleanId ||
+                        p.path === cleanId ||
+                        (p.metafold_project_id && String(p.metafold_project_id).toLowerCase() === cleanLower) ||
+                        (p.projectId && String(p.projectId).toLowerCase() === cleanLower) ||
+                        (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).toLowerCase() === cleanLower) ||
+                        (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.some(id => String(id).toLowerCase() === cleanLower))
+                    );
+                }
             }
 
             const pill = document.createElement('span');
             pill.className = `mf-pill-item ${isDerived ? 'mf-pill-derived' : (isRelated ? 'mf-pill-related' : 'mf-pill-tag')}`;
             pill.dataset.itemId = cleanId;
+            if (container.dataset.fieldPath) {
+                pill.dataset.fieldPath = container.dataset.fieldPath;
+            }
 
             if (isDerived) {
                 pill.style.cssText = 'display:inline-flex; align-items:center; gap:5px; background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd; border-radius:14px; padding:2px 8px; font-size:0.75rem;';
@@ -554,7 +617,8 @@
                 pill.innerHTML = `
                     <span>${linkedProj ? '📁' : '⚓'} <strong>${esc(linkedProj ? linkedProj.name : cleanId)}</strong></span>
                     ${linkedProj ? `<a href="#" class="mf-pill-open-link" data-project-path="${esc(safePath)}" title="Open / inspect linked project: ${esc(linkedProj.name)}" style="color:#60a5fa; text-decoration:none; font-size:0.78rem; font-weight:bold; margin-left:2px;">↗</a>` : ''}
-                    <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:3px; line-height:1;" title="Remove link">×</span>
+                    <button type="button" class="mf-pill-switch-relation-btn" data-target-mode="related_to" title="Switch to Related To (Associative Link)" style="background:none; border:none; color:#7dd3fc; cursor:pointer; padding:0 2px; font-size:0.75rem; line-height:1; opacity:0.9;">🔀</button>
+                    <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:2px; line-height:1;" title="Remove link">×</span>
                 `;
             } else if (isRelated) {
                 pill.style.cssText = 'display:inline-flex; align-items:center; gap:5px; background:rgba(56,189,248,0.2); border:1px solid rgba(56,189,248,0.45); color:#7dd3fc; border-radius:14px; padding:2px 8px; font-size:0.75rem;';
@@ -562,7 +626,8 @@
                 pill.innerHTML = `
                     <span>${linkedProj ? '📁' : '🔀'} <strong>${esc(linkedProj ? linkedProj.name : cleanId)}</strong></span>
                     ${linkedProj ? `<a href="#" class="mf-pill-open-link" data-project-path="${esc(safePath)}" title="Open / inspect linked project: ${esc(linkedProj.name)}" style="color:#38bdf8; text-decoration:none; font-size:0.78rem; font-weight:bold; margin-left:2px;">↗</a>` : ''}
-                    <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:3px; line-height:1;" title="Remove link">×</span>
+                    <button type="button" class="mf-pill-switch-relation-btn" data-target-mode="derived_from" title="Switch to Derived From (Parent Lineage)" style="background:none; border:none; color:#c4b5fd; cursor:pointer; padding:0 2px; font-size:0.75rem; line-height:1; opacity:0.9;">⬆️</button>
+                    <span class="mf-pill-remove-btn" style="cursor:pointer; opacity:0.7; font-weight:bold; font-size:0.85rem; margin-left:2px; line-height:1;" title="Remove link">×</span>
                 `;
             } else {
                 pill.style.cssText = 'display:inline-flex; align-items:center; gap:5px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; border-radius:14px; padding:2px 8px; font-size:0.75rem;';
@@ -662,8 +727,97 @@
                 };
             });
 
-            // Pill removal and link opening delegation
+            // Pill removal, relation-type switching, code scanning, and link opening delegation
             contentArea.onclick = (e) => {
+                const scanBtn = e.target.closest('.mf-editor-scan-btn');
+                if (scanBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!window.codeScannerModal || typeof window.codeScannerModal.open !== 'function') {
+                        alert('Code-Scanner ist nicht verfügbar.');
+                        return;
+                    }
+                    const fieldPath = scanBtn.dataset.fieldPath;
+                    const scanMode = scanBtn.dataset.scanMode || 'text';
+                    const fieldLabel = scanBtn.dataset.fieldLabel || fieldPath || '';
+                    const card = scanBtn.closest('.mf-editor-field-card');
+
+                    window.codeScannerModal.open({
+                        fieldLabel,
+                        onDetected: (code) => {
+                            const trimmed = String(code ?? '').trim();
+                            if (!trimmed || !card) return;
+
+                            if (scanMode === 'derived_from' || scanMode === 'related_to' || scanMode === 'tags') {
+                                const pillContainer = card.querySelector('.mf-pill-container');
+                                if (pillContainer) {
+                                    this._addPillToContainer(pillContainer, trimmed, scanMode);
+                                    this.isDirty = true;
+                                }
+                                return;
+                            }
+
+                            const inputEl = card.querySelector('.mf-editor-input');
+                            if (!inputEl) return;
+
+                            if (scanMode === 'number') {
+                                const normalized = trimmed.replace(',', '.');
+                                const num = Number(normalized);
+                                if (isNaN(num)) {
+                                    alert(`Gescannter Code "${trimmed}" ist keine gültige Zahl für "${fieldLabel}".`);
+                                    return;
+                                }
+                                inputEl.value = normalized;
+                                const mn = inputEl.getAttribute('min');
+                                const mx = inputEl.getAttribute('max');
+                                let clamped = num;
+                                if (mn !== null && mn !== '' && !isNaN(Number(mn)) && clamped < Number(mn)) clamped = Number(mn);
+                                if (mx !== null && mx !== '' && !isNaN(Number(mx)) && clamped > Number(mx)) clamped = Number(mx);
+                                inputEl.value = String(clamped);
+                                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                                this.isDirty = true;
+                                inputEl.focus();
+                                return;
+                            }
+
+                            if (scanMode === 'textarea' || scanMode === 'notes') {
+                                const start = typeof inputEl.selectionStart === 'number' ? inputEl.selectionStart : inputEl.value.length;
+                                const end = typeof inputEl.selectionEnd === 'number' ? inputEl.selectionEnd : inputEl.value.length;
+                                const before = inputEl.value.slice(0, start);
+                                const after = inputEl.value.slice(end);
+                                const spacer = before && !/[\s\n]$/.test(before) ? ' ' : '';
+                                inputEl.value = before + spacer + trimmed + after;
+                                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                                this.isDirty = true;
+                                inputEl.focus();
+                                return;
+                            }
+
+                            // text, url, id_anchor
+                            inputEl.value = trimmed;
+                            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                            inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            this.isDirty = true;
+                            inputEl.focus();
+                        }
+                    });
+                    return;
+                }
+
+                const switchBtn = e.target.closest('.mf-pill-switch-relation-btn');
+                if (switchBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const pill = switchBtn.closest('.mf-pill-item');
+                    const targetMode = switchBtn.dataset.targetMode;
+                    if (pill && targetMode) {
+                        this._switchPillRelationMode(pill, targetMode);
+                    }
+                    return;
+                }
+
                 const removeBtn = e.target.closest('.mf-pill-remove-btn');
                 if (removeBtn) {
                     e.stopPropagation();
@@ -746,6 +900,9 @@
                                 if (!q) return true;
                                 return (p.name && p.name.toLowerCase().includes(q)) ||
                                     (p.path && p.path.toLowerCase().includes(q)) ||
+                                    (p.metafold_project_id && String(p.metafold_project_id).toLowerCase().includes(q)) ||
+                                    (p.projectId && String(p.projectId).toLowerCase().includes(q)) ||
+                                    (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).toLowerCase().includes(q)) ||
                                     (p.lineage?.provides_ids && p.lineage.provides_ids.some(id => String(id).toLowerCase().includes(q)));
                             })
                             .slice(0, 20);
@@ -960,6 +1117,58 @@
                 el.addEventListener('input', () => { this.isDirty = true; });
                 el.addEventListener('change', () => { this.isDirty = true; });
             });
+        }
+
+        /**
+         * Moves a link pill cleanly between associative `related_to` and parent-lineage `derived_from`.
+         */
+        _switchPillRelationMode(pillEl, targetMode) {
+            if (!pillEl || (targetMode !== 'derived_from' && targetMode !== 'related_to')) return;
+            const itemId = pillEl.dataset.itemId;
+            if (!itemId) return;
+
+            const sourceContainer = pillEl.closest('.mf-pill-container');
+            if (sourceContainer && sourceContainer.dataset.mode === targetMode) return;
+
+            const rootEl = document.getElementById('facetRightPanelContent') || document;
+            let targetContainer = rootEl.querySelector(`.mf-pill-container[data-mode="${targetMode}"]`);
+
+            if (!targetContainer) {
+                const cleanKey = targetMode;
+                const cleanLabel = targetMode === 'derived_from' ? 'Derived From' : 'Related To';
+                const alreadyAdded = this.addedFields.some(af => af.path.join('::') === cleanKey);
+                if (!alreadyAdded) {
+                    this.addedFields.push({
+                        path: [cleanKey],
+                        field: {
+                            label: cleanLabel,
+                            type: targetMode,
+                            value: []
+                        }
+                    });
+                }
+
+                const fieldsContainer = document.getElementById('mfEditorFieldsContainer');
+                if (fieldsContainer) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = this._renderFieldOrGroup(
+                        cleanKey,
+                        { label: cleanLabel, type: targetMode, value: [] },
+                        []
+                    );
+                    if (tempDiv.firstElementChild) {
+                        fieldsContainer.appendChild(tempDiv.firstElementChild);
+                        this._bindEvents();
+                    }
+                }
+                targetContainer = rootEl.querySelector(`.mf-pill-container[data-mode="${targetMode}"]`);
+            }
+
+            if (!targetContainer) return;
+
+            this._addPillToContainer(targetContainer, itemId, targetMode);
+            pillEl.remove();
+            this.isDirty = true;
         }
 
         /**
@@ -1459,6 +1668,9 @@
                 };
 
                 if (window.facetSearch) {
+                    if (updatedProj && updatedProj.metadata && typeof window.facetSearch.flattenObject === 'function') {
+                        updatedProj.flatMeta = window.facetSearch.flattenObject(updatedProj.metadata);
+                    }
                     // Update masterData
                     const idx = window.facetSearch.masterData.findIndex(p => p.path === this.currentProject.path);
                     if (idx >= 0) {

@@ -95,6 +95,10 @@
                                 <button type="button" class="btn btn-secondary btn-sm" id="noteComposerTogglePreviewBtn" title="Switch between Write and Preview mode" style="padding: 2px 9px; font-size: 0.78rem; color: #c4b5fd; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 4px; cursor: pointer;">👁️ Preview</button>
                                 <span style="font-size: 0.7rem; color: #6b7280; margin-left: 6px;">Ctrl+Enter</span>
                             </div>
+                            <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px; display: flex; align-items: center; gap: 6px; padding: 0 2px;">
+                                <span>💡</span>
+                                <span><code>[[Project Name]]</code> links automatically as <strong>Related To</strong> (associative, keeps parent lineage clean) · <code>#tag</code> adds a clickable filter tag</span>
+                            </div>
 
                         </div>
 
@@ -483,7 +487,8 @@
                 return;
             }
 
-            dropdown.innerHTML = matches.map(m => `
+            const tagHeaderHtml = `<div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: #c4b5fd; background: rgba(139, 92, 246, 0.14); border-bottom: 1px solid rgba(139, 92, 246, 0.3); text-transform: uppercase; letter-spacing: 0.03em;">🏷️ Add tag (#tag)</div>`;
+            dropdown.innerHTML = tagHeaderHtml + matches.map(m => `
                 <div class="mf-ac-item" style="padding: 6px 10px; cursor: pointer; font-size: 0.8rem; color: #c4b5fd; border-bottom: 1px solid rgba(255,255,255,0.05);" data-val="${m}">
                     🏷️ #${m}
                 </div>
@@ -516,14 +521,43 @@
             dropdown.style.display = 'block';
         }
 
+        _updateLivePreview() {}
+
         _showProjectAutocomplete(query, textarea, tokenStart) {
             const dropdown = document.getElementById('noteComposerAutocomplete');
             if (!dropdown) return;
 
+            const esc = (str) => window.markdownLite?.escapeHtml
+                ? window.markdownLite.escapeHtml(str)
+                : String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escAttr = (str) => window.markdownLite?.escapeAttr
+                ? window.markdownLite.escapeAttr(str)
+                : esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            const seenLower = new Set();
             const allProjects = [];
+            const pushCandidate = (rawName) => {
+                const trimmed = String(rawName || '').trim();
+                if (!trimmed) return;
+                const key = trimmed.toLowerCase();
+                if (seenLower.has(key)) return;
+                seenLower.add(key);
+                allProjects.push(trimmed);
+            };
+
             if (window.facetSearch && Array.isArray(window.facetSearch.masterData)) {
-                window.facetSearch.masterData.forEach(p => {
-                    if (p.name) allProjects.push(p.name);
+                window.facetSearch.masterData.forEach(p => pushCandidate(p.name));
+            }
+            if (window.projectScanner && Array.isArray(window.projectScanner.projects)) {
+                window.projectScanner.projects.forEach(p => pushCandidate(p.name));
+            }
+            if (window.experimentForm && Array.isArray(window.experimentForm._idDictionaryItems)) {
+                window.experimentForm._idDictionaryItems.forEach(item => {
+                    if (typeof item === 'string') {
+                        pushCandidate(item);
+                    } else if (item && typeof item === 'object') {
+                        pushCandidate(item.projectName || item.name || item.title || item.id);
+                    }
                 });
             }
 
@@ -534,9 +568,10 @@
                 return;
             }
 
-            dropdown.innerHTML = matches.map(m => `
-                <div class="mf-ac-item" style="padding: 6px 10px; cursor: pointer; font-size: 0.8rem; color: #93c5fd; border-bottom: 1px solid rgba(255,255,255,0.05);" data-val="${m}">
-                    📁 ${m}
+            const headerHtml = `<div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: #7dd3fc; background: rgba(56, 189, 248, 0.1); border-bottom: 1px solid rgba(56, 189, 248, 0.25); text-transform: uppercase; letter-spacing: 0.03em;">🔀 Link related projects ([[Project]])</div>`;
+            dropdown.innerHTML = headerHtml + matches.map(m => `
+                <div class="mf-ac-item" style="padding: 6px 10px; cursor: pointer; font-size: 0.8rem; color: #93c5fd; border-bottom: 1px solid rgba(255,255,255,0.05);" data-val="${escAttr(m)}">
+                    📁 ${esc(m)}
                 </div>
             `).join('');
 

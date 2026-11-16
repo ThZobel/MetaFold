@@ -1671,27 +1671,95 @@ body.light-mode .facet-category-clear:hover {
 }
 
 .mf-md-tag {
-    display: inline-block;
-    background: rgba(139, 92, 246, 0.18);
-    color: #c4b5fd;
-    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(13, 148, 136, 0.18);
+    border: 1px solid rgba(13, 148, 136, 0.4);
+    color: #2dd4bf;
+    padding: 0 7px;
     border-radius: 10px;
-    font-size: 0.85em;
+    font-size: 0.84em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mf-md-tag:hover {
+    background: rgba(13, 148, 136, 0.32);
+    border-color: rgba(45, 212, 191, 0.65);
+    color: #99f6e4;
+    text-decoration: underline;
 }
 
 .mf-md-mention {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     background: rgba(59, 130, 246, 0.18);
+    border: 1px solid rgba(59, 130, 246, 0.35);
     color: #93c5fd;
-    padding: 0 6px;
+    padding: 0 7px;
     border-radius: 10px;
-    font-size: 0.88em;
+    font-size: 0.86em;
     text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
 
 .mf-md-mention:hover {
     text-decoration: underline;
     background: rgba(59, 130, 246, 0.28);
+    border-color: rgba(96, 165, 250, 0.6);
+}
+
+/* Compact inline chips for Tabulator table cells */
+.facet-cell-link-chip,
+.facet-cell-tag-chip,
+.facet-cell-id-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    margin-right: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.facet-cell-link-chip.is-derived {
+    background: rgba(99, 102, 241, 0.22);
+    border: 1px solid rgba(139, 92, 246, 0.45);
+    color: #c4b5fd;
+}
+
+.facet-cell-link-chip.is-related {
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    color: #7dd3fc;
+}
+
+.facet-cell-tag-chip {
+    background: rgba(13, 148, 136, 0.18);
+    border: 1px solid rgba(13, 148, 136, 0.4);
+    color: #2dd4bf;
+}
+
+.facet-cell-id-chip {
+    background: rgba(245, 158, 11, 0.18);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+}
+
+.facet-cell-link-chip:hover,
+.facet-cell-tag-chip:hover,
+.facet-cell-id-chip:hover {
+    filter: brightness(1.15);
+    text-decoration: underline;
 }
 
 .mf-category-pill:hover {
@@ -1736,13 +1804,44 @@ body.light-mode .mf-md-path {
 }
 
 body.light-mode .mf-md-tag {
-    background: #ede9fe;
-    color: #6d28d9;
+    background: #ccfbf1;
+    border-color: #5eead4;
+    color: #0f766e;
+}
+
+body.light-mode .mf-md-tag:hover {
+    background: #99f6e4;
+    color: #115e59;
 }
 
 body.light-mode .mf-md-mention {
     background: #dbeafe;
+    border-color: #93c5fd;
     color: #1d4ed8;
+}
+
+body.light-mode .facet-cell-link-chip.is-derived {
+    background: #ede9fe;
+    border-color: #c4b5fd;
+    color: #5b21b6;
+}
+
+body.light-mode .facet-cell-link-chip.is-related {
+    background: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0369a1;
+}
+
+body.light-mode .facet-cell-tag-chip {
+    background: #ccfbf1;
+    border-color: #5eead4;
+    color: #0f766e;
+}
+
+body.light-mode .facet-cell-id-chip {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
 }
 
 body.light-mode .mf-modal-container {

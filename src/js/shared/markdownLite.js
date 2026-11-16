@@ -127,7 +127,7 @@
             if (opts.mode === 'readme') {
                 return placeholder(`<span class="mf-md-mention">🔗 ${escapeHtml(clean)}</span>`);
             }
-            return placeholder(`<a href="#" class="mf-md-mention" data-mf-project="${escapeAttr(clean)}" title="Open project ${escapeAttr(clean)}">🔗 ${escapeHtml(clean)}</a>`);
+            return placeholder(`<a href="#" class="mf-md-mention" data-mf-project="${escapeAttr(clean)}" title="Related project (related_to): ${escapeAttr(clean)} — click to open or filter">🔗 ${escapeHtml(clean)}</a>`);
         });
 
         // 4. Bare URLs
@@ -150,7 +150,12 @@
         });
 
         // 6. Tags (#tag) — after URLs so URL fragments are already tokenized
-        text = text.replace(TAG_RE, (m, lead, tag) => lead + placeholder(`<span class="mf-md-tag" data-mf-tag="${escapeAttr(tag)}">#${escapeHtml(tag)}</span>`));
+        text = text.replace(TAG_RE, (m, lead, tag) => {
+            if (opts.mode === 'readme') {
+                return lead + placeholder(`<span class="mf-md-tag">#${escapeHtml(tag)}</span>`);
+            }
+            return lead + placeholder(`<a href="#" class="mf-md-tag" data-mf-tag="${escapeAttr(tag)}" title="Filter table by tag #${escapeAttr(tag)}">🏷️ #${escapeHtml(tag)}</a>`);
+        });
 
         // 7. Escape the rest
         text = escapeHtml(text);

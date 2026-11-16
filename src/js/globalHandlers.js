@@ -2102,13 +2102,68 @@ window.showProjectMetadataInSidebar = function (projectPath) {
     } else {
         html += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
 
+        const esc = (str) => window.markdownLite?.escapeHtml
+            ? window.markdownLite.escapeHtml(str)
+            : String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escAttr = (str) => window.markdownLite?.escapeAttr
+            ? window.markdownLite.escapeAttr(str)
+            : esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+        const resolveSidebarProject = (rawRef) => {
+            const clean = String(rawRef || '').replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
+            if (!clean) return null;
+            const cleanLower = clean.toLowerCase();
+            const scannerList = window.projectScanner?.projects || [];
+            const foundInScanner = scannerList.find(p =>
+                (p.name && p.name.toLowerCase() === cleanLower) ||
+                (p.metafold_project_id && String(p.metafold_project_id).trim().toLowerCase() === cleanLower) ||
+                (p.projectId && String(p.projectId).trim().toLowerCase() === cleanLower) ||
+                (p.metadata?.id_anchor && String(p.metadata.id_anchor?.value ?? p.metadata.id_anchor).trim().toLowerCase() === cleanLower) ||
+                (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).trim().toLowerCase() === cleanLower) ||
+                (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.some(id => String(id).trim().toLowerCase() === cleanLower))
+            );
+            if (foundInScanner) return foundInScanner;
+            if (window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function') {
+                return window.facetSearch._resolveProjectByRef(clean);
+            }
+            return null;
+        };
+
+        const renderSidebarChips = (items, kind) => {
+            const arr = (Array.isArray(items) ? items : [items])
+                .map(v => String(v ?? '').trim())
+                .filter(Boolean);
+            if (arr.length === 0) return '<em style="color: #6c7086;">Empty</em>';
+
+            return `<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px;">${arr.map(raw => {
+                if (kind === 'tags') {
+                    const cleanTag = raw.replace(/^#/, '').trim();
+                    if (!cleanTag) return '';
+                    return `<a href="#" class="mf-sidebar-tag" data-mf-tag="${escAttr(cleanTag)}" title="Filter by #${escAttr(cleanTag)}" style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; text-decoration: none; cursor: pointer;">🏷️ #${esc(cleanTag)}</a>`;
+                }
+                if (kind === 'id_anchor') {
+                    return `<a href="#" class="mf-sidebar-proj-link" data-lineage-id="${escAttr(raw)}" title="Filter lineage by anchor ID: ${escAttr(raw)}" style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.4); color: #fcd34d; text-decoration: none; cursor: pointer;">⚓ ${esc(raw)}</a>`;
+                }
+                const targetProj = resolveSidebarProject(raw);
+                const isDerived = kind === 'derived_from';
+                const badgeBg = isDerived ? 'rgba(99, 102, 241, 0.2)' : 'rgba(56, 189, 248, 0.18)';
+                const badgeBorder = isDerived ? 'rgba(139, 92, 246, 0.45)' : 'rgba(56, 189, 248, 0.45)';
+                const badgeColor = isDerived ? '#c4b5fd' : '#7dd3fc';
+                const icon = targetProj ? '📁' : (isDerived ? '⬆️' : '🔀');
+                const titleHint = isDerived
+                    ? `Derived From (Parent Lineage): ${targetProj ? targetProj.name : raw}`
+                    : `Related Project (Associative): ${targetProj ? targetProj.name : raw}`;
+                return `<a href="#" class="mf-sidebar-proj-link" data-lineage-id="${escAttr(raw)}" ${targetProj?.path ? `data-project-path="${escAttr(targetProj.path)}"` : ''} title="${escAttr(titleHint)}" style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; background: ${badgeBg}; border: 1px solid ${badgeBorder}; color: ${badgeColor}; text-decoration: none; cursor: pointer;">${icon} ${esc(targetProj ? targetProj.name : raw)}</a>`;
+            }).join('')}</div>`;
+        };
+
         const renderMetadataField = (key, field) => {
             if (['schemaVersion', 'schemaType', 'template', 'templateInfo', 'created_at', 'updated_at', 'metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level'].includes(key) || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) return '';
 
             // If field is an object but doesn't have 'value' and 'type', it's likely a nested category
             if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
                 let catHtml = `<div style="margin-bottom: 5px; padding: 10px; background: rgba(0,0,0,0.15); border-radius: 8px; border-left: 3px solid #89b4fa;">`;
-                catHtml += `<div style="font-size: 0.85rem; color: #89b4fa; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span>📁</span> ${key.replace(/_/g, ' ')}</div>`;
+                catHtml += `<div style="font-size: 0.85rem; color: #89b4fa; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span>📁</span> ${esc(key.replace(/_/g, ' '))}</div>`;
                 catHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
                 for (const [subKey, subField] of Object.entries(field)) {
                     catHtml += renderMetadataField(subKey, subField);
@@ -2119,24 +2174,55 @@ window.showProjectMetadataInSidebar = function (projectPath) {
 
             const value = (field && field.value !== undefined) ? field.value : field;
             const type = (field && field.type) ? field.type : 'text';
+            const lowerKey = key.toLowerCase();
             let label = (field && field.label) ? field.label : key.replace(/_/g, ' ');
             label = label.charAt(0).toUpperCase() + label.slice(1);
 
+            const isDerivedField = type === 'derived_from' || lowerKey === 'derived_from' || lowerKey.endsWith('.derived_from');
+            const isRelatedField = type === 'related_to' || lowerKey === 'related_to' || lowerKey.endsWith('.related_to');
+            const isIdAnchorField = type === 'id_anchor' || lowerKey === 'id_anchor' || lowerKey.endsWith('.id_anchor');
+            const isTagsField = type === 'tags' || lowerKey === 'tags' || lowerKey === 'keywords' || lowerKey.endsWith('.tags');
+
             let displayValue = value;
-            if (displayValue === null || displayValue === undefined || displayValue === '') {
+            if (displayValue === null || displayValue === undefined || displayValue === '' || (Array.isArray(displayValue) && displayValue.length === 0)) {
                 displayValue = '<em style="color: #6c7086;">Empty</em>';
-            } else if (type === 'url' || (typeof displayValue === 'string' && displayValue.startsWith('http'))) {
-                displayValue = `<a href="${displayValue}" target="_blank" style="color: #a6e3a1; text-decoration: underline; word-break: break-all;">${displayValue}</a>`;
+            } else if (isDerivedField) {
+                displayValue = renderSidebarChips(displayValue, 'derived_from');
+            } else if (isRelatedField) {
+                displayValue = renderSidebarChips(displayValue, 'related_to');
+            } else if (isIdAnchorField) {
+                displayValue = renderSidebarChips(displayValue, 'id_anchor');
+            } else if (isTagsField) {
+                displayValue = renderSidebarChips(displayValue, 'tags');
+            } else if (type === 'url' || (typeof displayValue === 'string' && /^https?:\/\//i.test(displayValue.trim()))) {
+                const cleanUrl = displayValue.trim();
+                displayValue = `<a href="#" class="mf-md-link" data-mf-url="${escAttr(cleanUrl)}" style="color: #a6e3a1; text-decoration: underline; word-break: break-all;">${esc(cleanUrl)}</a>`;
             } else if (Array.isArray(displayValue)) {
-                displayValue = displayValue.length > 0 ? displayValue.join(', ') : '<em style="color: #6c7086;">Empty</em>';
+                displayValue = displayValue
+                    .map(item => (typeof item === 'string' && window.markdownLite?.renderInline)
+                        ? window.markdownLite.renderInline(item, { mode: 'app' })
+                        : esc(String(item)))
+                    .join(', ');
             } else if (typeof displayValue === 'object') {
-                displayValue = '<pre style="margin: 0; font-size: 0.8rem; color: #cdd6f4; white-space: pre-wrap;">' + JSON.stringify(displayValue, null, 2) + '</pre>';
+                displayValue = '<pre style="margin: 0; font-size: 0.8rem; color: #cdd6f4; white-space: pre-wrap;">' + esc(JSON.stringify(displayValue, null, 2)) + '</pre>';
+            } else if (typeof displayValue === 'string') {
+                const trimmed = displayValue.trim();
+                const matchedProj = (!trimmed.includes('[[') && !trimmed.includes('\n')) ? resolveSidebarProject(trimmed) : null;
+                if (matchedProj && matchedProj.path !== project.path) {
+                    displayValue = `<a href="#" class="mf-sidebar-proj-link" data-lineage-id="${escAttr(trimmed)}" data-project-path="${escAttr(matchedProj.path)}" title="Open linked project: ${escAttr(matchedProj.name)} (${escAttr(trimmed)})" style="display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 10px; font-size: 0.78rem; background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.4); color: #7dd3fc; text-decoration: none; cursor: pointer;">📁 ${esc(matchedProj.name || trimmed)}</a>`;
+                } else if (window.markdownLite?.renderInline) {
+                    displayValue = window.markdownLite.renderInline(displayValue, { mode: 'app' });
+                } else {
+                    displayValue = esc(displayValue);
+                }
+            } else {
+                displayValue = esc(String(displayValue));
             }
 
             return `
                 <div style="background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">
-                    <div style="font-size: 0.7rem; color: #a6adc8; margin-bottom: 2px; font-weight: bold; text-transform: uppercase;">${label}</div>
-                    <div style="color: #cdd6f4; font-size: 0.85rem; word-break: break-word;">${displayValue}</div>
+                    <div style="font-size: 0.7rem; color: #a6adc8; margin-bottom: 2px; font-weight: bold; text-transform: uppercase;">${esc(label)}</div>
+                    <div class="mf-md" style="color: #cdd6f4; font-size: 0.85rem; word-break: break-word;">${displayValue}</div>
                 </div>
             `;
         };
@@ -2149,6 +2235,81 @@ window.showProjectMetadataInSidebar = function (projectPath) {
     }
 
     projectView.innerHTML = html;
+
+    projectView.onclick = (e) => {
+        const projEl = e.target.closest('.mf-md-mention, .mf-sidebar-proj-link');
+        if (projEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            const directPath = projEl.dataset.projectPath;
+            const ref = projEl.dataset.mfProject || projEl.dataset.mfMention || projEl.dataset.lineageId || '';
+            let targetPath = directPath;
+            if (!targetPath && ref) {
+                const cleanLower = ref.replace(/^\[\[/, '').replace(/\]\]$/, '').trim().toLowerCase();
+                const inScanner = (window.projectScanner?.projects || []).find(p =>
+                    (p.name && p.name.toLowerCase() === cleanLower) ||
+                    (p.metafold_project_id && String(p.metafold_project_id).trim().toLowerCase() === cleanLower) ||
+                    (p.projectId && String(p.projectId).trim().toLowerCase() === cleanLower) ||
+                    (p.metadata?.id_anchor && String(p.metadata.id_anchor?.value ?? p.metadata.id_anchor).trim().toLowerCase() === cleanLower) ||
+                    (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).trim().toLowerCase() === cleanLower) ||
+                    (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.some(id => String(id).trim().toLowerCase() === cleanLower))
+                );
+                if (inScanner?.path) {
+                    targetPath = inScanner.path;
+                } else if (window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function') {
+                    const resolved = window.facetSearch._resolveProjectByRef(ref);
+                    if (resolved?.path) targetPath = resolved.path;
+                }
+            }
+            if (targetPath) {
+                window.showProjectMetadataInSidebar(targetPath);
+                if (window.facetSearch && typeof window.facetSearch.selectAndInspectProjectByPath === 'function') {
+                    window.facetSearch.selectAndInspectProjectByPath(targetPath);
+                }
+            } else if (ref && window.facetSearch && typeof window.facetSearch.filterByLineageId === 'function') {
+                window.facetSearch.filterByLineageId(ref);
+            }
+            return;
+        }
+
+        const tagEl = e.target.closest('.mf-md-tag, .mf-sidebar-tag');
+        if (tagEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            const rawTag = tagEl.dataset.mfTag || tagEl.textContent || '';
+            const cleanTag = rawTag.replace(/^🏷️\s*/, '').replace(/^#/, '').trim();
+            if (!cleanTag) return;
+            if (window.facetSearch && typeof window.facetSearch.filterByLineageId === 'function') {
+                window.facetSearch.filterByLineageId('#' + cleanTag);
+            }
+            return;
+        }
+
+        const linkEl = e.target.closest('.mf-md-link');
+        if (linkEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            const url = linkEl.dataset.mfUrl || linkEl.getAttribute('href');
+            if (url && /^https?:\/\//i.test(url) && window.electronAPI?.openExternal) {
+                window.electronAPI.openExternal(url);
+            }
+            return;
+        }
+
+        const pathEl = e.target.closest('.mf-md-path');
+        if (pathEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            const targetPath = pathEl.dataset.mfPath;
+            if (targetPath) {
+                if (window.electronAPI?.showItemInFolder) {
+                    window.electronAPI.showItemInFolder(targetPath);
+                } else if (window.electronAPI?.openFolder) {
+                    window.electronAPI.openFolder(targetPath);
+                }
+            }
+        }
+    };
 };
 
 console.log('✅ ENHANCED MetaFold UI Integration loaded with JSONCrack support');

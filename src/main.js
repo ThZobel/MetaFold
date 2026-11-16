@@ -4,6 +4,12 @@ const path = require('path');
 const zlib = require('zlib');
 const OMEROProxyServer = require('./js/proxyManager.js');
 const metafoldSchema = require('./js/shared/schemaVersion.js');
+const markdownLite = require('./js/shared/markdownLite.js');
+const {
+    createProjectMetadataStore,
+    syncMentionsWithRelatedTo,
+    collectAllMarkdownAndFieldText
+} = require('./js/main/projectMetadataStore.js');
 
 let mainWindow;
 
@@ -296,6 +302,14 @@ async function createWindow() {
     };
 
     mainWindow = new BrowserWindow(windowOptions);
+
+    // Allow camera/media access for QR/Barcode/DataMatrix scanning in renderer
+    const ses = mainWindow.webContents && mainWindow.webContents.session;
+    if (ses && typeof ses.setPermissionRequestHandler === 'function') {
+        ses.setPermissionRequestHandler((_webContents, permission, callback) => {
+            callback(permission === 'media' || permission === 'clipboard-read' || permission === 'clipboard-sanitized-write');
+        });
+    }
 
     // =================== DEVTOOLS PROTECTION ===================
 
@@ -1184,6 +1198,9 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 enhancedMetadata['System.LastUpdatedBy'] = { value: updateEntry.user, type: 'user' };
                 enhancedMetadata['System.LastUpdatedAt'] = { value: updateEntry.date, type: 'date' };
             }
+
+            // Sync [[Project]] mentions in notes and fields into related_to before cleaning empty fields
+            syncMentionsWithRelatedTo(enhancedMetadata, collectAllMarkdownAndFieldText(enhancedMetadata));
 
             // Clean empty fields and ensure templateName from metadata before saving
             Object.keys(enhancedMetadata).forEach(key => {
@@ -2251,6 +2268,7 @@ ipcMain.handle('load-user-index', async (event, userInfo = null) => {
             const content = await fs.readFile(indexPath, 'utf8');
             const data = JSON.parse(content);
             const projects = Array.isArray(data) ? data : (data.projects || []);
+            populateLineageForProjects(projects);
             return {
                 success: true,
                 projects,
@@ -2313,6 +2331,7 @@ ipcMain.handle('merge-projects-into-user-index', async (event, newProjects, base
         }
 
         const merged = Array.from(pathMap.values());
+        populateLineageForProjects(merged);
         await fs.writeFile(indexPath, JSON.stringify({
             schemaVersion: metafoldSchema.SCHEMA_VERSION,
             schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
@@ -2378,9 +2397,11 @@ async function upsertSingleProjectInUserIndex(projectPath, basePath = null, user
         for (const p of existing) {
             if (p && p.path) pathMap.set(path.resolve(p.path).toLowerCase(), p);
         }
-        pathMap.set(path.resolve(project.path).toLowerCase(), project);
+        const projectKey = path.resolve(project.path).toLowerCase();
+        pathMap.set(projectKey, project);
 
         const merged = Array.from(pathMap.values());
+        populateLineageForProjects(merged);
         await fs.writeFile(indexPath, JSON.stringify({
             schemaVersion: metafoldSchema.SCHEMA_VERSION,
             schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
@@ -2388,7 +2409,7 @@ async function upsertSingleProjectInUserIndex(projectPath, basePath = null, user
             updatedAt: new Date().toISOString(),
             projects: merged
         }, null, 2), 'utf8');
-        return { success: true, project };
+        return { success: true, project: pathMap.get(projectKey) || project };
     } catch (err) {
         console.warn('⚠️ upsertSingleProjectInUserIndex error:', err.message);
         return { success: false, error: err.message };
@@ -2400,7 +2421,6 @@ ipcMain.handle('upsert-user-index-project', async (event, projectPath, basePath 
 });
 
 // Update project metadata, notes, changelog, history, README & user index
-const { createProjectMetadataStore } = require('./js/main/projectMetadataStore.js');
 const projectMetadataStore = createProjectMetadataStore({
     generateReadmeHtmlWithMetadata,
     upsertSingleProjectInUserIndex
@@ -3405,6 +3425,187 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
 
 // =================== PROJECT SCANNER API ===================
 
+/**
+ * Two-pass lineage, related_to, [[Project]] mention, and #tag extraction across projects.
+ */
+function populateLineageForProjects(projects) {
+    if (!Array.isArray(projects) || projects.length === 0) return;
+
+    const idRegistry = new Map();
+    const idRegistryLower = new Map();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
+    const skipLineageKeys = new Set([
+        'metafold_project_id', 'schemaversion', 'schematype', 'template',
+        'templateinfo', 'provenance', 'metafold_integration', 'integrations',
+        'changelog', 'notes_log', 'previous_names'
+    ]);
+
+    const registerId = (rawId, projectPath) => {
+        if (!rawId || !projectPath) return;
+        const clean = String(rawId).trim();
+        if (!clean) return;
+        if (!idRegistry.has(clean)) idRegistry.set(clean, projectPath);
+        const lower = clean.toLowerCase();
+        if (!idRegistryLower.has(lower)) idRegistryLower.set(lower, projectPath);
+    };
+
+    const pushUnique = (arr, rawVal) => {
+        if (rawVal === undefined || rawVal === null) return;
+        const clean = String(rawVal).trim();
+        if (!clean) return;
+        if (!arr.some(x => x.toLowerCase() === clean.toLowerCase())) {
+            arr.push(clean);
+        }
+    };
+
+    const extractLinkValues = (val, targetArr, ignoreUuid = true) => {
+        if (!val) return;
+        if (Array.isArray(val)) {
+            val.forEach(item => extractLinkValues(item, targetArr, ignoreUuid));
+            return;
+        }
+        if (typeof val === 'object') {
+            if (Object.prototype.hasOwnProperty.call(val, 'value')) {
+                extractLinkValues(val.value, targetArr, ignoreUuid);
+                return;
+            }
+            const itemStr = val.id || val.name;
+            if (typeof itemStr === 'string') {
+                const clean = itemStr.trim();
+                if (clean && (!ignoreUuid || !uuidRegex.test(clean))) {
+                    pushUnique(targetArr, clean);
+                }
+            }
+            return;
+        }
+        if (typeof val === 'string') {
+            val.split(',').forEach(part => {
+                const clean = part.trim();
+                if (clean && (!ignoreUuid || !uuidRegex.test(clean))) {
+                    pushUnique(targetArr, clean);
+                }
+            });
+        }
+    };
+
+    // Pass 1: Build ID Registry & extract derived_from / related_to / tags
+    projects.forEach(project => {
+        if (!project) return;
+        project.lineage = {
+            provides_ids: [],
+            derived_from_ids: [],
+            lineage_links: [],
+            related_to_ids: [],
+            related_links: [],
+            tags: []
+        };
+
+        if (project.name) {
+            pushUnique(project.lineage.provides_ids, project.name);
+            registerId(project.name, project.path);
+        }
+        const projectUuid = project.metafold_project_id || project.projectId || project.metadata?.metafold_project_id || '';
+        if (projectUuid) {
+            pushUnique(project.lineage.provides_ids, projectUuid);
+            registerId(projectUuid, project.path);
+        }
+        if (project.metadata?.projectName && project.metadata.projectName !== project.name) {
+            registerId(project.metadata.projectName, project.path);
+        }
+        const prevNames = Array.isArray(project.previous_names)
+            ? project.previous_names
+            : (Array.isArray(project.metadata?.previous_names) ? project.metadata.previous_names : []);
+        prevNames.forEach(prev => registerId(prev, project.path));
+
+        function extractLineage(obj) {
+            for (const [key, val] of Object.entries(obj || {})) {
+                const lowerKey = key.toLowerCase();
+                if (skipLineageKeys.has(lowerKey)) continue;
+
+                const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
+                if (isIdField) {
+                    let idVal = '';
+                    if (val && typeof val === 'object' && typeof val.value === 'string') {
+                        idVal = val.value.trim();
+                    } else if (typeof val === 'string') {
+                        idVal = val.trim();
+                    }
+                    if (idVal) {
+                        pushUnique(project.lineage.provides_ids, idVal);
+                        registerId(idVal, project.path);
+                    }
+                }
+
+                if (lowerKey === 'derived_from' || (val && val.type === 'derived_from')) {
+                    extractLinkValues(val, project.lineage.derived_from_ids, false);
+                } else if (lowerKey === 'related_to' || (val && val.type === 'related_to')) {
+                    extractLinkValues(val, project.lineage.related_to_ids, false);
+                } else if (tagKeyRegex.test(key) || (val && val.type === 'tags')) {
+                    extractLinkValues(val, project.lineage.tags, false);
+                } else if (val && typeof val === 'object' && !Array.isArray(val) && val.value === undefined && val.type === undefined) {
+                    extractLineage(val);
+                }
+            }
+        }
+
+        if (project.metadata) {
+            extractLineage(project.metadata);
+        }
+
+        // Also extract [[Project]] mentions and #tags from notes & metadata string fields
+        const allTextParts = [
+            project.notes_markdown || '',
+            project.hypothesis_or_goal || '',
+            ...(Array.isArray(project.notes_log) ? project.notes_log.map(n => n?.text || '') : []),
+            collectAllMarkdownAndFieldText(project.metadata || {})
+        ];
+        const combinedText = allTextParts.filter(Boolean).join('\n');
+        if (combinedText) {
+            const derivedLower = new Set(project.lineage.derived_from_ids.map(x => x.toLowerCase()));
+            const selfNameLower = (project.name || '').toLowerCase();
+            markdownLite.extractMentions(combinedText).forEach(m => {
+                const ml = m.toLowerCase();
+                if (!derivedLower.has(ml) && ml !== selfNameLower) {
+                    pushUnique(project.lineage.related_to_ids, m);
+                }
+            });
+            markdownLite.extractTags(combinedText).forEach(t => {
+                pushUnique(project.lineage.tags, t);
+            });
+        }
+    });
+
+    // Pass 2: Resolve Lineage Links & Related Links
+    projects.forEach(project => {
+        if (!project || !project.lineage) return;
+
+        project.lineage.derived_from_ids.forEach(derivedId => {
+            const sourcePath = idRegistry.get(derivedId) || idRegistryLower.get(derivedId.toLowerCase());
+            if (sourcePath && sourcePath !== project.path) {
+                if (!project.lineage.lineage_links.some(l => l.id === derivedId && l.source_path === sourcePath)) {
+                    project.lineage.lineage_links.push({
+                        id: derivedId,
+                        source_path: sourcePath
+                    });
+                }
+            }
+        });
+
+        project.lineage.related_to_ids.forEach(relId => {
+            const targetPath = idRegistry.get(relId) || idRegistryLower.get(relId.toLowerCase());
+            if (targetPath && targetPath !== project.path) {
+                if (!project.lineage.related_links.some(l => l.id === relId && l.target_path === targetPath)) {
+                    project.lineage.related_links.push({
+                        id: relId,
+                        target_path: targetPath
+                    });
+                }
+            }
+        });
+    });
+}
+
 // Scan directory recursively for MetaFold projects
 ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, options = {}) => {
     try {
@@ -3414,88 +3615,9 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, o
 
         const projects = await scanForMetaFoldProjects(basePath, scanOptions);
 
-        // --- PHASE 3: Two-Pass Scanner Logic (Lineage Linking) ---
-        // Pass 1: Build ID Registry from all scanned projects
-        const idRegistry = new Map();
-
-        projects.forEach(project => {
-            project.lineage = {
-                provides_ids: [],
-                derived_from_ids: [],
-                lineage_links: []
-            };
-
-            // Auto-register the project's own name as a valid ID
-            if (project.name) {
-                project.lineage.provides_ids.push(project.name);
-                idRegistry.set(project.name, project.path);
-            }
-
-            function extractLineage(obj) {
-                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                for (const [key, val] of Object.entries(obj || {})) {
-                    const lowerKey = key.toLowerCase();
-                    if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
-
-                    const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
-
-                    if (isIdField) {
-                        let idVal = '';
-                        if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
-                            idVal = val.value.trim();
-                        } else if (typeof val === 'string') {
-                            idVal = val.trim();
-                        }
-                        if (idVal && !uuidRegex.test(idVal)) {
-                            project.lineage.provides_ids.push(idVal);
-                            idRegistry.set(idVal, project.path);
-                        }
-                    }
-
-                    if (lowerKey === 'derived_from' || (val && val.type === 'derived_from')) {
-                        if (val && typeof val === 'object' && Array.isArray(val.value)) {
-                            project.lineage.derived_from_ids.push(
-                                ...val.value.filter(v => typeof v === 'string').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
-                            );
-                        } else if (val && typeof val === 'object' && typeof val.value === 'string') {
-                            project.lineage.derived_from_ids.push(
-                                ...val.value.split(',').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
-                            );
-                        } else if (typeof val === 'string') {
-                            project.lineage.derived_from_ids.push(
-                                ...val.split(',').map(v => v.trim()).filter(v => v && !uuidRegex.test(v))
-                            );
-                        } else if (Array.isArray(val)) {
-                            project.lineage.derived_from_ids.push(
-                                ...val.map(v => typeof v === 'string' ? v.trim() : String(v)).filter(v => v && !uuidRegex.test(v))
-                            );
-                        }
-                    } else if (val && typeof val === 'object' && !Array.isArray(val) && key !== 'provenance') {
-                        extractLineage(val);
-                    }
-                }
-            }
-
-            if (project.metadata) {
-                extractLineage(project.metadata);
-            }
-        });
-
-        // Pass 2: Resolve Lineage Links
-        projects.forEach(project => {
-            project.lineage.derived_from_ids.forEach(derivedId => {
-                const sourcePath = idRegistry.get(derivedId);
-                console.log(`[Lineage] Resolving derivedId "${derivedId}" for project "${project.path}" -> sourcePath: ${sourcePath}`);
-                if (sourcePath && sourcePath !== project.path) {
-                    console.log(`[Lineage] ESTABLISHED LINK: ${sourcePath} -> ${project.path}`);
-                    project.lineage.lineage_links.push({
-                        id: derivedId,
-                        source_path: sourcePath
-                    });
-                }
-            });
-        });
-        // --------------------------------------------------------
+        // --- PHASE 3: Two-Pass Scanner Logic (Lineage, Related Links & Tags) ---
+        populateLineageForProjects(projects);
+        // ------------------------------------------------------------------------
 
         console.log(`✅ Found ${projects.length} MetaFold projects`);
         return {
@@ -5515,6 +5637,19 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
 
         // Create a clean copy without internal system fields
         const cleanMetadata = { ...projectMetadata };
+        // Preserve notes, hypothesis, and rename history even in flat JSON documents
+        if (cleanMetadata.notes_markdown === undefined && typeof metadata.notes_markdown === 'string') {
+            cleanMetadata.notes_markdown = metadata.notes_markdown;
+        }
+        if (cleanMetadata.hypothesis_or_goal === undefined && typeof metadata.hypothesis_or_goal === 'string') {
+            cleanMetadata.hypothesis_or_goal = metadata.hypothesis_or_goal;
+        }
+        if (cleanMetadata.notes_log === undefined && Array.isArray(metadata.notes_log)) {
+            cleanMetadata.notes_log = metadata.notes_log;
+        }
+        if (cleanMetadata.previous_names === undefined && Array.isArray(metadata.previous_names)) {
+            cleanMetadata.previous_names = metadata.previous_names;
+        }
         // Extract integrations safely before deletion
         const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || metadata.metafold_integration?.external_links || metadata.integrations || null;
 
@@ -5559,6 +5694,7 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
             path: projectPath,
             schemaVersion: schemaVersion,
             projectId: projectId,  // NEW: stable UUID, null for legacy projects without one
+            previous_names: cleanMetadata.previous_names || metadata.previous_names || [],
             metadata: cleanMetadata,
             integrations: integrations,
             metadataFieldCount: metadataFieldCount,

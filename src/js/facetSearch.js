@@ -832,6 +832,8 @@ const facetSearch = {
             if (!q) return true;
             if ((item.name || '').toLowerCase().includes(q)) return true;
             if ((item.path || '').toLowerCase().includes(q)) return true;
+            const itemUuid = item.metafold_project_id || item.projectId || item.metadata?.metafold_project_id || '';
+            if (itemUuid && String(itemUuid).toLowerCase().includes(q)) return true;
             if (item.flatMeta) {
                 for (let k in item.flatMeta) {
                     const v = item.flatMeta[k];
@@ -839,6 +841,16 @@ const facetSearch = {
                         return true;
                     }
                 }
+            }
+            const notesMdVal = item.notes_markdown || item.metadata?.notes_markdown || '';
+            if (typeof notesMdVal === 'string' && notesMdVal.toLowerCase().includes(q)) return true;
+            const goalVal = item.hypothesis_or_goal || item.metadata?.hypothesis_or_goal || '';
+            if (typeof goalVal === 'string' && goalVal.toLowerCase().includes(q)) return true;
+            const notesLogVal = Array.isArray(item.notes_log) ? item.notes_log : (Array.isArray(item.metadata?.notes_log) ? item.metadata.notes_log : []);
+            if (notesLogVal.some(n => n && typeof n.text === 'string' && n.text.toLowerCase().includes(q))) return true;
+            if (item.tags) {
+                const tagStr = Array.isArray(item.tags) ? item.tags.join(' ') : String(item.tags);
+                if (tagStr.toLowerCase().includes(q)) return true;
             }
             if (item.lineage) {
                 if (Array.isArray(item.lineage.provides_ids) && item.lineage.provides_ids.some(id => String(id).toLowerCase().includes(q))) {
@@ -851,6 +863,18 @@ const facetSearch = {
                     (l.id && String(l.id).toLowerCase().includes(q)) ||
                     (l.source_path && String(l.source_path).toLowerCase().includes(q))
                 )) {
+                    return true;
+                }
+                if (Array.isArray(item.lineage.related_to_ids) && item.lineage.related_to_ids.some(id => String(id).toLowerCase().includes(q))) {
+                    return true;
+                }
+                if (Array.isArray(item.lineage.related_links) && item.lineage.related_links.some(l =>
+                    (l.id && String(l.id).toLowerCase().includes(q)) ||
+                    (l.target_path && String(l.target_path).toLowerCase().includes(q))
+                )) {
+                    return true;
+                }
+                if (Array.isArray(item.lineage.tags) && item.lineage.tags.some(t => String(t).toLowerCase().includes(q))) {
                     return true;
                 }
             }
@@ -2063,6 +2087,15 @@ const facetSearch = {
 
         this.allAvailableKeys.forEach(key => {
             const title = this._formatKeyLabel(key);
+            const baseKey = key.split('.').pop();
+            const fieldType = this.metadataTypes[key] || this.metadataTypes[baseKey] || '';
+            const lowerKey = key.toLowerCase();
+            const normKey = lowerKey.replace(/[\s_-]+/g, '');
+            const isDerivedCol = fieldType === 'derived_from' || lowerKey === 'derived_from' || lowerKey.includes('derived_from') || normKey === 'derivedfrom';
+            const isRelatedCol = fieldType === 'related_to' || lowerKey === 'related_to' || lowerKey.includes('related_to') || normKey === 'relatedto' || lowerKey.includes('related_project');
+            const isTagsCol = !isDerivedCol && !isRelatedCol && (fieldType === 'tags' || /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i.test(key));
+            const isIdAnchorCol = fieldType === 'id_anchor' || lowerKey === 'id_anchor';
+
             movableDefs[key] = {
                 title,
                 field: this._keyToField(key),
@@ -2072,14 +2105,108 @@ const facetSearch = {
                 sorter: 'string',
                 formatter: (cell) => {
                     const rawVal = cell.getValue();
-                    if (window.formatDisplayValue) {
-                        return window.formatDisplayValue(rawVal, { emptyPlaceholder: '—' });
+                    const displayStr = window.formatDisplayValue
+                        ? window.formatDisplayValue(rawVal, { emptyPlaceholder: '—' })
+                        : (rawVal === undefined || rawVal === null || rawVal === '' ? '—' : (typeof rawVal === 'object' ? JSON.stringify(rawVal) : String(rawVal)));
+                    if (!displayStr || displayStr === '—') return '—';
+
+                    const esc = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
+                    const escAttr = (window.markdownLite && window.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
+                    const rowData = cell.getRow ? cell.getRow().getData() : null;
+                    const currentRowPath = rowData ? (rowData._path || rowData.path || '') : '';
+
+                    if (isDerivedCol || isRelatedCol) {
+                        const tokens = displayStr.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                        if (tokens.length === 0) return '—';
+                        return tokens.map(part => {
+                            const refName = part.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                            const linkedProj = self._resolveProjectByRef(refName);
+                            const chipClass = isDerivedCol ? 'is-derived' : 'is-related';
+                            const icon = linkedProj ? '📁' : (isDerivedCol ? '⚓' : '🔀');
+                            const labelText = (linkedProj && linkedProj.name) ? linkedProj.name : part;
+                            const tip = linkedProj
+                                ? `Open linked project: ${linkedProj.name} (${refName})`
+                                : `Filter table by '${refName}'`;
+                            return `<a href="#" class="facet-cell-link-chip ${chipClass}" data-mf-ref="${escAttr(refName)}" data-mf-path="${linkedProj ? escAttr(linkedProj.path) : ''}" title="${escAttr(tip)}">${icon} ${esc(labelText)}</a>`;
+                        }).join(' ');
                     }
-                    if (rawVal === undefined || rawVal === null || rawVal === '') return '—';
-                    if (typeof rawVal === 'object') {
-                        try { return JSON.stringify(rawVal); } catch (_) { return String(rawVal); }
+
+                    if (isTagsCol) {
+                        const tags = displayStr.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                        if (tags.length === 0) return '—';
+                        return tags.map(part => {
+                            const tagClean = part.replace(/^#+/, '').trim();
+                            if (!tagClean) return '';
+                            return `<a href="#" class="facet-cell-tag-chip" data-mf-tag="${escAttr(tagClean)}" title="Filter table by tag '${escAttr(tagClean)}'">🏷️ ${esc(tagClean)}</a>`;
+                        }).filter(Boolean).join(' ');
                     }
-                    return String(rawVal);
+
+                    if (isIdAnchorCol) {
+                        return `<a href="#" class="facet-cell-id-chip" data-mf-id="${escAttr(displayStr)}" title="Filter table by ID '${escAttr(displayStr)}'">⚓ ${esc(displayStr)}</a>`;
+                    }
+
+                    if (window.markdownLite && window.markdownLite.renderInline && /(\[\[|https?:\/\/|\\\\|[A-Za-z]:\\|(?:^|[\s(])#[A-Za-z0-9\u00C0-\u024F])/.test(displayStr)) {
+                        return window.markdownLite.renderInline(displayStr);
+                    }
+
+                    const matchedProj = self._resolveProjectByRef(displayStr);
+                    if (matchedProj && matchedProj.path && matchedProj.path !== currentRowPath) {
+                        const displayLabel = matchedProj.name || displayStr;
+                        return `<a href="#" class="facet-cell-link-chip is-related" data-mf-ref="${escAttr(displayStr)}" data-mf-path="${escAttr(matchedProj.path)}" title="Open project: ${escAttr(matchedProj.name)} (${escAttr(displayStr)})">📁 ${esc(displayLabel)} ↗</a>`;
+                    }
+
+                    return esc(displayStr);
+                },
+                cellClick: (e) => {
+                    const target = e.target && e.target.closest ? e.target.closest('.facet-cell-link-chip, .facet-cell-tag-chip, .facet-cell-id-chip, .mf-md-mention, .mf-md-tag, .mf-md-link, .mf-md-path') : null;
+                    if (!target) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (target.classList.contains('facet-cell-link-chip')) {
+                        const targetPath = target.dataset.mfPath;
+                        const refName = target.dataset.mfRef;
+                        if (targetPath) {
+                            self.selectAndInspectProjectByPath(targetPath);
+                        } else if (refName) {
+                            const found = self._resolveProjectByRef(refName);
+                            if (found && found.path) self.selectAndInspectProjectByPath(found.path);
+                            else self.filterByLineageId(refName);
+                        }
+                        return;
+                    }
+                    if (target.classList.contains('facet-cell-tag-chip') || target.classList.contains('mf-md-tag')) {
+                        const tag = target.dataset.mfTag;
+                        if (tag) self.filterByLineageId(tag);
+                        return;
+                    }
+                    if (target.classList.contains('facet-cell-id-chip')) {
+                        const idVal = target.dataset.mfId;
+                        if (idVal) self.filterByLineageId(idVal);
+                        return;
+                    }
+                    if (target.classList.contains('mf-md-mention')) {
+                        const targetName = target.dataset.mfProject;
+                        if (targetName) {
+                            const found = self._resolveProjectByRef(targetName);
+                            if (found && found.path) self.selectAndInspectProjectByPath(found.path);
+                            else self.filterByLineageId(targetName);
+                        }
+                        return;
+                    }
+                    if (target.classList.contains('mf-md-path')) {
+                        const p = target.dataset.mfPath;
+                        if (p && window.electronAPI?.showItemInFolder) window.electronAPI.showItemInFolder(p);
+                        else if (p && window.electronAPI?.openFolder) window.electronAPI.openFolder(p);
+                        return;
+                    }
+                    if (target.classList.contains('mf-md-link')) {
+                        const u = target.dataset.mfUrl;
+                        if (u) {
+                            if (window.electronAPI?.openExternal) window.electronAPI.openExternal(u);
+                            else window.open(u, '_blank');
+                        }
+                    }
                 },
                 accessorDownload: (val) => {
                     if (window.formatDisplayValue) {
@@ -2303,7 +2430,7 @@ const facetSearch = {
 
         // Tabulator 6.x requires registering event listeners via .on()
         this.tabulatorInstance.on('rowClick', (e, row) => {
-            if (e.target && e.target.closest('.facet-act-open, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install, .tabulator-data-tree-control')) {
+            if (e.target && e.target.closest('.facet-act-open, .facet-act-add-note, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install, .tabulator-data-tree-control, .facet-cell-link-chip, .facet-cell-tag-chip, .facet-cell-id-chip, .mf-md-mention, .mf-md-tag, .mf-md-link, .mf-md-path')) {
                 return;
             }
             this._activateRow(row, false);
@@ -3321,6 +3448,465 @@ const facetSearch = {
         this.showProjectDetails(sc);
     },
 
+    // Resolve a project name, path, previous_name, or id_anchor to a project in masterData
+    _resolveProjectByRef(rawRef) {
+        if (!rawRef) return null;
+        const clean = String(rawRef).replace(/^\[\[|\]\]$/g, '').trim();
+        if (!clean || !Array.isArray(this.masterData)) return null;
+        const lower = clean.toLowerCase();
+
+        // 1. Exact path, UUID, or exact project name / provides_id match
+        const exact = this.masterData.find(p =>
+            p.path === clean ||
+            p.name === clean ||
+            p.metafold_project_id === clean ||
+            p.projectId === clean ||
+            p.metadata?.metafold_project_id === clean ||
+            p.metadata?.projectName === clean ||
+            (Array.isArray(p.previous_names) && p.previous_names.includes(clean)) ||
+            (Array.isArray(p.metadata?.previous_names) && p.metadata.previous_names.includes(clean)) ||
+            (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(clean))
+        );
+        if (exact) return exact;
+
+        // 2. Case-insensitive fallback
+        return this.masterData.find(p =>
+            (p.name && p.name.toLowerCase() === lower) ||
+            (p.metafold_project_id && String(p.metafold_project_id).toLowerCase() === lower) ||
+            (p.projectId && String(p.projectId).toLowerCase() === lower) ||
+            (p.metadata?.metafold_project_id && String(p.metadata.metafold_project_id).toLowerCase() === lower) ||
+            (p.metadata?.projectName && String(p.metadata.projectName).toLowerCase() === lower) ||
+            (Array.isArray(p.previous_names) && p.previous_names.some(n => String(n).toLowerCase() === lower)) ||
+            (Array.isArray(p.metadata?.previous_names) && p.metadata.previous_names.some(n => String(n).toLowerCase() === lower)) ||
+            (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.some(id => String(id).toLowerCase() === lower))
+        ) || null;
+    },
+
+    // Collects all text across a project's notes and string metadata fields
+    _collectProjectTextBlocks(project) {
+        if (!project) return '';
+        const parts = [];
+        const notesMd = project.notes_markdown || project.metadata?.notes_markdown || '';
+        const hypothesis = project.hypothesis_or_goal || project.metadata?.hypothesis_or_goal || '';
+        const notesLog = Array.isArray(project.notes_log)
+            ? project.notes_log
+            : (Array.isArray(project.metadata?.notes_log) ? project.metadata.notes_log : []);
+
+        if (notesMd) parts.push(String(notesMd));
+        if (hypothesis) parts.push(String(hypothesis));
+        notesLog.forEach(n => {
+            if (n && typeof n.text === 'string' && n.text.trim()) parts.push(n.text);
+        });
+
+        const skipKeys = new Set([
+            'schemaVersion', 'schemaType', 'metafold_project_id', 'projectName',
+            'provenance', 'metafold_integration', 'integrations', 'created_at',
+            'updated_at', 'previous_names', 'changelog', 'notes_log',
+            'notes_markdown', 'hypothesis_or_goal', 'template', 'templateInfo'
+        ]);
+        const walk = (obj) => {
+            if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+            for (const [k, v] of Object.entries(obj)) {
+                if (skipKeys.has(k) || k.startsWith('System.')) continue;
+                if (!v) continue;
+                if (typeof v === 'string') {
+                    if (v.trim()) parts.push(v);
+                } else if (typeof v === 'object' && !Array.isArray(v)) {
+                    if (Object.prototype.hasOwnProperty.call(v, 'value')) {
+                        if (typeof v.value === 'string' && v.value.trim()) parts.push(v.value);
+                    } else {
+                        walk(v);
+                    }
+                }
+            }
+        };
+        if (project.metadata) walk(project.metadata);
+        return parts.join('\n');
+    },
+
+    // Collect all structured links (derived_from, downstream, related_to, [[mentions]]), tags, and note links
+    _collectProjectLinksAndTags(project) {
+        const selfPath = project.path || '';
+        const selfNameLower = (project.name || project.metadata?.projectName || '').trim().toLowerCase();
+        const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
+        const skipWalkKeys = new Set([
+            'schemaVersion', 'schemaType', 'metafold_project_id', 'projectName',
+            'provenance', 'metafold_integration', 'integrations', 'created_at',
+            'updated_at', 'previous_names', 'changelog', 'notes_log',
+            'notes_markdown', 'hypothesis_or_goal', 'template', 'templateInfo'
+        ]);
+
+        const parseRawList = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'object' && val.value !== undefined) return parseRawList(val.value);
+            if (typeof val === 'string') return val.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+            return [];
+        };
+
+        const extractFieldsByRole = (metaObj) => {
+            const derived = [];
+            const related = [];
+            const tags = [];
+            const walk = (obj) => {
+                if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+                for (const [k, v] of Object.entries(obj)) {
+                    if (skipWalkKeys.has(k) || k.startsWith('System.')) continue;
+                    if (!v) continue;
+                    const lk = k.toLowerCase();
+                    const normK = lk.replace(/[\s_-]+/g, '');
+                    const labelStr = (typeof v === 'object' && v.label) ? String(v.label).toLowerCase() : '';
+                    const fType = (typeof v === 'object' && v.type) ? v.type : '';
+
+                    if (fType === 'derived_from' || lk === 'derived_from' || lk.includes('derived_from') || normK === 'derivedfrom' || labelStr.includes('derived from')) {
+                        derived.push(...parseRawList(v));
+                    } else if (fType === 'related_to' || lk === 'related_to' || lk.includes('related_to') || normK === 'relatedto' || labelStr.includes('related to') || labelStr.includes('related project') || lk.includes('related_project')) {
+                        related.push(...parseRawList(v));
+                    } else if (fType === 'tags' || tagKeyRegex.test(k)) {
+                        tags.push(...parseRawList(v));
+                    } else if (typeof v === 'object' && !Array.isArray(v) && v.value === undefined && v.type === undefined) {
+                        walk(v);
+                    }
+                }
+            };
+            walk(metaObj);
+            return { derived, related, tags };
+        };
+
+        const ownFields = extractFieldsByRole(project.metadata || {});
+        if (project.flatMeta) {
+            for (const [k, v] of Object.entries(project.flatMeta)) {
+                const lk = k.toLowerCase();
+                const normK = lk.replace(/[\s_-]+/g, '');
+                if (lk.includes('derived_from') || normK === 'derivedfrom') ownFields.derived.push(...parseRawList(v));
+                else if (lk.includes('related_to') || normK === 'relatedto' || lk.includes('related_project')) ownFields.related.push(...parseRawList(v));
+                else if (tagKeyRegex.test(k)) ownFields.tags.push(...parseRawList(v));
+            }
+        }
+        if (project.tags) ownFields.tags.push(...parseRawList(project.tags));
+
+        // 1. Upstream (Derived From)
+        const upstreamMap = new Map();
+        const upstreamKeysSet = new Set();
+        const addUpstream = (rawId, sourcePathHint = '', note = '') => {
+            const cleanId = String(rawId || '').trim();
+            if (!cleanId) return;
+            const linkedProj = (sourcePathHint && this.masterData.find(p => p.path === sourcePathHint)) || this._resolveProjectByRef(cleanId);
+            const resolvedPath = linkedProj?.path || sourcePathHint || '';
+            if (resolvedPath && resolvedPath === selfPath) return;
+            const dedupKey = resolvedPath ? `path::${resolvedPath.toLowerCase()}` : `id::${cleanId.toLowerCase()}`;
+            if (!upstreamMap.has(dedupKey)) {
+                upstreamMap.set(dedupKey, {
+                    id: cleanId,
+                    name: linkedProj ? linkedProj.name : (resolvedPath ? resolvedPath.split(/[\\/]/).pop() : cleanId),
+                    sourcePath: resolvedPath,
+                    linkedProj,
+                    note
+                });
+            }
+            upstreamKeysSet.add(cleanId.toLowerCase());
+            if (linkedProj?.name) upstreamKeysSet.add(linkedProj.name.toLowerCase());
+            if (resolvedPath) upstreamKeysSet.add(resolvedPath.toLowerCase());
+        };
+
+        (project.lineage?.lineage_links || []).forEach(l => addUpstream(l.id, l.source_path));
+        (project.lineage?.derived_from_ids || []).forEach(id => addUpstream(id));
+        ownFields.derived.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+                addUpstream(item.id || item.name, '', item.relation_note || item.anchor || '');
+            } else {
+                addUpstream(item);
+            }
+        });
+        const upstreamItems = Array.from(upstreamMap.values());
+
+        // 2. Downstream (Derived Projects)
+        const downstreamMap = new Map();
+        const downstreamPathsSet = new Set();
+        const downstreamNamesSet = new Set();
+        this.masterData.forEach(other => {
+            if (!other || other.path === selfPath) return;
+            const matchedLinks = (other.lineage?.lineage_links || []).filter(l => l.source_path === selfPath);
+            let viaIds = matchedLinks.map(l => l.id).filter(Boolean);
+
+            if (viaIds.length === 0) {
+                const otherDerived = [
+                    ...(other.lineage?.derived_from_ids || []),
+                    ...extractFieldsByRole(other.metadata || {}).derived.map(it => typeof it === 'object' && it ? (it.id || it.name) : String(it || ''))
+                ];
+                viaIds = otherDerived.filter(id => {
+                    const resolved = this._resolveProjectByRef(id);
+                    return resolved && resolved.path === selfPath;
+                });
+            }
+
+            if (viaIds.length > 0) {
+                const dedupKey = other.path.toLowerCase();
+                if (!downstreamMap.has(dedupKey)) {
+                    downstreamMap.set(dedupKey, {
+                        project: other,
+                        viaId: Array.from(new Set(viaIds)).join(', ')
+                    });
+                    downstreamPathsSet.add(dedupKey);
+                    if (other.name) downstreamNamesSet.add(other.name.toLowerCase());
+                }
+            }
+        });
+        const downstreamProjects = Array.from(downstreamMap.values());
+
+        // 3. Related Projects (related_to + [[Project]] mentions + incoming references)
+        const relatedMap = new Map();
+        const addRelated = (rawId, originLabel = '🔀 related_to', targetPathHint = '', direction = 'out') => {
+            const cleanId = String(rawId || '').trim();
+            if (!cleanId) return;
+            const lowerId = cleanId.toLowerCase();
+            if (lowerId === selfNameLower) return;
+
+            const linkedProj = (targetPathHint && this.masterData.find(p => p.path === targetPathHint)) || this._resolveProjectByRef(cleanId);
+            const resolvedPath = linkedProj?.path || targetPathHint || '';
+            if (resolvedPath && resolvedPath === selfPath) return;
+
+            // Skip items already shown in Derived From / Derived Projects
+            if (upstreamKeysSet.has(lowerId) || (resolvedPath && upstreamKeysSet.has(resolvedPath.toLowerCase()))) return;
+            if ((resolvedPath && downstreamPathsSet.has(resolvedPath.toLowerCase())) || downstreamNamesSet.has(lowerId)) return;
+
+            const dedupKey = resolvedPath ? `path::${resolvedPath.toLowerCase()}` : `id::${lowerId}`;
+            const existing = relatedMap.get(dedupKey);
+            if (!existing) {
+                relatedMap.set(dedupKey, {
+                    id: cleanId,
+                    name: linkedProj ? linkedProj.name : (resolvedPath ? resolvedPath.split(/[\\/]/).pop() : cleanId),
+                    sourcePath: resolvedPath,
+                    linkedProj,
+                    originLabel,
+                    direction
+                });
+            } else if (existing.originLabel === '↩ linked by' && direction === 'out') {
+                existing.originLabel = originLabel;
+                existing.direction = 'both';
+            }
+        };
+
+        (project.lineage?.related_links || []).forEach(l => addRelated(l.id, '🔀 related_to', l.target_path, 'out'));
+        (project.lineage?.related_to_ids || []).forEach(id => addRelated(id, '🔀 related_to', '', 'out'));
+        ownFields.related.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+                const origin = item.origin === 'note' ? '📝 [[Note]]' : '🔀 related_to';
+                addRelated(item.id || item.name, origin, '', 'out');
+            } else {
+                addRelated(item, '🔀 related_to', '', 'out');
+            }
+        });
+
+        const ownText = this._collectProjectTextBlocks(project);
+        if (ownText && window.markdownLite?.extractMentions) {
+            window.markdownLite.extractMentions(ownText).forEach(m => {
+                addRelated(m, '📝 [[Note]]', '', 'out');
+            });
+        }
+
+        // Incoming associative links from other projects
+        this.masterData.forEach(other => {
+            if (!other || other.path === selfPath) return;
+            const otherPathLower = (other.path || '').toLowerCase();
+            if (upstreamKeysSet.has(otherPathLower) || downstreamPathsSet.has(otherPathLower)) return;
+
+            let pointsToSelf = false;
+            if (other.lineage?.related_links?.some(l => l.target_path === selfPath)) {
+                pointsToSelf = true;
+            }
+            if (!pointsToSelf && Array.isArray(other.lineage?.related_to_ids)) {
+                pointsToSelf = other.lineage.related_to_ids.some(id => this._resolveProjectByRef(id)?.path === selfPath);
+            }
+            if (!pointsToSelf) {
+                const otherRelated = extractFieldsByRole(other.metadata || {}).related;
+                pointsToSelf = otherRelated.some(item => {
+                    const id = typeof item === 'object' && item ? (item.id || item.name) : String(item || '');
+                    const resolved = this._resolveProjectByRef(id);
+                    return resolved && resolved.path === selfPath;
+                });
+            }
+            if (!pointsToSelf && window.markdownLite?.extractMentions) {
+                const otherText = this._collectProjectTextBlocks(other);
+                if (otherText) {
+                    pointsToSelf = window.markdownLite.extractMentions(otherText).some(m => {
+                        const resolved = this._resolveProjectByRef(m);
+                        return resolved && resolved.path === selfPath;
+                    });
+                }
+            }
+            if (pointsToSelf) {
+                addRelated(other.name, '↩ linked by', other.path, 'in');
+            }
+        });
+        const relatedItems = Array.from(relatedMap.values());
+
+        // 4. Tags (from tags/keywords fields AND #tags in notes & metadata strings)
+        const tagsMap = new Map();
+        const addTag = (rawTag) => {
+            const clean = String(rawTag || '').replace(/^#+/, '').trim();
+            if (!clean) return;
+            const lower = clean.toLowerCase();
+            if (!tagsMap.has(lower)) {
+                tagsMap.set(lower, { tag: clean, count: 0 });
+            }
+        };
+        ownFields.tags.forEach(item => {
+            if (typeof item === 'object' && item !== null) addTag(item.name || item.id);
+            else addTag(item);
+        });
+        (project.lineage?.tags || []).forEach(addTag);
+        if (ownText && window.markdownLite?.extractTags) {
+            window.markdownLite.extractTags(ownText).forEach(addTag);
+        }
+        const tags = Array.from(tagsMap.values()).sort((a, b) => a.tag.localeCompare(b.tag));
+
+        // 5. External Web & File Links in Notes
+        const notesMd = project.notes_markdown || project.metadata?.notes_markdown || '';
+        const hypothesis = project.hypothesis_or_goal || project.metadata?.hypothesis_or_goal || '';
+        const notesLog = Array.isArray(project.notes_log)
+            ? project.notes_log
+            : (Array.isArray(project.metadata?.notes_log) ? project.metadata.notes_log : []);
+        const allNotesOnly = [notesMd, hypothesis, ...notesLog.map(n => n?.text || '')].filter(Boolean).join('\n');
+        const extractedNoteLinks = (window.markdownLite && window.markdownLite.extractLinks)
+            ? window.markdownLite.extractLinks(allNotesOnly).filter(l => l.type === 'url' || l.type === 'path')
+            : [];
+
+        return {
+            upstreamItems,
+            downstreamProjects,
+            relatedItems,
+            tags,
+            extractedNoteLinks
+        };
+    },
+
+    // Bind all interactive links, tags, note buttons & copy buttons inside #facetRightPanelContent
+    _bindRightPanelInteractiveElements(contentArea, project, notesLog = []) {
+        if (!contentArea) return;
+
+        const editMetaBtn = document.getElementById('facetBtnEditMetadata');
+        if (editMetaBtn) {
+            editMetaBtn.onclick = () => {
+                if (window.projectInlineEditor) {
+                    window.projectInlineEditor.startEdit(project);
+                }
+            };
+        }
+
+        const addNoteBtn = document.getElementById('facetBtnAddNote');
+        const addNoteInlineBtn = document.getElementById('facetBtnAddNoteInline');
+        const openAddNote = () => {
+            if (window.noteComposer) {
+                window.noteComposer.open(project);
+            }
+        };
+        if (addNoteBtn) addNoteBtn.onclick = openAddNote;
+        if (addNoteInlineBtn) addNoteInlineBtn.onclick = openAddNote;
+
+        contentArea.querySelectorAll('.mf-btn-edit-note').forEach(btn => {
+            btn.onclick = () => {
+                const noteId = btn.dataset.noteId;
+                const note = notesLog.find(n => n.id === noteId);
+                if (note && window.noteComposer) {
+                    window.noteComposer.editNote(project, note);
+                }
+            };
+        });
+        contentArea.querySelectorAll('.mf-btn-delete-note').forEach(btn => {
+            btn.onclick = () => {
+                const noteId = btn.dataset.noteId;
+                if (noteId && window.noteComposer) {
+                    window.noteComposer.deleteNote(project, noteId);
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-extracted-mention-link, .mf-md-mention').forEach(a => {
+            const rawRef = a.dataset.projectName || a.dataset.mfProject;
+            if (rawRef && a.classList.contains('mf-md-mention')) {
+                const resolved = this._resolveProjectByRef(rawRef);
+                if (resolved && resolved.name && resolved.name !== rawRef) {
+                    a.textContent = `🔗 ${resolved.name}`;
+                    a.title = `Related project (related_to): ${resolved.name} (${rawRef}) — click to open`;
+                }
+            }
+            a.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const targetName = a.dataset.projectName || a.dataset.mfProject;
+                if (!targetName) return;
+                const found = this._resolveProjectByRef(targetName);
+                if (found && found.path) {
+                    this.selectAndInspectProjectByPath(found.path);
+                } else {
+                    this.filterByLineageId(targetName);
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-md-tag').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const tag = a.dataset.mfTag;
+                if (tag) {
+                    this.filterByLineageId(tag);
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-extracted-path-link, .mf-md-path').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const p = a.dataset.projectPath || a.dataset.mfPath;
+                if (p && window.electronAPI?.showItemInFolder) {
+                    window.electronAPI.showItemInFolder(p);
+                } else if (p && window.electronAPI?.openFolder) {
+                    window.electronAPI.openFolder(p);
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-extracted-url-link, .mf-md-link').forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const u = a.dataset.url || a.dataset.mfUrl;
+                if (u) {
+                    if (window.electronAPI?.openExternal) window.electronAPI.openExternal(u);
+                    else window.open(u, '_blank');
+                }
+            };
+        });
+
+        contentArea.querySelectorAll('.mf-copy-btn').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const text = btn.dataset.copyText;
+                if (!text) return;
+                try {
+                    if (window.electronAPI?.writeToClipboard) {
+                        await window.electronAPI.writeToClipboard(text);
+                    } else if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(text);
+                    }
+                    const origHtml = btn.innerHTML;
+                    btn.textContent = '✓';
+                    btn.style.color = '#34d399';
+                    setTimeout(() => {
+                        btn.innerHTML = origHtml;
+                        btn.style.color = '';
+                    }, 1200);
+                } catch (err) {
+                    console.error('Copy to clipboard failed:', err);
+                }
+            };
+        });
+    },
+
     // Show full Project Metadata, Quick Actions & Collapsible Lineage Accordion inside the docked right panel on row click
     showProjectDetails(rowData) {
         if (!rowData) return;
@@ -3366,12 +3952,14 @@ const facetSearch = {
         }
 
         // Pre-extract notes for display and deduplication
+        let promotedNotesKey = null;
         let notesMd = project.notes_markdown || (project.metadata && project.metadata.notes_markdown) || '';
         if (!notesMd && project.metadata) {
             const findNotesVal = (obj) => {
                 for (const [k, v] of Object.entries(obj)) {
                     if (v && typeof v === 'object') {
                         if ((v.type === 'notes' || v.type === 'markdown' || v.displayInNotes === true) && v.value) {
+                            promotedNotesKey = k;
                             return String(v.value);
                         }
                         if (typeof v === 'object' && v.value === undefined && v.type === undefined) {
@@ -3406,12 +3994,15 @@ const facetSearch = {
             `;
         };
 
+        const escHtml = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
+        const escAttr = (window.markdownLite && window.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
+
         const renderMetadataField = (key, field) => {
             if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level', 'System.hasReadme', 'changelog', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'previous_names'].includes(key)) return '';
 
-            // Skip fields displayed under Notes & Observations to avoid duplication
+            // Skip only the single notes field that was already promoted into Notes & Observations
             if (field && typeof field === 'object') {
-                if (field.type === 'notes' || field.type === 'markdown' || field.displayInNotes === true) return '';
+                if (promotedNotesKey && key === promotedNotesKey) return '';
                 if (field.type === 'textarea' && notesMd && String(field.value || '').trim() === String(notesMd).trim()) {
                     return '';
                 }
@@ -3419,7 +4010,7 @@ const facetSearch = {
 
             if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
                 let catHtml = `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; border-left: 3px solid #8b5cf6;">`;
-                catHtml += `<div style="font-size: 0.76rem; color: #c4b5fd; margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">📁 ${key.replace(/_/g, ' ')}</div>`;
+                catHtml += `<div style="font-size: 0.76rem; color: #c4b5fd; margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">📁 ${escHtml(key.replace(/_/g, ' '))}</div>`;
                 catHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
                 for (const [subKey, subField] of Object.entries(field)) {
                     catHtml += renderMetadataField(subKey, subField);
@@ -3436,20 +4027,26 @@ const facetSearch = {
             let displayValue = value;
             const lowerKey = key.toLowerCase();
             const lowerLabel = label.toLowerCase();
-            const isDerived = lowerKey.includes('derived_from') || lowerKey.includes('related_to') ||
-                lowerKey.replace(/[\s_-]+/g, '') === 'derivedfrom' || lowerKey.replace(/[\s_-]+/g, '') === 'relatedto' ||
-                lowerLabel.includes('derived from') || lowerLabel.includes('related to') || lowerLabel.includes('related project') ||
-                type === 'derived_from' || type === 'related_to';
-            const isTags = !isDerived && (lowerKey === 'tags' || lowerKey.endsWith('_tags') || type === 'tags' || type === 'array');
+            const normKey = lowerKey.replace(/[\s_-]+/g, '');
+            const isDerivedFrom = lowerKey.includes('derived_from') || normKey === 'derivedfrom' || lowerLabel.includes('derived from') || type === 'derived_from';
+            const isRelatedTo = !isDerivedFrom && (
+                lowerKey.includes('related_to') || normKey === 'relatedto' ||
+                lowerLabel.includes('related to') || lowerLabel.includes('related project') ||
+                lowerKey.includes('related_project') || type === 'related_to'
+            );
+            const isIdAnchor = !isDerivedFrom && !isRelatedTo && (type === 'id_anchor' || lowerKey === 'id_anchor');
+            const isTags = !isDerivedFrom && !isRelatedTo && !isIdAnchor && (
+                /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i.test(key) || type === 'tags'
+            );
 
             if (displayValue === null || displayValue === undefined || displayValue === '') {
                 displayValue = '<em style="color: #6c7086;">Empty</em>';
-            } else if (isDerived) {
+            } else if (isDerivedFrom || isRelatedTo) {
                 let items = [];
                 if (Array.isArray(displayValue)) {
                     items = displayValue;
                 } else if (typeof displayValue === 'string') {
-                    items = displayValue.split(',').map(s => s.trim()).filter(Boolean);
+                    items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
                 }
                 if (items.length === 0) {
                     displayValue = '<em style="color: #6c7086;">Empty</em>';
@@ -3458,34 +4055,44 @@ const facetSearch = {
                         const rawId = typeof item === 'object' && item !== null ? (item.id || item.name || '') : String(item || '').trim();
                         const title = typeof item === 'object' && item !== null ? (item.name || item.id || '') : rawId;
                         const note = (typeof item === 'object' && item !== null) ? (item.relation_note || item.anchor || '') : '';
-                        const linkedProj = this.masterData.find(p => p.name === rawId || p.path === rawId || (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(rawId)));
+                        const linkedProj = this._resolveProjectByRef(rawId);
+                        const bgStyle = isDerivedFrom
+                            ? 'background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd;'
+                            : 'background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.42); color:#7dd3fc;';
+                        const roleHint = isDerivedFrom ? 'Derived From (Parent)' : 'Related To (Associative)';
                         if (linkedProj && linkedProj.path) {
                             const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                            return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Linked Project: ${linkedProj.name}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer; font-weight:500;">📁 ${linkedProj.name || title} ↗</span>`;
+                            return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="${roleHint}: ${escAttr(linkedProj.name)} — click to open" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer; font-weight:500;">${isRelatedTo ? '🔀 ' : ''}📁 ${escHtml(linkedProj.name || title)} ↗</span>`;
                         }
                         const safeRawId = rawId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                        return `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeRawId}')" title="Filter table for '${rawId}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">⚓ ${title}${note ? ` <em style="color:#a78bfa;">(${note})</em>` : ''} 🔍</span>`;
+                        return `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeRawId}')" title="${roleHint}: Filter table for '${escAttr(rawId)}'" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${isDerivedFrom ? '⚓' : '🔀'} ${escHtml(title)}${note ? ` <em style="opacity:0.8;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
                     }).join(' ');
                 }
+            } else if (isIdAnchor) {
+                const rawAnchor = String(displayValue).trim();
+                const safeAnchor = rawAnchor.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                displayValue = `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeAnchor}')" title="Own / Internal ID: Filter table for '${escAttr(rawAnchor)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.42); color:#fbbf24; padding:2px 8px; border-radius:12px; font-size:0.78rem; cursor:pointer; font-weight:500;">⚓ ${escHtml(rawAnchor)} 🔍</span>`;
             } else if (isTags) {
                 let items = [];
                 if (Array.isArray(displayValue)) {
                     items = displayValue;
                 } else if (typeof displayValue === 'string') {
-                    items = displayValue.split(',').map(s => s.trim()).filter(Boolean);
+                    items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
                 }
                 if (items.length === 0) {
                     displayValue = '<em style="color: #6c7086;">Empty</em>';
                 } else {
                     displayValue = items.map(tag => {
-                        const tagStr = typeof tag === 'object' && tag !== null ? (tag.name || tag.id || '') : String(tag || '').trim();
+                        const rawTag = typeof tag === 'object' && tag !== null ? (tag.name || tag.id || '') : String(tag || '').trim();
+                        const tagStr = rawTag.replace(/^#+/, '').trim();
+                        if (!tagStr) return '';
                         const safeTag = tagStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                        return `<span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag: '${tagStr}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">🏷️ ${tagStr}</span>`;
-                    }).join(' ');
+                        return `<span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag: '${escAttr(tagStr)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">🏷️ ${escHtml(tagStr)}</span>`;
+                    }).filter(Boolean).join(' ');
                 }
             } else if (type === 'url' || (typeof displayValue === 'string' && (displayValue.startsWith('http://') || displayValue.startsWith('https://')))) {
                 const safeUrl = String(displayValue).replace(/'/g, "\\'");
-                displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${displayValue}</span> <span style="font-size:0.8rem;">↗</span></a>`;
+                displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${escHtml(displayValue)}</span> <span style="font-size:0.8rem;">↗</span></a>`;
             } else if (Array.isArray(displayValue)) {
                 if (displayValue.length === 0) {
                     displayValue = '<em style="color: #6c7086;">Empty</em>';
@@ -3494,25 +4101,57 @@ const facetSearch = {
                         if (item && typeof item === 'object') {
                             const title = item.name || item.id || 'Link';
                             const note = item.relation_note || item.anchor || '';
-                            return `<span style="display:inline-block; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem;">${title}${note ? ` <em style="color:#c4b5fd;">(${note})</em>` : ''}</span>`;
+                            const linkedProj = this._resolveProjectByRef(item.id || item.name);
+                            if (linkedProj && linkedProj.path) {
+                                const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(title)})" style="display:inline-flex; align-items:center; gap:4px; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); color:#c4b5fd; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || title)}${note ? ` <em>(${escHtml(note)})</em>` : ''} ↗</span>`;
+                            }
+                            const safeTitle = String(title).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            return `<span onclick="facetSearch.filterByLineageId('${safeTitle}')" title="Filter table by '${escAttr(title)}'" style="display:inline-block; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(title)}${note ? ` <em style="color:#c4b5fd;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
                         }
-                        return `<span style="display:inline-block; background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem;">${item}</span>`;
+                        const itemStr = String(item || '').trim();
+                        const linkedProj = this._resolveProjectByRef(itemStr);
+                        if (linkedProj && linkedProj.path && linkedProj.path !== project.path) {
+                            const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            return `<span onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(itemStr)})" style="display:inline-block; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#7dd3fc; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || itemStr)} ↗</span>`;
+                        }
+                        const safeItem = itemStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        return `<span onclick="facetSearch.filterByLineageId('${safeItem}')" title="Filter table by '${escAttr(itemStr)}'" style="display:inline-block; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(itemStr)}</span>`;
                     }).join(' ');
                 }
             } else if (typeof displayValue === 'object') {
                 if (window.formatDisplayValue) {
-                    displayValue = window.formatDisplayValue(field);
+                    displayValue = escHtml(window.formatDisplayValue(field));
                 } else {
-                    displayValue = '<pre style="margin: 0; font-size: 0.76rem; white-space: pre-wrap;">' + JSON.stringify(displayValue, null, 2) + '</pre>';
+                    displayValue = '<pre style="margin: 0; font-size: 0.76rem; white-space: pre-wrap;">' + escHtml(JSON.stringify(displayValue, null, 2)) + '</pre>';
                 }
             } else {
+                const rawStr = String(displayValue);
                 const unitStr = (field && field.unit) ? ` ${field.unit}` : '';
-                displayValue = `${displayValue}${unitStr}`;
+                if (typeof displayValue === 'string' && window.markdownLite) {
+                    if (type === 'notes' || type === 'markdown' || (type === 'textarea' && rawStr.includes('\n'))) {
+                        displayValue = window.markdownLite.render(rawStr);
+                    } else {
+                        const renderedInline = window.markdownLite.renderInline(rawStr);
+                        const matchedProj = (!rawStr.includes('[[')) ? this._resolveProjectByRef(rawStr) : null;
+                        if (matchedProj && matchedProj.path && matchedProj.path !== project.path) {
+                            const safePath = matchedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const shownText = matchedProj.name && matchedProj.name !== rawStr.trim()
+                                ? `${escHtml(matchedProj.name)}${escHtml(unitStr)}`
+                                : `${renderedInline}${escHtml(unitStr)}`;
+                            displayValue = `${shownText} <span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open matching project: ${escAttr(matchedProj.name)} (${escAttr(rawStr)})" style="display:inline-flex; align-items:center; gap:3px; background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.4); color:#7dd3fc; padding:1px 6px; border-radius:10px; margin-left:4px; font-size:0.74rem; cursor:pointer;">↗ Open</span>`;
+                        } else {
+                            displayValue = `${renderedInline}${escHtml(unitStr)}`;
+                        }
+                    }
+                } else {
+                    displayValue = `${escHtml(rawStr)}${escHtml(unitStr)}`;
+                }
             }
 
             return `
                 <div style="background: rgba(255,255,255,0.04); padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px;">
-                    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${label}</div>
+                    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${escHtml(label)}</div>
                     <div style="font-size: 0.84rem; word-break: break-word;">${displayValue}</div>
                 </div>
             `;
@@ -3677,6 +4316,7 @@ const facetSearch = {
             `;
 
             contentArea.innerHTML = html;
+            this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
             return;
         }
 
@@ -3687,22 +4327,19 @@ const facetSearch = {
         const escapedName = (project.name || 'Project').replace(/'/g, "\\'");
         const createdStr = project.created ? new Date(project.created).toLocaleString() : '—';
 
-        // Calculate direct lineage connections (upstream & downstream) across masterData
-        const upstreamLinks = (project.lineage && Array.isArray(project.lineage.lineage_links))
-            ? project.lineage.lineage_links
-            : [];
-        const unresolvedDerivedIds = (project.lineage && Array.isArray(project.lineage.derived_from_ids))
-            ? project.lineage.derived_from_ids.filter(id => !upstreamLinks.some(l => l.id === id))
-            : [];
-        const downstreamProjects = this.masterData.filter(other =>
-            other.path !== project.path &&
-            other.lineage &&
-            Array.isArray(other.lineage.lineage_links) &&
-            other.lineage.lineage_links.some(l => l.source_path === project.path)
-        );
-        const totalUpstreamCount = upstreamLinks.length + unresolvedDerivedIds.length;
+        // Collect all links (derived_from, downstream, related_to, [[note mentions]]), tags, and note URLs/paths
+        const {
+            upstreamItems,
+            downstreamProjects,
+            relatedItems,
+            tags,
+            extractedNoteLinks
+        } = this._collectProjectLinksAndTags(project);
+        const totalUpstreamCount = upstreamItems.length;
         const totalDownstreamCount = downstreamProjects.length;
-        const hasAnyLineage = totalUpstreamCount > 0 || totalDownstreamCount > 0;
+        const totalRelatedCount = relatedItems.length;
+        const totalTagsCount = tags.length;
+        const hasAnyLinksOrTags = totalUpstreamCount > 0 || totalDownstreamCount > 0 || totalRelatedCount > 0 || totalTagsCount > 0 || extractedNoteLinks.length > 0;
 
         // Extract integration links
         const { omeroUrl, elabUrl } = this._extractUrls(project);
@@ -3712,70 +4349,33 @@ const facetSearch = {
             rspaceUrl = r.url || r.link || '';
         }
 
-        // Build Lineage Accordion body HTML
+        // Build Unified "Linked Projects & Tags" Accordion body HTML
         let lineageBodyHtml = '';
-        if (!hasAnyLineage) {
-            lineageBodyHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No incoming or outgoing project links found.</div>`;
+        if (!hasAnyLinksOrTags) {
+            lineageBodyHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No linked projects, [[note links]], or tags found yet.</div>`;
         } else {
             if (totalUpstreamCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em;">⬆️ Incoming / Derived From (${totalUpstreamCount})</div>`;
-                upstreamLinks.forEach(link => {
-                    const srcProj = this.masterData.find(p => p.path === link.source_path);
-                    const targetPath = (srcProj && srcProj.path) || link.source_path || '';
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em;">⬆️ Derived From (Parent Lineage) (${totalUpstreamCount})</div>`;
+                upstreamItems.forEach(item => {
+                    const targetPath = item.sourcePath || '';
                     const canOpen = Boolean(targetPath);
-                    const srcName = srcProj ? srcProj.name : (link.source_path ? link.source_path.split(/[\\/]/).pop() : link.id);
-                    const filterQuery = link.id || srcName || '';
+                    const filterQuery = item.id || item.name || '';
                     const safeSrcPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                     const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const usageCount = this.masterData.filter(p =>
-                        (p.lineage && Array.isArray(p.lineage.lineage_links) && p.lineage.lineage_links.some(l =>
-                            (targetPath && l.source_path === targetPath) ||
-                            (link.id && l.id === link.id)
-                        )) ||
-                        (link.id && p.lineage && Array.isArray(p.lineage.derived_from_ids) && p.lineage.derived_from_ids.includes(link.id))
-                    ).length;
                     const rowClickAction = canOpen
                         ? `facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')`
                         : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
 
                     lineageBodyHtml += `
-                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Linked project (${targetPath})` : `Filter by '${filterQuery}'`}">
+                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Parent project (${targetPath})` : `Filter by '${escAttr(filterQuery)}'`}">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                <strong>📁 ${srcName}</strong>
-                                ${link.id && link.id !== srcName ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(ID: ${link.id})</span>` : ''}
+                                <strong>${canOpen ? '📁' : '⚓'} ${escHtml(item.name)}</strong>
+                                ${item.id && item.id !== item.name ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(ID: ${escHtml(item.id)})</span>` : ''}
+                                ${!canOpen ? `<span style="color:#9ca3af; font-size:0.72rem; margin-left:4px;">(External ID)</span>` : ''}
                             </div>
                             <span class="facet-lineage-actions">
-                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table for all projects using '${filterQuery}'${usageCount > 0 ? ` (${usageCount} project${usageCount === 1 ? '' : 's'})` : ''}">🔍 Filter</span>
-                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')" title="Open / inspect project '${srcName}'">↗ Open</span>` : ''}
-                            </span>
-                        </div>
-                    `;
-                });
-                unresolvedDerivedIds.forEach(rawId => {
-                    const providerProj = this.masterData.find(p =>
-                        p.name === rawId ||
-                        (p.lineage && Array.isArray(p.lineage.provides_ids) && p.lineage.provides_ids.includes(rawId))
-                    );
-                    const targetPath = providerProj ? providerProj.path : '';
-                    const canOpen = Boolean(targetPath);
-                    const safeTargetPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const safeRawId = String(rawId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const sharedCount = this.masterData.filter(p =>
-                        p.lineage && Array.isArray(p.lineage.derived_from_ids) && p.lineage.derived_from_ids.includes(rawId)
-                    ).length;
-                    const rowClickAction = canOpen
-                        ? `facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')`
-                        : `facetSearch.filterByLineageId('${safeRawId}')`;
-
-                    lineageBodyHtml += `
-                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Linked project (${targetPath})` : `No local project folder found for '${rawId}'. Click to filter all projects referencing '${rawId}' in the table.`}">
-                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                🔗 <strong>${rawId}</strong>
-                                <span style="color:#9ca3af; font-size:0.73rem; margin-left:4px;">(${canOpen ? providerProj.name : 'External ID'}${sharedCount > 1 ? ` · ${sharedCount} projects` : ''})</span>
-                            </div>
-                            <span class="facet-lineage-actions">
-                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeRawId}')" title="Filter table for all projects referencing '${rawId}'${sharedCount > 0 ? ` (${sharedCount} project${sharedCount === 1 ? '' : 's'})` : ''}">🔍 Filter</span>
-                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')" title="Open / inspect project '${providerProj.name}'">↗ Open</span>` : ''}
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table for '${escAttr(filterQuery)}'">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')" title="Open / inspect project '${escAttr(item.name)}'">↗ Open</span>` : ''}
                             </span>
                         </div>
                     `;
@@ -3783,29 +4383,89 @@ const facetSearch = {
             }
 
             if (totalDownstreamCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${totalUpstreamCount > 0 ? '6px' : '0'};">⬇️ Outgoing / Derived Projects (${totalDownstreamCount})</div>`;
-                downstreamProjects.forEach(childProj => {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${totalUpstreamCount > 0 ? '6px' : '0'};">⬇️ Derived Projects (Child Lineage) (${totalDownstreamCount})</div>`;
+                downstreamProjects.forEach(({ project: childProj, viaId }) => {
                     const targetPath = childProj.path || '';
                     const canOpen = Boolean(targetPath);
                     const safeChildPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const matchedLinks = (childProj.lineage?.lineage_links || []).filter(l => l.source_path === project.path);
-                    const viaId = matchedLinks.map(l => l.id).filter(Boolean).join(', ');
                     const filterQuery = childProj.name || viaId || '';
                     const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
                     lineageBodyHtml += `
-                        <div class="facet-lineage-link-item" onclick="${canOpen ? `facetSearch.selectAndInspectProjectByPath('${safeChildPath}')` : `facetSearch.filterByLineageId('${safeFilterQuery}')`}" title="Derived project (${targetPath})">
+                        <div class="facet-lineage-link-item" onclick="${canOpen ? `facetSearch.selectAndInspectProjectByPath('${safeChildPath}')` : `facetSearch.filterByLineageId('${safeFilterQuery}')`}" title="Derived child project (${targetPath})">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                <strong>📁 ${childProj.name}</strong>
-                                ${viaId && viaId !== project.name ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(via ${viaId})</span>` : ''}
+                                <strong>📁 ${escHtml(childProj.name)}</strong>
+                                ${viaId && viaId !== project.name ? `<span style="color:#9ca3af; font-size:0.74rem; margin-left:6px;">(via ${escHtml(viaId)})</span>` : ''}
                             </div>
                             <span class="facet-lineage-actions">
-                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table by '${filterQuery}'">🔍 Filter</span>
-                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeChildPath}')" title="Open / inspect derived project '${childProj.name}'">↘ Open</span>` : ''}
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table by '${escAttr(filterQuery)}'">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeChildPath}')" title="Open / inspect derived project '${escAttr(childProj.name)}'">↘ Open</span>` : ''}
                             </span>
                         </div>
                     `;
                 });
+            }
+
+            if (totalRelatedCount > 0) {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount) > 0 ? '6px' : '0'};">🔀 Related Projects (Associative &amp; [[Links]]) (${totalRelatedCount})</div>`;
+                relatedItems.forEach(item => {
+                    const targetPath = item.sourcePath || '';
+                    const canOpen = Boolean(targetPath);
+                    const safeTargetPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const filterQuery = item.id || item.name || '';
+                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const rowClickAction = canOpen
+                        ? `facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')`
+                        : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
+
+                    lineageBodyHtml += `
+                        <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Related project (${targetPath})` : `Filter table by '${escAttr(filterQuery)}'`}">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                                <strong>${canOpen ? '📁' : '🔀'} ${escHtml(item.name)}</strong>
+                                <span style="font-size: 0.68rem; color: #7dd3fc; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); padding: 0 5px; border-radius: 8px; flex-shrink: 0;">${escHtml(item.originLabel)}</span>
+                            </div>
+                            <span class="facet-lineage-actions">
+                                <span class="facet-lineage-action-btn filter-btn" onclick="event.stopPropagation(); facetSearch.filterByLineageId('${safeFilterQuery}')" title="Filter table for '${escAttr(filterQuery)}'">🔍 Filter</span>
+                                ${canOpen ? `<span class="facet-lineage-action-btn open-btn" onclick="event.stopPropagation(); facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')" title="Open / inspect project '${escAttr(item.name)}'">↗ Open</span>` : ''}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            if (totalTagsCount > 0) {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #2dd4bf; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount + totalRelatedCount) > 0 ? '6px' : '0'};">🏷️ Tags (${totalTagsCount})</div>`;
+                lineageBodyHtml += `<div style="display: flex; flex-wrap: wrap; gap: 5px;">`;
+                tags.forEach(({ tag }) => {
+                    const safeTag = tag.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    lineageBodyHtml += `
+                        <span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag #${escAttr(tag)}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.42); color:#2dd4bf; padding:2px 9px; border-radius:12px; font-size:0.78rem; cursor:pointer;">🏷️ #${escHtml(tag)}</span>
+                    `;
+                });
+                lineageBodyHtml += `</div>`;
+            }
+
+            if (extractedNoteLinks.length > 0) {
+                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 6px;">🔗 Web &amp; File Links in Notes (${extractedNoteLinks.length})</div>`;
+                lineageBodyHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
+                extractedNoteLinks.forEach(link => {
+                    if (link.type === 'path') {
+                        lineageBodyHtml += `
+                            <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                <span>📁</span>
+                                <a href="#" class="mf-extracted-path-link" data-project-path="${escAttr(link.value)}" style="color: #34d399; text-decoration: underline; word-break: break-all;">${escHtml(link.label)}</a>
+                            </div>
+                        `;
+                    } else {
+                        lineageBodyHtml += `
+                            <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                <span>↗️</span>
+                                <a href="#" class="mf-extracted-url-link" data-url="${escAttr(link.value)}" style="color: #c4b5fd; text-decoration: underline; word-break: break-all;">${escHtml(link.label)}</a>
+                            </div>
+                        `;
+                    }
+                });
+                lineageBodyHtml += `</div>`;
             }
         }
 
@@ -3900,12 +4560,12 @@ const facetSearch = {
                 </button>` : ''}
             </div>
 
-            <!-- Collapsible Lineage Accordion (Incoming ↑ & Outgoing ↓ Linked Projects + Subtle Export Buttons) -->
-            <details class="facet-lineage-accordion" ${hasAnyLineage ? 'open' : ''}>
-                <summary title="Click to expand or collapse incoming (↑) and outgoing (↓) project links">
-                    <span><span class="accordion-arrow">▶</span>🕸️ Linked Projects (Lineage)</span>
-                    <span style="font-size: 0.76rem; color: ${hasAnyLineage ? '#ddd6fe' : '#9ca3af'}; font-weight: 600; background: rgba(139, 92, 246, 0.2); padding: 2px 8px; border-radius: 999px;">
-                        ${totalUpstreamCount} ↑ · ${totalDownstreamCount} ↓
+            <!-- Unified Collapsible Linked Projects & Tags Accordion -->
+            <details class="facet-lineage-accordion" ${hasAnyLinksOrTags ? 'open' : ''}>
+                <summary title="Click to expand or collapse derived parents (↑), derived children (↓), related projects (🔀), and tags (🏷️)">
+                    <span><span class="accordion-arrow">▶</span>🕸️ Linked Projects &amp; Tags</span>
+                    <span style="font-size: 0.74rem; color: ${hasAnyLinksOrTags ? '#ddd6fe' : '#9ca3af'}; font-weight: 600; background: rgba(139, 92, 246, 0.2); padding: 2px 8px; border-radius: 999px;">
+                        ${totalUpstreamCount} ↑ · ${totalDownstreamCount} ↓ · ${totalRelatedCount} 🔀 · ${totalTagsCount} 🏷️
                     </span>
                 </summary>
                 <div class="facet-lineage-accordion-body">
@@ -3915,10 +4575,6 @@ const facetSearch = {
         `;
 
         // Render Notes & Observations
-        // Extract links from all notes (Phase 4)
-        const allNotesForLinks = [notesMd, ...notesLog.map(n => n.text || '')].join('\n');
-        const extractedLinks = (window.markdownLite && window.markdownLite.extractLinks) ? window.markdownLite.extractLinks(allNotesForLinks) : [];
-
         if (notesMd || notesLog.length > 0 || hypothesis) {
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px 0;">
@@ -3928,17 +4584,20 @@ const facetSearch = {
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px;">
             `;
             if (hypothesis) {
+                const renderedGoal = window.markdownLite
+                    ? window.markdownLite.renderInline(hypothesis)
+                    : escHtml(hypothesis);
                 html += `
                     <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
                         <strong style="color: #c4b5fd; font-size: 0.76rem; text-transform: uppercase;">🎯 Goal:</strong>
-                        <div style="font-size: 0.84rem; color: #e5e7eb; margin-top: 2px;">${window.markdownLite ? window.markdownLite.escapeHtml(hypothesis) : hypothesis}</div>
+                        <div style="font-size: 0.84rem; color: #e5e7eb; margin-top: 2px;">${renderedGoal}</div>
                     </div>
                 `;
             }
             if (notesMd) {
                 const renderedMd = window.markdownLite
                     ? window.markdownLite.render(notesMd, { interactiveTasks: true, taskScope: 'notes_markdown' })
-                    : notesMd;
+                    : escHtml(notesMd);
                 html += `
                     <div style="font-size: 0.84rem; color: #e5e7eb; margin-bottom: 8px;">${renderedMd}</div>
                 `;
@@ -3954,7 +4613,7 @@ const facetSearch = {
                     const user = note.user ? ` · ${note.user}` : '';
                     const renderedNote = window.markdownLite
                         ? window.markdownLite.render(note.text || '', { interactiveTasks: true, taskScope: `note:${note.id}` })
-                        : (note.text || '');
+                        : escHtml(note.text || '');
                     html += `
                         <div class="mf-note-item" style="font-size: 0.82rem; background: rgba(0,0,0,0.22); border-left: 3px solid #8b5cf6; padding: 6px 8px; border-radius: 4px; position: relative;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -3981,41 +4640,6 @@ const facetSearch = {
                     No notes or observations documented yet.
                 </div>
             `;
-        }
-
-        // Render Links Found in Notes (Phase 4)
-        if (extractedLinks.length > 0) {
-            html += `
-                <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; margin: 12px 0 6px 0;">
-                    🔗 Links found in notes (${extractedLinks.length})
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-            `;
-            extractedLinks.forEach(link => {
-                if (link.type === 'mention') {
-                    html += `
-                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span>🧬</span>
-                            <a href="#" class="mf-extracted-mention-link" data-project-name="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #93c5fd; text-decoration: underline;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
-                        </div>
-                    `;
-                } else if (link.type === 'path') {
-                    html += `
-                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span>📁</span>
-                            <a href="#" class="mf-extracted-path-link" data-project-path="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #34d399; text-decoration: underline; word-break: break-all;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span>↗️</span>
-                            <a href="#" class="mf-extracted-url-link" data-url="${window.markdownLite ? window.markdownLite.escapeAttr(link.value) : link.value}" style="color: #c4b5fd; text-decoration: underline; word-break: break-all;">${window.markdownLite ? window.markdownLite.escapeHtml(link.label) : link.label}</a>
-                        </div>
-                    `;
-                }
-            });
-            html += `</div>`;
         }
 
         // Render Metadata Fields
@@ -4113,110 +4737,7 @@ const facetSearch = {
         }
 
         contentArea.innerHTML = html;
-
-        // Bind Edit Metadata button
-        const editMetaBtn = document.getElementById('facetBtnEditMetadata');
-        if (editMetaBtn) {
-            editMetaBtn.onclick = () => {
-                if (window.projectInlineEditor) {
-                    window.projectInlineEditor.startEdit(project);
-                }
-            };
-        }
-
-        // Bind Add Note buttons
-        const addNoteBtn = document.getElementById('facetBtnAddNote');
-        const addNoteInlineBtn = document.getElementById('facetBtnAddNoteInline');
-        const openAddNote = () => {
-            if (window.noteComposer) {
-                window.noteComposer.open(project);
-            }
-        };
-        if (addNoteBtn) addNoteBtn.onclick = openAddNote;
-        if (addNoteInlineBtn) addNoteInlineBtn.onclick = openAddNote;
-
-        // Bind note edit/delete buttons
-        contentArea.querySelectorAll('.mf-btn-edit-note').forEach(btn => {
-            btn.onclick = () => {
-                const noteId = btn.dataset.noteId;
-                const note = notesLog.find(n => n.id === noteId);
-                if (note && window.noteComposer) {
-                    window.noteComposer.editNote(project, note);
-                }
-            };
-        });
-        contentArea.querySelectorAll('.mf-btn-delete-note').forEach(btn => {
-            btn.onclick = () => {
-                const noteId = btn.dataset.noteId;
-                if (noteId && window.noteComposer) {
-                    window.noteComposer.deleteNote(project, noteId);
-                }
-            };
-        });
-
-        // Bind extracted links
-        contentArea.querySelectorAll('.mf-extracted-mention-link, .mf-md-mention').forEach(a => {
-            a.onclick = (e) => {
-                e.preventDefault();
-                const targetName = a.dataset.projectName || a.dataset.mfProject;
-                if (targetName) {
-                    const found = this.masterData.find(p => p.name === targetName || (p.metadata && p.metadata.projectName === targetName));
-                    if (found) {
-                        this.showProjectDetails(found);
-                    } else {
-                        alert(`Project "${targetName}" is not currently in the loaded projects index.`);
-                    }
-                }
-            };
-        });
-
-        contentArea.querySelectorAll('.mf-extracted-path-link, .mf-md-path').forEach(a => {
-            a.onclick = (e) => {
-                e.preventDefault();
-                const p = a.dataset.projectPath || a.dataset.mfPath;
-                if (p && window.electronAPI?.showItemInFolder) {
-                    window.electronAPI.showItemInFolder(p);
-                } else if (p && window.electronAPI?.openFolder) {
-                    window.electronAPI.openFolder(p);
-                }
-            };
-        });
-
-        contentArea.querySelectorAll('.mf-extracted-url-link, .mf-md-link').forEach(a => {
-            a.onclick = (e) => {
-                e.preventDefault();
-                const u = a.dataset.url || a.dataset.mfUrl;
-                if (u && window.electronAPI?.openExternal) {
-                    window.electronAPI.openExternal(u);
-                }
-            };
-        });
-
-        // Bind copy buttons (e.g. Project ID copy)
-        contentArea.querySelectorAll('.mf-copy-btn').forEach(btn => {
-            btn.onclick = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const text = btn.dataset.copyText;
-                if (!text) return;
-                try {
-                    if (window.electronAPI?.writeToClipboard) {
-                        await window.electronAPI.writeToClipboard(text);
-                    } else if (navigator.clipboard) {
-                        await navigator.clipboard.writeText(text);
-                    }
-                    const origHtml = btn.innerHTML;
-                    btn.textContent = '✓';
-                    btn.style.color = '#34d399';
-                    setTimeout(() => {
-                        btn.innerHTML = origHtml;
-                        btn.style.color = '';
-                    }, 1200);
-                } catch (err) {
-                    console.error('Copy to clipboard failed:', err);
-                }
-            };
-        });
+        this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
     },
 
     // Show Community Template details inside the exact same docked right panel on row click

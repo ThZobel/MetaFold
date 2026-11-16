@@ -124,10 +124,106 @@ async function atomicWriteJsonFile(targetPath, data) {
 }
 
 /**
- * Synchronizes [[Project Name]] mentions in notes with the related_to links array.
+ * Collects all text across notes_markdown, notes_log, hypothesis_or_goal,
+ * and string metadata fields (including nested groups) for [[Project]] / #tag extraction.
+ */
+function collectAllMarkdownAndFieldText(metadata) {
+    if (!metadata || typeof metadata !== 'object') return '';
+    const parts = [];
+
+    if (typeof metadata.notes_markdown === 'string' && metadata.notes_markdown.trim()) {
+        parts.push(metadata.notes_markdown);
+    }
+    if (Array.isArray(metadata.notes_log)) {
+        for (const n of metadata.notes_log) {
+            if (n && typeof n.text === 'string' && n.text.trim()) {
+                parts.push(n.text);
+            }
+        }
+    }
+    if (typeof metadata.hypothesis_or_goal === 'string' && metadata.hypothesis_or_goal.trim()) {
+        parts.push(metadata.hypothesis_or_goal);
+    }
+
+    const skipKeys = new Set([
+        'schemaVersion', 'schemaType', 'metafold_project_id', 'projectName',
+        'provenance', 'metafold_integration', 'integrations', 'created_at',
+        'updated_at', 'previous_names', 'changelog', 'template', 'templateInfo',
+        'elabftw', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'extra_fields'
+    ]);
+
+    const walkFields = (obj) => {
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+        for (const [k, v] of Object.entries(obj)) {
+            if (skipKeys.has(k) || k.startsWith('System.') || metafoldSchema.isReservedProjectKey(k)) continue;
+            if (!v) continue;
+            if (typeof v === 'string') {
+                if (v.trim()) parts.push(v);
+            } else if (typeof v === 'object' && !Array.isArray(v)) {
+                if (Object.prototype.hasOwnProperty.call(v, 'value')) {
+                    if (typeof v.value === 'string' && v.value.trim()) {
+                        parts.push(v.value);
+                    }
+                } else {
+                    walkFields(v);
+                }
+            }
+        }
+    };
+
+    walkFields(metadata);
+    return parts.join('\n');
+}
+
+/**
+ * Collects lowercase IDs and names currently present in any derived_from field.
+ */
+function collectExistingDerivedFromNames(metadata) {
+    const names = new Set();
+    if (!metadata || typeof metadata !== 'object') return names;
+
+    const addVal = (val) => {
+        if (!val) return;
+        if (Array.isArray(val)) {
+            val.forEach(item => addVal(item));
+        } else if (typeof val === 'string') {
+            val.split(',').forEach(s => {
+                const clean = s.trim().toLowerCase();
+                if (clean) names.add(clean);
+            });
+        } else if (typeof val === 'object') {
+            if (val.id) names.add(String(val.id).trim().toLowerCase());
+            if (val.name) names.add(String(val.name).trim().toLowerCase());
+            if (val.value !== undefined) addVal(val.value);
+        }
+    };
+
+    const walk = (obj) => {
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+        for (const [k, v] of Object.entries(obj)) {
+            if (!v) continue;
+            const lowerKey = k.toLowerCase();
+            if (lowerKey === 'derived_from' || (typeof v === 'object' && v.type === 'derived_from')) {
+                addVal(v);
+            } else if (typeof v === 'object' && !Array.isArray(v) && v.value === undefined && v.type === undefined) {
+                walk(v);
+            }
+        }
+    };
+
+    walk(metadata);
+    return names;
+}
+
+/**
+ * Synchronizes [[Project Name]] mentions in notes and fields with the related_to links array.
+ * Mentions already present in derived_from are skipped to avoid duplicate categorization.
  */
 function syncMentionsWithRelatedTo(metadata, allNotesText) {
-    const mentions = markdownLite.extractMentions(allNotesText || '');
+    const textToScan = allNotesText !== undefined ? allNotesText : collectAllMarkdownAndFieldText(metadata);
+    const derivedNames = collectExistingDerivedFromNames(metadata);
+    const mentions = markdownLite.extractMentions(textToScan || '')
+        .filter(m => !derivedNames.has(m.toLowerCase()));
 
     // Locate related_to container (root or first group containing it)
     let container = metadata;
@@ -145,12 +241,14 @@ function syncMentionsWithRelatedTo(metadata, allNotesText) {
     let existingField = container[targetKey];
     let list = [];
 
-    if (existingField && typeof existingField === 'object' && Array.isArray(existingField.value)) {
+    if (existingField && typeof existingField === 'object' && !Array.isArray(existingField) && Array.isArray(existingField.value)) {
         list = existingField.value;
     } else if (Array.isArray(existingField)) {
         list = existingField;
-    } else if (existingField && typeof existingField.value === 'string' && existingField.value.trim()) {
-        list = [existingField.value.trim()];
+    } else if (existingField && typeof existingField === 'object' && typeof existingField.value === 'string' && existingField.value.trim()) {
+        list = existingField.value.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (typeof existingField === 'string' && existingField.trim()) {
+        list = existingField.split(',').map(s => s.trim()).filter(Boolean);
     }
 
     // Normalize list items
@@ -164,12 +262,12 @@ function syncMentionsWithRelatedTo(metadata, allNotesText) {
         }
     }
 
-    // Remove old note mentions that are no longer in the notes text
+    // Remove old note mentions that are no longer in the notes text or were moved to derived_from
     const mentionsSet = new Set(mentions.map(m => m.toLowerCase()));
     const filtered = normalized.filter(item => {
         if (item.origin === 'note') {
             const name = (item.name || item.id || '').toLowerCase();
-            return mentionsSet.has(name);
+            return mentionsSet.has(name) && !derivedNames.has(name);
         }
         return true;
     });
@@ -177,18 +275,23 @@ function syncMentionsWithRelatedTo(metadata, allNotesText) {
     // Add newly found mentions
     const existingNames = new Set(filtered.map(i => (i.name || i.id || '').toLowerCase()));
     for (const mention of mentions) {
-        if (!existingNames.has(mention.toLowerCase())) {
+        const lower = mention.toLowerCase();
+        if (!existingNames.has(lower) && !derivedNames.has(lower)) {
             filtered.push({
                 id: mention,
                 name: mention,
                 origin: 'note',
                 relation_note: 'Mentioned in note'
             });
-            existingNames.add(mention.toLowerCase());
+            existingNames.add(lower);
         }
     }
 
-    if (existingField && typeof existingField === 'object') {
+    if (filtered.length === 0 && existingField === undefined) {
+        return;
+    }
+
+    if (existingField && typeof existingField === 'object' && !Array.isArray(existingField)) {
         existingField.value = filtered;
         existingField.isModified = true;
     } else {
@@ -487,11 +590,8 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
             }
         }
 
-        // 6. Sync [[Project]] Mentions with related_to
-        const allNotesText = [
-            metadata.notes_markdown || '',
-            ...(metadata.notes_log || []).map(n => n.text || '')
-        ].join('\n');
+        // 6. Sync [[Project]] Mentions with related_to across notes and metadata fields
+        const allNotesText = collectAllMarkdownAndFieldText(metadata);
         syncMentionsWithRelatedTo(metadata, allNotesText);
 
         // 7. Update Audit History & Changelog
@@ -621,6 +721,8 @@ module.exports = {
     createProjectMetadataStore,
     updateProjectMetadata,
     readProjectMetadataFromDisk,
-    findMetadataFileInDirectory
+    findMetadataFileInDirectory,
+    syncMentionsWithRelatedTo,
+    collectAllMarkdownAndFieldText
 };
 

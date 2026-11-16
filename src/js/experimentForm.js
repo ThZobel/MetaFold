@@ -455,10 +455,14 @@ const experimentForm = {
         const valueCell = document.createElement('td');
         valueCell.className = 'value-cell';
 
+        const safeFieldNameJs = String(fieldName).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const safeFieldIdJs = String(safeFieldId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const scanBtnHtml = (scanMode) => `<button type="button" class="mf-field-scan-btn" title="QR-/Barcode oder DataMatrix per Kamera scannen (Handscanner funktioniert direkt im Feld)" onclick="experimentForm.scanCodeForField('${safeFieldIdJs}', '${safeFieldNameJs}', '${scanMode}')" style="background:rgba(139,92,246,0.16);border:1px solid rgba(139,92,246,0.38);color:#c4b5fd;border-radius:6px;padding:4px 8px;font-size:12px;line-height:1.2;cursor:pointer;white-space:nowrap;flex-shrink:0;">📷</button>`;
+
         let inputHtml = '';
         switch (fieldInfo.type) {
             case 'text':
-                inputHtml = `<input type="text" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                inputHtml = `<div style="display:flex;gap:6px;align-items:center;width:100%;"><input type="text" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} onkeydown="if(event.key==='Enter'){event.preventDefault();}" style="flex:1;">${scanBtnHtml('text')}</div>`;
                 break;
             case 'id_anchor':
                 inputHtml = `
@@ -472,6 +476,7 @@ const experimentForm = {
                                    onfocus="experimentForm.openOwnIdSuggestions(this, '${safeFieldId}', '${fieldName}')"
                                    onclick="experimentForm.openOwnIdSuggestions(this, '${safeFieldId}', '${fieldName}')"
                                    onkeydown="experimentForm.handleOwnIdKeydown(event, this, '${safeFieldId}', '${fieldName}')">
+                            ${scanBtnHtml('id_anchor')}
                             <button type="button" class="scan-index-folder-btn" title="Scan folder to index IDs &amp; Tags" onclick="experimentForm.scanFolderForIds('${safeFieldId}_container','${fieldName}')"
                                     style="background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;">
                                 📂 Scan Folder
@@ -480,24 +485,30 @@ const experimentForm = {
                         <div class="own-id-status-hint" id="${safeFieldId}_hint" style="display:none;font-size:11px;line-height:1.3;"></div>
                     </div>`;
                 break;
-            case 'number':
-                const min = fieldInfo.min !== undefined ? `min="${fieldInfo.min}"` : '';
-                const max = fieldInfo.max !== undefined ? `max="${fieldInfo.max}"` : '';
-                const unitHtml = fieldInfo.unit ? `<span style="margin-left: 8px; color: #9ca3af; font-size: 0.9em; user-select: none;">${fieldInfo.unit}</span>` : '';
-                if (fieldInfo.unit) {
-                    inputHtml = `<div style="display: flex; align-items: center;"><input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''} style="flex: 1;">${unitHtml}</div>`;
-                } else {
-                    inputHtml = `<input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''}>`;
-                }
+            case 'number': {
+                const hasMin = fieldInfo.min !== undefined && fieldInfo.min !== null && fieldInfo.min !== '' && !isNaN(Number(fieldInfo.min));
+                const hasMax = fieldInfo.max !== undefined && fieldInfo.max !== null && fieldInfo.max !== '' && !isNaN(Number(fieldInfo.max));
+                const min = hasMin ? `min="${fieldInfo.min}"` : '';
+                const max = hasMax ? `max="${fieldInfo.max}"` : '';
+                const rangeHint = (hasMin && hasMax)
+                    ? `Min: ${fieldInfo.min} · Max: ${fieldInfo.max}`
+                    : (hasMin ? `Min: ${fieldInfo.min}` : (hasMax ? `Max: ${fieldInfo.max}` : ''));
+                const unitHtml = fieldInfo.unit ? `<span style="margin-left: 4px; color: #9ca3af; font-size: 0.9em; user-select: none;">${fieldInfo.unit}</span>` : '';
+                const numberInput = `<input type="number" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${min} ${max} ${isRequired ? 'required' : ''} oninput="experimentForm.handleNumberLimitInput(this)" onchange="experimentForm.clampNumberToLimits(this)" onblur="experimentForm.clampNumberToLimits(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" ${rangeHint ? `title="${rangeHint}"` : ''} style="flex: 1;">`;
+                const limitHintHtml = rangeHint
+                    ? `<div class="mf-number-limit-hint" style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${rangeHint}</div>`
+                    : '';
+                inputHtml = `<div style="display: flex; flex-direction: column; width: 100%;"><div style="display: flex; align-items: center; gap: 6px;">${numberInput}${unitHtml}${scanBtnHtml('number')}</div>${limitHintHtml}</div>`;
                 break;
+            }
             case 'date':
-                inputHtml = `<input type="date" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                inputHtml = `<input type="date" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} onclick="try { if (typeof this.showPicker === 'function') this.showPicker(); } catch (_) {}" style="cursor: pointer;">`;
                 break;
             case 'time':
-                inputHtml = `<input type="time" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''}>`;
+                inputHtml = `<input type="time" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} onclick="try { if (typeof this.showPicker === 'function') this.showPicker(); } catch (_) {}" style="cursor: pointer;">`;
                 break;
             case 'url':
-                inputHtml = `<input type="url" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} placeholder="https://...">`;
+                inputHtml = `<div style="display:flex;gap:6px;align-items:center;width:100%;"><input type="url" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} placeholder="https://..." onkeydown="if(event.key==='Enter'){event.preventDefault();}" style="flex:1;">${scanBtnHtml('url')}</div>`;
                 break;
             case 'email':
                 inputHtml = `<input type="email" id="${safeFieldId}" data-field-name="${fieldName}" value="${savedValue}" ${isRequired ? 'required' : ''} placeholder="name@domain.com">`;
@@ -517,8 +528,9 @@ const experimentForm = {
                 break;
             case 'textarea': {
                 inputHtml = `
-                    <div class="form-textarea-wrapper" style="width: 100%;">
-                        <textarea id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''} rows="2" style="width: 100%; min-height: 48px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.4;">${savedValue}</textarea>
+                    <div class="form-textarea-wrapper" style="width: 100%; display: flex; gap: 6px; align-items: flex-start;">
+                        <textarea id="${safeFieldId}" data-field-name="${fieldName}" ${isRequired ? 'required' : ''} rows="2" style="flex: 1; min-height: 48px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.4;">${savedValue}</textarea>
+                        ${scanBtnHtml('textarea')}
                     </div>
                 `;
                 break;
@@ -527,8 +539,8 @@ const experimentForm = {
             case 'markdown': {
                 inputHtml = `
                     <div class="form-textarea-wrapper form-notes-wrapper" style="position: relative; width: 100%;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                            <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: #c4b5fd; background: rgba(139,92,246,0.18); border: 1px solid rgba(139,92,246,0.3); padding: 1px 6px; border-radius: 4px;">📝 Notes &amp; Observations</span>
+                        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-bottom: 3px;">
+                            ${scanBtnHtml('notes')}
                             <button type="button" class="btn btn-secondary btn-sm form-textarea-preview-btn" onclick="experimentForm.toggleTextareaPreview('${safeFieldId}')" style="padding: 1px 7px; font-size: 11px; line-height: 1.4; color: #c4b5fd; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 4px; cursor: pointer;" title="Toggle Markdown Preview">
                                 👁️ Preview
                             </button>
@@ -539,7 +551,7 @@ const experimentForm = {
                             placeholder="Notes, observations, #tags, [[projects]]..."
                             style="width: 100%; min-height: 56px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.4;">${savedValue}</textarea>
                         <div id="${safeFieldId}_preview" class="mf-md form-textarea-preview" onclick="experimentForm.toggleTextareaPreview('${safeFieldId}')" style="display: none; width: 100%; min-height: 56px; padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 4px; font-size: 13px; line-height: 1.4; color: #e5e7eb; cursor: pointer;" title="Click anywhere to return to editing"></div>
-                        <div id="${safeFieldId}_ac" class="form-notes-ac-dropdown" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 2px; max-height: 200px; width: 340px; max-width: 100%; overflow-y: auto; background: #1e293b; border: 1px solid rgba(139, 92, 246, 0.5); border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.65); z-index: 10001; padding: 4px 0;"></div>
+                        <div id="${safeFieldId}_ac" class="form-notes-ac-dropdown" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 2px; max-height: 200px; width: 340px; max-width: 100%; overflow-y: auto; background: #1e293b; border: 1px solid rgba(139, 92, 246, 0.5); border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.65); z-index: 10001; padding: 0;"></div>
                     </div>
                 `;
                 break;
@@ -613,7 +625,20 @@ const experimentForm = {
                 const datalistId = `datalist_${safeFieldId}`;
                 const existingPills = initialTags.map(tagItem => {
                     const tagId = (tagItem && typeof tagItem === 'object') ? (tagItem.id || tagItem.name) : tagItem;
-                    const tagLabel = (tagItem && typeof tagItem === 'object') ? (tagItem.name || tagItem.id) : tagItem;
+                    let tagLabel = (tagItem && typeof tagItem === 'object') ? (tagItem.name || tagItem.id) : tagItem;
+                    if (isLinkField && tagId && String(tagLabel) === String(tagId)) {
+                        const resolvedProj = (window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function')
+                            ? window.facetSearch._resolveProjectByRef(tagId)
+                            : (window.projectScanner?.projects || []).find(p =>
+                                p.name === tagId ||
+                                p.metafold_project_id === tagId ||
+                                p.projectId === tagId ||
+                                p.metadata?.metafold_project_id === tagId
+                            );
+                        if (resolvedProj && resolvedProj.name) {
+                            tagLabel = resolvedProj.name;
+                        }
+                    }
                     const safeTagAttr = String(tagId).replace(/"/g, '&quot;');
                     const safeTagJs = String(tagId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                     const safeJsonData = (tagItem && typeof tagItem === 'object') ? JSON.stringify(tagItem).replace(/"/g, '&quot;') : '';
@@ -627,6 +652,13 @@ const experimentForm = {
                               onclick="experimentForm.removeTagFromField('${safeFieldId}','${fieldName}','${safeTagJs}')">×</span>
                     </span>`;
                 }).join('');
+                const _showDerivedHint = (typeof isDerivedFrom !== 'undefined' && isDerivedFrom) || (fieldName || '').toLowerCase() === 'derived_from';
+                const _showRelatedHint = (typeof isRelatedTo !== 'undefined' && isRelatedTo) || (fieldName || '').toLowerCase() === 'related_to';
+                const _relationHintHtml = _showDerivedHint
+                    ? `<div style="font-size: 11px; color: #c4b5fd; opacity: 0.9; line-height: 1.35;">⬆️ <strong>Causal Parent (Lineage Tree):</strong> This project directly derives from / builds upon the selected parent project or sample ID.</div>`
+                    : (_showRelatedHint
+                        ? `<div style="font-size: 11px; color: #7dd3fc; opacity: 0.9; line-height: 1.35;">🔀 <strong>Associative Link:</strong> General reference, comparison, or <code>[[Note]]</code> mention (does not alter parent-child lineage).</div>`
+                        : '');
                 inputHtml = `
                     <div class="tags-form-container" id="${safeFieldId}" data-field-name="${fieldName}" data-autocomplete-mode="${autocompleteMode}" style="display:flex;flex-direction:column;gap:5px;position:relative;">
                         <div class="tags-pills-row" style="display:flex;flex-wrap:wrap;gap:4px;min-height:26px;">${existingPills}</div>
@@ -638,11 +670,13 @@ const experimentForm = {
                                    oninput="experimentForm.handleFormTagChange(event, '${safeFieldId}', '${fieldName}', '${datalistId}', '${autocompleteMode}')"
                                    onfocus="experimentForm.openIdAutocomplete(this, '${datalistId}', '${safeFieldId}', '${fieldName}', '${autocompleteMode}')"
                                    onclick="experimentForm.openIdAutocomplete(this, '${datalistId}', '${safeFieldId}', '${fieldName}', '${autocompleteMode}')">
+                            ${scanBtnHtml(autocompleteMode)}
                             <button type="button" class="scan-index-folder-btn" title="Scan folder to index IDs &amp; Tags" onclick="experimentForm.scanFolderForIds('${safeFieldId}','${fieldName}')"
                                     style="background:rgba(13,148,136,0.2);border:1px solid rgba(13,148,136,0.4);color:#2dd4bf;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;">
                                 📂 Scan Folder
                             </button>
                         </div>
+                        ${_relationHintHtml}
                         <datalist id="${datalistId}" style="display:none;"></datalist>
                     </div>`;
                 break;
@@ -1025,6 +1059,132 @@ const experimentForm = {
         return str.replace(/[^a-zA-Z0-9-_]/g, '_');
     },
 
+    scanCodeForField(fieldId, fieldName, mode) {
+        if (!window.codeScannerModal || typeof window.codeScannerModal.open !== 'function') {
+            alert('Code-Scanner ist nicht verfügbar.');
+            return;
+        }
+        const fieldLabel = fieldName ? String(fieldName).replace(/_/g, ' ') : '';
+        window.codeScannerModal.open({
+            fieldLabel,
+            onDetected: (code) => {
+                const trimmed = String(code ?? '').trim();
+                if (!trimmed) return;
+
+                if (mode === 'derived_from' || mode === 'related_to' || mode === 'tags') {
+                    this.addTagToField(fieldId, fieldName, trimmed);
+                    return;
+                }
+
+                const el = document.getElementById(fieldId);
+                if (!el) return;
+
+                if (mode === 'number') {
+                    const normalized = trimmed.replace(',', '.');
+                    const num = Number(normalized);
+                    if (isNaN(num)) {
+                        alert(`Gescannter Code "${trimmed}" ist keine gültige Zahl für "${fieldLabel}".`);
+                        return;
+                    }
+                    el.value = normalized;
+                    this.clampNumberToLimits(el);
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    el.focus();
+                    return;
+                }
+
+                if (mode === 'textarea' || mode === 'notes') {
+                    const start = typeof el.selectionStart === 'number' ? el.selectionStart : el.value.length;
+                    const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : el.value.length;
+                    const before = el.value.slice(0, start);
+                    const after = el.value.slice(end);
+                    const spacer = before && !/[\s\n]$/.test(before) ? ' ' : '';
+                    el.value = before + spacer + trimmed + after;
+                    const newPos = before.length + spacer.length + trimmed.length;
+                    el.focus();
+                    try { el.setSelectionRange(newPos, newPos); } catch (_) {}
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return;
+                }
+
+                // text, url, id_anchor
+                el.value = trimmed;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                if (typeof this.saveFieldValue === 'function') {
+                    this.saveFieldValue(fieldName, trimmed);
+                }
+                if (mode === 'id_anchor' && typeof this.updateOwnIdStatusHint === 'function') {
+                    this.updateOwnIdStatusHint(trimmed, fieldId);
+                }
+                if (this.filenameState && Array.isArray(this.filenameState.selectedFields) && this.filenameState.selectedFields.includes(fieldName) && typeof this.updateFilenamePreview === 'function') {
+                    this.updateFilenamePreview();
+                }
+                el.focus();
+            }
+        });
+    },
+
+    handleNumberLimitInput(input) {
+        if (!input) return;
+        const raw = String(input.value || '').trim();
+        const hintEl = input.closest('td, .form-group, div')?.parentElement?.querySelector('.mf-number-limit-hint')
+            || input.parentElement?.parentElement?.querySelector('.mf-number-limit-hint')
+            || input.parentElement?.querySelector('.mf-number-limit-hint');
+        if (!raw) {
+            if (!input.required) input.classList.remove('error');
+            if (hintEl) hintEl.style.color = '#9ca3af';
+            return;
+        }
+        const num = Number(raw);
+        const minAttr = input.getAttribute('min');
+        const maxAttr = input.getAttribute('max');
+        const hasMin = minAttr !== null && minAttr !== '' && !isNaN(Number(minAttr));
+        const hasMax = maxAttr !== null && maxAttr !== '' && !isNaN(Number(maxAttr));
+        const outOfRange = isNaN(num)
+            || (hasMin && num < Number(minAttr))
+            || (hasMax && num > Number(maxAttr));
+        if (outOfRange) {
+            input.classList.add('error');
+            if (hintEl) hintEl.style.color = '#f87171';
+        } else {
+            input.classList.remove('error');
+            if (hintEl) hintEl.style.color = '#9ca3af';
+        }
+    },
+
+    clampNumberToLimits(input) {
+        if (!input) return;
+        const raw = String(input.value || '').trim();
+        const hintEl = input.parentElement?.parentElement?.querySelector('.mf-number-limit-hint')
+            || input.parentElement?.querySelector('.mf-number-limit-hint');
+        if (!raw) {
+            if (hintEl) hintEl.style.color = '#9ca3af';
+            return;
+        }
+        let num = Number(raw);
+        if (isNaN(num)) {
+            input.value = '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            return;
+        }
+        const minAttr = input.getAttribute('min');
+        const maxAttr = input.getAttribute('max');
+        const hasMin = minAttr !== null && minAttr !== '' && !isNaN(Number(minAttr));
+        const hasMax = maxAttr !== null && maxAttr !== '' && !isNaN(Number(maxAttr));
+        let clamped = num;
+        if (hasMin && clamped < Number(minAttr)) clamped = Number(minAttr);
+        if (hasMax && clamped > Number(maxAttr)) clamped = Number(maxAttr);
+        if (clamped !== num) {
+            input.value = String(clamped);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        input.classList.remove('error');
+        if (hintEl) hintEl.style.color = '#9ca3af';
+    },
+
     // Validate form
     validate() {
         const requiredFields = document.querySelectorAll('[required]');
@@ -1059,6 +1219,31 @@ const experimentForm = {
                     }
                 } else if (field.classList.contains('error') && requiredFields.includes && !requiredFields.includes(field)) {
                     field.classList.remove('error');
+                }
+            }
+        });
+
+        const numberFields = document.querySelectorAll('input[type="number"][min], input[type="number"][max]');
+        numberFields.forEach(field => {
+            const raw = field.value.trim();
+            if (!raw) return;
+            const num = Number(raw);
+            const minAttr = field.getAttribute('min');
+            const maxAttr = field.getAttribute('max');
+            const hasMin = minAttr !== null && minAttr !== '' && !isNaN(Number(minAttr));
+            const hasMax = maxAttr !== null && maxAttr !== '' && !isNaN(Number(maxAttr));
+            const tooLow = hasMin && num < Number(minAttr);
+            const tooHigh = hasMax && num > Number(maxAttr);
+            if (isNaN(num) || tooLow || tooHigh) {
+                isValid = false;
+                field.classList.add('error');
+                if (!message) {
+                    const fieldName = field.getAttribute('data-field-name');
+                    const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace('*', '').trim();
+                    const rangeDesc = (hasMin && hasMax)
+                        ? `between ${minAttr} and ${maxAttr}`
+                        : (hasMin ? `>= ${minAttr}` : `<= ${maxAttr}`);
+                    message = `Field "${label || fieldName || 'Unknown'}" must be ${rangeDesc}.`;
                 }
             }
         });
@@ -1586,7 +1771,9 @@ const experimentForm = {
         const { dropdown, mode, items, activeIndex } = this._notesAcState;
         if (!dropdown) return;
 
-        let html = '';
+        let html = mode === 'tag'
+            ? `<div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: #c4b5fd; background: rgba(139, 92, 246, 0.14); border-bottom: 1px solid rgba(139, 92, 246, 0.3); text-transform: uppercase; letter-spacing: 0.03em;">🏷️ Add tag (#tag)</div>`
+            : `<div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: #7dd3fc; background: rgba(56, 189, 248, 0.1); border-bottom: 1px solid rgba(56, 189, 248, 0.25); text-transform: uppercase; letter-spacing: 0.03em;">🔀 Link related projects ([[Project]])</div>`;
         items.forEach((item, idx) => {
             const isActive = idx === activeIndex;
             const bg = isActive ? 'rgba(139, 92, 246, 0.28)' : 'transparent';
@@ -2530,6 +2717,21 @@ const experimentForm = {
         } else {
             value = String(rawValue || '').trim().replace(/,$/, '');
             displayLabel = value;
+            const modeAttr = document.getElementById(containerId)?.getAttribute('data-autocomplete-mode') || '';
+            if (value && (modeAttr === 'derived_from' || modeAttr === 'related_to')) {
+                const resolvedProj = (window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function')
+                    ? window.facetSearch._resolveProjectByRef(value)
+                    : (window.projectScanner?.projects || []).find(p =>
+                        p.name === value ||
+                        p.metafold_project_id === value ||
+                        p.projectId === value ||
+                        p.metadata?.metafold_project_id === value
+                    );
+                if (resolvedProj && resolvedProj.name) {
+                    displayLabel = resolvedProj.name;
+                    structuredData = { id: value, name: resolvedProj.name };
+                }
+            }
         }
 
         if (!value) return false;
@@ -2851,6 +3053,12 @@ const experimentForm = {
                 this.updateOwnIdStatusHint(chosen.id, safeFieldId);
                 this.closeIdAutocompleteDropdown();
             }
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            this.closeIdAutocompleteDropdown();
         }
     },
 
