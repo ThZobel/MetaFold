@@ -7,10 +7,15 @@
 
 ## Security Model & Trust Boundaries
 
-1. **Local-First, Zero Telemetry**
-   - MetaFold runs locally as an Electron desktop application.
-   - There are **no** MetaFold backend servers and **no** telemetry or analytics uploads.
-   - Outbound network requests occur only when explicitly triggered by the user to their configured laboratory services (e.g., OMERO, eLabFTW, RSpace) or to fetch public community templates from GitHub.
+1. **No MetaFold Backend, Zero Telemetry, Explicit Server Integrations**
+   - MetaFold runs locally as an Electron desktop application. There are **no** MetaFold-operated servers, **no** cloud accounts, and **no** hidden telemetry or analytics uploads.
+   - **Outbound connections only on explicit user action:** Metadata and integration payloads are sent **only** to servers explicitly configured and triggered by the user:
+     - **Institutional ELN / Repository integrations:** **OMERO**, **eLabFTW**, and **RSpace** (typically self-hosted institutional HTTPS endpoints).
+     - **Community Templates (optional):** Reading public template indexes from GitHub; template submissions open a pre-filled GitHub Issue in the user's browser with local file paths and usernames stripped.
+   - **Transport & Proxy Security:**
+     - Outbound HTTPS connections enforce TLS certificate validation by default (`rejectUnauthorized: true` in `src/js/proxyManager.js`; self-signed development certificates require explicit opt-in).
+     - The local OMERO CORS/CSRF proxy operates on `localhost` only and restricts `Access-Control-Allow-Origin` to `localhost` / `127.0.0.1` origins.
+     - Server credentials and API tokens are transmitted only to their respective configured endpoint.
 
 2. **Non-Destructive Data Handling**
    - MetaFold creates folder structures and metadata files (`README.html`, metadata JSON / RO-Crate files) in user-selected target directories.
