@@ -189,7 +189,7 @@ class MetaFoldLineageTree {
                         const actionBar = document.getElementById('lineage-action-bar');
                         if (actionBar) {
                             const escapedPath = d.data._project.path.replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
-                            const escapedTitle = (d.data.name || '').replace(/'/g, "\\'");
+                            const escapedTitle = (d.data.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                             
                             let connectHtml = '';
                             if (window.isConnectingLineage) {

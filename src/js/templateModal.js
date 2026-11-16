@@ -550,25 +550,25 @@ const templateModal = {
                 messageDiv.style.background = '#fee2e2';
                 messageDiv.style.color = '#dc2626';
                 messageDiv.style.border = '1px solid #f87171';
-                messageDiv.innerHTML = `❌ ${message}`;
+                messageDiv.textContent = `❌ ${message}`;
                 break;
             case 'success':
                 messageDiv.style.background = '#d1fae5';
                 messageDiv.style.color = '#059669';
                 messageDiv.style.border = '1px solid #34d399';
-                messageDiv.innerHTML = `✅ ${message}`;
+                messageDiv.textContent = `✅ ${message}`;
                 break;
             case 'warning':
                 messageDiv.style.background = '#fef3c7';
                 messageDiv.style.color = '#d97706';
                 messageDiv.style.border = '1px solid #fbbf24';
-                messageDiv.innerHTML = `⚠️ ${message}`;
+                messageDiv.textContent = `⚠️ ${message}`;
                 break;
             default:
                 messageDiv.style.background = '#dbeafe';
                 messageDiv.style.color = '#2563eb';
                 messageDiv.style.border = '1px solid #60a5fa';
-                messageDiv.innerHTML = `ℹ️ ${message}`;
+                messageDiv.textContent = `ℹ️ ${message}`;
         }
         
         // Add animation CSS if not exists

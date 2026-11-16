@@ -638,8 +638,8 @@ const omeroAuth = {
         
         try {
             // Set cookies with proper flags
-            document.cookie = `sessionid=${sessionId}; path=/; SameSite=None`;
-            document.cookie = `csrftoken=${csrfToken}; path=/; SameSite=None`;
+            document.cookie = `sessionid=${sessionId}; path=/; SameSite=None; Secure`;
+            document.cookie = `csrftoken=${csrfToken}; path=/; SameSite=None; Secure`;
             
             if (!this.session) {
                 this.session = {};

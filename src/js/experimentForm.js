@@ -1197,7 +1197,7 @@ const experimentForm = {
                 field.classList.add('error');
                 if (!message) {
                     const fieldName = field.getAttribute('data-field-name');
-                    const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace('*', '').trim();
+                    const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace(/\*/g, '').trim();
                     message = `Field "${label || fieldName || 'Unknown'}" is required.`;
                 }
             } else {
@@ -1214,7 +1214,7 @@ const experimentForm = {
                     field.classList.add('error');
                     if (!message) {
                         const fieldName = field.getAttribute('data-field-name');
-                        const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace('*', '').trim();
+                        const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace(/\*/g, '').trim();
                         message = `Field "${label || fieldName || 'Unknown'}" contains an invalid E-Mail address.`;
                     }
                 } else if (field.classList.contains('error') && requiredFields.includes && !requiredFields.includes(field)) {
@@ -1239,7 +1239,7 @@ const experimentForm = {
                 field.classList.add('error');
                 if (!message) {
                     const fieldName = field.getAttribute('data-field-name');
-                    const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace('*', '').trim();
+                    const label = field.closest('tr')?.querySelector('.field-name')?.textContent?.replace(/\*/g, '').trim();
                     const rangeDesc = (hasMin && hasMax)
                         ? `between ${minAttr} and ${maxAttr}`
                         : (hasMin ? `>= ${minAttr}` : `<= ${maxAttr}`);

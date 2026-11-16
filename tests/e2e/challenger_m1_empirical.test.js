@@ -13,12 +13,8 @@ const MODAL_JS_PATH = path.join(PROJECT_ROOT, 'src', 'js', 'templateModal.js');
 // Helper to decode basic HTML entities
 function decodeHtmlEntities(str) {
     if (!str) return '';
-    return str
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
+    const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+    return str.replace(/&(amp|lt|gt|quot|#39);/g, m => entities[m]);
 }
 
 // Helper to normalize objects/arrays across VM boundary

@@ -655,12 +655,16 @@ const metadataEditor = {
             return;
         }
 
+        const escHtml = (s) => (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+            ? appUtils.escapeHtml(s)
+            : String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
         previewDiv.innerHTML = options.map(opt => `
             <span class="multicheckbox-pill">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0">
                     <rect x="0.5" y="0.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-opacity="0.6"/>
                 </svg>
-                ${opt}
+                ${escHtml(opt)}
             </span>
         `).join('');
     },

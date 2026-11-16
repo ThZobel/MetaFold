@@ -724,7 +724,9 @@ test.describe('Tier 1: Feature Coverage (Features 1–25)', () => {
             const env = createMockEnvironment();
             await env.uploadModal.submit();
             assert.ok(env.uploadModal.lastOpenedUrl, 'Must launch browser with URL');
-            assert.ok(env.uploadModal.lastOpenedUrl.includes('https://github.com/ThZobel/MetaFold-Templates'));
+            const parsedUrl = new URL(env.uploadModal.lastOpenedUrl);
+            assert.strictEqual(parsedUrl.origin, 'https://github.com');
+            assert.ok(parsedUrl.pathname.startsWith('/ThZobel/MetaFold-Templates'));
         });
     });
 

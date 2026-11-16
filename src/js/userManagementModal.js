@@ -1591,12 +1591,15 @@ const userManagementModal = {
         const executeBtn = document.getElementById('ugmExecuteExportBtn');
 
         if (summaryBox) {
+            const escHtml = (s) => (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+                ? appUtils.escapeHtml(s)
+                : String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             let details = '';
             if (selectedScope === 'user') {
                 const grpName = exportData.groups[0]?.name || 'Default';
-                details = `User: <strong>${targetName || 'None'}</strong> (Group: <em>${grpName}</em>)`;
+                details = `User: <strong>${escHtml(targetName || 'None')}</strong> (Group: <em>${escHtml(grpName)}</em>)`;
             } else if (selectedScope === 'group') {
-                details = `Group: <strong>${targetName || 'None'}</strong> (${exportData.users.length} member${exportData.users.length !== 1 ? 's' : ''})`;
+                details = `Group: <strong>${escHtml(targetName || 'None')}</strong> (${exportData.users.length} member${exportData.users.length !== 1 ? 's' : ''})`;
             } else {
                 details = `All Profiles: <strong>${exportData.users.length}</strong> user(s), <strong>${exportData.groups.length}</strong> group(s)`;
             }
@@ -1813,12 +1816,16 @@ const userManagementModal = {
             font-weight: 500; max-width: 400px; animation: slideInRight 0.3s ease-out;
         `;
 
-        messageDiv.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-size: 1.2rem;">${isError ? '⚠️' : isWarning ? '⚠️' : isSuccess ? '✅' : 'ℹ️'}</span>
-                <span>${message}</span>
-            </div>
-        `;
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display: flex; align-items: center; gap: 0.5rem;';
+        const iconSpan = document.createElement('span');
+        iconSpan.style.fontSize = '1.2rem';
+        iconSpan.textContent = isError ? '⚠️' : isWarning ? '⚠️' : isSuccess ? '✅' : 'ℹ️';
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = message;
+        wrapper.appendChild(iconSpan);
+        wrapper.appendChild(msgSpan);
+        messageDiv.appendChild(wrapper);
 
         document.body.appendChild(messageDiv);
 

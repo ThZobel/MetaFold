@@ -814,13 +814,16 @@ const visualizationManager = {
 
     // Error display for JSONCrack failures
     renderJSONCrackError(container, errorMessage) {
+        const safeError = (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+            ? appUtils.escapeHtml(errorMessage)
+            : String(errorMessage || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         container.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #ef4444; text-align: center; flex-direction: column; padding: 40px;">
                 <svg fill="currentColor" viewBox="0 0 24 24" style="width: 64px; height: 64px; margin-bottom: 20px;">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM13 17h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                 </svg>
                 <h4>JSONCrack Rendering Error</h4>
-                <p><strong>Error:</strong> ${errorMessage}</p>
+                <p><strong>Error:</strong> ${safeError}</p>
                 <div style="margin-top: 20px; display: flex; gap: 10px;">
                     <button class="btn btn-secondary" onclick="visualizationManager.setVisualizationType('d3graph')">
                         🌐 Try D3.js Graph

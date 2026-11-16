@@ -1,6 +1,26 @@
 // Utility functions for the application
 
 const appUtils = {
+    escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    escapeJsAttr(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    },
+
     // Safe ID generation for HTML elements
     createSafeId(fieldName) {
         return fieldName.replace(/[^a-zA-Z0-9]/g, '_');
@@ -254,8 +274,9 @@ window.showExportSuccessModal = function (options = {}) {
             animation: exportFadeIn 0.18s ease-out;
         `;
 
-        // Escape helper for safe attribute injection
-        const esc = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        // Escape helpers for safe HTML and attribute injection
+        const esc = (str) => appUtils.escapeJsAttr(str);
+        const escHtml = (str) => appUtils.escapeHtml(str);
 
         let filesHtml = '';
         if (normalizedFiles.length > 0) {
@@ -268,12 +289,12 @@ window.showExportSuccessModal = function (options = {}) {
                         ${normalizedFiles.map(f => `
                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px;">
                                 <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
-                                    <span style="font-size: 1.15rem; flex-shrink: 0;">${f.icon}</span>
+                                    <span style="font-size: 1.15rem; flex-shrink: 0;">${escHtml(f.icon)}</span>
                                     <div style="min-width: 0; flex: 1;">
-                                        <div style="font-weight: 500; font-size: 0.88rem; color: #f3f4f6; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${esc(f.name)}">
-                                            ${f.name}
+                                        <div style="font-weight: 500; font-size: 0.88rem; color: #f3f4f6; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${escHtml(f.name)}">
+                                            ${escHtml(f.name)}
                                         </div>
-                                        ${f.label && f.label !== f.name ? `<div style="font-size: 0.74rem; color: #9ca3af;">${f.label}</div>` : ''}
+                                        ${f.label && f.label !== f.name ? `<div style="font-size: 0.74rem; color: #9ca3af;">${escHtml(f.label)}</div>` : ''}
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 6px; flex-shrink: 0;">
@@ -305,7 +326,7 @@ window.showExportSuccessModal = function (options = {}) {
                     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
                         ${entries.map(([k, v]) => `
                             <span style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 0.78rem; color: #6ee7b7;">
-                                <span style="color: #9ca3af;">${k}:</span> <strong>${v}</strong>
+                                <span style="color: #9ca3af;">${escHtml(k)}:</span> <strong>${escHtml(v)}</strong>
                             </span>
                         `).join('')}
                     </div>
@@ -319,7 +340,7 @@ window.showExportSuccessModal = function (options = {}) {
                 <div style="margin-top: 14px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                     <div style="min-width: 0; flex: 1;">
                         <div style="font-size: 0.75rem; color: #9ca3af; margin-bottom: 2px;">📁 Destination Folder:</div>
-                        <code style="font-size: 0.8rem; color: #a7f3d0; word-break: break-all; display: block; font-family: monospace;">${targetFolder}</code>
+                        <code style="font-size: 0.8rem; color: #a7f3d0; word-break: break-all; display: block; font-family: monospace;">${escHtml(targetFolder)}</code>
                     </div>
                     <button type="button" class="btn btn-secondary btn-sm"
                         style="flex-shrink: 0; font-size: 0.8rem; padding: 6px 12px; background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4); color: #ecfdf5; cursor: pointer;"
@@ -352,7 +373,7 @@ window.showExportSuccessModal = function (options = {}) {
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.5rem; line-height: 1;">🎉</span>
                         <div>
-                            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #f3f4f6;">${title}</h3>
+                            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #f3f4f6;">${escHtml(title)}</h3>
                             <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 2px;">Export operation finished successfully</div>
                         </div>
                     </div>

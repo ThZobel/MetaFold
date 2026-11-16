@@ -414,7 +414,11 @@ class CommunityManager {
                     border-bottom: 1px solid rgba(255,255,255,0.08);
                     background: rgba(124, 58, 237, 0.1);
                 `;
-                addNewItem.innerHTML = `➕ Create new tag: "<strong>${this.normalizeTag(query)}</strong>"`;
+                addNewItem.textContent = '➕ Create new tag: "';
+                const strong = document.createElement('strong');
+                strong.textContent = this.normalizeTag(query);
+                addNewItem.appendChild(strong);
+                addNewItem.append('"');
                 addNewItem.addEventListener('click', (e) => {
                     e.stopPropagation();
                     addTag(query);

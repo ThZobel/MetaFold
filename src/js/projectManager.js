@@ -477,10 +477,14 @@ const projectManager = {
                     const nowIso = new Date().toISOString();
                     const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
                         ? crypto.randomUUID()
-                        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-                            const r = Math.random() * 16 | 0;
-                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-                        });
+                        : (() => {
+                            const bytes = new Uint8Array(16);
+                            crypto.getRandomValues(bytes);
+                            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+                            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+                            const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+                            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+                        })();
                     const payload = {
                         schemaVersion: '0.1',
                         schemaType: 'metafold-project-metadata',
@@ -1624,14 +1628,17 @@ const projectManager = {
 
         const successDiv = document.getElementById('successMessage');
         if (successDiv) {
-            let content = message;
+            const escHtml = (s) => (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+                ? appUtils.escapeHtml(s)
+                : String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            let content = escHtml(message).replace(/\n/g, '<br>');
 
             // Add action buttons container
             let buttonsHtml = '';
 
             // Add "Open Folder" button if path is provided
             if (projectPath) {
-                const escapedPath = projectPath.replace(/\\/g, '\\\\');
+                const escapedPath = String(projectPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openCreatedFolder('${escapedPath}')" style="margin-top: 8px; margin-right: 8px;">📂 Open Folder</button>`;
             }
 
@@ -1654,10 +1661,10 @@ const projectManager = {
                         return;
                     }
 
-                    const escapedUrl = urlToUse.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    const escapedUrl = String(urlToUse).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     const linkText = link.text || 'Open Link';
 
-                    buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openExternalLink('${escapedUrl}')" style="margin-top: 8px; margin-right: 8px;">${linkText}</button>`;
+                    buttonsHtml += `<button class="btn btn-secondary" onclick="projectManager.openExternalLink('${escapedUrl}')" style="margin-top: 8px; margin-right: 8px;">${escHtml(linkText)}</button>`;
 
                 } catch (error) {
                     console.error(`❌ Error processing link ${index}:`, link, error);
@@ -1718,7 +1725,7 @@ const projectManager = {
 
         const errorDiv = document.getElementById('errorMessage');
         if (errorDiv) {
-            errorDiv.innerHTML = `❌ ${message}`;
+            errorDiv.textContent = `❌ ${message}`;
             errorDiv.style.display = 'block';
 
             // Reset to original error styling
@@ -1769,7 +1776,7 @@ const projectManager = {
 
         const infoDiv = document.getElementById('infoMessage');
         if (infoDiv) {
-            infoDiv.innerHTML = `ℹ️ ${message}`;
+            infoDiv.textContent = `ℹ️ ${message}`;
             infoDiv.style.display = 'block';
 
             console.log('ℹ️ Info message displayed:', message.substring(0, 50) + '...');
@@ -2245,13 +2252,16 @@ const projectManager = {
 
         const errorDiv = document.getElementById('errorMessage');
         if (errorDiv) {
-            let content = `⚠️ ${message}`;
+            errorDiv.textContent = `⚠️ ${message}`;
 
             if (guidance) {
-                content += `<br><small style="margin-top: 5px; display: block;">${guidance}</small>`;
+                errorDiv.appendChild(document.createElement('br'));
+                const small = document.createElement('small');
+                small.style.marginTop = '5px';
+                small.style.display = 'block';
+                small.textContent = guidance;
+                errorDiv.appendChild(small);
             }
-
-            errorDiv.innerHTML = content;
             errorDiv.style.display = 'block';
 
             // Reset to original error message style
@@ -2497,7 +2507,7 @@ const projectManager = {
 
         const warningDiv = document.getElementById('errorMessage'); // Reuse error message div
         if (warningDiv) {
-            warningDiv.innerHTML = `⚠️ ${message}`;
+            warningDiv.textContent = `⚠️ ${message}`;
             warningDiv.style.display = 'block';
             warningDiv.style.background = 'rgba(239, 196, 68, 0.1)'; // Yellow warning color
             warningDiv.style.color = '#d97706';

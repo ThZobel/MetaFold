@@ -19,10 +19,12 @@ class OMEROProxyServer {
         // Session storage für Client-zu-OMERO Mapping (wie im Python Proxy)
         this.clientSessions = new Map();
         
-        // Connection pooling with SSL fixes for development servers
+        this.allowSelfSignedCerts = process.env.OMERO_ALLOW_SELF_SIGNED === 'true';
+
+        // Connection pooling
         this.httpsAgent = new https.Agent({
             keepAlive: true,
-            rejectUnauthorized: false, // Accept self-signed certificates
+            rejectUnauthorized: !this.allowSelfSignedCerts,
             secureProtocol: 'TLS_method' // Use modern TLS
         });
         
@@ -38,6 +40,15 @@ class OMEROProxyServer {
         // Update OMERO server URL if provided in settings (even if already running)
         if (settings.serverUrl) {
             this.omeroServerUrl = settings.serverUrl;
+        }
+
+        if (typeof settings.allowSelfSignedCerts === 'boolean') {
+            this.allowSelfSignedCerts = settings.allowSelfSignedCerts;
+            this.httpsAgent = new https.Agent({
+                keepAlive: true,
+                rejectUnauthorized: !this.allowSelfSignedCerts,
+                secureProtocol: 'TLS_method'
+            });
         }
 
         if (this.status === 'running') {
@@ -230,7 +241,7 @@ class OMEROProxyServer {
                 method: req.method,
                 headers: this.processRequestHeaders(req, clientId),
                 agent: this.httpsAgent,
-                rejectUnauthorized: false, // Accept self-signed certificates
+                rejectUnauthorized: !this.allowSelfSignedCerts,
                 timeout: 30000 // 30 second timeout
             };
 
@@ -310,13 +321,32 @@ class OMEROProxyServer {
             }
         }
         
-        console.log(`🔧 Headers for ${clientId}:`, {
+        console.log('🔧 Headers for %s:', clientId, {
             referer: headers.referer,
             origin: headers.origin,
             hasCookies: !!headers.cookie
         });
         
         return headers;
+    }
+
+    /**
+     * Validate and return an allowed local CORS origin
+     */
+    getAllowedOrigin(req) {
+        const defaultOrigin = `http://localhost:${this.port}`;
+        const origin = req && req.headers ? req.headers.origin : null;
+        if (!origin) return defaultOrigin;
+        try {
+            const parsed = new URL(origin);
+            if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+                (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1')) {
+                return `${parsed.protocol}//${parsed.host}`;
+            }
+        } catch (_) {
+            // Ignore malformed origin
+        }
+        return defaultOrigin;
     }
 
     /**
@@ -329,7 +359,7 @@ class OMEROProxyServer {
         // Set response headers
         res.writeHead(proxyRes.statusCode, {
             ...proxyRes.headers,
-            'Access-Control-Allow-Origin': req.headers.origin || 'http://localhost:3000',
+            'Access-Control-Allow-Origin': this.getAllowedOrigin(req),
             'Access-Control-Allow-Credentials': 'true',
             'Access-Control-Expose-Headers': 'Set-Cookie, Content-Type, Content-Length'
         });
@@ -416,8 +446,7 @@ class OMEROProxyServer {
      * Set CORS headers
      */
     setCorsHeaders(req, res) {
-        const origin = req.headers.origin || 'http://localhost:3000';
-        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Origin', this.getAllowedOrigin(req));
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRFToken, Referer, Accept, Cookie, Origin');
         res.setHeader('Access-Control-Allow-Credentials', 'true');

@@ -648,9 +648,10 @@ const projectScanner = {
         let integrationButtons = '';
         const addedLinks = new Set();
 
+        const escJsAttr = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const addIntegrationBtn = (name, url, color, bgColor, icon) => {
             if (!addedLinks.has(url)) {
-                integrationButtons += `<button class="btn btn-small" style="background: ${bgColor}; color: ${color}; border: 1px solid ${color.replace(')', ', 0.3)').replace('rgb', 'rgba')};" onclick="window.electronAPI.openExternal('${url.replace(/'/g, "\\'")}')" title="Open in ${name}">${icon} ${name}</button>`;
+                integrationButtons += `<button class="btn btn-small" style="background: ${bgColor}; color: ${color}; border: 1px solid ${color.replace(')', ', 0.3)').replace('rgb', 'rgba')};" onclick="window.electronAPI.openExternal('${escJsAttr(url)}')" title="Open in ${escJsAttr(name)}">${icon} ${name}</button>`;
                 addedLinks.add(url);
             }
         };
@@ -714,7 +715,7 @@ const projectScanner = {
                     <button class="btn btn-small" onclick="projectScanner.openProject('${escapedPath}')" title="Open in Explorer">
                         📂 Open
                     </button>
-                    ${project.hasReadme ? `<button class="btn btn-small" onclick="projectScanner.openReadme('${escapedPath}', '${project.name.replace(/'/g, "\\'")}')" title="Open README">📖 README</button>` : ''}
+                    ${project.hasReadme ? `<button class="btn btn-small" onclick="projectScanner.openReadme('${escapedPath}', '${escJsAttr(project.name)}')" title="Open README">📖 README</button>` : ''}
                     ${integrationButtons}
                     <button class="btn btn-small" onclick="projectScanner.visualizeProject('${escapedPath}')" title="Open interactive graph to select subsets for RO-Crate export">
                         🧠 Visualize and Edit

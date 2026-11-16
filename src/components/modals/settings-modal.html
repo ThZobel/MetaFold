@@ -259,37 +259,39 @@
                     if (!preview) return;
 
                     const categories = ['category1', 'category2', 'category3', 'category4'];
-                    let html = '';
+                    preview.textContent = '';
 
                     categories.forEach(cat => {
                         const name = document.getElementById(`${cat}Name`)?.value || 'Unnamed';
                         const icon = document.getElementById(`${cat}Icon`)?.value || '📋';
-                        const color = document.getElementById(`${cat}Color`)?.value || '#8b5cf6';
+                        const rawColor = document.getElementById(`${cat}Color`)?.value || '#8b5cf6';
+                        const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#8b5cf6';
 
                         const lighterColor = lightenColor(color, 20);
 
-                        html += `
-                            <div style="
-                                padding: 10px 12px;
-                                background: linear-gradient(135deg, ${color}, ${lighterColor});
-                                border: 1px solid ${color}80;
-                                border-radius: 8px;
-                                color: white;
-                                font-weight: 500;
-                                text-align: center;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                gap: 6px;
-                                box-shadow: 0 2px 8px ${color}50;
-                            ">
-                                <span>${icon}</span>
-                                <span>${name}</span>
-                            </div>
+                        const card = document.createElement('div');
+                        card.style.cssText = `
+                            padding: 10px 12px;
+                            background: linear-gradient(135deg, ${color}, ${lighterColor});
+                            border: 1px solid ${color}80;
+                            border-radius: 8px;
+                            color: white;
+                            font-weight: 500;
+                            text-align: center;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 6px;
+                            box-shadow: 0 2px 8px ${color}50;
                         `;
+                        const iconSpan = document.createElement('span');
+                        iconSpan.textContent = icon;
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = name;
+                        card.appendChild(iconSpan);
+                        card.appendChild(nameSpan);
+                        preview.appendChild(card);
                     });
-
-                    preview.innerHTML = html;
                 }
 
                 function lightenColor(hex, percent) {

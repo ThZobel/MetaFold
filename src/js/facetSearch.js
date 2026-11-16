@@ -4128,7 +4128,7 @@ const facetSearch = {
                             }).filter(Boolean).join(' ');
                         }
                     } else if (type === 'url' || (typeof displayValue === 'string' && (displayValue.startsWith('http://') || displayValue.startsWith('https://')))) {
-                        const safeUrl = String(displayValue).replace(/'/g, "\\'");
+                        const safeUrl = String(displayValue).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                         displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${escHtml(displayValue)}</span> <span style="font-size:0.8rem;">↗</span></a>`;
                     } else if (Array.isArray(displayValue)) {
                         if (displayValue.length === 0) {
@@ -4269,40 +4269,40 @@ const facetSearch = {
                         sidecarInfoHtml += renderCompactField('File Path', `<span style="font-family:monospace; font-size:0.78rem;">${filePath}</span>`);
                     }
                     if (sidecarPath) {
-                        sidecarInfoHtml += renderCompactField('Sidecar JSON Path', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarPath}</span>`);
+                        sidecarInfoHtml += renderCompactField('Sidecar JSON Path', `<span style="font-family:monospace; font-size:0.78rem;">${escHtml(sidecarPath)}</span>`);
                     }
                     if (project && project.path) {
-                        sidecarInfoHtml += renderCompactField('Project Path', `<span style="font-family:monospace; font-size:0.78rem;">${project.path}</span>`);
+                        sidecarInfoHtml += renderCompactField('Project Path', `<span style="font-family:monospace; font-size:0.78rem;">${escHtml(project.path)}</span>`);
                     }
                     const parentProjId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
                     if (parentProjId) {
-                        sidecarInfoHtml += renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${parentProjId}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`);
+                        sidecarInfoHtml += renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${escHtml(parentProjId)}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${escAttr(parentProjId)}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`);
                     }
                     if (sidecarEntry.sidecar_id) {
-                        sidecarInfoHtml += renderCompactField('Sidecar ID', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarEntry.sidecar_id}</span>`);
+                        sidecarInfoHtml += renderCompactField('Sidecar ID', `<span style="font-family:monospace; font-size:0.78rem;">${escHtml(sidecarEntry.sidecar_id)}</span>`);
                     }
                     if (sidecarEntry.generated_at) {
-                        sidecarInfoHtml += renderCompactField('Generated At', new Date(sidecarEntry.generated_at).toLocaleString());
+                        sidecarInfoHtml += renderCompactField('Generated At', escHtml(new Date(sidecarEntry.generated_at).toLocaleString()));
                     }
                     if (sidecarEntry.generator) {
-                        sidecarInfoHtml += renderCompactField('Generator', `${sidecarEntry.generator}${sidecarEntry.metafold_version ? ` (v${sidecarEntry.metafold_version})` : ''}`);
+                        sidecarInfoHtml += renderCompactField('Generator', `${escHtml(sidecarEntry.generator)}${sidecarEntry.metafold_version ? ` (v${escHtml(sidecarEntry.metafold_version)})` : ''}`);
                     }
                     if (Array.isArray(sidecarEntry.inherited_from_summary) && sidecarEntry.inherited_from_summary.length > 0) {
-                        const levelsStr = sidecarEntry.inherited_from_summary.map(lvl => `${lvl.folder || `Level ${lvl.level}`}`).join(' → ');
+                        const levelsStr = sidecarEntry.inherited_from_summary.map(lvl => `${escHtml(lvl.folder || `Level ${lvl.level}`)}`).join(' → ');
                         sidecarInfoHtml += renderCompactField('Inherited Levels (ISA)', levelsStr);
                     }
 
                     const html = `
                 <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
-                    <h3 style="margin: 0 0 5px 0; color: #38bdf8; font-size: 1.05rem; word-break: break-word;">📄 ${sidecarEntry.name || 'File Sidecar'}</h3>
+                    <h3 style="margin: 0 0 5px 0; color: #38bdf8; font-size: 1.05rem; word-break: break-word;">📄 ${escHtml(sidecarEntry.name || 'File Sidecar')}</h3>
                     ${parentProjId ? `
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 0.74rem;">
                         <span style="color: #9ca3af;">Project ID:</span>
-                        <code style="font-family: monospace; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem;">${parentProjId}</code>
-                        <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 1px 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>
+                        <code style="font-family: monospace; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem;">${escHtml(parentProjId)}</code>
+                        <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${escAttr(parentProjId)}" style="padding: 1px 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>
                     </div>` : ''}
-                    <div style="font-size: 0.76rem; font-family: monospace; color: #9ca3af; word-break: break-all; margin-bottom: 5px;">${filePath || sidecarPath || ''}</div>
-                    <div style="font-size: 0.78rem; color: #c4b5fd;">📁 Project: <strong>${project.name || 'Project'}</strong> · 📅 ${fileModStr}</div>
+                    <div style="font-size: 0.76rem; font-family: monospace; color: #9ca3af; word-break: break-all; margin-bottom: 5px;">${escHtml(filePath || sidecarPath || '')}</div>
+                    <div style="font-size: 0.78rem; color: #c4b5fd;">📁 Project: <strong>${escHtml(project.name || 'Project')}</strong> · 📅 ${escHtml(fileModStr)}</div>
                 </div>
 
                 <!-- Quick File & Sidecar Actions -->
@@ -4324,7 +4324,7 @@ const facetSearch = {
                 <!-- 1. Collapsible Project Metadata -->
                 <details class="facet-lineage-accordion" style="margin-bottom: 10px;">
                     <summary title="Click to expand or collapse project metadata">
-                        <span><span class="accordion-arrow">▶</span>📋 Project Metadata (${project.name || 'Project'})</span>
+                        <span><span class="accordion-arrow">▶</span>📋 Project Metadata (${escHtml(project.name || 'Project')})</span>
                     </summary>
                     <div class="facet-lineage-accordion-body" style="gap: 0; padding: 8px;">
                         ${projMetaHtml}
@@ -4360,8 +4360,9 @@ const facetSearch = {
                 // ═══════════════════════════════════════════════════════════════════════
                 // VIEW B: PROJECT ROW
                 // ═══════════════════════════════════════════════════════════════════════
-                const escapedPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const escapedName = (project.name || 'Project').replace(/'/g, "\\'");
+                const escJs = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const escapedPath = escJs(project.path || '');
+                const escapedName = escJs(project.name || 'Project');
                 const createdStr = project.created ? new Date(project.created).toLocaleString() : '—';
 
                 // Collect all links (derived_from, downstream, related_to, [[note mentions]]), tags, and note URLs/paths
@@ -4587,15 +4588,15 @@ const facetSearch = {
                     <span class="btn-icon">📖</span> README.html
                 </button>` : ''}
                 ${omeroUrl ? `
-                <button class="facet-detail-action-btn facet-action-omero" onclick="window.electronAPI.openExternal('${omeroUrl.replace(/'/g, "\\'")}')" title="Open linked dataset in OMERO">
+                <button class="facet-detail-action-btn facet-action-omero" onclick="window.electronAPI.openExternal('${escJs(omeroUrl)}')" title="Open linked dataset in OMERO">
                     <span class="btn-icon">🔵</span> OMERO
                 </button>` : ''}
                 ${elabUrl ? `
-                <button class="facet-detail-action-btn facet-action-elab" onclick="window.electronAPI.openExternal('${elabUrl.replace(/'/g, "\\'")}')" title="Open linked experiment in eLabFTW">
+                <button class="facet-detail-action-btn facet-action-elab" onclick="window.electronAPI.openExternal('${escJs(elabUrl)}')" title="Open linked experiment in eLabFTW">
                     <span class="btn-icon">🟢</span> eLabFTW
                 </button>` : ''}
                 ${rspaceUrl ? `
-                <button class="facet-detail-action-btn facet-action-rspace" onclick="window.electronAPI.openExternal('${rspaceUrl.replace(/'/g, "\\'")}')" title="Open linked document in RSpace">
+                <button class="facet-detail-action-btn facet-action-rspace" onclick="window.electronAPI.openExternal('${escJs(rspaceUrl)}')" title="Open linked document in RSpace">
                     <span class="btn-icon">🟠</span> RSpace
                 </button>` : ''}
             </div>
@@ -4730,12 +4731,12 @@ const facetSearch = {
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
             `;
                     changelog.forEach(entry => {
-                        const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
-                        const user = entry.user ? ` · ${window.markdownLite ? window.markdownLite.escapeHtml(entry.user) : entry.user}` : '';
+                        const esc = (window.markdownLite && window.markdownLite.escapeHtml) || escHtml;
+                        const ts = entry.timestamp ? esc(new Date(entry.timestamp).toLocaleString()) : '';
+                        const user = entry.user ? ` · ${esc(entry.user)}` : '';
                         let details = '';
                         if (Array.isArray(entry.changes)) {
                             details = entry.changes.map(c => {
-                                const esc = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
                                 if (c.field === 'notes_log') {
                                     const cat = c.category ? `<span style="font-size:0.68rem; background:rgba(139,92,246,0.25); color:#c4b5fd; padding:1px 6px; border-radius:10px; margin-right:4px; text-transform:uppercase;">${esc(c.category)}</span>` : '';
                                     const textVal = esc(c.text || c.to || '');
@@ -4764,7 +4765,7 @@ const facetSearch = {
                                 return `<code>${esc(c.field || 'Field')}</code> updated`;
                             }).join(', ');
                         } else if (entry.action) {
-                            details = window.markdownLite ? window.markdownLite.escapeHtml(entry.action) : entry.action;
+                            details = esc(entry.action);
                         }
                         html += `
                     <div style="font-size: 0.78rem; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,0.2);">

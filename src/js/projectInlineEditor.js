@@ -29,14 +29,24 @@
         return typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
     }
 
+    function escapeHtmlFallback(s) {
+        if (s === null || s === undefined) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function getEsc() {
         const win = getWindow();
-        return (win.markdownLite && win.markdownLite.escapeHtml) || (s => String(s || ''));
+        return (win.markdownLite && win.markdownLite.escapeHtml) || escapeHtmlFallback;
     }
 
     function getEscAttr() {
         const win = getWindow();
-        return (win.markdownLite && win.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
+        return (win.markdownLite && win.markdownLite.escapeAttr) || escapeHtmlFallback;
     }
 
     class ProjectInlineEditor {
