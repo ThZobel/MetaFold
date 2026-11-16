@@ -15,10 +15,10 @@ class OMEROProxyServer {
         this.omeroServerUrl = omeroServerUrl;
         this.server = null;
         this.status = 'stopped';
-        
+
         // Session storage für Client-zu-OMERO Mapping (wie im Python Proxy)
         this.clientSessions = new Map();
-        
+
         this.allowSelfSignedCerts = process.env.OMERO_ALLOW_SELF_SIGNED === 'true';
 
         // Connection pooling
@@ -27,7 +27,7 @@ class OMEROProxyServer {
             rejectUnauthorized: !this.allowSelfSignedCerts,
             secureProtocol: 'TLS_method' // Use modern TLS
         });
-        
+
         console.log('🔬 OMERO Proxy Manager initialized');
     }
 
@@ -86,7 +86,7 @@ class OMEROProxyServer {
                     console.log(`🚀 OMERO Proxy Server started on http://localhost:${this.port}`);
                     console.log(`🔬 Target OMERO: ${this.omeroServerUrl}`);
                     console.log('🔧 CSRF/CORS fixes applied for MetaFold integration');
-                    
+
                     resolve({
                         success: true,
                         message: 'Proxy server started successfully',
@@ -181,7 +181,7 @@ class OMEROProxyServer {
 
         // Route requests with enhanced debugging
         console.log(`🔍 Incoming request: ${req.method} ${path}`);
-        
+
         if (path.startsWith('/omero-api/')) {
             console.log(`🔗 Routing to OMERO proxy: ${path}`);
             this.proxyToOMERO(req, res);
@@ -191,7 +191,7 @@ class OMEROProxyServer {
             this.serveCsrfDebug(req, res);
         } else {
             // Handle other requests (404)
-            res.writeHead(404, {'Content-Type': 'application/json'});
+            res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 error: 'Not Found',
                 message: 'Endpoint not found',
@@ -206,19 +206,19 @@ class OMEROProxyServer {
     async proxyToOMERO(req, res) {
         try {
             const clientId = this.getClientId(req);
-            
+
             // Process path (remove /omero-api prefix)
             let omeroPath = req.url.replace(/^\/omero-api\/?/, '/');
-            
+
             // Apply path corrections (like in Python proxy)
             if (omeroPath.startsWith('/api/api/')) {
                 omeroPath = omeroPath.replace('/api/api/', '/api/');
             }
-            
+
             // Smart API prefix handling
             const knownPrefixes = ['/api/', '/webclient/', '/webgateway/', '/static/'];
             const needsApiPrefix = !knownPrefixes.some(prefix => omeroPath.startsWith(prefix));
-            
+
             if (needsApiPrefix && !omeroPath.startsWith('/api')) {
                 omeroPath = '/api' + omeroPath;
             }
@@ -227,7 +227,7 @@ class OMEROProxyServer {
             const cleanServerUrl = this.omeroServerUrl.replace(/\/$/, '');
             const cleanPath = omeroPath.startsWith('/') ? omeroPath : '/' + omeroPath;
             const omeroUrl = cleanServerUrl + cleanPath;
-            
+
             console.log(`🔬 [${req.method}] ${req.url} -> ${omeroUrl}`);
             console.log(`🔍 URL Transformation Details:`);
             console.log(`   Original request: ${req.url}`);
@@ -255,7 +255,7 @@ class OMEROProxyServer {
                 console.error('❌ Proxy request error:', error);
                 console.error('❌ Failed URL:', omeroUrl);
                 console.error('❌ OMERO Server:', this.omeroServerUrl);
-                res.writeHead(502, {'Content-Type': 'application/json'});
+                res.writeHead(502, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     error: 'Bad Gateway',
                     message: `Failed to connect to OMERO server: ${error.message}`,
@@ -274,7 +274,7 @@ class OMEROProxyServer {
 
         } catch (error) {
             console.error('❌ Proxy error:', error);
-            res.writeHead(500, {'Content-Type': 'application/json'});
+            res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 error: 'Internal Server Error',
                 message: error.message
@@ -287,11 +287,11 @@ class OMEROProxyServer {
      */
     processRequestHeaders(req, clientId) {
         const headers = { ...req.headers };
-        
+
         // Remove problematic headers
         delete headers.host;
         delete headers['content-length']; // Will be set automatically
-        
+
         // Clean origin (strict: no trailing slash or path for Django 4+ CSRF)
         let cleanOrigin = this.omeroServerUrl;
         try {
@@ -303,10 +303,10 @@ class OMEROProxyServer {
 
         // CSRF FIX 1: Set proper Referer header (single slash or specific endpoint)
         headers.referer = `${cleanOrigin}/webclient/login/`;
-        
+
         // CSRF FIX 2: Set Origin header for Django 4+ compatibility (STRICT: no trailing slash!)
         headers.origin = cleanOrigin;
-        
+
         // CSRF FIX 3: Ensure proper cookie handling
         if (this.clientSessions.has(clientId)) {
             headers.cookie = this.clientSessions.get(clientId);
@@ -320,13 +320,13 @@ class OMEROProxyServer {
                 headers.cookie = currentCookies ? `${currentCookies}; csrftoken=${csrfTokenHeader}` : `csrftoken=${csrfTokenHeader}`;
             }
         }
-        
+
         console.log('🔧 Headers for %s:', clientId, {
             referer: headers.referer,
             origin: headers.origin,
             hasCookies: !!headers.cookie
         });
-        
+
         return headers;
     }
 
@@ -339,208 +339,215 @@ class OMEROProxyServer {
         if (!origin) return defaultOrigin;
         try {
             const parsed = new URL(origin);
-            if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-                (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1')) {
-                return `${parsed.protocol}//${parsed.host}`;
+                const isHttps = parsed.protocol === 'https:';
+                const isHttp = parsed.protocol === 'http:';
+                if (!isHttps && !isHttp) return defaultOrigin;
+                const portNum = parsed.port ? parseInt(parsed.port, 10) : null;
+                const portSuffix = (portNum && portNum > 0 && portNum <= 65535) ? `:${portNum}` : '';
+                if (parsed.hostname === 'localhost') {
+                    return (isHttps ? 'https://localhost' : 'http://localhost') + portSuffix;
+                }
+                if (parsed.hostname === '127.0.0.1') {
+                    return (isHttps ? 'https://127.0.0.1' : 'http://127.0.0.1') + portSuffix;
+                }
+            } catch (_) {
+                // Ignore malformed origin
             }
-        } catch (_) {
-            // Ignore malformed origin
+            return defaultOrigin;
         }
-        return defaultOrigin;
-    }
 
     /**
      * Handle response from OMERO server
      */
     handleProxyResponse(req, res, proxyRes, clientId) {
-        // Process response cookies (preserve CSRF tokens)
-        this.processResponseCookies(proxyRes, clientId);
-        
-        // Set response headers
-        res.writeHead(proxyRes.statusCode, {
-            ...proxyRes.headers,
-            'Access-Control-Allow-Origin': this.getAllowedOrigin(req),
-            'Access-Control-Allow-Credentials': 'true',
-            'Access-Control-Expose-Headers': 'Set-Cookie, Content-Type, Content-Length'
-        });
-        
-        // Pipe response body
-        proxyRes.pipe(res);
-        
-        // Log response
-        console.log(`✅ Response ${proxyRes.statusCode} for ${clientId}`);
-    }
+            // Process response cookies (preserve CSRF tokens)
+            this.processResponseCookies(proxyRes, clientId);
 
-    /**
-     * Process response cookies to preserve CSRF tokens
-     */
-    processResponseCookies(proxyRes, clientId) {
-        const setCookieHeaders = proxyRes.headers['set-cookie'];
-        if (!setCookieHeaders) return;
+            // Set response headers
+            res.writeHead(proxyRes.statusCode, {
+                ...proxyRes.headers,
+                'Access-Control-Allow-Origin': this.getAllowedOrigin(req),
+                'Access-Control-Allow-Credentials': 'true',
+                'Access-Control-Expose-Headers': 'Set-Cookie, Content-Type, Content-Length'
+            });
 
-        let existingCookies = this.clientSessions.get(clientId) || '';
-        const cookieMap = new Map();
-        
-        // Parse existing cookies
-        if (existingCookies) {
-            existingCookies.split(';').forEach(cookie => {
-                const [name, value] = cookie.trim().split('=');
+            // Pipe response body
+            proxyRes.pipe(res);
+
+            // Log response
+            console.log(`✅ Response ${proxyRes.statusCode} for ${clientId}`);
+        }
+
+        /**
+         * Process response cookies to preserve CSRF tokens
+         */
+        processResponseCookies(proxyRes, clientId) {
+            const setCookieHeaders = proxyRes.headers['set-cookie'];
+            if (!setCookieHeaders) return;
+
+            let existingCookies = this.clientSessions.get(clientId) || '';
+            const cookieMap = new Map();
+
+            // Parse existing cookies
+            if (existingCookies) {
+                existingCookies.split(';').forEach(cookie => {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name && value) {
+                        cookieMap.set(name, value);
+                    }
+                });
+            }
+
+            // Process new cookies
+            setCookieHeaders.forEach(cookie => {
+                const [nameValue] = cookie.split(';');
+                const [name, value] = nameValue.split('=');
                 if (name && value) {
-                    cookieMap.set(name, value);
+                    cookieMap.set(name.trim(), value.trim());
+
+                    // Log CSRF token updates
+                    if (name.trim() === 'csrftoken') {
+                        console.log(`🔧 CSRF token updated for ${clientId}: ${value.trim().substring(0, 8)}...`);
+                    }
                 }
             });
+
+            // Update session cookies
+            const updatedCookies = Array.from(cookieMap.entries())
+                .map(([name, value]) => `${name}=${value}`).join('; ');
+
+            this.clientSessions.set(clientId, updatedCookies);
         }
-        
-        // Process new cookies
-        setCookieHeaders.forEach(cookie => {
-            const [nameValue] = cookie.split(';');
-            const [name, value] = nameValue.split('=');
-            if (name && value) {
-                cookieMap.set(name.trim(), value.trim());
-                
-                // Log CSRF token updates
-                if (name.trim() === 'csrftoken') {
-                    console.log(`🔧 CSRF token updated for ${clientId}: ${value.trim().substring(0, 8)}...`);
-                }
+
+        /**
+         * Generate unique client ID (like Python proxy)
+         */
+        getClientId(req) {
+            let clientIp = req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+            // Normalize localhost/loopback addresses (::1 vs 127.0.0.1)
+            if (clientIp === '::1' || clientIp === '127.0.0.1' || clientIp === '::ffff:127.0.0.1') {
+                clientIp = 'localhost';
             }
-        });
-        
-        // Update session cookies
-        const updatedCookies = Array.from(cookieMap.entries())
-            .map(([name, value]) => `${name}=${value}`).join('; ');
-        
-        this.clientSessions.set(clientId, updatedCookies);
-    }
 
-    /**
-     * Generate unique client ID (like Python proxy)
-     */
-    getClientId(req) {
-        let clientIp = req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
-        // Normalize localhost/loopback addresses (::1 vs 127.0.0.1)
-        if (clientIp === '::1' || clientIp === '127.0.0.1' || clientIp === '::ffff:127.0.0.1') {
-            clientIp = 'localhost';
-        }
+            const userAgent = req.headers['user-agent'] || 'unknown';
 
-        const userAgent = req.headers['user-agent'] || 'unknown';
-        
-        // Try to use CSRF token for stable client ID (from cookie or header)
-        const cookies = req.headers.cookie || '';
-        if (cookies.includes('csrftoken=')) {
-            const csrfMatch = cookies.match(/csrftoken=([^;]+)/);
-            if (csrfMatch) {
-                return `${clientIp}_${csrfMatch[1].substring(0, 8)}`;
-            }
-        }
-
-        if (req.headers['x-csrftoken']) {
-            return `${clientIp}_${req.headers['x-csrftoken'].substring(0, 8)}`;
-        }
-        
-        // Fallback to IP + hash of user agent
-        const hash = this.simpleHash(userAgent);
-        return `${clientIp}_${hash}`;
-    }
-
-    /**
-     * Set CORS headers
-     */
-    setCorsHeaders(req, res) {
-        res.setHeader('Access-Control-Allow-Origin', this.getAllowedOrigin(req));
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRFToken, Referer, Accept, Cookie, Origin');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type, Content-Length');
-    }
-
-    /**
-     * Serve proxy status endpoint
-     */
-    serveProxyStatus(req, res) {
-        const status = {
-            proxy_running: true,
-            omero_server: this.omeroServerUrl,
-            active_sessions: this.clientSessions.size,
-            port: this.port,
-            csrf_fixes_applied: [
-                'Referer header automatically set',
-                'Origin header set to OMERO server', 
-                'CSRF tokens preserved in cookies',
-                'Cookie domain restrictions handled',
-                'Cross-origin credentials enabled'
-            ]
-        };
-        
-        res.writeHead(200, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify(status, null, 2));
-    }
-
-    /**
-     * Serve CSRF debug endpoint
-     */
-    serveCsrfDebug(req, res) {
-        const debugInfo = {
-            timestamp: new Date().toISOString(),
-            active_sessions: this.clientSessions.size,
-            session_details: {}
-        };
-        
-        // Add session details (without exposing full tokens for security)
-        this.clientSessions.forEach((cookies, clientId) => {
-            const hasCSRF = cookies.includes('csrftoken=');
-            let csrfPreview = null;
-            
-            if (hasCSRF) {
+            // Try to use CSRF token for stable client ID (from cookie or header)
+            const cookies = req.headers.cookie || '';
+            if (cookies.includes('csrftoken=')) {
                 const csrfMatch = cookies.match(/csrftoken=([^;]+)/);
                 if (csrfMatch) {
-                    csrfPreview = csrfMatch[1].substring(0, 10) + '...';
+                    return `${clientIp}_${csrfMatch[1].substring(0, 8)}`;
                 }
             }
-            
-            debugInfo.session_details[clientId] = {
-                has_csrf_token: hasCSRF,
-                csrf_token_preview: csrfPreview,
-                cookie_count: cookies.split(';').length
+
+            if (req.headers['x-csrftoken']) {
+                return `${clientIp}_${req.headers['x-csrftoken'].substring(0, 8)}`;
+            }
+
+            // Fallback to IP + hash of user agent
+            const hash = this.simpleHash(userAgent);
+            return `${clientIp}_${hash}`;
+        }
+
+        /**
+         * Set CORS headers
+         */
+        setCorsHeaders(req, res) {
+            res.setHeader('Access-Control-Allow-Origin', this.getAllowedOrigin(req));
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRFToken, Referer, Accept, Cookie, Origin');
+            res.setHeader('Access-Control-Allow-Credentials', 'true');
+            res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type, Content-Length');
+        }
+
+        /**
+         * Serve proxy status endpoint
+         */
+        serveProxyStatus(req, res) {
+            const status = {
+                proxy_running: true,
+                omero_server: this.omeroServerUrl,
+                active_sessions: this.clientSessions.size,
+                port: this.port,
+                csrf_fixes_applied: [
+                    'Referer header automatically set',
+                    'Origin header set to OMERO server',
+                    'CSRF tokens preserved in cookies',
+                    'Cookie domain restrictions handled',
+                    'Cross-origin credentials enabled'
+                ]
             };
-        });
-        
-        res.writeHead(200, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify(debugInfo, null, 2));
-    }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(status, null, 2));
+        }
+
+        /**
+         * Serve CSRF debug endpoint
+         */
+        serveCsrfDebug(req, res) {
+            const debugInfo = {
+                timestamp: new Date().toISOString(),
+                active_sessions: this.clientSessions.size,
+                session_details: {}
+            };
+
+            // Add session details (without exposing full tokens for security)
+            this.clientSessions.forEach((cookies, clientId) => {
+                const hasCSRF = cookies.includes('csrftoken=');
+                let csrfPreview = null;
+
+                if (hasCSRF) {
+                    const csrfMatch = cookies.match(/csrftoken=([^;]+)/);
+                    if (csrfMatch) {
+                        csrfPreview = csrfMatch[1].substring(0, 10) + '...';
+                    }
+                }
+
+                debugInfo.session_details[clientId] = {
+                    has_csrf_token: hasCSRF,
+                    csrf_token_preview: csrfPreview,
+                    cookie_count: cookies.split(';').length
+                };
+            });
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(debugInfo, null, 2));
+        }
 
     /**
      * Find available port starting from specified port
      */
     async findAvailablePort(startPort) {
-        const net = require('net');
-        
-        return new Promise((resolve) => {
-            const server = net.createServer();
-            
-            server.listen(startPort, 'localhost', () => {
-                const port = server.address().port;
-                server.close(() => resolve(port));
-            });
-            
-            server.on('error', () => {
-                // Port is in use, try next one
-                this.findAvailablePort(startPort + 1).then(resolve);
-            });
-        });
-    }
+            const net = require('net');
 
-    /**
-     * Simple hash function for client ID generation
-     */
-    simpleHash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
+            return new Promise((resolve) => {
+                const server = net.createServer();
+
+                server.listen(startPort, 'localhost', () => {
+                    const port = server.address().port;
+                    server.close(() => resolve(port));
+                });
+
+                server.on('error', () => {
+                    // Port is in use, try next one
+                    this.findAvailablePort(startPort + 1).then(resolve);
+                });
+            });
         }
-        return Math.abs(hash).toString(16).substring(0, 8);
+
+        /**
+         * Simple hash function for client ID generation
+         */
+        simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            return Math.abs(hash).toString(16).substring(0, 8);
+        }
     }
-}
 
 module.exports = OMEROProxyServer;

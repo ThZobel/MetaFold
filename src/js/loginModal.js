@@ -288,11 +288,11 @@ const loginModal = {
         try {
             const stored = JSON.parse(localStorage.getItem('metafold_user_history') || '[]');
             if (Array.isArray(stored)) stored.forEach(u => u && set.add(u));
-        } catch (e) {}
+        } catch (e) { }
         try {
             const mapping = JSON.parse(localStorage.getItem('metafold_user_group_mapping') || '{}');
             Object.keys(mapping).forEach(u => u && set.add(u));
-        } catch (e) {}
+        } catch (e) { }
         if (window.secureStorage?.hasUserPassword?.('Admin')) {
             set.add('Admin');
         }
@@ -544,6 +544,9 @@ const loginModal = {
 
     promptForPassword(username) {
         return new Promise((resolve) => {
+            const escHtml = (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+                ? appUtils.escapeHtml(username)
+                : String(username ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const promptHTML = `
                 <div id="loginPasswordPrompt" style="
                     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -561,7 +564,7 @@ const loginModal = {
                             🔐 Password Required
                         </h3>
                         <p style="margin: 0 0 2rem 0; color: #9ca3af; text-align: center; font-size: 1.1rem;">
-                            Enter password for <strong style="color: #a855f7;">${username}</strong>:
+                            Enter password for <strong style="color: #a855f7;">${escHtml}</strong>:
                         </p>
                         <div style="position: relative; margin-bottom: 2rem;">
                             <input type="password" id="loginPasswordInput" placeholder="Enter your password" style="

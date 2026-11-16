@@ -18,7 +18,7 @@ const userManagementModal = {
     activeTab: 'users', // 'users' or 'groups'
 
     // =================== MAIN FUNCTIONS ===================
-    
+
     /**
      * Show user management modal (main entry point)
      */
@@ -59,7 +59,7 @@ const userManagementModal = {
 
         const currentUser = window.userManager?.currentUser;
         const isAdmin = currentUser === 'Admin';
-        
+
         // Auto-enable password system
         this.ensurePasswordSystemEnabled();
 
@@ -392,7 +392,7 @@ const userManagementModal = {
     _buildGroupHybridSelect(id, isEdit = false) {
         const groups = window.profileManager ? window.profileManager.getAllGroups() : [];
         const editClass = isEdit ? 'edit-input' : '';
-        
+
         return `
             <div class="ugm-hybrid-select">
                 <select id="${id}" class="form-select ${editClass}" onchange="userManagementModal._onGroupSelectChange('${id}')">
@@ -433,11 +433,11 @@ const userManagementModal = {
     _getGroupValue(id) {
         const select = document.getElementById(id);
         const customInput = document.getElementById(`${id}_custom`);
-        
+
         if (customInput && customInput.style.display !== 'none' && customInput.value.trim()) {
             return customInput.value.trim();
         }
-        
+
         if (select && select.value && select.value !== '__new__') {
             return select.value;
         }
@@ -451,7 +451,7 @@ const userManagementModal = {
     _buildRoleHybridSelect(id, isEdit = false) {
         const roles = window.profileManager ? window.profileManager.getPredefinedRoles() : [];
         const editClass = isEdit ? 'edit-input' : '';
-        
+
         return `
             <div class="ugm-hybrid-select">
                 <select id="${id}" class="form-select ${editClass}" onchange="userManagementModal._onRoleSelectChange('${id}')">
@@ -492,11 +492,11 @@ const userManagementModal = {
     _getRoleValue(id) {
         const select = document.getElementById(id);
         const customInput = document.getElementById(`${id}_custom`);
-        
+
         if (customInput && customInput.style.display !== 'none' && customInput.value.trim()) {
             return customInput.value.trim();
         }
-        
+
         if (select && select.value && select.value !== '__custom__') {
             return select.value;
         }
@@ -608,7 +608,7 @@ const userManagementModal = {
         if (adminExists && !users.includes('Admin')) {
             users = ['Admin', ...users];
         }
-        
+
         userSelect.innerHTML = '<option value="">Select user...</option>';
         users.forEach(user => {
             const hasPassword = window.secureStorage?.hasUserPassword?.(user) ? '🔒' : '';
@@ -711,8 +711,8 @@ const userManagementModal = {
 
         // Get profile data
         const profile = window.profileManager?.getUserByUsername(username);
-        const group = window.profileManager?.getUserPrimaryGroupName(username) || 
-                      window.userManager?.getUserGroup(username) || 'Default';
+        const group = window.profileManager?.getUserPrimaryGroupName(username) ||
+            window.userManager?.getUserGroup(username) || 'Default';
 
         // Show edit section and populate
         const editSection = document.getElementById('editUserSection');
@@ -893,8 +893,8 @@ const userManagementModal = {
             }
 
             const actualGroup = username === 'Admin' ? 'System' : group;
-            const hasPassword = this.isPasswordSystemEnabled() && 
-                            window.secureStorage?.hasUserPassword?.(username);
+            const hasPassword = this.isPasswordSystemEnabled() &&
+                window.secureStorage?.hasUserPassword?.(username);
 
             if (hasPassword) {
                 const password = await this._promptForPassword(username);
@@ -1019,10 +1019,10 @@ const userManagementModal = {
 
             // Clear inputs
             ['newGroupName', 'newGroupPI', 'newGroupEmail',
-             'newGroupInstitution', 'newGroupDepartment'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
+                'newGroupInstitution', 'newGroupDepartment'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
 
             this.toggleAddGroupForm(false);
             this.renderGroupList();
@@ -1135,7 +1135,7 @@ const userManagementModal = {
 
         const countBadge = document.getElementById('userCountBadge');
         if (countBadge) countBadge.textContent = users.length;
-        
+
         const currentUser = window.userManager?.currentUser;
 
         if (users.length === 0) {
@@ -1149,11 +1149,18 @@ const userManagementModal = {
             return;
         }
 
+        const escHtml = (s) => (typeof appUtils !== 'undefined' && appUtils.escapeHtml)
+            ? appUtils.escapeHtml(s)
+            : String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const escJsAttr = (s) => (typeof appUtils !== 'undefined' && appUtils.escapeJsAttr)
+            ? appUtils.escapeJsAttr(s)
+            : String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
         listContainer.innerHTML = users.map(user => {
             const profile = window.profileManager?.getUserByUsername(user);
-            const groupName = user === 'Admin' ? 'System' : 
-                (window.profileManager?.getUserPrimaryGroupName(user) || 
-                 window.userManager?.getUserGroup(user) || 'Default');
+            const groupName = user === 'Admin' ? 'System' :
+                (window.profileManager?.getUserPrimaryGroupName(user) ||
+                    window.userManager?.getUserGroup(user) || 'Default');
             const color = window.userManager?.generateUserColor?.(user) || '#7c3aed';
             const initials = window.userManager?.getUserInitials?.(user) || '??';
             const isCurrent = user === currentUser;
@@ -1166,20 +1173,26 @@ const userManagementModal = {
             if (profile) {
                 const infoParts = [];
                 const fullName = [profile.title, profile.firstName, profile.lastName].filter(Boolean).join(' ');
-                if (fullName) infoParts.push(`👤 ${fullName}`);
-                if (profile.email) infoParts.push(`📧 ${profile.email}`);
-                if (profile.orcid) infoParts.push(`🆔 ${profile.orcid}`);
-                if (profile.role) infoParts.push(`🏷️ ${profile.role}`);
+                if (fullName) infoParts.push(`👤 ${escHtml(fullName)}`);
+                if (profile.email) infoParts.push(`📧 ${escHtml(profile.email)}`);
+                if (profile.orcid) infoParts.push(`🆔 ${escHtml(profile.orcid)}`);
+                if (profile.role) infoParts.push(`🏷️ ${escHtml(profile.role)}`);
                 if (infoParts.length > 0) {
                     extendedInfo = `<div style="color: #6b7280; font-size: 0.8rem; margin-top: 2px;">${infoParts.join(' · ')}</div>`;
                 }
             }
 
+            const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#7c3aed';
+            const safeUserHtml = escHtml(user);
+            const safeUserJs = escJsAttr(user);
+            const safeGroupHtml = escHtml(groupName);
+            const safeGroupJs = escJsAttr(groupName);
+
             return `
                 <div class="ugm-user-item ${isCurrent ? 'current' : ''} ${isEditing ? 'editing' : ''}">
                     <!-- Avatar -->
-                    <div class="ugm-avatar" style="background: ${color};">
-                        ${initials}
+                    <div class="ugm-avatar" style="background: ${safeColor};">
+                        ${escHtml(initials)}
                         ${hasPassword ? '<div class="ugm-avatar-badge password">🔒</div>' : ''}
                         ${isAdmin ? '<div class="ugm-avatar-badge admin">👑</div>' : ''}
                     </div>
@@ -1187,13 +1200,13 @@ const userManagementModal = {
                     <!-- User Info -->
                     <div style="flex: 1; min-width: 0;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <span style="font-weight: 600; color: #e0e0e0;">${user}</span>
+                            <span style="font-weight: 600; color: #e0e0e0;">${safeUserHtml}</span>
                             ${isAdmin ? '<span style="color: #f59e0b; font-size: 0.8rem; font-weight: 600;">ADMIN</span>' : ''}
                             ${hasPassword ? '<span style="color: #10b981; font-size: 0.8rem;">🔒</span>' : ''}
                             ${isCurrent ? '<span style="color: #7c3aed; font-size: 0.8rem; font-weight: 600;">CURRENT</span>' : ''}
                         </div>
                         <div style="color: #9ca3af; font-size: 0.9rem; margin-top: 2px;">
-                            Group: ${groupName}
+                            Group: ${safeGroupHtml}
                             ${isEditing ? ' <span style="color: #f59e0b; font-weight: 600;">(editing)</span>' : ''}
                         </div>
                         ${extendedInfo}
@@ -1201,17 +1214,17 @@ const userManagementModal = {
                     
                     <!-- Actions -->
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex-shrink: 0;">
-                        <button type="button" onclick="userManagementModal.exportSingleUser('${user}')" class="btn btn-secondary btn-small" title="Export this user & templates">📤</button>
+                        <button type="button" onclick="userManagementModal.exportSingleUser('${safeUserJs}')" class="btn btn-secondary btn-small" title="Export this user & templates">📤</button>
                         ${!isEditing && (currentUser === 'Admin' || currentUser === user) ? `
-                            <button onclick="userManagementModal.startEditUser('${user}')" class="btn btn-warning btn-small">✏️</button>
+                            <button onclick="userManagementModal.startEditUser('${safeUserJs}')" class="btn btn-warning btn-small">✏️</button>
                         ` : ''}
                         ${!isCurrent ? `
-                            <button onclick="userManagementModal.switchToUser('${user}', '${groupName}')" class="btn btn-primary btn-small">Switch</button>
+                            <button onclick="userManagementModal.switchToUser('${safeUserJs}', '${safeGroupJs}')" class="btn btn-primary btn-small">Switch</button>
                         ` : `
                             <button disabled class="btn btn-disabled btn-small">✓ Active</button>
                         `}
                         ${!isCurrent && !isEditing && currentUser === 'Admin' && user !== 'Admin' ? `
-                            <button onclick="userManagementModal.deleteUser('${user}')" class="btn btn-danger btn-small">🗑️</button>
+                            <button onclick="userManagementModal.deleteUser('${safeUserJs}')" class="btn btn-danger btn-small">🗑️</button>
                         ` : ''}
                     </div>
                 </div>
@@ -1369,7 +1382,7 @@ const userManagementModal = {
 
         try {
             const result = await window.profileManager.importProfiles('merge');
-            
+
             if (result && result.canceled) {
                 console.log('ℹ️ Profile import cancelled by user');
                 return;
@@ -1381,7 +1394,7 @@ const userManagementModal = {
                 if (stats.templatesImported > 0) {
                     message += ` (${stats.templatesImported} template${stats.templatesImported !== 1 ? 's' : ''} imported)`;
                 }
-                
+
                 if (stats.groupsSkipped > 0 || stats.usersSkipped > 0) {
                     message += ` (${stats.groupsSkipped + stats.usersSkipped} skipped - already exist)`;
                 }
@@ -1807,10 +1820,10 @@ const userManagementModal = {
 
         messageDiv.style.cssText = `
             position: fixed; top: 20px; right: 20px; z-index: 10001;
-            background: ${isError ? 'linear-gradient(45deg, #dc2626, #ef4444)' : 
-                         isWarning ? 'linear-gradient(45deg, #f59e0b, #d97706)' :
-                         isSuccess ? 'linear-gradient(45deg, #059669, #10b981)' : 
-                         'linear-gradient(45deg, #7c3aed, #a855f7)'};
+            background: ${isError ? 'linear-gradient(45deg, #dc2626, #ef4444)' :
+                isWarning ? 'linear-gradient(45deg, #f59e0b, #d97706)' :
+                    isSuccess ? 'linear-gradient(45deg, #059669, #10b981)' :
+                        'linear-gradient(45deg, #7c3aed, #a855f7)'};
             color: white; padding: 1rem 1.5rem; border-radius: 12px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.3); font-family: inherit;
             font-weight: 500; max-width: 400px; animation: slideInRight 0.3s ease-out;

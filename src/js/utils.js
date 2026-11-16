@@ -62,7 +62,7 @@ const appUtils = {
         const basePath = document.getElementById('targetPath').value.trim();
         const projectName = document.getElementById('projectName').value.trim();
         const preview = document.getElementById('fullPathPreview');
-        
+
         if (basePath && projectName) {
             const separator = window.electronAPI && window.electronAPI.platform === 'win32' ? '\\' : '/';
             preview.textContent = basePath + separator + projectName;
@@ -80,16 +80,16 @@ const appUtils = {
             console.warn('⚠️ showError called with empty message, ignoring');
             return;
         }
-        
+
         const errorMessage = document.getElementById('errorMessage');
         if (!errorMessage) {
             console.warn('⚠️ errorMessage element not found');
             return;
         }
-        
+
         errorMessage.innerHTML = `<strong>❌ Error!</strong><br>${message}`;
         errorMessage.style.display = 'block';
-        
+
         // Hide after 8 seconds
         setTimeout(() => {
             errorMessage.style.display = 'none';
@@ -104,16 +104,16 @@ const appUtils = {
             console.warn('⚠️ showSuccess called with empty message, ignoring');
             return;
         }
-        
+
         const successMessage = document.getElementById('successMessage');
         if (!successMessage) {
             console.warn('⚠️ successMessage element not found');
             return;
         }
-        
+
         successMessage.innerHTML = message;
         successMessage.style.display = 'block';
-        
+
         // Hide after 8 seconds
         setTimeout(() => {
             successMessage.style.display = 'none';
@@ -128,16 +128,16 @@ const appUtils = {
             console.warn('⚠️ showInfo called with empty message, ignoring');
             return;
         }
-        
+
         const infoMessage = document.getElementById('infoMessage');
         if (!infoMessage) {
             console.warn('⚠️ infoMessage element not found');
             return;
         }
-        
+
         infoMessage.innerHTML = `<strong>ℹ️ Info:</strong><br>${message}`;
         infoMessage.style.display = 'block';
-        
+
         // Hide after 6 seconds
         setTimeout(() => {
             infoMessage.style.display = 'none';
@@ -150,17 +150,17 @@ const appUtils = {
         const successMessage = document.getElementById('successMessage');
         const errorMessage = document.getElementById('errorMessage');
         const infoMessage = document.getElementById('infoMessage');
-        
+
         if (successMessage) {
             successMessage.style.display = 'none';
             successMessage.innerHTML = '';
         }
-        
+
         if (errorMessage) {
             errorMessage.style.display = 'none';
             errorMessage.innerHTML = '';
         }
-        
+
         if (infoMessage) {
             infoMessage.style.display = 'none';
             infoMessage.innerHTML = '';
@@ -382,7 +382,7 @@ window.showExportSuccessModal = function (options = {}) {
 
                 <!-- Body -->
                 <div style="padding: 20px;">
-                    <div style="font-size: 0.92rem; color: #d1d5db; line-height: 1.5;">${message}</div>
+                    <div style="font-size: 0.92rem; color: #d1d5db; line-height: 1.5;">${escHtml(message).replace(/\n/g, '<br>')}</div>
                     ${statsHtml}
                     ${folderHtml}
                     ${filesHtml}
@@ -401,7 +401,7 @@ window.showExportSuccessModal = function (options = {}) {
                         <button type="button" class="btn btn-secondary"
                             style="font-size: 0.88rem; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2);"
                             onclick="window.electronAPI && window.electronAPI.openFile && window.electronAPI.openFile('${esc(primaryFile.path)}')">
-                            <span>${primaryFile.icon}</span> Open ${primaryFile.label || 'File'}
+                            <span>${escHtml(primaryFile.icon)}</span> Open ${escHtml(primaryFile.label || 'File')}
                         </button>
                     ` : ''}
                     <button type="button" class="btn btn-secondary"
@@ -443,7 +443,7 @@ if (typeof window !== 'undefined') {
      * - experimentForm._tagDictionaryItems
      * - Project notes markdown (#tag mentions)
      */
-    window.getAllKnownTags = function() {
+    window.getAllKnownTags = function () {
         const allTags = new Set();
         const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
 
@@ -512,7 +512,7 @@ if (typeof window !== 'undefined') {
                         window.markdownLite.extractTags(p.notes_markdown).forEach(t => {
                             if (t && typeof t === 'string' && t !== '[object Object]') allTags.add(t.trim());
                         });
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             });
         }
