@@ -1,0 +1,78 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  electronegativity:
+    name: Electron Security (Electronegativity)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Electronegativity on src/
+        run: |
+          npx --yes @doyensec/electronegativity -i ./src -o csv -f electronegativity-report.csv || true
+          if [ -f electronegativity-report.csv ]; then
+            echo "### Electronegativity Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            head -n 40 electronegativity-report.csv >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Electronegativity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electronegativity-report
+          path: electronegativity-report.csv
+          if-no-files-found: ignore
+
+  gitleaks:
+    name: Secret Scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-audit:
+    name: Dependency Audit (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit runtime dependencies in src/
+        working-directory: src
+        run: |
+          npm audit --omit=dev --audit-level=high
+          echo "### npm audit (including devDependencies)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm audit --audit-level=high || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

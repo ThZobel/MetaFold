@@ -336,25 +336,20 @@ class OMEROProxyServer {
     getAllowedOrigin(req) {
         const defaultOrigin = `http://localhost:${this.port}`;
         const origin = req && req.headers ? req.headers.origin : null;
-        if (!origin) return defaultOrigin;
-        try {
-            const parsed = new URL(origin);
-                const isHttps = parsed.protocol === 'https:';
-                const isHttp = parsed.protocol === 'http:';
-                if (!isHttps && !isHttp) return defaultOrigin;
-                const portNum = parsed.port ? parseInt(parsed.port, 10) : null;
-                const portSuffix = (portNum && portNum > 0 && portNum <= 65535) ? `:${portNum}` : '';
-                if (parsed.hostname === 'localhost') {
-                    return (isHttps ? 'https://localhost' : 'http://localhost') + portSuffix;
-                }
-                if (parsed.hostname === '127.0.0.1') {
-                    return (isHttps ? 'https://127.0.0.1' : 'http://127.0.0.1') + portSuffix;
-                }
-            } catch (_) {
-                // Ignore malformed origin
-            }
-            return defaultOrigin;
-        }
+        if (!origin || typeof origin !== 'string') return defaultOrigin;
+        const allowedOrigins = [
+            `http://localhost:${this.port}`,
+            `https://localhost:${this.port}`,
+            `http://127.0.0.1:${this.port}`,
+            `https://127.0.0.1:${this.port}`,
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:8080'
+        ];
+        const idx = allowedOrigins.indexOf(origin);
+        return idx !== -1 ? allowedOrigins[idx] : defaultOrigin;
+    }
 
     /**
      * Handle response from OMERO server

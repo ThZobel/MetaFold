@@ -4031,9 +4031,13 @@ const facetSearch = {
             `;
         };
 
-        const escHtml = (window.markdownLite && window.markdownLite.escapeHtml) ||
-            (s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'));
-        const escAttr = (window.markdownLite && window.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
+        const escHtml = (s) => String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        const escAttr = (s) => escHtml(s);
 
         const renderMetadataField = (key, field) => {
             if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level', 'System.hasReadme', 'changelog', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'previous_names'].includes(key)) return '';
@@ -4203,9 +4207,10 @@ const facetSearch = {
             const fileObj = sidecarEntry.file || {};
             const filePath = sidecarEntry.path || fileObj.path || '';
             const sidecarPath = sidecarEntry.sidecarPath || rowData._sidecarPath || '';
-            const escapedFilePath = (filePath || sidecarPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const escapedSidecarPath = sidecarPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const escapedProjPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escJsPath = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escapedFilePath = escJsPath(filePath || sidecarPath);
+            const escapedSidecarPath = escJsPath(sidecarPath);
+            const escapedProjPath = escJsPath(project.path || '');
             const fileModStr = fileObj.modified ? new Date(fileObj.modified).toLocaleString() : (sidecarEntry.created ? new Date(sidecarEntry.created).toLocaleString() : '—');
             const flatMeta = sidecarEntry.flatMeta || {};
 
