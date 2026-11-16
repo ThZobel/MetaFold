@@ -38,17 +38,36 @@
     },
     "previous_names": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Historical project names recorded on rename for silent lineage self-healing."
     },
     "template": {
       "type": "object",
       "description": "Reference to the template used to capture this project.",
       "properties": {
-        "id": { "type": ["string", "null"] },
-        "name": { "type": "string" },
-        "category": { "type": ["string", "null"] },
-        "derivedFromTemplateId": { "type": ["string", "null"] }
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "derivedFromTemplateId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       },
       "additionalProperties": true
     },
@@ -58,34 +77,70 @@
       "properties": {
         "creator": {
           "type": "object",
-          "required": ["username"],
+          "required": [
+            "username"
+          ],
           "properties": {
-            "username": { "type": "string" },
-            "title": { "type": "string" },
-            "firstName": { "type": "string" },
-            "lastName": { "type": "string" },
-            "email": { "type": "string" },
-            "orcid": { "type": "string" },
-            "affiliation": { "type": "string" },
-            "role": { "type": "string" }
+            "username": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "orcid": {
+              "type": "string"
+            },
+            "affiliation": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
         },
         "group": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" },
-            "principalInvestigator": { "type": "string" },
-            "piEmail": { "type": "string" },
-            "piOrcid": { "type": "string" },
-            "institution": { "type": "string" },
-            "department": { "type": "string" },
-            "description": { "type": "string" }
+            "name": {
+              "type": "string"
+            },
+            "principalInvestigator": {
+              "type": "string"
+            },
+            "piEmail": {
+              "type": "string"
+            },
+            "piOrcid": {
+              "type": "string"
+            },
+            "institution": {
+              "type": "string"
+            },
+            "department": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
         },
-        "createdAt": { "type": "string" },
-        "metafoldVersion": { "type": "string" }
+        "createdAt": {
+          "type": "string"
+        },
+        "metafoldVersion": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
@@ -93,15 +148,27 @@
       "type": "object",
       "description": "External system links and synchronization status.",
       "properties": {
-        "created_at": { "type": "string" },
-        "local_path": { "type": "string" },
+        "created_at": {
+          "type": "string"
+        },
+        "local_path": {
+          "type": "string"
+        },
         "external_links": {
           "type": "object",
           "properties": {
-            "elabftw": { "$ref": "#/$defs/externalLink" },
-            "omero": { "$ref": "#/$defs/externalLink" },
-            "rspace": { "$ref": "#/$defs/externalLink" },
-            "n8n": { "$ref": "#/$defs/externalLink" }
+            "elabftw": {
+              "$ref": "#/$defs/externalLink"
+            },
+            "omero": {
+              "$ref": "#/$defs/externalLink"
+            },
+            "rspace": {
+              "$ref": "#/$defs/externalLink"
+            },
+            "n8n": {
+              "$ref": "#/$defs/externalLink"
+            }
           },
           "additionalProperties": true
         }
@@ -122,15 +189,33 @@
       "description": "Structured array of timestamped project notes.",
       "items": {
         "type": "object",
-        "required": ["id", "text", "timestamp"],
+        "required": [
+          "id",
+          "text",
+          "timestamp"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "category": { "type": "string" },
-          "text": { "type": "string" },
-          "timestamp": { "type": "string" },
-          "user": { "type": "string" },
-          "edited_at": { "type": "string" },
-          "edited_by": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "edited_at": {
+            "type": "string"
+          },
+          "edited_by": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       }
@@ -143,10 +228,18 @@
       "items": {
         "type": "object",
         "properties": {
-          "timestamp": { "type": "string" },
-          "user": { "type": "string" },
-          "action": { "type": "string" },
-          "changes": { "type": "array" }
+          "timestamp": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array"
+          }
         },
         "additionalProperties": true
       }
@@ -161,60 +254,131 @@
       "description": "Optional eLabFTW display configuration when using the eLabFTW envelope.",
       "additionalProperties": true
     },
-    "System.ProjectAbsolutePath": { "$ref": "#/$defs/systemField" },
-    "System.ProjectRelativePath": { "$ref": "#/$defs/systemField" },
-    "System.UpdateHistory": { "$ref": "#/$defs/systemField" },
-    "System.LastUpdatedBy": { "$ref": "#/$defs/systemField" },
-    "System.LastUpdatedAt": { "$ref": "#/$defs/systemField" },
-    "System.Level": { "$ref": "#/$defs/systemField" },
-    "System.TemplateCategory": { "$ref": "#/$defs/systemField" }
+    "System.ProjectAbsolutePath": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.ProjectRelativePath": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.UpdateHistory": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.LastUpdatedBy": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.LastUpdatedAt": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.Level": {
+      "$ref": "#/$defs/systemField"
+    },
+    "System.TemplateCategory": {
+      "$ref": "#/$defs/systemField"
+    }
   },
   "additionalProperties": {
     "anyOf": [
-      { "$ref": "#/$defs/userFieldObject" },
-      { "$ref": "#/$defs/fieldGroupObject" },
-      { "type": ["string", "number", "boolean", "array", "null"] }
+      {
+        "$ref": "#/$defs/userFieldObject"
+      },
+      {
+        "$ref": "#/$defs/fieldGroupObject"
+      },
+      {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "array",
+          "null"
+        ]
+      }
     ]
   },
   "$defs": {
     "ontologyTerm": {
       "type": "object",
       "description": "Optional ontology reference for a field or value.",
-      "required": ["uri"],
+      "required": [
+        "uri"
+      ],
       "properties": {
-        "label": { "type": "string" },
-        "uri": { "type": "string" },
-        "ontology": { "type": "string" }
+        "label": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "ontology": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
     "userFieldObject": {
       "type": "object",
       "description": "Self-describing metadata field object.",
-      "required": ["type", "value"],
+      "required": [
+        "type",
+        "value"
+      ],
       "properties": {
-        "label": { "type": "string" },
-        "type": { "type": "string" },
-        "value": {},
-        "unit": { "type": "string" },
-        "required": { "type": "boolean" },
-        "position": { "type": "number" },
-        "description": { "type": "string" },
-        "options": {
-          "type": ["array", "null"],
-          "items": { "type": "string" }
+        "label": {
+          "type": "string"
         },
-        "templateName": { "type": "string" },
-        "term": { "$ref": "#/$defs/ontologyTerm" },
+        "type": {
+          "type": "string"
+        },
+        "value": {},
+        "unit": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "position": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "options": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "templateName": {
+          "type": "string"
+        },
+        "term": {
+          "$ref": "#/$defs/ontologyTerm"
+        },
         "valueTerm": {
           "oneOf": [
-            { "$ref": "#/$defs/ontologyTerm" },
-            { "type": "array", "items": { "$ref": "#/$defs/ontologyTerm" } }
+            {
+              "$ref": "#/$defs/ontologyTerm"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ontologyTerm"
+              }
+            }
           ]
         },
-        "isModified": { "type": "boolean" },
-        "lastUpdatedBy": { "type": "string" },
-        "lastUpdatedAt": { "type": "string" }
+        "isModified": {
+          "type": "boolean"
+        },
+        "lastUpdatedBy": {
+          "type": "string"
+        },
+        "lastUpdatedAt": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
@@ -223,29 +387,55 @@
       "description": "Nested group of userFieldObjects or sub-groups (top-level groups map to OMERO namespaces).",
       "additionalProperties": {
         "anyOf": [
-          { "$ref": "#/$defs/userFieldObject" },
-          { "$ref": "#/$defs/fieldGroupObject" },
-          { "type": ["string", "number", "boolean", "array", "null"] }
+          {
+            "$ref": "#/$defs/userFieldObject"
+          },
+          {
+            "$ref": "#/$defs/fieldGroupObject"
+          },
+          {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "array",
+              "null"
+            ]
+          }
         ]
       }
     },
     "systemField": {
       "type": "object",
-      "required": ["value"],
+      "required": [
+        "value"
+      ],
       "properties": {
-        "label": { "type": "string" },
-        "type": { "type": "string" },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
         "value": {},
-        "position": { "type": "number" }
+        "position": {
+          "type": "number"
+        }
       },
       "additionalProperties": true
     },
     "externalLink": {
       "type": "object",
       "properties": {
-        "url": { "type": "string" },
-        "status": { "type": "string" },
-        "uploaded_at": { "type": "string" }
+        "url": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "uploaded_at": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     }
