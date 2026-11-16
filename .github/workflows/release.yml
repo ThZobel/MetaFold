@@ -195,7 +195,7 @@ jobs:
           find src/dist -type f -name "*.*" 2>/dev/null || echo "No files in dist"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: metafold-${{ matrix.platform }}
           path: |
