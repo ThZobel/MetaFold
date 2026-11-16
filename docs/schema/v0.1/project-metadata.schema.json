@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/project-metadata.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/project-metadata.schema.json",
   "title": "MetaFold Project Metadata Envelope (v0.1)",
   "description": "Schema for <ProjectName>-metadata.json and ReadyToImport.json. Validates the fixed MetaFold envelope while allowing arbitrary self-describing user fields and nested groups.",
   "type": "object",
@@ -170,7 +170,7 @@
     "System.TemplateCategory": { "$ref": "#/$defs/systemField" }
   },
   "additionalProperties": {
-    "oneOf": [
+    "anyOf": [
       { "$ref": "#/$defs/userFieldObject" },
       { "$ref": "#/$defs/fieldGroupObject" },
       { "type": ["string", "number", "boolean", "array", "null"] }
@@ -220,10 +220,11 @@
     },
     "fieldGroupObject": {
       "type": "object",
-      "description": "Nested group of userFieldObjects (maps to an OMERO namespace).",
+      "description": "Nested group of userFieldObjects or sub-groups (top-level groups map to OMERO namespaces).",
       "additionalProperties": {
-        "oneOf": [
+        "anyOf": [
           { "$ref": "#/$defs/userFieldObject" },
+          { "$ref": "#/$defs/fieldGroupObject" },
           { "type": ["string", "number", "boolean", "array", "null"] }
         ]
       }

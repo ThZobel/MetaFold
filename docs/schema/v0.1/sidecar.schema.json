@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/sidecar.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/sidecar.schema.json",
   "title": "MetaFold File Sidecar Schema (v0.1)",
   "description": "Schema for <File>.metafold-sidecar.json files stored in <Project>/.metafold/sidecars/.",
   "type": "object",
@@ -35,7 +35,8 @@
       "type": "string"
     },
     "generator": {
-      "type": "string"
+      "type": "string",
+      "description": "Identifier of the scanner/tool that created this sidecar (e.g. 'MetaFold BioFormats Scanner', 'MetaFold Flow Scanner', 'MetaFold Fastq Scanner')."
     },
     "file": {
       "type": "object",
@@ -77,9 +78,14 @@
       },
       "additionalProperties": true
     },
+    "extracted_metadata": {
+      "type": "object",
+      "description": "Extractor- or instrument-specific metadata extracted from the file header/payload (e.g. BioFormats OME-XML, FCS keywords, FASTQ/BAM metrics, DICOM tags, TIFF metadata).",
+      "additionalProperties": true
+    },
     "ome_metadata": {
       "type": ["object", "null"],
-      "description": "Extracted BioFormats OME-XML metadata (Image, Pixels, Channels, Instrument)."
+      "description": "Microscopy OME-XML metadata extracted via BioFormats (maintained for BioFormats compatibility; may also be placed in extracted_metadata)."
     }
   },
   "additionalProperties": true

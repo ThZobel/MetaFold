@@ -1765,7 +1765,7 @@ const experimentForm = {
             if (!obj || typeof obj !== 'object') return;
             for (const [key, val] of Object.entries(obj)) {
                 if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' ||
-                    key === 'templateInfo' || key === 'integrations' || key === 'provenance' || 
+                    key === 'templateInfo' || key === 'integrations' || key === 'provenance' ||
                     key === 'created_at' || key === 'updated_at' || key === 'previous_names' ||
                     (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
                     continue;

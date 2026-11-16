@@ -18,17 +18,19 @@ Instead, MetaFold defines and versions a **stable JSON envelope ("Hülle")** wit
 
 ## Overview of MetaFold JSON File Types (`v0.1`)
 
+Schema source directory on GitHub: [`https://github.com/ThZobel/MetaFold/tree/main/docs/schema/v0.1`](https://github.com/ThZobel/MetaFold/tree/main/docs/schema/v0.1)
+
 All files written by MetaFold carry `"schemaVersion": "0.1"` and a `"schemaType"` identifier at the top level:
 
-| File Pattern | `schemaType` | JSON Schema | Purpose & Location |
+| File Pattern | `schemaType` | JSON Schema & Canonical Raw ID | Purpose & Location |
 |---|---|---|---|
-| `<ProjectName>-metadata.json` / `ReadyToImport.json` | `"metafold-project-metadata"` | [project-metadata.schema.json](./project-metadata.schema.json) | **Portable Ground Truth** stored directly inside the project directory alongside the data. |
-| `<File>.metafold-sidecar.json` | `"metafold-sidecar"` | [sidecar.schema.json](./sidecar.schema.json) | File-level metadata & extracted BioFormats OME-XML stored in `<Project>/.metafold/sidecars/`. |
-| `<template_name>.json` | `"metafold-template"` | [template.schema.json](./template.schema.json) | Reusable folder & metadata form template stored in `~/MetaFold/Templates/`. |
-| `user_index.json` | `"metafold-user-index"` | [user-index.schema.json](./user-index.schema.json) | Reconstructible local search cache for Facet Search & Discovery. |
-| `users.json` / `groups.json` | `"metafold-users"` / `"metafold-groups"` | [profiles.schema.json](./profiles.schema.json) | Local RDM user & group profiles (ORCID, ROR, affiliation; never contains passwords). |
-| `id_dictionary_<user>.json` | `"metafold-id-dictionary"` | [exports.schema.json](./exports.schema.json) | Autocomplete cache of project names, `id_anchor` identifiers, and tags. |
-| Scanner Summary / Lineage Export | `"metafold-scan-summary"` / `"metafold-lineage-export"` | [exports.schema.json](./exports.schema.json) | Portable snapshots exported from the Project Scanner or Lineage Graph. |
+| `<ProjectName>-metadata.json` / `ReadyToImport.json` | `"metafold-project-metadata"` | [project-metadata.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/project-metadata.schema.json) | **Portable Ground Truth** stored directly inside the project directory alongside the data. |
+| `<File>.metafold-sidecar.json` | `"metafold-sidecar"` | [sidecar.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/sidecar.schema.json) | Extensible file-level metadata & extracted file header payloads (Microscopy OME-XML, Flow Cytometry FCS, Genomics, etc.) stored in `<Project>/.metafold/sidecars/`. |
+| `<template_name>.json` | `"metafold-template"` | [template.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/template.schema.json) | Reusable folder structure & metadata form template stored in `~/MetaFold/Templates/`. |
+| `user_index.json` | `"metafold-user-index"` | [user-index.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/user-index.schema.json) | Reconstructible local search cache for Facet Search & Discovery. |
+| `users.json` / `groups.json` | `"metafold-users"` / `"metafold-groups"` | [profiles.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/profiles.schema.json) | Local RDM user & group profiles (ORCID, ROR, affiliation; never contains passwords). |
+| `id_dictionary_<user>.json` | `"metafold-id-dictionary"` | [exports.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/exports.schema.json) | Autocomplete cache of project names, `id_anchor` identifiers, and tags. |
+| Scanner Summary / Lineage Export | `"metafold-scan-summary"` / `"metafold-lineage-export"` | [exports.schema.json](https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/exports.schema.json) | Portable snapshots exported from the Project Scanner or Lineage Graph. |
 
 > **Note on RO-Crate (`ro-crate-metadata.json`):** RO-Crate exports follow the official W3C/RO-Crate 1.1 JSON-LD specification (`"conformsTo": { "@id": "https://w3id.org/ro/crate/1.1" }`) and are validated against the RO-Crate 1.1 standard.
 
@@ -54,10 +56,15 @@ All files written by MetaFold carry `"schemaVersion": "0.1"` and a `"schemaType"
 | `notes_log` | `object[]` | Optional | Structured array of timestamped log entries: `[{ id, category, text, timestamp, user }]`. |
 | `hypothesis_or_goal` | `string` | Optional | Short scientific hypothesis or study goal. |
 | `changelog` | `object[]` | Optional | Audit log of field modifications (`[{ timestamp, user, action, changes: [{ field, from, to, op }] }]`). |
-| `System.ProjectAbsolutePath` | `object` | Optional | System field `{ label, type: "text", value, position }` storing the local path at write time. |
-| `System.ProjectRelativePath` | `object` | Optional | System field storing the relative path to the chosen base directory. |
-| `System.UpdateHistory` | `object` | Optional | High-level modification history `{ type: "history", value: [{ date, user, group, action }] }`. |
-| `System.LastUpdatedBy` / `System.LastUpdatedAt` | `object` | Optional | System fields tracking the last editor and timestamp. |
+| `System.ProjectAbsolutePath` | `object` | Optional | Runtime system field storing the absolute local folder path at write time (used for navigation and lineage resolution). |
+| `System.ProjectRelativePath` | `object` | Optional | Runtime system field storing the relative path from the scan root (ensures portable lineage exports). |
+| `System.UpdateHistory` | `object` | Optional | Audit history array `{ type: "history", value: [{ date, user, group, action }] }` tracking batch extensions and edits. |
+| `System.LastUpdatedBy` / `System.LastUpdatedAt` | `object` | Optional | Quick lookup fields for the username and timestamp of the last modification. |
+| `System.Level` | `object` | Optional | Directory hierarchy depth assigned during folder scanning (e.g. `1` for root project, `2` for subproject). |
+| `System.TemplateCategory` | `object` | Optional | Cached template category (e.g. `"Microscopy"`) used for instant facet search filtering without loading full templates. |
+
+> **Why the `System.*` prefix?**  
+> Keys prefixed with `System.` represent **operational runtime metadata** generated automatically by MetaFold. The `System.` prefix guarantees that these keys are **never** rendered as user experiment fields in form editors, never added to user-facing README tables, and never uploaded to ELN/LIMS systems (like OMERO or eLabFTW) as experimental measurements.
 
 ---
 
@@ -86,6 +93,13 @@ Any top-level key **not** listed in the reserved envelope table above is either:
   }
 }
 ```
+
+#### What is `term` and `valueTerm`? (Ontology Anchoring)
+
+MetaFold supports semantic research data management (FAIR principles):
+- **`term` (Concept URI):** Unambiguously anchors what the field represents. While different labs might label a field `"Laser"`, `"Wavelength"`, or `"Anregungswellenlänge"`, setting `"term": { "uri": "http://purl.obolibrary.org/obo/OBI_0000001", "label": "excitation wavelength", "ontology": "OBI" }` enables external tools, knowledge graphs, and AI agents to recognize that all three mean the exact same concept in the *Ontology for Biomedical Investigations* (OBI).
+- **`valueTerm` (Value URI):** Used on dropdowns or controlled vocabularies to anchor the *chosen value* to an ontology (e.g. Organism: `"Mouse"` anchored to `http://purl.obolibrary.org/obo/NCBITaxon_10090`).
+- **Completely Optional:** Templates and fields without `term` work identically. It acts as an optional semantic enrichment layer.
 
 #### Supported Field Types (`type`)
 
@@ -192,6 +206,7 @@ See [fixtures/v0.1/project-metadata.example.json](./fixtures/v0.1/project-metada
     "external_links": {
       "omero": {
         "url": "https://omero.example.org/webclient/?show=dataset-421",
+        "_comment": "Example URL; actual URL points to your facility's OMERO instance",
         "dataset_id": "421",
         "object_type": "dataset",
         "group_name": "BioImaging",

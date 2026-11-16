@@ -1,12 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/template.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/template.schema.json",
   "title": "MetaFold Template Schema (v0.1)",
   "description": "Schema for MetaFold template JSON files stored in ~/MetaFold/Templates/.",
   "type": "object",
   "required": [
-    "name",
-    "type"
+    "name"
   ],
   "properties": {
     "schemaVersion": {
@@ -28,10 +27,6 @@
     "name": {
       "type": "string",
       "minLength": 1
-    },
-    "type": {
-      "type": "string",
-      "enum": ["experiment", "folders"]
     },
     "category": {
       "type": "string"

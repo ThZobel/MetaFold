@@ -21,11 +21,11 @@ const projectManager = {
     // NEW Helper: Process dynamic folder variables
     processDynamicFolderStructure(templateStructure, experimentMetadata, template) {
         if (!templateStructure || !experimentMetadata) return templateStructure;
-        
+
         console.log('🔄 Processing dynamic folder structure variables...');
         let lines = templateStructure.split('\n');
         let processedLines = [];
-        
+
         // Helper to find field value even if it's nested in a group
         const getFieldValue = (fieldName) => {
             if (experimentMetadata[fieldName] !== undefined) return experimentMetadata[fieldName];
@@ -41,7 +41,7 @@ const projectManager = {
 
         for (let line of lines) {
             let skipLine = false;
-            
+
             let processedLine = line.replace(/\[([^\]]+)\]/g, (match, fieldName) => {
                 const normalizedTarget = fieldName.trim().toLowerCase();
 
@@ -79,28 +79,28 @@ const projectManager = {
 
                 // Check if this is an actual field in the template or in metadata
                 const isField = (templateFields && templateFields[resolvedKey]) || (getFieldValue(resolvedKey) !== null);
-                
+
                 if (!isField) {
                     return match; // Not a field, leave as is
                 }
-                
+
                 let val = getFieldValue(resolvedKey);
-                
+
                 // If value is empty or not found, mark to skip this folder line
                 if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
                     skipLine = true;
-                    return ""; 
+                    return "";
                 }
-                
+
                 if (typeof val === 'object' && !Array.isArray(val) && val.value !== undefined) {
                     val = val.value;
                 } else if (Array.isArray(val)) {
-                    val = val.join('-'); 
+                    val = val.join('-');
                 }
-                
+
                 return String(val).replace(/[<>:"/\\|?*]/g, '_');
             });
-            
+
             if (!skipLine) {
                 processedLines.push(processedLine);
             } else {
@@ -139,7 +139,7 @@ const projectManager = {
                 if (selectedPath) {
                     document.getElementById('targetPath').value = selectedPath;
                     this.updatePathPreview();
-                    
+
                     if (document.getElementById('onlyIntegrations')?.checked) {
                         this.checkAndAutoFillExistingProject();
                     } else if (window.electronAPI.listDirectory) {
@@ -249,7 +249,7 @@ const projectManager = {
                 preview.textContent = 'Choose directory and project name';
             }
         }
-        
+
         // Auto-save project defaults to the current template if active
         if (window.templateManager && typeof window.templateManager.saveCurrentTemplateWithElabFTWCategory === 'function') {
             // Debounce to prevent too many saves while typing
@@ -286,7 +286,7 @@ const projectManager = {
                     inputElement.title = 'Enter a name for your project';
                 }
             }
-            
+
             // Do NOT display selectMetadataBtn
             if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
 
@@ -310,7 +310,7 @@ const projectManager = {
                     inputElement.title = 'Enter a name for your project';
                 }
             }
-            
+
             if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
             if (extendHint) extendHint.style.display = 'none';
 
@@ -433,14 +433,14 @@ const projectManager = {
         let errors = [];
 
         let customFileName = document.getElementById('projectName').value.trim();
-        
+
         // Get and process folder structure
         let templateStructure = template.folderStructure || template.structure || '';
         if (Array.isArray(templateStructure)) {
             templateStructure = templateStructure.join('\n');
         }
         templateStructure = String(templateStructure || '');
-        
+
         if (templateStructure && experimentMetadata) {
             templateStructure = this.processDynamicFolderStructure(templateStructure, experimentMetadata, template);
         }
@@ -496,7 +496,7 @@ const projectManager = {
                     await window.electronAPI.writeFile(filePath, metadataStr);
                     if (window.electronAPI.upsertUserIndexProject) {
                         const ui = window.userManager?.getCurrentUserInfo?.() || null;
-                        await window.electronAPI.upsertUserIndexProject(targetPath, null, ui).catch(() => {});
+                        await window.electronAPI.upsertUserIndexProject(targetPath, null, ui).catch(() => { });
                     }
                 }
                 successCount++;
@@ -514,7 +514,7 @@ const projectManager = {
             this.showError(`Failed to write to ${errors.length} folder(s). First error: ${errors[0]}`);
         } else {
             this.showSuccess(`Successfully wrote metadata to ${successCount} folder(s)!`);
-            
+
             // Clear selections if it was multiple folders
             if (template.options?.multipleFolders) {
                 this.multiFolderTargetPaths = [];
@@ -526,7 +526,7 @@ const projectManager = {
         if (!templateManager.currentTemplate) return;
 
         const template = templateManager.currentTemplate;
-        
+
         // NEW: Batch file writer mode
         if (template.options?.multipleFolders || template.options?.writeFilesOnly) {
             return this.executeBatchFileWrite(template);
@@ -688,7 +688,7 @@ const projectManager = {
 
             if (shouldFetchNextId && !existingExpId && await settingsManager.get('elabftw.enabled') && await this.shouldSyncToElabFTW()) {
                 console.log('🧪 eLabFTW: "Fetch Next ID" is enabled. Creating experiment FIRST to get ID...');
-                
+
                 const categoryIdElement = document.getElementById('elabftwProjectCategory');
                 const specificCategoryId = categoryIdElement?.value?.trim();
 
@@ -721,7 +721,7 @@ const projectManager = {
 
             if (!isCloudOnly) {
                 console.log(skipFolder ? '📄 Creating local project file (Skipping Folder)...' : '🚀 Creating local project folder...');
-                
+
                 const userInfo = window.userManager ? { username: window.userManager.currentUser, groupname: window.userManager.currentGroup } : null;
                 const templateRef = window.metafoldSchema
                     ? window.metafoldSchema.buildTemplateRef(template)
@@ -738,8 +738,8 @@ const projectManager = {
                     templateInfo: templateRef
                 };
 
-                const projectNameToUse = (conflictResolution.extend && conflictResolution.existingProjectName) 
-                    ? conflictResolution.existingProjectName 
+                const projectNameToUse = (conflictResolution.extend && conflictResolution.existingProjectName)
+                    ? conflictResolution.existingProjectName
                     : finalProjectName;
 
                 result = await window.electronAPI.createProject(
@@ -765,7 +765,7 @@ const projectManager = {
                 if (window.electronAPI && window.electronAPI.saveIdValues && experimentMetadata) {
                     try {
                         const harvestResult = await window.electronAPI.saveIdValues(
-                            experimentMetadata, 
+                            experimentMetadata,
                             window.userManager?.getCurrentUserInfo() || { username: 'default' }
                         );
                         if (harvestResult && harvestResult.success && harvestResult.newCount > 0) {
@@ -793,7 +793,7 @@ const projectManager = {
                 } else if (conflictResolution.extend) {
                     successMessage += ` (Extended existing metadata)`;
                 }
-                
+
                 let omeroResult = null;
 
                 // elabFTW Integration
@@ -1023,7 +1023,7 @@ const projectManager = {
                                 // IPC path: runs in Main Process, supports rejectUnauthorized for self-signed certs
                                 console.log(`🤖 Sending webhook via IPC (Main Process) | SSL verify: ${sslVerificationEnabled}`);
                                 const response = await window.electronAPI.sendWebhook(webhookUrl, payload, headers, sslVerificationEnabled);
-                                
+
                                 if (!response.success) {
                                     // Provide a helpful error message for SSL issues
                                     const errMsg = response.error || String(response.status);
@@ -1036,7 +1036,7 @@ const projectManager = {
                                     }
                                     throw new Error(`n8n Webhook request failed: ${errMsg}`);
                                 }
-                                
+
                                 try {
                                     responseData = JSON.parse(response.data);
                                 } catch (e) {
@@ -2103,7 +2103,7 @@ const projectManager = {
                     }
                     // ✅ FIX: Use projectData.projectName instead of undefined finalProjectName
                     const projectName = projectData.projectName;
-                    
+
                     let omeroGroupName = null;
                     if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
                         omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
@@ -2340,10 +2340,10 @@ const projectManager = {
      */
     async checkDirectoryAndResolveConflicts(basePath, originalProjectName, skipFolder = false) {
         try {
-            const originalPath = skipFolder 
-                ? basePath 
-                : (window.utils && window.utils.buildFullPath 
-                    ? window.utils.buildFullPath(basePath, originalProjectName) 
+            const originalPath = skipFolder
+                ? basePath
+                : (window.utils && window.utils.buildFullPath
+                    ? window.utils.buildFullPath(basePath, originalProjectName)
                     : basePath + (basePath.endsWith('/') || basePath.endsWith('\\') ? '' : '/') + originalProjectName);
 
             console.log(`📁 Checking path: ${originalPath}`);

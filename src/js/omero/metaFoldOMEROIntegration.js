@@ -139,7 +139,7 @@ const metaFoldOMEROIntegration = {
                             (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) {
                             return;
                         }
-                        
+
                         if (fieldData !== undefined) {
                             if (typeof fieldData === 'object' && fieldData.type === undefined && fieldData.value === undefined) {
                                 // It's a group!
@@ -160,7 +160,7 @@ const metaFoldOMEROIntegration = {
                         } else {
                             Object.entries(options.integrationData).forEach(([k, v]) => systemPairs.push([k, String(v)]));
                         }
-                        
+
                         if (systemPairs.length > 0) {
                             const systemNamespace = 'System Metadata by MetaFold';
                             console.log(`🔄 Uploading ${systemPairs.length} system key-value pairs (Namespace: ${systemNamespace})...`);
@@ -1121,7 +1121,7 @@ const metaFoldOMEROIntegration = {
             const isProjectCreation = options.projectId === 'create_new_project';
             const datasetDescription = this.generateDatasetDescription(projectName, metadata, options);
             let datasetResult;
-            
+
             if (isProjectCreation) {
                 datasetResult = await this.hybridAuth.createProjectInGroup(
                     projectName,

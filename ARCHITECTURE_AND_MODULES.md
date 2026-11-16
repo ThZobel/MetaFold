@@ -83,6 +83,7 @@ Key stylesheets:
 | `templateManager.js` | Template loading, saving, selection, rendering; dynamically toggles UI modes (e.g. `writeFilesOnly`, `multipleFolders`) |
 | `experimentForm.js` | Dynamic metadata form, drag & drop field ordering, filename preview, integration toggle management. Supports advanced field types (e.g. `email` with validation, `rating` with 5-star UI) and groups fields under Accordion UIs. Outputs nested JSON payloads for hierarchical metadata export. |
 | `metadataLoader.js` | Loads and parses existing project metadata files |
+| `shared/schemaVersion.js` | Shared (Main + Renderer) schema contract helper: defines `SCHEMA_VERSION` (`"0.1"`), `SCHEMA_TYPES`, `RESERVED_PROJECT_KEYS`, `getSchemaVersion()` (`"0.0"` legacy fallback), and `isReservedProjectKey()`. |
 
 ### Sidebar & Integrations
 | Module | Purpose |
@@ -587,3 +588,25 @@ When implementing complex features (such as the Community Template Hub or Metada
 2. The **Electron/IPC Agent** handles data retrieval, parsing, and secure IPC exposure.
 3. The **QA Agent** reviews the implementation for bugs, edge cases, and theme consistency.
 The Orchestrator oversees the process, merges the results, and communicates with the user.
+
+---
+
+## 16. JSON Schemas & Data Contract (`docs/schema/v0.1/`)
+
+MetaFold's file formats are formally specified in [`docs/schema/v0.1/`](docs/schema/v0.1/README.md) (JSON Schema Draft 2020-12). All future features that read, write, or extend MetaFold JSON files must adhere to this contract.
+
+### Schema Files
+| Schema | `schemaType` | Target Files |
+|---|---|---|
+| [`project-metadata.schema.json`](docs/schema/v0.1/project-metadata.schema.json) | `metafold-project-metadata` | `<ProjectName>-metadata.json`, `ReadyToImport.json` |
+| [`template.schema.json`](docs/schema/v0.1/template.schema.json) | `metafold-template` | `~/MetaFold/Templates/*.json` |
+| [`sidecar.schema.json`](docs/schema/v0.1/sidecar.schema.json) | `metafold-sidecar` | `<Project>/.metafold/sidecars/<File>.metafold-sidecar.json` |
+| [`user-index.schema.json`](docs/schema/v0.1/user-index.schema.json) | `metafold-user-index` | `user_index.json` |
+| [`profiles.schema.json`](docs/schema/v0.1/profiles.schema.json) | `metafold-users` / `metafold-groups` | `users.json`, `groups.json` |
+| [`exports.schema.json`](docs/schema/v0.1/exports.schema.json) | `metafold-scan-summary`, `metafold-lineage-export`, `metafold-visualization-export`, `metafold-id-dictionary` | Scanner summaries, lineage/graph exports, ID dictionaries |
+
+### Implementation & Verification Rules for Future Development
+- **Single Source of Truth (`src/js/shared/schemaVersion.js`)**: Always use `SCHEMA_VERSION`, `SCHEMA_TYPES`, `getSchemaVersion()`, and `isReservedProjectKey()` instead of hardcoding version strings or envelope key lists.
+- **Reserved Envelope Keys**: Any new top-level system key added to `<ProjectName>-metadata.json` must be registered in both `RESERVED_PROJECT_KEYS` (`src/js/shared/schemaVersion.js`) and `project-metadata.schema.json` (or use the `System.` prefix) so it is never rendered or exported as a user experiment field.
+- **Legacy Compatibility (`0.0`)**: Files without `schemaVersion` must continue to be treated as `"0.0"` and remain readable across all loaders and scanners.
+- **Contract Tests & Fixtures**: Example fixtures live in `docs/schema/v0.1/fixtures/` (`v0.1/` and `v0.0-legacy/`). Run `node tests/schema-contract.test.js` after any schema or metadata-writer changes.

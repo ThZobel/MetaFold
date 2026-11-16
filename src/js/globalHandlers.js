@@ -3,7 +3,7 @@
 /**
  * Checks if a value is a MetaFold metadata field object ({ value, type, label, unit, ... })
  */
-window.isMetadataValueObject = function(obj) {
+window.isMetadataValueObject = function (obj) {
     return Boolean(obj && typeof obj === 'object' && !Array.isArray(obj) && ('value' in obj || 'type' in obj));
 };
 
@@ -11,7 +11,7 @@ window.isMetadataValueObject = function(obj) {
  * Centrally formats any metadata value for display in Tabulator, Sidebar, Search, or Tooltips.
  * Prevents [object Object] output and cleanly appends units (e.g. "488 nm").
  */
-window.formatDisplayValue = function(rawFieldOrVal, options = {}) {
+window.formatDisplayValue = function (rawFieldOrVal, options = {}) {
     if (rawFieldOrVal === undefined || rawFieldOrVal === null) {
         return options.emptyPlaceholder !== undefined ? options.emptyPlaceholder : '—';
     }
@@ -107,7 +107,7 @@ window.switchMainTab = function (tabName) {
         // Sidebar Toggling for Metadata
         const templateView = document.getElementById('sidebar-template-view');
         const projectView = document.getElementById('sidebar-project-view');
-        
+
         if (templateView && projectView) {
             if (tabName === 'discover') {
                 templateView.style.display = 'none';
@@ -184,8 +184,8 @@ window.switchMainTab = function (tabName) {
             setTimeout(() => {
                 if (window.visualizationManager && window.visualizationManager.checkJSONCrackAvailability) {
                     if (typeof window.visualizationManager.checkJSONCrackAvailability === 'function') {
-                    window.visualizationManager.checkJSONCrackAvailability();
-                }
+                        window.visualizationManager.checkJSONCrackAvailability();
+                    }
                 }
             }, 200);
         }
@@ -706,20 +706,20 @@ window.loadSettingsIntoModal = async function () {
         if (n8nEnabledEl) n8nEnabledEl.checked = n8nEnabled;
         if (n8nWebhookEl) n8nWebhookEl.value = await sm.get('n8n.webhook_url');
         if (n8nInstanceIdEl) n8nInstanceIdEl.value = await sm.get('n8n.instance_id');
-        
+
         const authType = await sm.get('n8n.auth_type');
         if (n8nAuthTypeEl) n8nAuthTypeEl.value = authType;
         if (n8nAuthEl) n8nAuthEl.value = await sm.get('n8n.auth_token');
         if (n8nBasicUserEl) n8nBasicUserEl.value = await sm.get('n8n.basic_user');
         if (n8nBasicPassEl) n8nBasicPassEl.value = await sm.get('n8n.basic_pass');
-        
+
         // Use true as default fallback if not explicitly false
         if (n8nVerifySslEl) n8nVerifySslEl.checked = (await sm.get('n8n.verify_ssl')) !== false;
 
         if (n8nConfigEl) {
             n8nConfigEl.style.display = n8nEnabled ? 'block' : 'none';
         }
-        
+
         // Ensure UI toggles match the loaded auth type
         if (typeof updaten8nAuthTypeUI === 'function') {
             updaten8nAuthTypeUI(authType);
@@ -760,7 +760,7 @@ window.pluginsSettingsInit = async function () {
 
     if (fse) fse.checked = (await sm.get('plugins.filescanner_enabled')) === true;
     if (bfe) bfe.checked = (await sm.get('plugins.bioformats_enabled')) === true;
-    if (bfp) bfp.value  = (await sm.get('plugins.bioformats_path'))    || '';
+    if (bfp) bfp.value = (await sm.get('plugins.bioformats_path')) || '';
     if (bfStatus) { bfStatus.className = 'plugins-bf-status idle'; bfStatus.textContent = 'ℹ Not tested yet'; }
 
     // Render extension checkboxes
@@ -881,7 +881,7 @@ window.pluginsBrowseBioFormats = async function () {
  */
 window.pluginsAutoDetectBioFormats = async function () {
     const statusEl = document.getElementById('bfStatus');
-    const pathEl   = document.getElementById('bioformatsPath');
+    const pathEl = document.getElementById('bioformatsPath');
     if (!statusEl) return;
 
     statusEl.className = 'plugins-bf-status checking';
@@ -1604,7 +1604,7 @@ window.updaten8nInstanceId = async function () {
     }
 };
 
-window.updaten8nAuthTypeUI = function(authType) {
+window.updaten8nAuthTypeUI = function (authType) {
     const bearerGroup = document.getElementById('n8nBearerAuthGroup');
     const basicGroup = document.getElementById('n8nBasicAuthGroup');
     if (bearerGroup) bearerGroup.style.display = authType === 'bearer' ? 'block' : 'none';
@@ -2050,7 +2050,7 @@ window.testJSONCrackIntegration = async function () {
 
 
 // =================== SIDEBAR PROJECT METADATA VIEWER ===================
-window.showProjectMetadataInSidebar = function(projectPath) {
+window.showProjectMetadataInSidebar = function (projectPath) {
     const projectView = document.getElementById('sidebar-project-view');
     if (!projectView) return;
 
@@ -2059,11 +2059,11 @@ window.showProjectMetadataInSidebar = function(projectPath) {
     projectView.style.display = 'block';
 
     let project = null;
-    
+
     if (window.projectScanner && window.projectScanner.projects) {
         project = window.projectScanner.projects.find(p => p.path === projectPath || p.path.replace(/\\/g, '\\\\') === projectPath.replace(/\\/g, '\\\\'));
     }
-    
+
     // Highlight the selected project item in the UI
     document.querySelectorAll('.project-item').forEach(item => {
         item.classList.remove('active');
@@ -2101,7 +2101,7 @@ window.showProjectMetadataInSidebar = function(projectPath) {
         `;
     } else {
         html += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
-        
+
         const renderMetadataField = (key, field) => {
             if (['schemaVersion', 'schemaType', 'template', 'templateInfo', 'created_at', 'updated_at', 'metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level'].includes(key) || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key))) return '';
 
@@ -2144,7 +2144,7 @@ window.showProjectMetadataInSidebar = function(projectPath) {
         for (const [key, field] of Object.entries(project.metadata)) {
             html += renderMetadataField(key, field);
         }
-        
+
         html += `</div>`;
     }
 

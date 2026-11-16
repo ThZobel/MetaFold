@@ -40,10 +40,10 @@ window.roCrateManager = {
             const proj = allProjects.find(p => p.path === projPath);
             return (proj.name || proj.displayName) + '/'; // Top-level project
         }
-        
+
         ancestors.sort((a, b) => a.path.length - b.path.length);
         const rootAncestor = ancestors[0];
-        
+
         const rootAncestorName = rootAncestor.name || rootAncestor.displayName;
         const relativePath = projPath.substring(rootAncestor.path.length + 1).replace(/\\/g, '/');
         return `${rootAncestorName}/${relativePath}/`;
@@ -199,10 +199,10 @@ window.roCrateManager = {
             console.error("Scanner projects not available.");
             return;
         }
-        
+
         const allProjects = window.projectScanner.projects;
         const rootProject = allProjects.find(p => p.path.replace(/\\/g, '\\\\') === projectPath.replace(/\\/g, '\\\\') || p.path === projectPath);
-        
+
         if (!rootProject) {
             console.error("Project not found: " + projectPath);
             return;
@@ -211,7 +211,7 @@ window.roCrateManager = {
         // Calculate scope arrays
         const ancestorsSet = new Set();
         const descendantsSet = new Set();
-        
+
         const collectAncestors = (proj) => {
             if (ancestorsSet.has(proj.path)) return;
             ancestorsSet.add(proj.path);
@@ -232,7 +232,7 @@ window.roCrateManager = {
         };
         collectAncestors(rootProject);
         collectDescendants(rootProject);
-        
+
         const fullSet = new Set();
         const collectDependencies = (proj) => {
             if (fullSet.has(proj.path)) return;
@@ -283,7 +283,7 @@ window.roCrateManager = {
                 // Also pull all children of this project
                 const children = window.projectScanner.projects.filter(p => p.path !== selected.path && p.path.startsWith(selected.path));
                 projectsToExport = [...projectsToExport, ...children];
-                
+
                 rootName = selected.name;
                 rootDesc = `Export of project ${selected.name} and its ${children.length} sub-components.`;
             }
@@ -320,10 +320,10 @@ window.roCrateManager = {
             if (currentUser !== 'Admin') {
                 const user = window.profileManager.getUserByUsername(currentUser);
                 if (user) {
-                    authorInfo = { 
+                    authorInfo = {
                         username: user.username,
-                        firstName: user.firstName, 
-                        lastName: user.lastName, 
+                        firstName: user.firstName,
+                        lastName: user.lastName,
                         orcid: user.orcid,
                         institution: user.primaryGroupId ? window.profileManager.getGroupById(user.primaryGroupId)?.institution : ''
                     };
@@ -339,7 +339,7 @@ window.roCrateManager = {
         }
 
         const isLineage = this.currentExportData.type === 'lineage';
-        
+
         const modal = document.createElement('div');
         modal.className = 'ro-crate-modal';
         modal.innerHTML = `
@@ -419,7 +419,7 @@ window.roCrateManager = {
         document.getElementById('rocrate-title').addEventListener('input', () => this.updateValidation());
         document.getElementById('rocrate-desc').addEventListener('input', () => this.updateValidation());
         document.getElementById('rocrate-license').addEventListener('change', () => this.updateValidation());
-        if(isLineage) document.getElementById('rocrate-scope').addEventListener('change', () => this.updateValidation());
+        if (isLineage) document.getElementById('rocrate-scope').addEventListener('change', () => this.updateValidation());
     },
 
     updateValidation() {
@@ -427,7 +427,7 @@ window.roCrateManager = {
         const desc = document.getElementById('rocrate-desc').value;
         const license = document.getElementById('rocrate-license').value;
         const isLineage = this.currentExportData.type === 'lineage';
-        
+
         let projectsToExport = this.currentExportData.fullProjects;
         if (isLineage) {
             const scope = document.getElementById('rocrate-scope').value;
@@ -480,10 +480,10 @@ window.roCrateManager = {
 
     async executeExport() {
         if (!this.currentExportData.validatedCrateData) return;
-        
+
         const mode = document.getElementById('rocrate-mode').value;
         const isHarvestMode = mode === 'harvest';
-        
+
         let projectsToExport = this.currentExportData.fullProjects;
         if (this.currentExportData.type === 'lineage') {
             const scope = document.getElementById('rocrate-scope').value;
@@ -516,16 +516,16 @@ window.roCrateManager = {
 
         if (isHarvestMode) {
             const dirName = basePath.substring(Math.max(basePath.lastIndexOf('\\'), basePath.lastIndexOf('/')) + 1);
-            
+
             // Only explicitly harvest top-level projects; nested sub-projects will be copied naturally 
             // as part of their parent's folders. This prevents duplicating nested lineage projects at the root.
             const topLevelProjects = projectsToExport.filter(proj => {
                 const ancestors = projectsToExport.filter(p => p !== proj && proj.path.toLowerCase().startsWith(p.path.toLowerCase() + '\\'));
                 return ancestors.length === 0;
             });
-            
+
             const harvestData = [];
-            
+
             for (const p of topLevelProjects) {
                 const subfoldersResult = await window.electronAPI.getSubfolders([p.path]);
                 const folders = (subfoldersResult.success && subfoldersResult.subfolders[p.path]) ? subfoldersResult.subfolders[p.path] : [];
@@ -535,11 +535,11 @@ window.roCrateManager = {
                     selectedFolders: folders
                 });
             }
-            
+
             if (window.projectScanner && window.projectScanner.showSuccess) {
                 window.projectScanner.showSuccess("Copying data into Crate... This may take a while.");
             }
-            
+
             const harvestResult = await window.electronAPI.harvestProjects(basePath, harvestData);
             if (!harvestResult.success) {
                 if (window.projectScanner && window.projectScanner.showError) window.projectScanner.showError("Failed to copy data: " + harvestResult.message);
@@ -547,7 +547,7 @@ window.roCrateManager = {
             }
         }
         const jsonContent = JSON.stringify(this.currentExportData.validatedCrateData, null, 2);
-        
+
         let htmlContent = '';
         let generatePreview = true;
         if (window.settingsManager) {
@@ -556,7 +556,7 @@ window.roCrateManager = {
         if (generatePreview) {
             htmlContent = this.generateHtmlPreview(this.currentExportData.validatedCrateData);
         }
-        
+
         const jsonResult = await window.electronAPI.writeFile(jsonPath, jsonContent);
         if (generatePreview) {
             await window.electronAPI.writeFile(htmlPath, htmlContent);
@@ -575,10 +575,10 @@ window.roCrateManager = {
                 timestamp: new Date().toISOString(),
                 projects: projectsToExport
             };
-            
+
             legacyJsonPath = basePath + '/metafold-lineage-data.json';
             legacyHtmlPath = basePath + '/metafold-dashboard.html';
-            
+
             const legacyHtml = window.generateLineageHtml(legacyData);
             await window.electronAPI.writeFile(legacyJsonPath, JSON.stringify(legacyData, null, 2));
             await window.electronAPI.writeFile(legacyHtmlPath, legacyHtml);

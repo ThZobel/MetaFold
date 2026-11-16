@@ -595,7 +595,7 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
         if (!upsertedProject && typeof context.parseMetaFoldProject === 'function') {
             try {
                 upsertedProject = await context.parseMetaFoldProject(currentProjectPath, metadataFilename);
-            } catch (_) {}
+            } catch (_) { }
         }
 
         return {

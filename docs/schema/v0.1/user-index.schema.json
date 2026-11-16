@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/user-index.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/user-index.schema.json",
   "title": "MetaFold User Index Schema (v0.1)",
   "description": "Schema for user_index.json (reconstructible local project cache).",
   "type": "object",

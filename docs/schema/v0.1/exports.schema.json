@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/exports.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/exports.schema.json",
   "title": "MetaFold Scanner Summary, Lineage Export & ID Dictionary Schema (v0.1)",
   "description": "Schema covering scanner summary exports, lineage exports, and autocomplete ID dictionaries.",
   "oneOf": [
@@ -9,10 +9,17 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "type"],
+        "required": [
+          "id",
+          "type"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "type": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       }
@@ -21,7 +28,10 @@
       "title": "Envelope Export Object (Summary, Lineage, or ID Dictionary v0.1)",
       "type": "object",
       "properties": {
-        "schemaVersion": { "type": "string", "default": "0.1" },
+        "schemaVersion": {
+          "type": "string",
+          "default": "0.1"
+        },
         "schemaType": {
           "type": "string",
           "enum": [
@@ -31,10 +41,18 @@
             "metafold-id-dictionary"
           ]
         },
-        "exportInfo": { "type": "object" },
-        "overview": { "type": "object" },
-        "projects": { "type": "array" },
-        "entries": { "type": "array" }
+        "exportInfo": {
+          "type": "object"
+        },
+        "overview": {
+          "type": "object"
+        },
+        "projects": {
+          "type": "array"
+        },
+        "entries": {
+          "type": "array"
+        }
       },
       "additionalProperties": true
     }

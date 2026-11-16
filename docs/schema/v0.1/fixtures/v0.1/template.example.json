@@ -4,7 +4,6 @@
   "id": "template_confocal_01",
   "derivedFromTemplateId": null,
   "name": "Confocal Microscopy",
-  "type": "experiment",
   "category": "category1",
   "description": "Standard template for confocal fluorescence microscopy sessions.",
   "structure": "01_Raw_Data/\n02_Processed/\n03_Analysis/",

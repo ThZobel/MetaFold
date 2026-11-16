@@ -1051,7 +1051,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
                         // Check if newField has a meaningful value
                         const hasNewValue = newField.value !== undefined && newField.value !== null &&
-                                            (Array.isArray(newField.value) ? newField.value.length > 0 : newField.value !== '');
+                            (Array.isArray(newField.value) ? newField.value.length > 0 : newField.value !== '');
                         if (!hasNewValue) {
                             return; // Keep existing value if user left new field empty
                         }
@@ -1167,9 +1167,9 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 if (!enhancedMetadata['System.UpdateHistory']) {
                     enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
                 }
-                
-                const historyArray = Array.isArray(enhancedMetadata['System.UpdateHistory'].value) 
-                    ? enhancedMetadata['System.UpdateHistory'].value 
+
+                const historyArray = Array.isArray(enhancedMetadata['System.UpdateHistory'].value)
+                    ? enhancedMetadata['System.UpdateHistory'].value
                     : [];
 
                 const updateEntry = {
@@ -1178,7 +1178,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     group: options.userInfo.groupname || 'Unknown',
                     action: 'Metadata Extended'
                 };
-                
+
                 historyArray.push(updateEntry);
                 enhancedMetadata['System.UpdateHistory'] = { value: historyArray, type: 'history' };
                 enhancedMetadata['System.LastUpdatedBy'] = { value: updateEntry.user, type: 'user' };
@@ -1514,13 +1514,13 @@ ipcMain.handle('harvest-projects', async (event, exportPath, projectsData) => {
         for (const proj of projectsData) {
             const destDir = path.join(exportPath, proj.name);
             await fs.mkdir(destDir, { recursive: true });
-            
+
             if (require('fs').existsSync(proj.path)) {
                 const entries = await fs.readdir(proj.path, { withFileTypes: true });
                 for (const entry of entries) {
                     const src = path.join(proj.path, entry.name);
                     const dest = path.join(destDir, entry.name);
-                    
+
                     if (entry.isFile()) {
                         await fs.copyFile(src, dest);
                     } else if (entry.isDirectory()) {
@@ -2302,7 +2302,7 @@ ipcMain.handle('merge-projects-into-user-index', async (event, newProjects, base
             const content = await fs.readFile(indexPath, 'utf8');
             const data = JSON.parse(content);
             existing = Array.isArray(data) ? data : (data.projects || []);
-        } catch (_) {}
+        } catch (_) { }
 
         const pathMap = new Map();
         for (const p of existing) {
@@ -2359,7 +2359,7 @@ async function upsertSingleProjectInUserIndex(projectPath, basePath = null, user
             const content = await fs.readFile(indexPath, 'utf8');
             const data = JSON.parse(content);
             existing = Array.isArray(data) ? data : (data.projects || []);
-        } catch (_) {}
+        } catch (_) { }
 
         // Find metadata file
         const normPath = path.resolve(projectPath);
@@ -2906,13 +2906,13 @@ async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0,
         if (metadataFiles.length > 0) {
             for (const metadataFile of metadataFiles) {
                 console.log(`📁 Found project in: ${basePath}`);
-    
+
                 const project = await parseMetaFoldProject(basePath, metadataFile.name);
                 if (project) {
                     // Always assign System.Level based on nesting depth
                     project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
                     project.hasMetadata = true; // NEW FLAG
-    
+
                     if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
                         // Merge: parent metadata as base, child metadata overrides
                         const mergedMetadata = { ...parentMetadata };
@@ -2923,7 +2923,7 @@ async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0,
                         project.metadataFieldCount = Object.keys(project.metadata).length;
                         console.log(`🔗 Inherited ${Object.keys(parentMetadata).length} metadata fields from parent into: ${project.name}`);
                     }
-    
+
                     // Collect file sidecars if option is enabled
                     if (includeFileSidecars) {
                         const sidecars = await collectFileSidecars(basePath);
@@ -2932,9 +2932,9 @@ async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0,
                             console.log(`📄 Found ${sidecars.length} file sidecar(s) in: ${project.name}`);
                         }
                     }
-    
+
                     projects.push(project);
-    
+
                     // Build metadata to pass to children (own clean metadata, excluding System fields)
                     if (inheritMetadata) {
                         for (const [key, val] of Object.entries(project.metadata)) {
@@ -2962,14 +2962,14 @@ async function scanForMetaFoldProjects(basePath, options = {}, currentDepth = 0,
                     hasReadme: false,
                     projectId: null
                 };
-                
+
                 project.metadata['System.Level'] = { value: currentDepth + 1, type: 'system' };
-                
+
                 if (inheritMetadata && Object.keys(parentMetadata).length > 0) {
                     project.metadata = { ...parentMetadata, 'System.Level': { value: currentDepth + 1, type: 'system' } };
                     project.metadataFieldCount = Object.keys(project.metadata).length;
                 }
-                
+
                 projects.push(project);
             } catch (err) {
                 // Ignore stat errors for unreadable directories
@@ -3175,10 +3175,10 @@ function getUserIdRegistryPath(userInfo) {
         username = userInfo.username;
     }
     const safeUsername = username.replace(/[^a-zA-Z0-9_\-]/g, '_').toLowerCase();
-    
+
     // Determine the template directory which already includes the user's folder
     const registryDir = getTemplatesDirectory(userInfo);
-    
+
     if (!fsSync.existsSync(registryDir)) {
         fsSync.mkdirSync(registryDir, { recursive: true });
     }
@@ -3192,7 +3192,7 @@ function extractIdValues(obj, result = []) {
         if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
         const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
         const isProjectName = lowerKey === 'projectname';
-        
+
         if (isIdField) {
             let idVal = '';
             if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
@@ -3204,7 +3204,7 @@ function extractIdValues(obj, result = []) {
                 result.push({ id: idVal, type: 'id_anchor' });
             }
         }
-        
+
         if (isProjectName) {
             let projVal = '';
             if (typeof val === 'string') {
@@ -3214,7 +3214,7 @@ function extractIdValues(obj, result = []) {
                 result.push({ id: projVal, type: 'project' });
             }
         }
-        
+
         if (val && typeof val === 'object' && !Array.isArray(val)) {
             extractIdValues(val, result);
         }
@@ -3291,10 +3291,10 @@ ipcMain.handle('save-id-values', async (event, metadata, userInfo) => {
     try {
         const fsSync = require('fs');
         if (!metadata) return { success: false, newCount: 0 };
-        
+
         const extractedIds = extractIdValues(metadata);
         if (extractedIds.length === 0) return { success: true, newCount: 0 };
-        
+
         const filePath = getUserIdRegistryPath(userInfo);
         let currentIds = [];
         if (fsSync.existsSync(filePath)) {
@@ -3306,20 +3306,20 @@ ipcMain.handle('save-id-values', async (event, metadata, userInfo) => {
                 console.error('Error reading ID dictionary for merge:', e);
             }
         }
-        
+
         const initialCount = currentIds.length;
-        
+
         const idMap = new Map();
         currentIds.forEach(item => idMap.set(item.id, item));
-        
+
         extractedIds.forEach(item => {
             if (item.type === 'id_anchor' || !idMap.has(item.id)) {
                 idMap.set(item.id, item);
             }
         });
-        
+
         const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-        
+
         fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
         return { success: true, newCount: newArray.length - initialCount, total: newArray.length };
     } catch (err) {
@@ -3337,14 +3337,14 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
             errors: [],
             directoriesScanned: 0
         };
-        
+
         function scanDir(currentPath) {
             try {
                 debugInfo.directoriesScanned++;
                 const entries = fsSync.readdirSync(currentPath, { withFileTypes: true });
                 for (const entry of entries) {
                     const fullPath = path.join(currentPath, entry.name);
-                    
+
                     if (entry.isDirectory() && recursive) {
                         scanDir(fullPath);
                     } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
@@ -3366,9 +3366,9 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
                 console.error(`[harvestIdsFromFolder] Directory error at ${currentPath}:`, e);
             }
         }
-        
+
         scanDir(dirPath);
-        
+
         if (totalExtracted.length > 0) {
             const filePath = getUserIdRegistryPath(userInfo);
             let currentIds = [];
@@ -3376,26 +3376,26 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
                 try {
                     currentIds = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
                     currentIds = currentIds.map(item => typeof item === 'string' ? { id: item, type: 'id_anchor' } : item);
-                } catch (e) {}
+                } catch (e) { }
             }
-            
+
             const initialCount = currentIds.length;
-            
+
             const idMap = new Map();
             currentIds.forEach(item => idMap.set(item.id, item));
-            
+
             totalExtracted.forEach(item => {
                 if (item.type === 'id_anchor' || !idMap.has(item.id)) {
                     idMap.set(item.id, item);
                 }
             });
-            
+
             const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-            
+
             fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
             return { success: true, newCount: newArray.length - initialCount, total: newArray.length, foundCount: totalExtracted.length, debugInfo };
         }
-        
+
         return { success: true, newCount: 0, total: 0, foundCount: 0, debugInfo };
     } catch (err) {
         console.error('Error harvesting IDs:', err);
@@ -3417,28 +3417,28 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, o
         // --- PHASE 3: Two-Pass Scanner Logic (Lineage Linking) ---
         // Pass 1: Build ID Registry from all scanned projects
         const idRegistry = new Map();
-        
+
         projects.forEach(project => {
             project.lineage = {
                 provides_ids: [],
                 derived_from_ids: [],
                 lineage_links: []
             };
-            
+
             // Auto-register the project's own name as a valid ID
             if (project.name) {
                 project.lineage.provides_ids.push(project.name);
                 idRegistry.set(project.name, project.path);
             }
-            
+
             function extractLineage(obj) {
                 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                 for (const [key, val] of Object.entries(obj || {})) {
                     const lowerKey = key.toLowerCase();
                     if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
-                    
+
                     const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
-                    
+
                     if (isIdField) {
                         let idVal = '';
                         if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
@@ -3451,7 +3451,7 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, o
                             idRegistry.set(idVal, project.path);
                         }
                     }
-                    
+
                     if (lowerKey === 'derived_from' || (val && val.type === 'derived_from')) {
                         if (val && typeof val === 'object' && Array.isArray(val.value)) {
                             project.lineage.derived_from_ids.push(
@@ -3475,7 +3475,7 @@ ipcMain.handle('scan-metafold-projects', async (event, basePath, maxDepth = 5, o
                     }
                 }
             }
-            
+
             if (project.metadata) {
                 extractLineage(project.metadata);
             }
@@ -3920,7 +3920,7 @@ function parseOmeXmlToJson(xmlString) {
             },
             // Preserve acquisition timestamp if present
             AcquisitionDate: extract('AcquisitionDate', null, xmlString)
-                            || extractAttr('Image', ['AcquisitionDate'], xmlString).AcquisitionDate
+                || extractAttr('Image', ['AcquisitionDate'], xmlString).AcquisitionDate
         };
 
         // Clean up empty objects
@@ -4807,13 +4807,13 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                     if (children.length > 0 && children[0].templateName) {
                         tplName = children[0].templateName;
                     }
-                    
+
                     if (!fieldsByTemplate[tplName]) {
                         fieldsByTemplate[tplName] = { normal: [] };
                     }
                     // Add the group itself
                     fieldsByTemplate[tplName].normal.push([groupKey, { type: 'group', label: groupKey }]);
-                    
+
                     // Add all children
                     Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
                         fieldsByTemplate[tplName].normal.push([subKey, subFieldInfo]);
@@ -4842,7 +4842,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
         } else {
             templateNames.forEach(tplName => {
                 const fields = fieldsByTemplate[tplName];
-                
+
                 // Filter out empty normal fields
                 const validNormalFields = fields.normal.filter(([key, fieldInfo]) => {
                     if (fieldInfo.type === 'group') return true;
@@ -4872,10 +4872,10 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
                 if (finalFields.length > 0) {
                     hasMetadata = true;
-                    
+
                     let sectionUpdater = null;
                     let sectionUpdateDate = null;
-                    
+
                     // Find latest updater for the entire template section
                     finalFields.forEach(([key, fieldInfo]) => {
                         if (fieldInfo.lastUpdatedBy) {
@@ -4894,7 +4894,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             <span>on ${new Date(sectionUpdateDate).toLocaleString()}</span>
                         </div>`;
                     }
-                    
+
                     htmlContent += `
                 <section class="section">
                     <h2 class="section-title" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
@@ -4914,7 +4914,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             htmlContent += `</div>`;
                             return;
                         }
-                        
+
                         const label = fieldInfo.label || key;
                         let value = fieldInfo.value;
 
@@ -4978,7 +4978,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                     htmlContent += `</div></section>`;
                 }
             });
-            
+
             if (!hasMetadata) {
                 htmlContent += `
                 <section class="section">
@@ -5006,12 +5006,12 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
         const prov = metadata.provenance;
         const creator = prov.creator || {};
         const group = prov.group || {};
-        
+
         let creatorDetails = [];
         if (creator.firstName || creator.lastName) creatorDetails.push(`${creator.firstName || ''} ${creator.lastName || ''}`.trim());
         if (creator.email) creatorDetails.push(`Email: ${creator.email}`);
         if (creator.orcid) creatorDetails.push(`ORCID: ${creator.orcid}`);
-        
+
         let groupDetails = [];
         if (group.name) groupDetails.push(group.name);
         if (group.principalInvestigator) groupDetails.push(`PI: ${group.principalInvestigator}`);
@@ -5031,7 +5031,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                                 ${creatorDetails.length > 0 ? `<div class="metadata-description">${creatorDetails.join('<br>')}</div>` : ''}
                             </div>
                         </div>`;
-                        
+
         if (Object.keys(group).length > 0 && group.name) {
             htmlContent += `
                         <div class="metadata-item">
@@ -5042,7 +5042,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             </div>
                         </div>`;
         }
-        
+
         if (prov.createdAt) {
             htmlContent += `
                         <div class="metadata-item">
@@ -5052,7 +5052,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             </div>
                         </div>`;
         }
-        
+
         htmlContent += `
                     </div>
                 </section>`;
@@ -5067,7 +5067,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                         System Information
                     </h2>
                     <div class="metadata-grid">`;
-                    
+
         if (metadata['System.ProjectAbsolutePath']) {
             htmlContent += `
                         <div class="metadata-item">
@@ -5077,7 +5077,7 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             </div>
                         </div>`;
         }
-        
+
         if (metadata['System.ProjectRelativePath']) {
             htmlContent += `
                         <div class="metadata-item">
@@ -5512,12 +5512,12 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         if (Object.keys(projectMetadata).length === 0) {
             projectMetadata = { ...metadata };
         }
-        
+
         // Create a clean copy without internal system fields
         const cleanMetadata = { ...projectMetadata };
         // Extract integrations safely before deletion
         const integrations = cleanMetadata.metafold_integration?.external_links || cleanMetadata.integrations || metadata.metafold_integration?.external_links || metadata.integrations || null;
-        
+
         // Extract template category before deletion (for ISA / facet search)
         const templateCategory =
             cleanMetadata.template?.category ||
@@ -5534,7 +5534,7 @@ async function parseMetaFoldProject(projectPath, metadataFilename) {
         // elabFTW-enveloped format ({ extra_fields, elabftw, metafold_project_id }),
         // where the ID sits as a sibling of extra_fields, not inside it.
         const projectId = cleanMetadata.metafold_project_id || metadata.metafold_project_id || null;
-        
+
         delete cleanMetadata.schemaVersion;
         delete cleanMetadata.schemaType;
         delete cleanMetadata.projectName;

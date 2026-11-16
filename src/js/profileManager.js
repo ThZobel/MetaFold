@@ -144,28 +144,28 @@ const profileManager = {
             const sep = this._dataDir.includes('\\') ? '\\' : '/';
 
             const groupsPath = this._dataDir + sep + 'groups.json';
-            const groupsContent = JSON.stringify({ 
+            const groupsContent = JSON.stringify({
                 schemaVersion: '0.1',
                 schemaType: 'metafold-groups',
                 version: '0.1',
                 exportedAt: new Date().toISOString(),
-                groups: this.groups 
+                groups: this.groups
             }, null, 2);
-            
+
             const writeResult1 = await window.electronAPI.writeFile(groupsPath, groupsContent);
             if (writeResult1 && writeResult1.success === false) {
                 console.error('❌ Failed to write groups.json:', writeResult1.message);
             }
 
             const usersPath = this._dataDir + sep + 'users.json';
-            const usersContent = JSON.stringify({ 
+            const usersContent = JSON.stringify({
                 schemaVersion: '0.1',
                 schemaType: 'metafold-users',
                 version: '0.1',
                 exportedAt: new Date().toISOString(),
-                users: this.users 
+                users: this.users
             }, null, 2);
-            
+
             const writeResult2 = await window.electronAPI.writeFile(usersPath, usersContent);
             if (writeResult2 && writeResult2.success === false) {
                 console.error('❌ Failed to write users.json:', writeResult2.message);
@@ -377,7 +377,7 @@ const profileManager = {
         // Create new user
         const groupName = userData.groupName || userData.groupname || 'Default';
         let group = this.getGroupByName(groupName);
-        
+
         // Auto-create group if it doesn't exist and has a non-default name
         if (!group && groupName && groupName !== 'Default') {
             group = await this.createGroup({ name: groupName });
@@ -428,7 +428,7 @@ const profileManager = {
         if (updates.groupName || updates.groupname) {
             const groupName = updates.groupName || updates.groupname;
             let group = this.getGroupByName(groupName);
-            
+
             if (!group && groupName && groupName !== 'Default') {
                 group = await this.createGroup({ name: groupName });
             }
@@ -446,8 +446,8 @@ const profileManager = {
         }
 
         // Apply other updates
-        const allowedKeys = ['username', 'title', 'firstName', 'lastName', 'email', 'orcid', 
-                           'affiliation', 'role', 'groupIds', 'primaryGroupId'];
+        const allowedKeys = ['username', 'title', 'firstName', 'lastName', 'email', 'orcid',
+            'affiliation', 'role', 'groupIds', 'primaryGroupId'];
         for (const key of allowedKeys) {
             if (updates[key] !== undefined) {
                 user[key] = updates[key];
@@ -516,7 +516,7 @@ const profileManager = {
     getUserPrimaryGroupName(username) {
         const user = this.getUserByUsername(username);
         if (!user || !user.primaryGroupId) return 'Default';
-        
+
         const group = this.getGroupById(user.primaryGroupId);
         return group ? group.name : 'Default';
     },
@@ -692,7 +692,7 @@ const profileManager = {
                 if (typeof window.templateManager.getAllTemplates === 'function') {
                     allTemplates = window.templateManager.getAllTemplates(true) || [];
                 }
-            } catch (e) {}
+            } catch (e) { }
             if (allTemplates.length === 0 && Array.isArray(window.templateManager.templates)) {
                 allTemplates = [...window.templateManager.templates];
             }
@@ -715,7 +715,7 @@ const profileManager = {
                                         allTemplates.push(parsed);
                                     }
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                 }
@@ -1105,7 +1105,7 @@ const profileManager = {
                     const destPath = this._dataDir + sep + `${safeName}.json`;
                     await window.electronAPI.writeFile(destPath, JSON.stringify(data, null, 2));
                     if (window.templateManager?.init) {
-                        try { await window.templateManager.init(); } catch (e) {}
+                        try { await window.templateManager.init(); } catch (e) { }
                     }
                     return { success: true, stats: { groupsAdded: 0, groupsSkipped: 0, usersAdded: 0, usersSkipped: 0, templatesImported: 1, usersNeedPassword: [] } };
                 }

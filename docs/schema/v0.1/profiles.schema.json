@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://metafold.org/schema/v0.1/profiles.schema.json",
+  "$id": "https://raw.githubusercontent.com/ThZobel/MetaFold/refs/heads/main/docs/schema/v0.1/profiles.schema.json",
   "title": "MetaFold RDM User & Group Profiles Schema (v0.1)",
   "description": "Schema for users.json and groups.json managed by profileManager.js.",
   "type": "object",

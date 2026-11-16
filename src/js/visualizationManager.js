@@ -7,8 +7,8 @@ const visualizationManager = {
     currentVisualizationType: 'knowledgegraph', // Default to Knowledge Graph
     usesFallback: false,
     activeFilters: null, // Store active filters from search
-    
-    
+
+
     // Available visualization types
     visualizationTypes: {
         dashboard: {
@@ -46,9 +46,9 @@ const visualizationManager = {
     // Initialize the visualization manager
     init() {
         if (this.initialized) return;
-        
+
         console.log('📊 Initializing Enhanced Visualization Manager...');
-        
+
         try {
             this.setupVisualizationContainer();
             this.checkAvailableLibraries();
@@ -66,9 +66,9 @@ const visualizationManager = {
         const availability = {
             d3: typeof d3 !== 'undefined'
         };
-        
+
         console.log('📊 Library availability check:', availability);
-        
+
         // Check D3.js availability
         if (availability.d3) {
             this.usesFallback = false;
@@ -77,7 +77,7 @@ const visualizationManager = {
             this.currentVisualizationType = 'tree';
             console.log('⚠️ Advanced libraries not available - using tree view fallback');
         }
-        
+
         return availability;
     },
 
@@ -85,7 +85,7 @@ const visualizationManager = {
     getAvailableTypes() {
         const availability = this.checkAvailableLibraries();
         const availableTypes = [];
-        
+
         // D3.js availability
         if (availability.d3) {
             availableTypes.push('dashboard');
@@ -93,31 +93,31 @@ const visualizationManager = {
             availableTypes.push('knowledgegraph');
             availableTypes.push('metadatatree');
         }
-        
+
         // Tree view always available
         availableTypes.push('tree');
-        
+
         return availableTypes;
     },
 
     // Set the current visualization type
     setVisualizationType(type) {
         const availableTypes = this.getAvailableTypes();
-        
+
         if (!availableTypes.includes(type)) {
             console.warn(`⚠️ Visualization type "${type}" not available. Available: ${availableTypes.join(', ')}`);
             // Fallback to first available type
             type = availableTypes[0] || 'tree';
         }
-        
+
         // ENHANCED: Cleanup previous visualization
-        
+
         this.currentVisualizationType = type;
         console.log(`📊 Visualization type set to: ${type}`);
-        
+
         // Update UI buttons
         this.updateVisualizationTypeButtons();
-        
+
         // Re-render current data if available
         if (this.currentData) {
             this.renderVisualization(this.currentData);
@@ -127,7 +127,7 @@ const visualizationManager = {
     // Update visualization type buttons in UI
     updateVisualizationTypeButtons() {
         const availableTypes = this.getAvailableTypes();
-        
+
         // Update button states
         Object.keys(this.visualizationTypes).forEach(type => {
             const button = document.getElementById(type + 'TypeBtn');
@@ -149,35 +149,35 @@ const visualizationManager = {
         const sidebar = document.getElementById('vizSidebar');
         const content = document.getElementById('vizSidebarContent');
         const countBadge = document.getElementById('vizFilterCount');
-        
+
         if (!sidebar || !content) return;
-        
+
         if (!this.activeFilters || Object.keys(this.activeFilters).length === 0) {
             sidebar.style.display = 'none';
             return;
         }
-        
+
         sidebar.style.display = 'block';
         content.innerHTML = '';
-        
+
         let totalFilters = 0;
-        
+
         for (let key in this.activeFilters) {
             const values = this.activeFilters[key];
             if (!values || values.length === 0) continue;
-            
+
             totalFilters += values.length;
-            
+
             const groupDiv = document.createElement('div');
             groupDiv.style.marginBottom = '10px';
-            
+
             const title = document.createElement('div');
             title.style.color = '#9ca3af';
             title.style.fontSize = '12px';
             title.style.marginBottom = '4px';
             title.textContent = key.split('.').pop().replace(/_/g, ' ');
             groupDiv.appendChild(title);
-            
+
             values.forEach(val => {
                 const chip = document.createElement('div');
                 chip.style.display = 'inline-block';
@@ -188,17 +188,17 @@ const visualizationManager = {
                 chip.style.padding = '2px 6px';
                 chip.style.fontSize = '11px';
                 chip.style.margin = '0 4px 4px 0';
-                
+
                 let displayVal = val.toString();
                 if (displayVal.length > 25) displayVal = displayVal.substring(0, 25) + '...';
                 chip.textContent = displayVal;
-                
+
                 groupDiv.appendChild(chip);
             });
-            
+
             content.appendChild(groupDiv);
         }
-        
+
         if (countBadge) countBadge.textContent = totalFilters;
     },
 
@@ -221,13 +221,13 @@ const visualizationManager = {
 
         const availableTypes = this.getAvailableTypes();
         const currentType = this.visualizationTypes[this.currentVisualizationType];
-        
+
         const availableLibraries = [];
         if (typeof React !== 'undefined') availableLibraries.push('React');
         if (typeof d3 !== 'undefined') availableLibraries.push('D3.js');
-        
-        const libraryStatus = availableLibraries.length > 0 ? 
-            `Available: ${availableLibraries.join(', ')}` : 
+
+        const libraryStatus = availableLibraries.length > 0 ?
+            `Available: ${availableLibraries.join(', ')}` :
             'No visualization libraries detected';
 
         container.innerHTML = `
@@ -261,7 +261,7 @@ const visualizationManager = {
             }
 
             const template = window.templateManager.currentTemplate;
-            
+
             // Check if template has metadata
             if (template.type !== 'experiment' || !template.metadata || Object.keys(template.metadata).length === 0) {
                 this.showError('Selected template has no metadata to visualize. Please select an experiment template with metadata fields.');
@@ -302,29 +302,29 @@ const visualizationManager = {
             this.showError('Error loading template data: ' + error.message);
         }
     },
-    
+
     // NEW: Load data from scanned projects (PROJECT SCANNER INTEGRATION)
     loadFromScannedProjects() {
         try {
             console.log('📁 Loading data from Project Scanner...');
-            
+
             if (!window.projectScanner || !window.projectScanner.projects || window.projectScanner.projects.length === 0) {
                 this.showError('No scanned projects available. Go to Discovery tab and scan a directory first.');
                 return;
             }
-            
+
             const projects = window.projectScanner.projects;
             const statistics = window.projectScanner.statistics;
-            
+
             console.log(`📊 Processing ${projects.length} scanned projects for visualization...`);
-            
+
             // Create comprehensive visualization data structure
             const visualizationData = this.createProjectNetworkData(projects, statistics);
-            
+
             this.currentData = visualizationData;
             this.renderVisualization(visualizationData);
             this.showSuccess(`Loaded ${projects.length} MetaFold projects for visualization`);
-            
+
         } catch (error) {
             console.error('❌ Error loading scanned projects:', error);
             this.showError('Error loading scanned projects: ' + error.message);
@@ -335,24 +335,24 @@ const visualizationManager = {
     visualizeFilteredProjects(filteredProjects, filters) {
         try {
             console.log(`📁 Visualizing ${filteredProjects.length} filtered projects...`, filters);
-            
+
             // Rebuild the network data using ONLY the filtered projects
             // We use the global statistics if available since statistics are overall
             const statistics = window.projectScanner ? window.projectScanner.statistics : {};
-            
+
             const visualizationData = this.createProjectNetworkData(filteredProjects, statistics);
-            
+
             this.currentData = visualizationData;
             this.activeFilters = filters;
-            
+
             // Set type to knowledge graph if currently on an incompatible view
             if (this.currentVisualizationType === 'dashboard' || this.currentVisualizationType === 'jsoncrack') {
                 this.currentVisualizationType = 'knowledgegraph';
             }
-            
+
             this.renderVisualization(visualizationData);
             this.updateVisualizationTypeButtons();
-            
+
             this.showSuccess(`Visualizing subset of ${filteredProjects.length} projects`);
         } catch (error) {
             console.error('❌ Error visualizing filtered projects:', error);
@@ -381,7 +381,7 @@ const visualizationManager = {
     // Create network data structure from scanned projects
     createProjectNetworkData(projects, statistics) {
         console.log('🔗 Creating project network data structure...');
-        
+
         const networkData = {
             schemaVersion: '0.1',
             schemaType: 'metafold-visualization-export',
@@ -396,7 +396,7 @@ const visualizationManager = {
             relationships: this.analyzeProjectRelationships(projects),
             metadataAnalysis: this.analyzeAggregatedMetadata(projects)
         };
-        
+
         console.log('✅ Project network data created:', networkData);
         return networkData;
     },
@@ -442,7 +442,7 @@ const visualizationManager = {
         const fields = project.metadata.extra_fields;
         const totalFields = Object.keys(fields).length;
         if (totalFields === 0) return 0;
-        const completedFields = Object.values(fields).filter(field => 
+        const completedFields = Object.values(fields).filter(field =>
             field.value && field.value.toString().trim() !== ''
         ).length;
         return (completedFields / totalFields) * 100;
@@ -463,7 +463,7 @@ const visualizationManager = {
             fieldTypes: {},
             commonFields: []
         };
-        
+
         projects.forEach(project => {
             if (project.metadata && project.metadata.extra_fields) {
                 Object.entries(project.metadata.extra_fields).forEach(([fieldName, fieldData]) => {
@@ -473,7 +473,7 @@ const visualizationManager = {
                 });
             }
         });
-        
+
         return analysis;
     },
 
@@ -486,7 +486,7 @@ const visualizationManager = {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
-            
+
             input.onchange = async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -494,13 +494,13 @@ const visualizationManager = {
                 try {
                     const text = await file.text();
                     const data = JSON.parse(text);
-                    
+
                     console.log('📊 Loaded JSON data:', data);
-                    
+
                     this.currentData = data;
                     this.renderVisualization(data);
                     this.showSuccess(`Loaded data from file: ${file.name}`);
-                    
+
                 } catch (parseError) {
                     console.error('❌ Error parsing JSON file:', parseError);
                     this.showError('Invalid JSON file: ' + parseError.message);
@@ -571,10 +571,10 @@ const visualizationManager = {
         try {
             console.log('📊 Rendering visualization with data:', data);
             console.log('📊 Using visualization type:', this.currentVisualizationType);
-            
+
             // CRITICAL: Save data for re-rendering when switching types
             this.currentData = data;
-            
+
             this.renderActiveFilters();
 
             // Clear container
@@ -605,7 +605,7 @@ const visualizationManager = {
         } catch (error) {
             console.error('❌ Error rendering visualization:', error);
             this.showError('Error rendering visualization: ' + error.message);
-            
+
             // Try fallback on error
             if (this.currentVisualizationType !== 'tree') {
                 console.log('📊 Attempting fallback to tree visualization...');
@@ -789,7 +789,7 @@ const visualizationManager = {
     // Render Analytics Dashboard Visualization
     renderDashboardVisualization(data) {
         console.log('📊 Rendering Analytics Dashboard visualization...');
-        
+
         const container = document.getElementById('visualizationContent');
         if (!container) {
             console.error('❌ Visualization container not found');
@@ -1107,13 +1107,13 @@ const visualizationManager = {
             .attr('class', 'bar').attr('x', d => x(d[xKey])).attr('width', x.bandwidth())
             .attr('y', d => y(d[yKey])).attr('height', d => height - y(d[yKey]))
             .attr('fill', color).attr('rx', 3)
-            .on('mouseover', function(event, d) {
+            .on('mouseover', function (event, d) {
                 d3.select(this).transition().duration(200).attr('fill', d3.color(color).brighter(0.5));
                 tooltip.transition().duration(200).style('opacity', 1);
                 tooltip.html(`<strong>${d[xKey]}</strong><br/>Count: ${d[yKey]}`)
                     .style('left', (event.pageX + 10) + 'px').style('top', (event.pageY - 28) + 'px');
             })
-            .on('mouseout', function() {
+            .on('mouseout', function () {
                 d3.select(this).transition().duration(200).attr('fill', color);
                 tooltip.transition().duration(500).style('opacity', 0);
             });
@@ -1127,7 +1127,7 @@ const visualizationManager = {
             'tree': 'tree',
             'raw': 'tree' // Raw view is handled within tree view now
         };
-        
+
         const newType = typeMapping[viewType] || viewType;
         this.setVisualizationType(newType);
     },
@@ -1136,7 +1136,7 @@ const visualizationManager = {
     createJsonTreeHTML(obj, level = 0) {
         let html = '';
         const indent = '  '.repeat(level);
-        
+
         if (Array.isArray(obj)) {
             html += `<div class="json-array" style="margin-left: ${level * 20}px;">`;
             html += `<span class="json-bracket">[</span>`;
@@ -1156,7 +1156,7 @@ const visualizationManager = {
         } else if (typeof obj === 'object' && obj !== null) {
             const keys = Object.keys(obj);
             html += `<div class="json-object" style="margin-left: ${level * 20}px;">`;
-            
+
             if (level > 0) {
                 html += `<div class="json-toggle" onclick="visualizationManager.toggleNode(this)" data-expanded="true">`;
                 html += `<span class="json-expand-icon">▼</span>`;
@@ -1167,22 +1167,22 @@ const visualizationManager = {
             } else {
                 html += `<span class="json-bracket">{</span>`;
             }
-            
+
             keys.forEach((key, index) => {
                 html += `<div class="json-property" style="margin-left: ${level > 0 ? 20 : 0}px;">`;
                 html += `<span class="json-key">"${key}"</span><span class="json-colon">: </span>`;
-                
+
                 const value = obj[key];
                 if (typeof value === 'object' && value !== null) {
                     html += this.createJsonTreeHTML(value, level + 1);
                 } else {
                     html += `<span class="json-value json-${typeof value}">${this.formatValue(value)}</span>`;
                 }
-                
+
                 if (index < keys.length - 1) html += '<span class="json-comma">,</span>';
                 html += `</div>`;
             });
-            
+
             if (level > 0) {
                 html += `</div>`;
             }
@@ -1191,7 +1191,7 @@ const visualizationManager = {
         } else {
             html += `<span class="json-value json-${typeof obj}">${this.formatValue(obj)}</span>`;
         }
-        
+
         return html;
     },
 
@@ -1250,7 +1250,7 @@ const visualizationManager = {
         const icon = element.querySelector('.json-expand-icon');
         const content = element.nextElementSibling;
         const isExpanded = element.getAttribute('data-expanded') === 'true';
-        
+
         if (isExpanded) {
             icon.classList.add('collapsed');
             content.classList.add('collapsed');
@@ -1317,15 +1317,15 @@ const visualizationManager = {
 
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            
+
             const a = document.createElement('a');
             a.href = url;
             a.download = defaultFilename;
             a.click();
-            
+
             URL.revokeObjectURL(url);
             this.showSuccess('Visualization data exported successfully');
-            
+
         } catch (error) {
             console.error('❌ Error exporting visualization:', error);
             this.showError('Failed to export visualization');
@@ -1335,7 +1335,7 @@ const visualizationManager = {
     // Render tree visualization (PRESERVED from original)
     renderMetadataTreeVisualization(data) {
         console.log('🏷️ Rendering Metadata Tree visualization...');
-        
+
         const container = document.getElementById('visualizationContent');
         if (!container) return;
 
@@ -1360,7 +1360,7 @@ const visualizationManager = {
 
     renderTreeVisualization(data) {
         console.log('🌳 Rendering tree visualization...');
-        
+
         const container = document.getElementById('visualizationContent');
         if (!container) {
             console.error('❌ Visualization container not found');
@@ -1415,7 +1415,7 @@ const visualizationManager = {
         try {
             // Convert JSON to nodes and links
             const { nodes, links } = this.convertJSONToGraph(data);
-            
+
             const width = container.clientWidth;
             const height = container.clientHeight;
 
@@ -1530,7 +1530,7 @@ const visualizationManager = {
         function traverse(obj, parent = null, currentPath = '') {
             const id = `node_${nodeId++}`;
             const type = Array.isArray(obj) ? 'array' : typeof obj === 'object' && obj !== null ? 'object' : 'primitive';
-            
+
             let label, value;
             if (type === 'primitive') {
                 label = currentPath.split('.').pop() || 'root';
@@ -1596,7 +1596,7 @@ const visualizationManager = {
             'tree': 'tree',
             'raw': 'tree' // Raw view is handled within tree view now
         };
-        
+
         const newType = typeMapping[viewType] || viewType;
         this.setVisualizationType(newType);
     },
@@ -1605,7 +1605,7 @@ const visualizationManager = {
     createJsonTreeHTML(obj, level = 0) {
         let html = '';
         const indent = '  '.repeat(level);
-        
+
         if (Array.isArray(obj)) {
             html += `<div class="json-array" style="margin-left: ${level * 20}px;">`;
             html += `<span class="json-bracket">[</span>`;
@@ -1625,7 +1625,7 @@ const visualizationManager = {
         } else if (typeof obj === 'object' && obj !== null) {
             const keys = Object.keys(obj);
             html += `<div class="json-object" style="margin-left: ${level * 20}px;">`;
-            
+
             if (level > 0) {
                 html += `<div class="json-toggle" onclick="visualizationManager.toggleNode(this)" data-expanded="true">`;
                 html += `<span class="json-expand-icon">▼</span>`;
@@ -1636,22 +1636,22 @@ const visualizationManager = {
             } else {
                 html += `<span class="json-bracket">{</span>`;
             }
-            
+
             keys.forEach((key, index) => {
                 html += `<div class="json-property" style="margin-left: ${level > 0 ? 20 : 0}px;">`;
                 html += `<span class="json-key">"${key}"</span><span class="json-colon">: </span>`;
-                
+
                 const value = obj[key];
                 if (typeof value === 'object' && value !== null) {
                     html += this.createJsonTreeHTML(value, level + 1);
                 } else {
                     html += `<span class="json-value json-${typeof value}">${this.formatValue(value)}</span>`;
                 }
-                
+
                 if (index < keys.length - 1) html += '<span class="json-comma">,</span>';
                 html += `</div>`;
             });
-            
+
             if (level > 0) {
                 html += `</div>`;
             }
@@ -1660,7 +1660,7 @@ const visualizationManager = {
         } else {
             html += `<span class="json-value json-${typeof obj}">${this.formatValue(obj)}</span>`;
         }
-        
+
         return html;
     },
 
@@ -1719,7 +1719,7 @@ const visualizationManager = {
         const icon = element.querySelector('.json-expand-icon');
         const content = element.nextElementSibling;
         const isExpanded = element.getAttribute('data-expanded') === 'true';
-        
+
         if (isExpanded) {
             icon.classList.add('collapsed');
             content.classList.add('collapsed');
@@ -1786,15 +1786,15 @@ const visualizationManager = {
 
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            
+
             const a = document.createElement('a');
             a.href = url;
             a.download = defaultFilename;
             a.click();
-            
+
             URL.revokeObjectURL(url);
             this.showSuccess('Visualization data exported successfully');
-            
+
         } catch (error) {
             console.error('❌ Error exporting visualization:', error);
             this.showError('Failed to export visualization');
@@ -1807,7 +1807,7 @@ const visualizationManager = {
     // Render Knowledge Graph visualization
     renderKnowledgeGraphVisualization(data) {
         console.log('🌌 Rendering Knowledge Graph (Tidy-Tree) visualization...');
-        
+
         const container = document.getElementById('visualizationContent');
         if (!container) return;
 
@@ -1886,21 +1886,21 @@ const visualizationManager = {
         if (!metadataSchema) return stats;
 
         stats.totalFields = Object.keys(metadataSchema).length;
-        
+
         Object.values(metadataSchema).forEach(field => {
             const type = field.type || 'unknown';
             stats.fieldTypes[type] = (stats.fieldTypes[type] || 0) + 1;
         });
 
         if (currentValues) {
-            stats.filledFields = Object.keys(currentValues).filter(key => 
-                currentValues[key] !== null && 
-                currentValues[key] !== undefined && 
+            stats.filledFields = Object.keys(currentValues).filter(key =>
+                currentValues[key] !== null &&
+                currentValues[key] !== undefined &&
                 currentValues[key] !== ''
             ).length;
         }
 
-        stats.completionPercentage = stats.totalFields > 0 ? 
+        stats.completionPercentage = stats.totalFields > 0 ?
             Math.round((stats.filledFields / stats.totalFields) * 100) : 0;
 
         return stats;
@@ -1927,15 +1927,15 @@ const visualizationManager = {
 window.visualizationManager = visualizationManager;
 
 // Export Lineage function for use by Knowledge Graph and Lineage Tree context menus
-window.generateLineageHtml = async function(exportData) {
+window.generateLineageHtml = async function (exportData) {
     const rootName = exportData.rootProject;
     const timestamp = new Date(exportData.timestamp).toLocaleString();
-    
+
     // --- Topological Sort ---
     const projMap = new Map();
     const adjList = new Map();
     const inDegree = new Map();
-    
+
     exportData.projects.forEach(p => {
         projMap.set(p.path, p);
         adjList.set(p.path, []);
@@ -1962,7 +1962,7 @@ window.generateLineageHtml = async function(exportData) {
     while (queue.length > 0) {
         const curr = queue.shift();
         sortedProjects.push(projMap.get(curr));
-        
+
         adjList.get(curr).forEach(neighbor => {
             inDegree.set(neighbor, inDegree.get(neighbor) - 1);
             if (inDegree.get(neighbor) === 0) {
@@ -1980,7 +1980,7 @@ window.generateLineageHtml = async function(exportData) {
 
     // --- Generate Mermaid Graph ---
     let mermaidGraph = `graph TD;\n`;
-    
+
     // Define CSS Classes
     mermaidGraph += `    classDef root fill:#cba6f7,stroke:#11111b,stroke-width:2px,color:#11111b,font-weight:bold;\n`;
     mermaidGraph += `    classDef direct fill:#89b4fa,stroke:#11111b,stroke-width:1px,color:#11111b;\n`;
@@ -1988,14 +1988,14 @@ window.generateLineageHtml = async function(exportData) {
 
     exportData.projects.forEach(p => {
         const cleanName = p.name.replace(/[^a-zA-Z0-9]/g, '_');
-        
+
         let nodeClass = "indirect";
         if (p.path === exportData.rootProjectPath || p.name === exportData.rootProject) {
             nodeClass = "root";
         } else if (exportData.directLineagePaths && exportData.directLineagePaths.includes(p.path)) {
             nodeClass = "direct";
         }
-        
+
         mermaidGraph += `    node_${cleanName}["${p.name}"]:::${nodeClass}\n`;
         const parents = p.lineage?.lineage_links?.map(link => link.source_path) || [];
         parents.forEach(parentPath => {
@@ -2005,11 +2005,11 @@ window.generateLineageHtml = async function(exportData) {
                 mermaidGraph += `    node_${parentClean} --> node_${cleanName}\n`;
             }
         });
-        
+
         // Add click event for navigation
         mermaidGraph += `    click node_${cleanName} href "#card_${cleanName}" "Go to project details"\n`;
     });
-    
+
     // --- Pre-render Mermaid Graph to Static SVG (100% Offline Support) ---
     let renderedSvg = null;
     if (window.mermaid) {
@@ -2107,7 +2107,7 @@ ${mermaidGraph}
     sortedProjects.forEach((proj, index) => {
         let omeroUrl = '';
         let elabUrl = '';
-        
+
         if (proj.integrations) {
             const o = proj.integrations.omero || proj.integrations.OMERO || {};
             omeroUrl = o.url || o.link || o.webUrl || '';
@@ -2128,7 +2128,7 @@ ${mermaidGraph}
         }
 
         let metadataHtml = '';
-        
+
         const formatExportMetadata = (val) => {
             if (val === null || val === undefined) return '';
             if (Array.isArray(val)) return val.map(formatExportMetadata).join(', ');
@@ -2140,7 +2140,7 @@ ${mermaidGraph}
                     }
                     return formatExportMetadata(val.value);
                 }
-                
+
                 // Group or custom object
                 let subHtml = '<div style="margin-top: 4px; border-left: 2px solid #45475a; padding-left: 10px;">';
                 for (const [sk, sv] of Object.entries(val)) {
@@ -2161,12 +2161,12 @@ ${mermaidGraph}
         if (proj.metadata) {
             for (const [k, v] of Object.entries(proj.metadata)) {
                 if (k === 'schemaVersion' || k === 'schemaType' || k === 'template' || k === 'templateInfo' || k === 'provenance' || k === 'System.UpdateHistory' || k === 'System.Level' || k === 'metafold_project_id' || k === 'projectName' || k === 'created_at' || k === 'updated_at' || (window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(k))) continue;
-                
+
                 let label = k;
                 if (v !== null && typeof v === 'object' && v.label) {
                     label = v.label;
                 }
-                
+
                 const displayVal = formatExportMetadata(v);
                 if (displayVal && displayVal !== '<div style="margin-top: 4px; border-left: 2px solid #45475a; padding-left: 10px;"></div>') {
                     metadataHtml += `<tr><th>${label}</th><td>${displayVal}</td></tr>`;
@@ -2188,21 +2188,21 @@ ${mermaidGraph}
             provides = '<span style="color:#6c7086; font-style: italic;">None</span>';
         }
 
-        let localPath = proj.metadata && proj.metadata['System.ProjectAbsolutePath'] 
-            ? proj.metadata['System.ProjectAbsolutePath'].value 
+        let localPath = proj.metadata && proj.metadata['System.ProjectAbsolutePath']
+            ? proj.metadata['System.ProjectAbsolutePath'].value
             : proj.path;
 
         const stepIndex = index + 1;
         const cleanName = proj.name.replace(/[^a-zA-Z0-9]/g, '_');
-        
+
         let pathDisplay = `Path: ${localPath}`;
         if (exportData.isHarvest) {
             pathDisplay = `Relative Path: ./${cleanName} <br><span style="font-size: 0.8em; color: #6c7086;">Original: ${localPath}</span>`;
             localPath = `./${cleanName}`;
         }
-        
+
         const escapedPath = localPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        
+
         let readmeBtn = '';
         if (proj.hasReadme && proj.readmeFilename) {
             let readmePath;
@@ -2265,10 +2265,10 @@ window.exportLineage = async (projectPath) => {
             console.error("Scanner projects not available.");
             return;
         }
-        
+
         const allProjects = window.projectScanner.projects;
         const rootProject = allProjects.find(p => p.path.replace(/\\/g, '\\\\') === projectPath.replace(/\\/g, '\\\\') || p.path === projectPath);
-        
+
         if (!rootProject) {
             console.error("Project not found: " + projectPath);
             return;
@@ -2277,7 +2277,7 @@ window.exportLineage = async (projectPath) => {
         // 1. Calculate Direct Lineage (Ancestors & Descendants)
         const ancestorsSet = new Set();
         const descendantsSet = new Set();
-        
+
         const collectAncestors = (proj) => {
             if (ancestorsSet.has(proj.path)) return;
             ancestorsSet.add(proj.path);
@@ -2287,7 +2287,7 @@ window.exportLineage = async (projectPath) => {
                 if (parent) collectAncestors(parent);
             });
         };
-        
+
         const collectDescendants = (proj) => {
             if (descendantsSet.has(proj.path)) return;
             descendantsSet.add(proj.path);
@@ -2297,7 +2297,7 @@ window.exportLineage = async (projectPath) => {
                 }
             });
         };
-        
+
         collectAncestors(rootProject);
         collectDescendants(rootProject);
         const directLineageSet = new Set([...ancestorsSet, ...descendantsSet]);
@@ -2307,7 +2307,7 @@ window.exportLineage = async (projectPath) => {
         const collectDependencies = (proj) => {
             if (fullSet.has(proj.path)) return;
             fullSet.add(proj.path);
-            
+
             const parentPaths = proj.lineage?.lineage_links?.map(l => l.source_path) || [];
             parentPaths.forEach(path => {
                 const parent = allProjects.find(p => p.path === path);
@@ -2320,7 +2320,7 @@ window.exportLineage = async (projectPath) => {
                 }
             });
         };
-        
+
         collectDependencies(rootProject);
 
         // --- EXPORT OPTIONS MODAL ---
@@ -2469,7 +2469,7 @@ window.exportLineage = async (projectPath) => {
                     const subs = subfolders[p.path] || [];
                     html += `<div style="background: #181825; padding: 15px; border-radius: 8px; border: 1px solid #313244;">`;
                     html += `<h3 style="margin: 0 0 10px 0; color: #cba6f7; font-size: 1.1em;">${p.name}</h3>`;
-                    
+
                     if (subs.length === 0) {
                         html += `<div style="color: #6c7086; font-size: 0.9em; font-style: italic;">No subfolders found. Root files will be copied.</div>`;
                     } else {
@@ -2525,7 +2525,7 @@ window.exportLineage = async (projectPath) => {
         }
 
         const safeName = rootProject.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        
+
         // Use showSaveDialog to let user choose filename and directory
         const savePath = await window.electronAPI.showSaveDialog({
             title: isHarvestMode ? 'Select Harvest Destination' : 'Export Lineage JSON & HTML',
@@ -2539,7 +2539,7 @@ window.exportLineage = async (projectPath) => {
             console.log('Export cancelled by user');
             return;
         }
-        
+
         // Strip .json or .html if the user typed it, to get the base path
         let basePath = savePath;
         if (basePath.toLowerCase().endsWith('.json')) basePath = basePath.substring(0, basePath.length - 5);
@@ -2565,11 +2565,11 @@ window.exportLineage = async (projectPath) => {
             const dirName = basePath.substring(Math.max(basePath.lastIndexOf('\\'), basePath.lastIndexOf('/')) + 1);
             jsonPath = basePath + '/' + dirName + '.json';
             htmlPath = basePath + '/' + dirName + '.html';
-            
+
             if (window.projectScanner && window.projectScanner.showSuccess) {
                 window.projectScanner.showSuccess("Copying data... This may take a while depending on size.");
             }
-            
+
             const harvestResult = await window.electronAPI.harvestProjects(basePath, harvestData);
             if (!harvestResult.success) {
                 console.error("Harvest failed:", harvestResult.message);
@@ -2586,7 +2586,7 @@ window.exportLineage = async (projectPath) => {
 
         const jsonContent = JSON.stringify(exportData, null, 2);
         const htmlContent = await window.generateLineageHtml(exportData);
-        
+
         const jsonResult = await window.electronAPI.writeFile(jsonPath, jsonContent);
         const htmlResult = await window.electronAPI.writeFile(htmlPath, htmlContent);
 
