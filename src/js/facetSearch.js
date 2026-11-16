@@ -271,7 +271,7 @@ const facetSearch = {
         const ignoredKeys = ['schemaVersion', 'schemaType', 'template', 'metafold_project_id', 'projectName', 'provenance', 'templateInfo', 'metafold_integration', 'System.UpdateHistory', 'changelog', 'notes_log', 'previous_names', 'created_at', 'updated_at'];
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                if (ignoredKeys.includes(key) || ( !prefix && window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key) && key !== 'notes_markdown' && key !== 'hypothesis_or_goal' )) continue;
+                if (ignoredKeys.includes(key) || (!prefix && window.metafoldSchema && window.metafoldSchema.isReservedProjectKey(key) && key !== 'notes_markdown' && key !== 'hypothesis_or_goal')) continue;
                 const newKey = prefix ? `${prefix}.${key}` : key;
                 const value = obj[key];
 
@@ -771,12 +771,43 @@ const facetSearch = {
         // Close modal without bouncing back to 'create' and switch tab to 'visualize'
         await this.closeSearch({ targetTab: 'visualize' });
 
-        // Pass to visualization manager with tab already active
-        window.visualizationManager.visualizeFilteredProjects(fullProjects, activeFiltersCopy);
+        // Always start in Mermaid Lineage Graph when coming from Facet Search
+        const fullPool = scannerProjects.length > 0 ? scannerProjects : (Array.isArray(this.masterData) ? this.masterData : fullProjects);
+        const explicitRootPath = this.selectedProjectPath
+            || (fullProjects.length === 1 ? fullProjects[0]?.path : null);
+
+        window.visualizationManager.visualizeFilteredProjects(fullProjects, activeFiltersCopy, {
+            preferredView: 'mermaidlineage',
+            rootProjectPath: explicitRootPath || null,
+            fullProjectPool: fullPool
+        });
 
         if (window.switchMainTab) {
             window.switchMainTab('visualize');
         }
+    },
+
+    // 2b. Visualize Mermaid Lineage for a specific project from Project Details
+    async visualizeProjectLineage(projectPath) {
+        if (!window.visualizationManager) {
+            console.error('visualizationManager is not available');
+            return;
+        }
+        const scannerProjects = (window.projectScanner && Array.isArray(window.projectScanner.projects)) ? window.projectScanner.projects : [];
+        const pool = scannerProjects.length > 0 ? scannerProjects : (Array.isArray(this.masterData) ? this.masterData : []);
+        if (window.projectScanner && (!window.projectScanner.projects || window.projectScanner.projects.length === 0)) {
+            window.projectScanner.projects = pool;
+        }
+
+        await this.closeSearch({ targetTab: 'visualize' });
+
+        if (window.switchMainTab) {
+            window.switchMainTab('visualize');
+        }
+
+        setTimeout(() => {
+            window.visualizationManager.visualizeProjectLineage(projectPath, pool);
+        }, 40);
     },
 
     // 3. Load the exported Summary JSON from file
@@ -3908,354 +3939,360 @@ const facetSearch = {
     },
 
     // Show full Project Metadata, Quick Actions & Collapsible Lineage Accordion inside the docked right panel on row click
-    showProjectDetails(rowData) {
-        if (!rowData) return;
-        const targetPath = rowData._path || rowData.path;
-        this.selectedProjectPath = targetPath;
-
-        const isSidecar = rowData._type === 'file_sidecar';
-
-        // Find full project in masterData (or sidecar parent if a file_sidecar row was clicked)
-        let project = null;
-        let sidecarEntry = null;
-
-        if (isSidecar) {
-            project = this.masterData.find(p =>
-                (rowData._parentProjectPath && p.path === rowData._parentProjectPath) ||
-                (p._sidecarChildren && p._sidecarChildren.some(sc =>
-                    (rowData._sidecarId && sc.id === rowData._sidecarId) ||
-                    (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
-                    (targetPath && sc.path === targetPath)
-                ))
-            );
-            if (project && Array.isArray(project._sidecarChildren)) {
-                sidecarEntry = project._sidecarChildren.find(sc =>
-                    (rowData._sidecarId && sc.id === rowData._sidecarId) ||
-                    (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
-                    (targetPath && sc.path === targetPath) ||
-                    (rowData.name && sc.name === rowData.name)
-                );
+        // When `options.targetContentEl` is provided (e.g. from Mermaid Lineage view), renders into that container instead.
+        showProjectDetails(rowData, options = {}) {
+            if (!rowData) return;
+            const targetPath = rowData._path || rowData.path;
+            const customContainer = options && options.targetContentEl ? options.targetContentEl : null;
+            if (!customContainer) {
+                this.selectedProjectPath = targetPath;
             }
-            if (!sidecarEntry) sidecarEntry = rowData;
-            if (!project) project = { name: sidecarEntry._parentProjectName || 'Project', path: sidecarEntry._parentProjectPath || '', metadata: sidecarEntry.project_metadata || {} };
-        } else {
-            project = this.masterData.find(p => p.path === targetPath) || rowData;
-        }
 
-        const contentArea = this.openRightPanel(isSidecar ? '📄 File Sidecar Details' : '📋 Project Details');
-        if (!contentArea) return;
+            const isSidecar = rowData._type === 'file_sidecar';
 
-        // Keep projectScanner.projects synced so RO-Crate & Lineage exports have full graph context
-        if (window.projectScanner) {
-            window.projectScanner.projects = this.masterData;
-            window.projectScanner.selectedProjectPath = project.path;
-        }
+            // Find full project in masterData (or sidecar parent if a file_sidecar row was clicked)
+            let project = null;
+            let sidecarEntry = null;
 
-        // Pre-extract notes for display and deduplication
-        let promotedNotesKey = null;
-        let notesMd = project.notes_markdown || (project.metadata && project.metadata.notes_markdown) || '';
-        if (!notesMd && project.metadata) {
-            const findNotesVal = (obj) => {
-                for (const [k, v] of Object.entries(obj)) {
-                    if (v && typeof v === 'object') {
-                        if ((v.type === 'notes' || v.type === 'markdown' || v.displayInNotes === true) && v.value) {
-                            promotedNotesKey = k;
-                            return String(v.value);
-                        }
-                        if (typeof v === 'object' && v.value === undefined && v.type === undefined) {
-                            const res = findNotesVal(v);
-                            if (res) return res;
-                        }
+            if (isSidecar) {
+                project = this.masterData.find(p =>
+                    (rowData._parentProjectPath && p.path === rowData._parentProjectPath) ||
+                    (p._sidecarChildren && p._sidecarChildren.some(sc =>
+                        (rowData._sidecarId && sc.id === rowData._sidecarId) ||
+                        (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
+                        (targetPath && sc.path === targetPath)
+                    ))
+                );
+                if (project && Array.isArray(project._sidecarChildren)) {
+                    sidecarEntry = project._sidecarChildren.find(sc =>
+                        (rowData._sidecarId && sc.id === rowData._sidecarId) ||
+                        (rowData._sidecarPath && sc.sidecarPath === rowData._sidecarPath) ||
+                        (targetPath && sc.path === targetPath) ||
+                        (rowData.name && sc.name === rowData.name)
+                    );
+                }
+                if (!sidecarEntry) sidecarEntry = rowData;
+                if (!project) project = { name: sidecarEntry._parentProjectName || 'Project', path: sidecarEntry._parentProjectPath || '', metadata: sidecarEntry.project_metadata || {} };
+            } else {
+                project = this.masterData.find(p => p.path === targetPath) || rowData;
+            }
+
+            const contentArea = customContainer || this.openRightPanel(isSidecar ? '📄 File Sidecar Details' : '📋 Project Details');
+            if (!contentArea) return;
+
+            // Keep projectScanner.projects synced so RO-Crate & Lineage exports have full graph context
+                if (window.projectScanner && Array.isArray(this.masterData) && this.masterData.length > 0) {
+                    window.projectScanner.projects = this.masterData;
+                    if (!customContainer) {
+                        window.projectScanner.selectedProjectPath = project.path;
                     }
                 }
-                return '';
-            };
-            notesMd = findNotesVal(project.metadata);
-        }
-        const notesLog = Array.isArray(project.notes_log) ? project.notes_log : (Array.isArray(project.metadata && project.metadata.notes_log) ? project.metadata.notes_log : []);
-        const hypothesis = project.hypothesis_or_goal || (project.metadata && project.metadata.hypothesis_or_goal) || '';
 
-        const formatBytes = (bytes) => {
-            if (bytes === undefined || bytes === null || isNaN(Number(bytes))) return '—';
-            const n = Number(bytes);
-            if (n < 1024) return `${n} B`;
-            if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB (${n.toLocaleString()} B)`;
-            if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB (${n.toLocaleString()} B)`;
-            return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB (${n.toLocaleString()} B)`;
-        };
+                // Pre-extract notes for display and deduplication
+                let promotedNotesKey = null;
+                let notesMd = project.notes_markdown || (project.metadata && project.metadata.notes_markdown) || '';
+                if (!notesMd && project.metadata) {
+                    const findNotesVal = (obj) => {
+                        for (const [k, v] of Object.entries(obj)) {
+                            if (v && typeof v === 'object') {
+                                if ((v.type === 'notes' || v.type === 'markdown' || v.displayInNotes === true) && v.value) {
+                                    promotedNotesKey = k;
+                                    return String(v.value);
+                                }
+                                if (typeof v === 'object' && v.value === undefined && v.type === undefined) {
+                                    const res = findNotesVal(v);
+                                    if (res) return res;
+                                }
+                            }
+                        }
+                        return '';
+                    };
+                    notesMd = findNotesVal(project.metadata);
+                }
+                const notesLog = Array.isArray(project.notes_log) ? project.notes_log : (Array.isArray(project.metadata && project.metadata.notes_log) ? project.metadata.notes_log : []);
+                const hypothesis = project.hypothesis_or_goal || (project.metadata && project.metadata.hypothesis_or_goal) || '';
 
-        const renderCompactField = (label, val) => {
-            if (val === undefined || val === null || val === '') return '';
-            return `
+                const formatBytes = (bytes) => {
+                    if (bytes === undefined || bytes === null || isNaN(Number(bytes))) return '—';
+                    const n = Number(bytes);
+                    if (n < 1024) return `${n} B`;
+                    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB (${n.toLocaleString()} B)`;
+                    if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB (${n.toLocaleString()} B)`;
+                    return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB (${n.toLocaleString()} B)`;
+                };
+
+                const renderCompactField = (label, val) => {
+                    if (val === undefined || val === null || val === '') return '';
+                    return `
                 <div style="background: rgba(255,255,255,0.04); padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px;">
                     <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${label}</div>
                     <div style="font-size: 0.84rem; color: #e5e7eb; word-break: break-word;">${val}</div>
                 </div>
             `;
-        };
+                };
 
-        const escHtml = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
-        const escAttr = (window.markdownLite && window.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
+                const escHtml = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
+                const escAttr = (window.markdownLite && window.markdownLite.escapeAttr) || (s => String(s || '').replace(/"/g, '&quot;'));
 
-        const renderMetadataField = (key, field) => {
-            if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level', 'System.hasReadme', 'changelog', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'previous_names'].includes(key)) return '';
+                const renderMetadataField = (key, field) => {
+                    if (['metafold_project_id', 'projectName', 'provenance', 'System.UpdateHistory', 'System.Level', 'System.hasReadme', 'changelog', 'notes_log', 'notes_markdown', 'hypothesis_or_goal', 'previous_names'].includes(key)) return '';
 
-            // Skip only the single notes field that was already promoted into Notes & Observations
-            if (field && typeof field === 'object') {
-                if (promotedNotesKey && key === promotedNotesKey) return '';
-                if (field.type === 'textarea' && notesMd && String(field.value || '').trim() === String(notesMd).trim()) {
-                    return '';
-                }
-            }
-
-            if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
-                let catHtml = `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; border-left: 3px solid #8b5cf6;">`;
-                catHtml += `<div style="font-size: 0.76rem; color: #c4b5fd; margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">📁 ${escHtml(key.replace(/_/g, ' '))}</div>`;
-                catHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
-                for (const [subKey, subField] of Object.entries(field)) {
-                    catHtml += renderMetadataField(subKey, subField);
-                }
-                catHtml += `</div></div>`;
-                return catHtml;
-            }
-
-            const value = (field && field.value !== undefined) ? field.value : field;
-            const type = (field && field.type) ? field.type : 'text';
-            let label = (field && field.label) ? field.label : key.replace(/_/g, ' ');
-            label = label.charAt(0).toUpperCase() + label.slice(1);
-
-            let displayValue = value;
-            const lowerKey = key.toLowerCase();
-            const lowerLabel = label.toLowerCase();
-            const normKey = lowerKey.replace(/[\s_-]+/g, '');
-            const isDerivedFrom = lowerKey.includes('derived_from') || normKey === 'derivedfrom' || lowerLabel.includes('derived from') || type === 'derived_from';
-            const isRelatedTo = !isDerivedFrom && (
-                lowerKey.includes('related_to') || normKey === 'relatedto' ||
-                lowerLabel.includes('related to') || lowerLabel.includes('related project') ||
-                lowerKey.includes('related_project') || type === 'related_to'
-            );
-            const isIdAnchor = !isDerivedFrom && !isRelatedTo && (type === 'id_anchor' || lowerKey === 'id_anchor');
-            const isTags = !isDerivedFrom && !isRelatedTo && !isIdAnchor && (
-                /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i.test(key) || type === 'tags'
-            );
-
-            if (displayValue === null || displayValue === undefined || displayValue === '') {
-                displayValue = '<em style="color: #6c7086;">Empty</em>';
-            } else if (isDerivedFrom || isRelatedTo) {
-                let items = [];
-                if (Array.isArray(displayValue)) {
-                    items = displayValue;
-                } else if (typeof displayValue === 'string') {
-                    items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
-                }
-                if (items.length === 0) {
-                    displayValue = '<em style="color: #6c7086;">Empty</em>';
-                } else {
-                    displayValue = items.map(item => {
-                        const rawId = typeof item === 'object' && item !== null ? (item.id || item.name || '') : String(item || '').trim();
-                        const title = typeof item === 'object' && item !== null ? (item.name || item.id || '') : rawId;
-                        const note = (typeof item === 'object' && item !== null) ? (item.relation_note || item.anchor || '') : '';
-                        const linkedProj = this._resolveProjectByRef(rawId);
-                        const bgStyle = isDerivedFrom
-                            ? 'background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd;'
-                            : 'background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.42); color:#7dd3fc;';
-                        const roleHint = isDerivedFrom ? 'Derived From (Parent)' : 'Related To (Associative)';
-                        if (linkedProj && linkedProj.path) {
-                            const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                            return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="${roleHint}: ${escAttr(linkedProj.name)} — click to open" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer; font-weight:500;">${isRelatedTo ? '🔀 ' : ''}📁 ${escHtml(linkedProj.name || title)} ↗</span>`;
-                        }
-                        const safeRawId = rawId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                        return `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeRawId}')" title="${roleHint}: Filter table for '${escAttr(rawId)}'" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${isDerivedFrom ? '⚓' : '🔀'} ${escHtml(title)}${note ? ` <em style="opacity:0.8;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
-                    }).join(' ');
-                }
-            } else if (isIdAnchor) {
-                const rawAnchor = String(displayValue).trim();
-                const safeAnchor = rawAnchor.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                displayValue = `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeAnchor}')" title="Own / Internal ID: Filter table for '${escAttr(rawAnchor)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.42); color:#fbbf24; padding:2px 8px; border-radius:12px; font-size:0.78rem; cursor:pointer; font-weight:500;">⚓ ${escHtml(rawAnchor)} 🔍</span>`;
-            } else if (isTags) {
-                let items = [];
-                if (Array.isArray(displayValue)) {
-                    items = displayValue;
-                } else if (typeof displayValue === 'string') {
-                    items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
-                }
-                if (items.length === 0) {
-                    displayValue = '<em style="color: #6c7086;">Empty</em>';
-                } else {
-                    displayValue = items.map(tag => {
-                        const rawTag = typeof tag === 'object' && tag !== null ? (tag.name || tag.id || '') : String(tag || '').trim();
-                        const tagStr = rawTag.replace(/^#+/, '').trim();
-                        if (!tagStr) return '';
-                        const safeTag = tagStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                        return `<span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag: '${escAttr(tagStr)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">🏷️ ${escHtml(tagStr)}</span>`;
-                    }).filter(Boolean).join(' ');
-                }
-            } else if (type === 'url' || (typeof displayValue === 'string' && (displayValue.startsWith('http://') || displayValue.startsWith('https://')))) {
-                const safeUrl = String(displayValue).replace(/'/g, "\\'");
-                displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${escHtml(displayValue)}</span> <span style="font-size:0.8rem;">↗</span></a>`;
-            } else if (Array.isArray(displayValue)) {
-                if (displayValue.length === 0) {
-                    displayValue = '<em style="color: #6c7086;">Empty</em>';
-                } else {
-                    displayValue = displayValue.map(item => {
-                        if (item && typeof item === 'object') {
-                            const title = item.name || item.id || 'Link';
-                            const note = item.relation_note || item.anchor || '';
-                            const linkedProj = this._resolveProjectByRef(item.id || item.name);
-                            if (linkedProj && linkedProj.path) {
-                                const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                                return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(title)})" style="display:inline-flex; align-items:center; gap:4px; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); color:#c4b5fd; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || title)}${note ? ` <em>(${escHtml(note)})</em>` : ''} ↗</span>`;
-                            }
-                            const safeTitle = String(title).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                            return `<span onclick="facetSearch.filterByLineageId('${safeTitle}')" title="Filter table by '${escAttr(title)}'" style="display:inline-block; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(title)}${note ? ` <em style="color:#c4b5fd;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
-                        }
-                        const itemStr = String(item || '').trim();
-                        const linkedProj = this._resolveProjectByRef(itemStr);
-                        if (linkedProj && linkedProj.path && linkedProj.path !== project.path) {
-                            const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                            return `<span onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(itemStr)})" style="display:inline-block; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#7dd3fc; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || itemStr)} ↗</span>`;
-                        }
-                        const safeItem = itemStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                        return `<span onclick="facetSearch.filterByLineageId('${safeItem}')" title="Filter table by '${escAttr(itemStr)}'" style="display:inline-block; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(itemStr)}</span>`;
-                    }).join(' ');
-                }
-            } else if (typeof displayValue === 'object') {
-                if (window.formatDisplayValue) {
-                    displayValue = escHtml(window.formatDisplayValue(field));
-                } else {
-                    displayValue = '<pre style="margin: 0; font-size: 0.76rem; white-space: pre-wrap;">' + escHtml(JSON.stringify(displayValue, null, 2)) + '</pre>';
-                }
-            } else {
-                const rawStr = String(displayValue);
-                const unitStr = (field && field.unit) ? ` ${field.unit}` : '';
-                if (typeof displayValue === 'string' && window.markdownLite) {
-                    if (type === 'notes' || type === 'markdown' || (type === 'textarea' && rawStr.includes('\n'))) {
-                        displayValue = window.markdownLite.render(rawStr);
-                    } else {
-                        const renderedInline = window.markdownLite.renderInline(rawStr);
-                        const matchedProj = (!rawStr.includes('[[')) ? this._resolveProjectByRef(rawStr) : null;
-                        if (matchedProj && matchedProj.path && matchedProj.path !== project.path) {
-                            const safePath = matchedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                            const shownText = matchedProj.name && matchedProj.name !== rawStr.trim()
-                                ? `${escHtml(matchedProj.name)}${escHtml(unitStr)}`
-                                : `${renderedInline}${escHtml(unitStr)}`;
-                            displayValue = `${shownText} <span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open matching project: ${escAttr(matchedProj.name)} (${escAttr(rawStr)})" style="display:inline-flex; align-items:center; gap:3px; background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.4); color:#7dd3fc; padding:1px 6px; border-radius:10px; margin-left:4px; font-size:0.74rem; cursor:pointer;">↗ Open</span>`;
-                        } else {
-                            displayValue = `${renderedInline}${escHtml(unitStr)}`;
+                    // Skip only the single notes field that was already promoted into Notes & Observations
+                    if (field && typeof field === 'object') {
+                        if (promotedNotesKey && key === promotedNotesKey) return '';
+                        if (field.type === 'textarea' && notesMd && String(field.value || '').trim() === String(notesMd).trim()) {
+                            return '';
                         }
                     }
-                } else {
-                    displayValue = `${escHtml(rawStr)}${escHtml(unitStr)}`;
-                }
-            }
 
-            return `
+                    if (typeof field === 'object' && field !== null && !Array.isArray(field) && field.value === undefined && field.type === undefined) {
+                        let catHtml = `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; border-left: 3px solid #8b5cf6;">`;
+                        catHtml += `<div style="font-size: 0.76rem; color: #c4b5fd; margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">📁 ${escHtml(key.replace(/_/g, ' '))}</div>`;
+                        catHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
+                        for (const [subKey, subField] of Object.entries(field)) {
+                            catHtml += renderMetadataField(subKey, subField);
+                        }
+                        catHtml += `</div></div>`;
+                        return catHtml;
+                    }
+
+                    const value = (field && field.value !== undefined) ? field.value : field;
+                    const type = (field && field.type) ? field.type : 'text';
+                    let label = (field && field.label) ? field.label : key.replace(/_/g, ' ');
+                    label = label.charAt(0).toUpperCase() + label.slice(1);
+
+                    let displayValue = value;
+                    const lowerKey = key.toLowerCase();
+                    const lowerLabel = label.toLowerCase();
+                    const normKey = lowerKey.replace(/[\s_-]+/g, '');
+                    const isDerivedFrom = lowerKey.includes('derived_from') || normKey === 'derivedfrom' || lowerLabel.includes('derived from') || type === 'derived_from';
+                    const isRelatedTo = !isDerivedFrom && (
+                        lowerKey.includes('related_to') || normKey === 'relatedto' ||
+                        lowerLabel.includes('related to') || lowerLabel.includes('related project') ||
+                        lowerKey.includes('related_project') || type === 'related_to'
+                    );
+                    const isIdAnchor = !isDerivedFrom && !isRelatedTo && (type === 'id_anchor' || lowerKey === 'id_anchor');
+                    const isTags = !isDerivedFrom && !isRelatedTo && !isIdAnchor && (
+                        /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i.test(key) || type === 'tags'
+                    );
+
+                    if (displayValue === null || displayValue === undefined || displayValue === '') {
+                        displayValue = '<em style="color: #6c7086;">Empty</em>';
+                    } else if (isDerivedFrom || isRelatedTo) {
+                        let items = [];
+                        if (Array.isArray(displayValue)) {
+                            items = displayValue;
+                        } else if (typeof displayValue === 'string') {
+                            items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                        }
+                        if (items.length === 0) {
+                            displayValue = '<em style="color: #6c7086;">Empty</em>';
+                        } else {
+                            displayValue = items.map(item => {
+                                const rawId = typeof item === 'object' && item !== null ? (item.id || item.name || '') : String(item || '').trim();
+                                const title = typeof item === 'object' && item !== null ? (item.name || item.id || '') : rawId;
+                                const note = (typeof item === 'object' && item !== null) ? (item.relation_note || item.anchor || '') : '';
+                                const linkedProj = this._resolveProjectByRef(rawId);
+                                const bgStyle = isDerivedFrom
+                                    ? 'background:rgba(99,102,241,0.22); border:1px solid rgba(139,92,246,0.45); color:#c4b5fd;'
+                                    : 'background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.42); color:#7dd3fc;';
+                                const roleHint = isDerivedFrom ? 'Derived From (Parent)' : 'Related To (Associative)';
+                                if (linkedProj && linkedProj.path) {
+                                    const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                    return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="${roleHint}: ${escAttr(linkedProj.name)} — click to open" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer; font-weight:500;">${isRelatedTo ? '🔀 ' : ''}📁 ${escHtml(linkedProj.name || title)} ↗</span>`;
+                                }
+                                const safeRawId = rawId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeRawId}')" title="${roleHint}: Filter table for '${escAttr(rawId)}'" style="display:inline-flex; align-items:center; gap:4px; ${bgStyle} padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${isDerivedFrom ? '⚓' : '🔀'} ${escHtml(title)}${note ? ` <em style="opacity:0.8;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
+                            }).join(' ');
+                        }
+                    } else if (isIdAnchor) {
+                        const rawAnchor = String(displayValue).trim();
+                        const safeAnchor = rawAnchor.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        displayValue = `<span class="facet-lineage-chip" onclick="facetSearch.filterByLineageId('${safeAnchor}')" title="Own / Internal ID: Filter table for '${escAttr(rawAnchor)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.42); color:#fbbf24; padding:2px 8px; border-radius:12px; font-size:0.78rem; cursor:pointer; font-weight:500;">⚓ ${escHtml(rawAnchor)} 🔍</span>`;
+                    } else if (isTags) {
+                        let items = [];
+                        if (Array.isArray(displayValue)) {
+                            items = displayValue;
+                        } else if (typeof displayValue === 'string') {
+                            items = displayValue.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                        }
+                        if (items.length === 0) {
+                            displayValue = '<em style="color: #6c7086;">Empty</em>';
+                        } else {
+                            displayValue = items.map(tag => {
+                                const rawTag = typeof tag === 'object' && tag !== null ? (tag.name || tag.id || '') : String(tag || '').trim();
+                                const tagStr = rawTag.replace(/^#+/, '').trim();
+                                if (!tagStr) return '';
+                                const safeTag = tagStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return `<span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag: '${escAttr(tagStr)}'" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.4); color:#2dd4bf; padding:2px 8px; border-radius:12px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">🏷️ ${escHtml(tagStr)}</span>`;
+                            }).filter(Boolean).join(' ');
+                        }
+                    } else if (type === 'url' || (typeof displayValue === 'string' && (displayValue.startsWith('http://') || displayValue.startsWith('https://')))) {
+                        const safeUrl = String(displayValue).replace(/'/g, "\\'");
+                        displayValue = `<a href="#" onclick="event.preventDefault(); window.electronAPI.openExternal('${safeUrl}')" style="color: #34d399; text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;"><span>${escHtml(displayValue)}</span> <span style="font-size:0.8rem;">↗</span></a>`;
+                    } else if (Array.isArray(displayValue)) {
+                        if (displayValue.length === 0) {
+                            displayValue = '<em style="color: #6c7086;">Empty</em>';
+                        } else {
+                            displayValue = displayValue.map(item => {
+                                if (item && typeof item === 'object') {
+                                    const title = item.name || item.id || 'Link';
+                                    const note = item.relation_note || item.anchor || '';
+                                    const linkedProj = this._resolveProjectByRef(item.id || item.name);
+                                    if (linkedProj && linkedProj.path) {
+                                        const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                        return `<span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(title)})" style="display:inline-flex; align-items:center; gap:4px; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); color:#c4b5fd; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || title)}${note ? ` <em>(${escHtml(note)})</em>` : ''} ↗</span>`;
+                                    }
+                                    const safeTitle = String(title).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                    return `<span onclick="facetSearch.filterByLineageId('${safeTitle}')" title="Filter table by '${escAttr(title)}'" style="display:inline-block; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.35); padding:1px 6px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(title)}${note ? ` <em style="color:#c4b5fd;">(${escHtml(note)})</em>` : ''} 🔍</span>`;
+                                }
+                                const itemStr = String(item || '').trim();
+                                const linkedProj = this._resolveProjectByRef(itemStr);
+                                if (linkedProj && linkedProj.path && linkedProj.path !== project.path) {
+                                    const safePath = linkedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                    return `<span onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open project: ${escAttr(linkedProj.name)} (${escAttr(itemStr)})" style="display:inline-block; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#7dd3fc; padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">📁 ${escHtml(linkedProj.name || itemStr)} ↗</span>`;
+                                }
+                                const safeItem = itemStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return `<span onclick="facetSearch.filterByLineageId('${safeItem}')" title="Filter table by '${escAttr(itemStr)}'" style="display:inline-block; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:1px 7px; border-radius:10px; margin:2px 3px 2px 0; font-size:0.78rem; cursor:pointer;">${escHtml(itemStr)}</span>`;
+                            }).join(' ');
+                        }
+                    } else if (typeof displayValue === 'object') {
+                        if (window.formatDisplayValue) {
+                            displayValue = escHtml(window.formatDisplayValue(field));
+                        } else {
+                            displayValue = '<pre style="margin: 0; font-size: 0.76rem; white-space: pre-wrap;">' + escHtml(JSON.stringify(displayValue, null, 2)) + '</pre>';
+                        }
+                    } else {
+                        const rawStr = String(displayValue);
+                        const unitStr = (field && field.unit) ? ` ${field.unit}` : '';
+                        if (typeof displayValue === 'string' && window.markdownLite) {
+                            if (type === 'notes' || type === 'markdown' || (type === 'textarea' && rawStr.includes('\n'))) {
+                                displayValue = window.markdownLite.render(rawStr);
+                            } else {
+                                const renderedInline = window.markdownLite.renderInline(rawStr);
+                                const matchedProj = (!rawStr.includes('[[')) ? this._resolveProjectByRef(rawStr) : null;
+                                if (matchedProj && matchedProj.path && matchedProj.path !== project.path) {
+                                    const safePath = matchedProj.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                    const shownText = matchedProj.name && matchedProj.name !== rawStr.trim()
+                                        ? `${escHtml(matchedProj.name)}${escHtml(unitStr)}`
+                                        : `${renderedInline}${escHtml(unitStr)}`;
+                                    displayValue = `${shownText} <span class="facet-lineage-chip" onclick="facetSearch.selectAndInspectProjectByPath('${safePath}')" title="Open matching project: ${escAttr(matchedProj.name)} (${escAttr(rawStr)})" style="display:inline-flex; align-items:center; gap:3px; background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.4); color:#7dd3fc; padding:1px 6px; border-radius:10px; margin-left:4px; font-size:0.74rem; cursor:pointer;">↗ Open</span>`;
+                                } else {
+                                    displayValue = `${renderedInline}${escHtml(unitStr)}`;
+                                }
+                            }
+                        } else {
+                            displayValue = `${escHtml(rawStr)}${escHtml(unitStr)}`;
+                        }
+                    }
+
+                    return `
                 <div style="background: rgba(255,255,255,0.04); padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px;">
                     <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 1px; text-transform: uppercase;">${escHtml(label)}</div>
                     <div style="font-size: 0.84rem; word-break: break-word;">${displayValue}</div>
                 </div>
             `;
-        };
+                };
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // VIEW A: FILE SIDECAR ROW
-        // Order: 1. Project Metadata (collapsible), 2. Sidecar Metadata (flat), 3. Project & Sidecar Info (collapsible)
-        // ═══════════════════════════════════════════════════════════════════════
-        if (isSidecar) {
-            const fileObj = sidecarEntry.file || {};
-            const filePath = sidecarEntry.path || fileObj.path || '';
-            const sidecarPath = sidecarEntry.sidecarPath || rowData._sidecarPath || '';
-            const escapedFilePath = (filePath || sidecarPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const escapedSidecarPath = sidecarPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const escapedProjPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            const fileModStr = fileObj.modified ? new Date(fileObj.modified).toLocaleString() : (sidecarEntry.created ? new Date(sidecarEntry.created).toLocaleString() : '—');
-            const flatMeta = sidecarEntry.flatMeta || {};
+                // ═══════════════════════════════════════════════════════════════════════
+                // VIEW A: FILE SIDECAR ROW
+                // Order: 1. Project Metadata (collapsible), 2. Sidecar Metadata (flat), 3. Project & Sidecar Info (collapsible)
+                // ═══════════════════════════════════════════════════════════════════════
+                if (isSidecar) {
+                    const fileObj = sidecarEntry.file || {};
+                    const filePath = sidecarEntry.path || fileObj.path || '';
+                    const sidecarPath = sidecarEntry.sidecarPath || rowData._sidecarPath || '';
+                    const escapedFilePath = (filePath || sidecarPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const escapedSidecarPath = sidecarPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const escapedProjPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    const fileModStr = fileObj.modified ? new Date(fileObj.modified).toLocaleString() : (sidecarEntry.created ? new Date(sidecarEntry.created).toLocaleString() : '—');
+                    const flatMeta = sidecarEntry.flatMeta || {};
 
-            // 1. Top: Collapsible Project Metadata
-            let projMetaHtml = '';
-            const projMetaSource = (project && project.metadata && Object.keys(project.metadata).length > 0)
-                ? project.metadata
-                : ((sidecarEntry.project_metadata && Object.keys(sidecarEntry.project_metadata).length > 0)
-                    ? sidecarEntry.project_metadata
-                    : (project && project.flatMeta ? project.flatMeta : {}));
+                    // 1. Top: Collapsible Project Metadata
+                    let projMetaHtml = '';
+                    const projMetaSource = (project && project.metadata && Object.keys(project.metadata).length > 0)
+                        ? project.metadata
+                        : ((sidecarEntry.project_metadata && Object.keys(sidecarEntry.project_metadata).length > 0)
+                            ? sidecarEntry.project_metadata
+                            : (project && project.flatMeta ? project.flatMeta : {}));
 
-            if (!projMetaSource || Object.keys(projMetaSource).length === 0) {
-                projMetaHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No project metadata fields found.</div>`;
-            } else {
-                for (const [key, field] of Object.entries(projMetaSource)) {
-                    projMetaHtml += renderMetadataField(key, field);
-                }
-            }
-
-            // 2. Middle: Sidecar Metadata (flat, compact list like Project Metadata Fields)
-            let sidecarFieldsHtml = '';
-            const sidecarEntries = Object.entries(flatMeta).filter(([k, v]) =>
-                !k.startsWith('File.') &&
-                !k.startsWith('System.') &&
-                v !== undefined && v !== null && String(v).trim() !== ''
-            );
-
-            if (sidecarEntries.length > 0) {
-                // Combine *Unit fields onto their corresponding value (e.g. PhysicalSizeX + PhysicalSizeXUnit -> "0.108 µm")
-                const unitMap = new Map();
-                sidecarEntries.forEach(([k, v]) => {
-                    if (k.endsWith('Unit')) {
-                        unitMap.set(k.slice(0, -4), String(v));
+                    if (!projMetaSource || Object.keys(projMetaSource).length === 0) {
+                        projMetaHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No project metadata fields found.</div>`;
+                    } else {
+                        for (const [key, field] of Object.entries(projMetaSource)) {
+                            projMetaHtml += renderMetadataField(key, field);
+                        }
                     }
-                });
 
-                sidecarEntries.forEach(([k, v]) => {
-                    if (k.endsWith('Unit') && flatMeta[k.slice(0, -4)] !== undefined) {
-                        return; // already appended to the base key
+                    // 2. Middle: Sidecar Metadata (flat, compact list like Project Metadata Fields)
+                    let sidecarFieldsHtml = '';
+                    const sidecarEntries = Object.entries(flatMeta).filter(([k, v]) =>
+                        !k.startsWith('File.') &&
+                        !k.startsWith('System.') &&
+                        v !== undefined && v !== null && String(v).trim() !== ''
+                    );
+
+                    if (sidecarEntries.length > 0) {
+                        // Combine *Unit fields onto their corresponding value (e.g. PhysicalSizeX + PhysicalSizeXUnit -> "0.108 µm")
+                        const unitMap = new Map();
+                        sidecarEntries.forEach(([k, v]) => {
+                            if (k.endsWith('Unit')) {
+                                unitMap.set(k.slice(0, -4), String(v));
+                            }
+                        });
+
+                        sidecarEntries.forEach(([k, v]) => {
+                            if (k.endsWith('Unit') && flatMeta[k.slice(0, -4)] !== undefined) {
+                                return; // already appended to the base key
+                            }
+                            const label = this._formatKeyLabel(k);
+                            let valStr = Array.isArray(v) ? v.join(', ') : String(v);
+                            if (unitMap.has(k)) {
+                                valStr = `${valStr} ${unitMap.get(k)}`;
+                            }
+                            sidecarFieldsHtml += renderCompactField(label, valStr);
+                        });
+                    } else {
+                        sidecarFieldsHtml = `<div style="color: #9ca3af; font-style: italic; padding: 8px 0;">No extracted sidecar metadata fields found.</div>`;
                     }
-                    const label = this._formatKeyLabel(k);
-                    let valStr = Array.isArray(v) ? v.join(', ') : String(v);
-                    if (unitMap.has(k)) {
-                        valStr = `${valStr} ${unitMap.get(k)}`;
+
+                    // 3. Bottom: Collapsible Project & Sidecar Info
+                    let sidecarInfoHtml = '';
+                    sidecarInfoHtml += renderCompactField('File Name', fileObj.name || sidecarEntry.name || '—');
+                    sidecarInfoHtml += renderCompactField('Extension', fileObj.extension || flatMeta['File.Extension'] || '—');
+                    sidecarInfoHtml += renderCompactField('File Size', formatBytes(fileObj.size_bytes ?? flatMeta['File.Size']));
+                    sidecarInfoHtml += renderCompactField('Modified', fileModStr);
+                    if (fileObj.relativePath || flatMeta['File.RelativePath']) {
+                        sidecarInfoHtml += renderCompactField('Relative Path', `<span style="font-family:monospace;">${fileObj.relativePath || flatMeta['File.RelativePath']}</span>`);
                     }
-                    sidecarFieldsHtml += renderCompactField(label, valStr);
-                });
-            } else {
-                sidecarFieldsHtml = `<div style="color: #9ca3af; font-style: italic; padding: 8px 0;">No extracted sidecar metadata fields found.</div>`;
-            }
+                    if (filePath) {
+                        sidecarInfoHtml += renderCompactField('File Path', `<span style="font-family:monospace; font-size:0.78rem;">${filePath}</span>`);
+                    }
+                    if (sidecarPath) {
+                        sidecarInfoHtml += renderCompactField('Sidecar JSON Path', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarPath}</span>`);
+                    }
+                    if (project && project.path) {
+                        sidecarInfoHtml += renderCompactField('Project Path', `<span style="font-family:monospace; font-size:0.78rem;">${project.path}</span>`);
+                    }
+                    const parentProjId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
+                    if (parentProjId) {
+                        sidecarInfoHtml += renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${parentProjId}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`);
+                    }
+                    if (sidecarEntry.sidecar_id) {
+                        sidecarInfoHtml += renderCompactField('Sidecar ID', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarEntry.sidecar_id}</span>`);
+                    }
+                    if (sidecarEntry.generated_at) {
+                        sidecarInfoHtml += renderCompactField('Generated At', new Date(sidecarEntry.generated_at).toLocaleString());
+                    }
+                    if (sidecarEntry.generator) {
+                        sidecarInfoHtml += renderCompactField('Generator', `${sidecarEntry.generator}${sidecarEntry.metafold_version ? ` (v${sidecarEntry.metafold_version})` : ''}`);
+                    }
+                    if (Array.isArray(sidecarEntry.inherited_from_summary) && sidecarEntry.inherited_from_summary.length > 0) {
+                        const levelsStr = sidecarEntry.inherited_from_summary.map(lvl => `${lvl.folder || `Level ${lvl.level}`}`).join(' → ');
+                        sidecarInfoHtml += renderCompactField('Inherited Levels (ISA)', levelsStr);
+                    }
 
-            // 3. Bottom: Collapsible Project & Sidecar Info
-            let sidecarInfoHtml = '';
-            sidecarInfoHtml += renderCompactField('File Name', fileObj.name || sidecarEntry.name || '—');
-            sidecarInfoHtml += renderCompactField('Extension', fileObj.extension || flatMeta['File.Extension'] || '—');
-            sidecarInfoHtml += renderCompactField('File Size', formatBytes(fileObj.size_bytes ?? flatMeta['File.Size']));
-            sidecarInfoHtml += renderCompactField('Modified', fileModStr);
-            if (fileObj.relativePath || flatMeta['File.RelativePath']) {
-                sidecarInfoHtml += renderCompactField('Relative Path', `<span style="font-family:monospace;">${fileObj.relativePath || flatMeta['File.RelativePath']}</span>`);
-            }
-            if (filePath) {
-                sidecarInfoHtml += renderCompactField('File Path', `<span style="font-family:monospace; font-size:0.78rem;">${filePath}</span>`);
-            }
-            if (sidecarPath) {
-                sidecarInfoHtml += renderCompactField('Sidecar JSON Path', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarPath}</span>`);
-            }
-            if (project && project.path) {
-                sidecarInfoHtml += renderCompactField('Project Path', `<span style="font-family:monospace; font-size:0.78rem;">${project.path}</span>`);
-            }
-            const parentProjId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
-            if (parentProjId) {
-                sidecarInfoHtml += renderCompactField('Project ID', `<span style="font-family:monospace; font-size:0.75rem;">${parentProjId}</span> <button type="button" class="btn btn-secondary btn-sm mf-copy-btn" data-copy-text="${parentProjId}" style="padding: 0 4px; font-size: 0.65rem;" title="Copy Project ID">📋</button>`);
-            }
-            if (sidecarEntry.sidecar_id) {
-                sidecarInfoHtml += renderCompactField('Sidecar ID', `<span style="font-family:monospace; font-size:0.78rem;">${sidecarEntry.sidecar_id}</span>`);
-            }
-            if (sidecarEntry.generated_at) {
-                sidecarInfoHtml += renderCompactField('Generated At', new Date(sidecarEntry.generated_at).toLocaleString());
-            }
-            if (sidecarEntry.generator) {
-                sidecarInfoHtml += renderCompactField('Generator', `${sidecarEntry.generator}${sidecarEntry.metafold_version ? ` (v${sidecarEntry.metafold_version})` : ''}`);
-            }
-            if (Array.isArray(sidecarEntry.inherited_from_summary) && sidecarEntry.inherited_from_summary.length > 0) {
-                const levelsStr = sidecarEntry.inherited_from_summary.map(lvl => `${lvl.folder || `Level ${lvl.level}`}`).join(' → ');
-                sidecarInfoHtml += renderCompactField('Inherited Levels (ISA)', levelsStr);
-            }
-
-            const html = `
+                    const html = `
                 <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
                     <h3 style="margin: 0 0 5px 0; color: #38bdf8; font-size: 1.05rem; word-break: break-word;">📄 ${sidecarEntry.name || 'File Sidecar'}</h3>
                     ${parentProjId ? `
@@ -4315,58 +4352,58 @@ const facetSearch = {
                 </details>
             `;
 
-            contentArea.innerHTML = html;
-            this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
-            return;
-        }
+                    contentArea.innerHTML = html;
+                    this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
+                    return;
+                }
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // VIEW B: PROJECT ROW
-        // ═══════════════════════════════════════════════════════════════════════
-        const escapedPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        const escapedName = (project.name || 'Project').replace(/'/g, "\\'");
-        const createdStr = project.created ? new Date(project.created).toLocaleString() : '—';
+                // ═══════════════════════════════════════════════════════════════════════
+                // VIEW B: PROJECT ROW
+                // ═══════════════════════════════════════════════════════════════════════
+                const escapedPath = (project.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const escapedName = (project.name || 'Project').replace(/'/g, "\\'");
+                const createdStr = project.created ? new Date(project.created).toLocaleString() : '—';
 
-        // Collect all links (derived_from, downstream, related_to, [[note mentions]]), tags, and note URLs/paths
-        const {
-            upstreamItems,
-            downstreamProjects,
-            relatedItems,
-            tags,
-            extractedNoteLinks
-        } = this._collectProjectLinksAndTags(project);
-        const totalUpstreamCount = upstreamItems.length;
-        const totalDownstreamCount = downstreamProjects.length;
-        const totalRelatedCount = relatedItems.length;
-        const totalTagsCount = tags.length;
-        const hasAnyLinksOrTags = totalUpstreamCount > 0 || totalDownstreamCount > 0 || totalRelatedCount > 0 || totalTagsCount > 0 || extractedNoteLinks.length > 0;
+                // Collect all links (derived_from, downstream, related_to, [[note mentions]]), tags, and note URLs/paths
+                const {
+                    upstreamItems,
+                    downstreamProjects,
+                    relatedItems,
+                    tags,
+                    extractedNoteLinks
+                } = this._collectProjectLinksAndTags(project);
+                const totalUpstreamCount = upstreamItems.length;
+                const totalDownstreamCount = downstreamProjects.length;
+                const totalRelatedCount = relatedItems.length;
+                const totalTagsCount = tags.length;
+                const hasAnyLinksOrTags = totalUpstreamCount > 0 || totalDownstreamCount > 0 || totalRelatedCount > 0 || totalTagsCount > 0 || extractedNoteLinks.length > 0;
 
-        // Extract integration links
-        const { omeroUrl, elabUrl } = this._extractUrls(project);
-        let rspaceUrl = '';
-        if (project.integrations && (project.integrations.rspace || project.integrations.RSpace)) {
-            const r = project.integrations.rspace || project.integrations.RSpace;
-            rspaceUrl = r.url || r.link || '';
-        }
+                // Extract integration links
+                const { omeroUrl, elabUrl } = this._extractUrls(project);
+                let rspaceUrl = '';
+                if (project.integrations && (project.integrations.rspace || project.integrations.RSpace)) {
+                    const r = project.integrations.rspace || project.integrations.RSpace;
+                    rspaceUrl = r.url || r.link || '';
+                }
 
-        // Build Unified "Linked Projects & Tags" Accordion body HTML
-        let lineageBodyHtml = '';
-        if (!hasAnyLinksOrTags) {
-            lineageBodyHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No linked projects, [[note links]], or tags found yet.</div>`;
-        } else {
-            if (totalUpstreamCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em;">⬆️ Derived From (Parent Lineage) (${totalUpstreamCount})</div>`;
-                upstreamItems.forEach(item => {
-                    const targetPath = item.sourcePath || '';
-                    const canOpen = Boolean(targetPath);
-                    const filterQuery = item.id || item.name || '';
-                    const safeSrcPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const rowClickAction = canOpen
-                        ? `facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')`
-                        : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
+                // Build Unified "Linked Projects & Tags" Accordion body HTML
+                let lineageBodyHtml = '';
+                if (!hasAnyLinksOrTags) {
+                    lineageBodyHtml = `<div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No linked projects, [[note links]], or tags found yet.</div>`;
+                } else {
+                    if (totalUpstreamCount > 0) {
+                        lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.03em;">⬆️ Derived From (Parent Lineage) (${totalUpstreamCount})</div>`;
+                        upstreamItems.forEach(item => {
+                            const targetPath = item.sourcePath || '';
+                            const canOpen = Boolean(targetPath);
+                            const filterQuery = item.id || item.name || '';
+                            const safeSrcPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const rowClickAction = canOpen
+                                ? `facetSearch.selectAndInspectProjectByPath('${safeSrcPath}')`
+                                : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
 
-                    lineageBodyHtml += `
+                            lineageBodyHtml += `
                         <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Parent project (${targetPath})` : `Filter by '${escAttr(filterQuery)}'`}">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 <strong>${canOpen ? '📁' : '⚓'} ${escHtml(item.name)}</strong>
@@ -4379,19 +4416,19 @@ const facetSearch = {
                             </span>
                         </div>
                     `;
-                });
-            }
+                        });
+                    }
 
-            if (totalDownstreamCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${totalUpstreamCount > 0 ? '6px' : '0'};">⬇️ Derived Projects (Child Lineage) (${totalDownstreamCount})</div>`;
-                downstreamProjects.forEach(({ project: childProj, viaId }) => {
-                    const targetPath = childProj.path || '';
-                    const canOpen = Boolean(targetPath);
-                    const safeChildPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const filterQuery = childProj.name || viaId || '';
-                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    if (totalDownstreamCount > 0) {
+                        lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${totalUpstreamCount > 0 ? '6px' : '0'};">⬇️ Derived Projects (Child Lineage) (${totalDownstreamCount})</div>`;
+                        downstreamProjects.forEach(({ project: childProj, viaId }) => {
+                            const targetPath = childProj.path || '';
+                            const canOpen = Boolean(targetPath);
+                            const safeChildPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const filterQuery = childProj.name || viaId || '';
+                            const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-                    lineageBodyHtml += `
+                            lineageBodyHtml += `
                         <div class="facet-lineage-link-item" onclick="${canOpen ? `facetSearch.selectAndInspectProjectByPath('${safeChildPath}')` : `facetSearch.filterByLineageId('${safeFilterQuery}')`}" title="Derived child project (${targetPath})">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 <strong>📁 ${escHtml(childProj.name)}</strong>
@@ -4403,22 +4440,22 @@ const facetSearch = {
                             </span>
                         </div>
                     `;
-                });
-            }
+                        });
+                    }
 
-            if (totalRelatedCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount) > 0 ? '6px' : '0'};">🔀 Related Projects (Associative &amp; [[Links]]) (${totalRelatedCount})</div>`;
-                relatedItems.forEach(item => {
-                    const targetPath = item.sourcePath || '';
-                    const canOpen = Boolean(targetPath);
-                    const safeTargetPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const filterQuery = item.id || item.name || '';
-                    const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const rowClickAction = canOpen
-                        ? `facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')`
-                        : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
+                    if (totalRelatedCount > 0) {
+                        lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount) > 0 ? '6px' : '0'};">🔀 Related Projects (Associative &amp; [[Links]]) (${totalRelatedCount})</div>`;
+                        relatedItems.forEach(item => {
+                            const targetPath = item.sourcePath || '';
+                            const canOpen = Boolean(targetPath);
+                            const safeTargetPath = targetPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const filterQuery = item.id || item.name || '';
+                            const safeFilterQuery = String(filterQuery).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            const rowClickAction = canOpen
+                                ? `facetSearch.selectAndInspectProjectByPath('${safeTargetPath}')`
+                                : `facetSearch.filterByLineageId('${safeFilterQuery}')`;
 
-                    lineageBodyHtml += `
+                            lineageBodyHtml += `
                         <div class="facet-lineage-link-item" onclick="${rowClickAction}" title="${canOpen ? `Related project (${targetPath})` : `Filter table by '${escAttr(filterQuery)}'`}">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
                                 <strong>${canOpen ? '📁' : '🔀'} ${escHtml(item.name)}</strong>
@@ -4430,68 +4467,71 @@ const facetSearch = {
                             </span>
                         </div>
                     `;
-                });
-            }
+                        });
+                    }
 
-            if (totalTagsCount > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #2dd4bf; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount + totalRelatedCount) > 0 ? '6px' : '0'};">🏷️ Tags (${totalTagsCount})</div>`;
-                lineageBodyHtml += `<div style="display: flex; flex-wrap: wrap; gap: 5px;">`;
-                tags.forEach(({ tag }) => {
-                    const safeTag = tag.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    lineageBodyHtml += `
+                    if (totalTagsCount > 0) {
+                        lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #2dd4bf; text-transform: uppercase; letter-spacing: 0.03em; margin-top: ${(totalUpstreamCount + totalDownstreamCount + totalRelatedCount) > 0 ? '6px' : '0'};">🏷️ Tags (${totalTagsCount})</div>`;
+                        lineageBodyHtml += `<div style="display: flex; flex-wrap: wrap; gap: 5px;">`;
+                        tags.forEach(({ tag }) => {
+                            const safeTag = tag.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                            lineageBodyHtml += `
                         <span class="facet-tag-chip" onclick="facetSearch.filterByLineageId('${safeTag}')" title="Filter table by tag #${escAttr(tag)}" style="display:inline-flex; align-items:center; gap:4px; background:rgba(13,148,136,0.18); border:1px solid rgba(13,148,136,0.42); color:#2dd4bf; padding:2px 9px; border-radius:12px; font-size:0.78rem; cursor:pointer;">🏷️ #${escHtml(tag)}</span>
                     `;
-                });
-                lineageBodyHtml += `</div>`;
-            }
+                        });
+                        lineageBodyHtml += `</div>`;
+                    }
 
-            if (extractedNoteLinks.length > 0) {
-                lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 6px;">🔗 Web &amp; File Links in Notes (${extractedNoteLinks.length})</div>`;
-                lineageBodyHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
-                extractedNoteLinks.forEach(link => {
-                    if (link.type === 'path') {
-                        lineageBodyHtml += `
+                    if (extractedNoteLinks.length > 0) {
+                        lineageBodyHtml += `<div style="font-size: 0.74rem; font-weight: 600; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 6px;">🔗 Web &amp; File Links in Notes (${extractedNoteLinks.length})</div>`;
+                        lineageBodyHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
+                        extractedNoteLinks.forEach(link => {
+                            if (link.type === 'path') {
+                                lineageBodyHtml += `
                             <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
                                 <span>📁</span>
                                 <a href="#" class="mf-extracted-path-link" data-project-path="${escAttr(link.value)}" style="color: #34d399; text-decoration: underline; word-break: break-all;">${escHtml(link.label)}</a>
                             </div>
                         `;
-                    } else {
-                        lineageBodyHtml += `
+                            } else {
+                                lineageBodyHtml += `
                             <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
                                 <span>↗️</span>
                                 <a href="#" class="mf-extracted-url-link" data-url="${escAttr(link.value)}" style="color: #c4b5fd; text-decoration: underline; word-break: break-all;">${escHtml(link.label)}</a>
                             </div>
                         `;
+                            }
+                        });
+                        lineageBodyHtml += `</div>`;
                     }
-                });
-                lineageBodyHtml += `</div>`;
-            }
-        }
+                }
 
-        // Subtle, compact export bar inside the right-hand Lineage section (in addition to the main header buttons)
-        lineageBodyHtml += `
-            <div style="display: flex; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(139, 92, 246, 0.18);">
+                // Subtle, compact export & visualize bar inside the right-hand Lineage section
+                lineageBodyHtml += `
+            <div style="display: flex; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(139, 92, 246, 0.18); flex-wrap: wrap;">
+                <button class="btn btn-primary" style="flex: 1; font-size: 0.74rem; padding: 4px 8px; background: rgba(139, 92, 246, 0.28); border: 1px solid rgba(139, 92, 246, 0.55); color: #ede9fe;" onclick="facetSearch.visualizeProjectLineage('${escapedPath}')" title="Open interactive clickable Mermaid Lineage Graph focused on this project">
+                    🕸️ View Lineage
+                </button>
                 <button class="btn btn-secondary" style="flex: 1; font-size: 0.74rem; padding: 4px 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.32); color: #6ee7b7;" onclick="window.roCrateManager.exportLineageRoCrate('${escapedPath}')" title="Export this project &amp; its lineage as a FAIR RO-Crate (Direct vs. Full Graph &amp; Metadata vs. Harvest)">
                     📦 RO-Crate...
                 </button>
                 <button class="btn btn-secondary" style="flex: 1; font-size: 0.74rem; padding: 4px 8px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.32); color: #c4b5fd;" onclick="window.exportLineage('${escapedPath}')" title="Export Lineage (HTML/JSON) for this project (Direct vs. Full Graph &amp; Metadata vs. Harvest)">
-                    🕸️ Lineage...
+                    🌐 Export...
                 </button>
             </div>
         `;
 
-        // Build optional collapsible Sidecar Files list at the bottom of Project Details
-        let projectSidecarsHtml = '';
-        const sidecarList = project._sidecarChildren || [];
-        if (sidecarList.length > 0) {
-            let itemsHtml = '';
-            sidecarList.forEach(sc => {
-                const scIdSafe = String(sc.id || sc.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const scFileSafe = String(sc.path || sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const scJsonSafe = String(sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                // Build optional collapsible Sidecar Files list at the bottom of Project Details
+                let projectSidecarsHtml = '';
+                const sidecarList = project._sidecarChildren || [];
+                if (sidecarList.length > 0) {
+                    let itemsHtml = '';
+                    sidecarList.forEach(sc => {
+                        const scIdSafe = String(sc.id || sc.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const scFileSafe = String(sc.path || sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const scJsonSafe = String(sc.sidecarPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-                itemsHtml += `
+                        itemsHtml += `
                     <div class="facet-lineage-link-item" onclick="facetSearch.inspectSidecarById('${escapedPath}', '${scIdSafe}')" title="Click to inspect sidecar metadata for '${sc.name}'">
                         <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             <strong>📄 ${sc.name}</strong>
@@ -4502,9 +4542,9 @@ const facetSearch = {
                         </span>
                     </div>
                 `;
-            });
+                    });
 
-            projectSidecarsHtml = `
+                    projectSidecarsHtml = `
                 <details class="facet-lineage-accordion" style="margin-top: 12px;">
                     <summary title="Sidecar files in this project">
                         <span><span class="accordion-arrow">▶</span>📄 Sidecar Files (${sidecarList.length})</span>
@@ -4514,11 +4554,11 @@ const facetSearch = {
                     </div>
                 </details>
             `;
-        }
+                }
 
-        const projectId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
+                const projectId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
 
-        let html = `
+                let html = `
             <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
                 <h3 style="margin: 0 0 6px 0; color: #a78bfa; font-size: 1.1rem; word-break: break-word;">📁 ${project.name || 'Project'}</h3>
                 ${projectId ? `
@@ -4574,47 +4614,47 @@ const facetSearch = {
             </details>
         `;
 
-        // Render Notes & Observations
-        if (notesMd || notesLog.length > 0 || hypothesis) {
-            html += `
+                // Render Notes & Observations
+                if (notesMd || notesLog.length > 0 || hypothesis) {
+                    html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px 0;">
                     <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa;">📝 Notes &amp; Observations</div>
                     <button type="button" class="btn btn-secondary btn-sm" id="facetBtnAddNoteInline" style="padding: 1px 7px; font-size: 0.72rem; color: #34d399;">➕ Add Note</button>
                 </div>
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px;">
             `;
-            if (hypothesis) {
-                const renderedGoal = window.markdownLite
-                    ? window.markdownLite.renderInline(hypothesis)
-                    : escHtml(hypothesis);
-                html += `
+                    if (hypothesis) {
+                        const renderedGoal = window.markdownLite
+                            ? window.markdownLite.renderInline(hypothesis)
+                            : escHtml(hypothesis);
+                        html += `
                     <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
                         <strong style="color: #c4b5fd; font-size: 0.76rem; text-transform: uppercase;">🎯 Goal:</strong>
                         <div style="font-size: 0.84rem; color: #e5e7eb; margin-top: 2px;">${renderedGoal}</div>
                     </div>
                 `;
-            }
-            if (notesMd) {
-                const renderedMd = window.markdownLite
-                    ? window.markdownLite.render(notesMd, { interactiveTasks: true, taskScope: 'notes_markdown' })
-                    : escHtml(notesMd);
-                html += `
+                    }
+                    if (notesMd) {
+                        const renderedMd = window.markdownLite
+                            ? window.markdownLite.render(notesMd, { interactiveTasks: true, taskScope: 'notes_markdown' })
+                            : escHtml(notesMd);
+                        html += `
                     <div style="font-size: 0.84rem; color: #e5e7eb; margin-bottom: 8px;">${renderedMd}</div>
                 `;
-            }
-            if (notesLog.length > 0) {
-                html += `<div style="display: flex; flex-direction: column; gap: 6px;">`;
-                notesLog.forEach(note => {
-                    const catIcons = { general: '📝', observation: '🔍', deviation: '⚠️', retrospective: '🔁' };
-                    const icon = catIcons[note.category] || '📝';
-                    const catLabel = note.category ? `${icon} ${note.category}` : '';
-                    const catBadge = catLabel ? `<span style="font-size: 0.68rem; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 1px 6px; border-radius: 10px; margin-right: 6px; text-transform: uppercase;">${catLabel}</span>` : '';
-                    const ts = note.timestamp ? new Date(note.timestamp).toLocaleDateString() : '';
-                    const user = note.user ? ` · ${note.user}` : '';
-                    const renderedNote = window.markdownLite
-                        ? window.markdownLite.render(note.text || '', { interactiveTasks: true, taskScope: `note:${note.id}` })
-                        : escHtml(note.text || '');
-                    html += `
+                    }
+                    if (notesLog.length > 0) {
+                        html += `<div style="display: flex; flex-direction: column; gap: 6px;">`;
+                        notesLog.forEach(note => {
+                            const catIcons = { general: '📝', observation: '🔍', deviation: '⚠️', retrospective: '🔁' };
+                            const icon = catIcons[note.category] || '📝';
+                            const catLabel = note.category ? `${icon} ${note.category}` : '';
+                            const catBadge = catLabel ? `<span style="font-size: 0.68rem; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 1px 6px; border-radius: 10px; margin-right: 6px; text-transform: uppercase;">${catLabel}</span>` : '';
+                            const ts = note.timestamp ? new Date(note.timestamp).toLocaleDateString() : '';
+                            const user = note.user ? ` · ${note.user}` : '';
+                            const renderedNote = window.markdownLite
+                                ? window.markdownLite.render(note.text || '', { interactiveTasks: true, taskScope: `note:${note.id}` })
+                                : escHtml(note.text || '');
+                            html += `
                         <div class="mf-note-item" style="font-size: 0.82rem; background: rgba(0,0,0,0.22); border-left: 3px solid #8b5cf6; padding: 6px 8px; border-radius: 4px; position: relative;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                                 <div style="font-size: 0.7rem; color: #9ca3af;">${catBadge}${ts}${user}</div>
@@ -4626,12 +4666,12 @@ const facetSearch = {
                             <div>${renderedNote}</div>
                         </div>
                     `;
-                });
-                html += `</div>`;
-            }
-            html += `</div>`;
-        } else {
-            html += `
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                } else {
+                    html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px 0;">
                     <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa;">📝 Notes &amp; Observations</div>
                     <button type="button" class="btn btn-secondary btn-sm" id="facetBtnAddNoteInline" style="padding: 1px 7px; font-size: 0.72rem; color: #34d399;">➕ Add Note</button>
@@ -4640,30 +4680,30 @@ const facetSearch = {
                     No notes or observations documented yet.
                 </div>
             `;
-        }
+                }
 
-        // Render Metadata Fields
-        html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; margin-bottom: 8px;">📋 Metadata Fields</div>`;
+                // Render Metadata Fields
+                html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; margin-bottom: 8px;">📋 Metadata Fields</div>`;
 
-        const metaSource = project.metadata || project.flatMeta || {};
-        if (!metaSource || Object.keys(metaSource).length === 0) {
-            html += `<div style="color: #9ca3af; font-style: italic; padding: 12px;">No metadata fields found.</div>`;
-        } else {
-            for (const [key, field] of Object.entries(metaSource)) {
-                html += renderMetadataField(key, field);
-            }
-        }
+                const metaSource = project.metadata || project.flatMeta || {};
+                if (!metaSource || Object.keys(metaSource).length === 0) {
+                    html += `<div style="color: #9ca3af; font-style: italic; padding: 12px;">No metadata fields found.</div>`;
+                } else {
+                    for (const [key, field] of Object.entries(metaSource)) {
+                        html += renderMetadataField(key, field);
+                    }
+                }
 
-        html += projectSidecarsHtml;
+                html += projectSidecarsHtml;
 
-        // Render System Information Accordion (Project ID, Paths, Level, etc.)
-        const absPath = project.path || (project.metadata && project.metadata['System.ProjectAbsolutePath']?.value) || '';
-        const relPath = (project.metadata && project.metadata['System.ProjectRelativePath']?.value) || project.relativePath || '';
-        const sysLevel = (project.metadata && project.metadata['System.Level']?.value) || project.level || '';
-        const prevNames = Array.isArray(project.previous_names) && project.previous_names.length > 0 ? project.previous_names.join(', ') : '';
-        const modifiedStr = project.modified || project.updated_at ? new Date(project.modified || project.updated_at).toLocaleString() : '';
+                // Render System Information Accordion (Project ID, Paths, Level, etc.)
+                const absPath = project.path || (project.metadata && project.metadata['System.ProjectAbsolutePath']?.value) || '';
+                const relPath = (project.metadata && project.metadata['System.ProjectRelativePath']?.value) || project.relativePath || '';
+                const sysLevel = (project.metadata && project.metadata['System.Level']?.value) || project.level || '';
+                const prevNames = Array.isArray(project.previous_names) && project.previous_names.length > 0 ? project.previous_names.join(', ') : '';
+                const modifiedStr = project.modified || project.updated_at ? new Date(project.modified || project.updated_at).toLocaleString() : '';
 
-        html += `
+                html += `
             <details class="facet-lineage-accordion" style="margin-top: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px;">
                 <summary style="font-size: 0.8rem; font-weight: 600; color: #9ca3af; cursor: pointer; user-select: none;">
                     <span><span class="accordion-arrow">▶</span>⚙️ System Information</span>
@@ -4679,237 +4719,237 @@ const facetSearch = {
             </details>
         `;
 
-        // Render Changelog Accordion at the very bottom
-        const changelog = Array.isArray(project.changelog) ? project.changelog : (Array.isArray(project.metadata && project.metadata.changelog) ? project.metadata.changelog : []);
-        if (changelog.length > 0) {
-            html += `
+                // Render Changelog Accordion at the very bottom
+                const changelog = Array.isArray(project.changelog) ? project.changelog : (Array.isArray(project.metadata && project.metadata.changelog) ? project.metadata.changelog : []);
+                if (changelog.length > 0) {
+                    html += `
                 <details class="facet-lineage-accordion" style="margin-top: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px;">
                     <summary style="font-size: 0.8rem; font-weight: 600; color: #9ca3af; cursor: pointer; user-select: none;">
                         <span><span class="accordion-arrow">▶</span>🕒 Changelog (${changelog.length})</span>
                     </summary>
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
             `;
-            changelog.forEach(entry => {
-                const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
-                const user = entry.user ? ` · ${window.markdownLite ? window.markdownLite.escapeHtml(entry.user) : entry.user}` : '';
-                let details = '';
-                if (Array.isArray(entry.changes)) {
-                    details = entry.changes.map(c => {
-                        const esc = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
-                        if (c.field === 'notes_log') {
-                            const cat = c.category ? `<span style="font-size:0.68rem; background:rgba(139,92,246,0.25); color:#c4b5fd; padding:1px 6px; border-radius:10px; margin-right:4px; text-transform:uppercase;">${esc(c.category)}</span>` : '';
-                            const textVal = esc(c.text || c.to || '');
-                            if (c.op === 'added' || c.action?.startsWith('Note Added')) {
-                                return `➕ <strong>Note added:</strong> ${cat}"${textVal}"`;
-                            } else if (c.op === 'removed' || c.action === 'Note Removed') {
-                                return `🗑️ <strong>Note removed</strong>${textVal ? `: "${textVal}"` : ''}`;
-                            } else if (c.op === 'modified' || c.action === 'Note Edited') {
-                                const fromVal = esc(c.from || '');
-                                return `✏️ <strong>Note edited:</strong> <s>"${fromVal}"</s> → <strong>"${textVal}"</strong>`;
-                            }
-                            return `📝 <strong>Note:</strong> ${esc(c.action || 'Updated')}`;
+                    changelog.forEach(entry => {
+                        const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+                        const user = entry.user ? ` · ${window.markdownLite ? window.markdownLite.escapeHtml(entry.user) : entry.user}` : '';
+                        let details = '';
+                        if (Array.isArray(entry.changes)) {
+                            details = entry.changes.map(c => {
+                                const esc = (window.markdownLite && window.markdownLite.escapeHtml) || (s => String(s || ''));
+                                if (c.field === 'notes_log') {
+                                    const cat = c.category ? `<span style="font-size:0.68rem; background:rgba(139,92,246,0.25); color:#c4b5fd; padding:1px 6px; border-radius:10px; margin-right:4px; text-transform:uppercase;">${esc(c.category)}</span>` : '';
+                                    const textVal = esc(c.text || c.to || '');
+                                    if (c.op === 'added' || c.action?.startsWith('Note Added')) {
+                                        return `➕ <strong>Note added:</strong> ${cat}"${textVal}"`;
+                                    } else if (c.op === 'removed' || c.action === 'Note Removed') {
+                                        return `🗑️ <strong>Note removed</strong>${textVal ? `: "${textVal}"` : ''}`;
+                                    } else if (c.op === 'modified' || c.action === 'Note Edited') {
+                                        const fromVal = esc(c.from || '');
+                                        return `✏️ <strong>Note edited:</strong> <s>"${fromVal}"</s> → <strong>"${textVal}"</strong>`;
+                                    }
+                                    return `📝 <strong>Note:</strong> ${esc(c.action || 'Updated')}`;
+                                }
+                                if (c.op === 'removed' || c.op === 'deleted') {
+                                    return `🗑️ <code>${esc(c.field)}</code> removed`;
+                                }
+                                if (c.op === 'added') {
+                                    return `➕ <code>${esc(c.field)}</code> added: <strong>${esc(c.to !== undefined ? c.to : '')}</strong>`;
+                                }
+                                if (c.from !== undefined || c.to !== undefined) {
+                                    return `<code>${esc(c.field)}</code>: <s>${esc(c.from !== null && c.from !== undefined ? c.from : 'empty')}</s> → <strong>${esc(c.to !== null && c.to !== undefined ? c.to : 'empty')}</strong>`;
+                                }
+                                if (c.action) {
+                                    return `<code>${esc(c.field || 'Field')}</code>: ${esc(c.action)}`;
+                                }
+                                return `<code>${esc(c.field || 'Field')}</code> updated`;
+                            }).join(', ');
+                        } else if (entry.action) {
+                            details = window.markdownLite ? window.markdownLite.escapeHtml(entry.action) : entry.action;
                         }
-                        if (c.op === 'removed' || c.op === 'deleted') {
-                            return `🗑️ <code>${esc(c.field)}</code> removed`;
-                        }
-                        if (c.op === 'added') {
-                            return `➕ <code>${esc(c.field)}</code> added: <strong>${esc(c.to !== undefined ? c.to : '')}</strong>`;
-                        }
-                        if (c.from !== undefined || c.to !== undefined) {
-                            return `<code>${esc(c.field)}</code>: <s>${esc(c.from !== null && c.from !== undefined ? c.from : 'empty')}</s> → <strong>${esc(c.to !== null && c.to !== undefined ? c.to : 'empty')}</strong>`;
-                        }
-                        if (c.action) {
-                            return `<code>${esc(c.field || 'Field')}</code>: ${esc(c.action)}`;
-                        }
-                        return `<code>${esc(c.field || 'Field')}</code> updated`;
-                    }).join(', ');
-                } else if (entry.action) {
-                    details = window.markdownLite ? window.markdownLite.escapeHtml(entry.action) : entry.action;
-                }
-                html += `
+                        html += `
                     <div style="font-size: 0.78rem; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,0.2);">
                         <div style="font-size: 0.68rem; color: #9ca3af;">${ts}${user}</div>
                         <div>${details}</div>
                     </div>
                 `;
-            });
-            html += `</div></details>`;
-        }
+                    });
+                    html += `</div></details>`;
+                }
 
-        contentArea.innerHTML = html;
-        this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
-    },
+                contentArea.innerHTML = html;
+                this._bindRightPanelInteractiveElements(contentArea, project, notesLog);
+            },
 
     // Show Community Template details inside the exact same docked right panel on row click
     async showTemplatePreview(data) {
-        if (!this.isTemplateHub || !data) return;
-        this.selectedProjectPath = data.path || data._path || null;
+                if (!this.isTemplateHub || !data) return;
+                this.selectedProjectPath = data.path || data._path || null;
 
-        const contentArea = this.openRightPanel('📦 Template Details');
-        if (!contentArea) return;
-        contentArea.innerHTML = '<div style="text-align: center; margin-top: 40px; color: #9ca3af;">Loading Template Details...</div>';
+                const contentArea = this.openRightPanel('📦 Template Details');
+                if (!contentArea) return;
+                contentArea.innerHTML = '<div style="text-align: center; margin-top: 40px; color: #9ca3af;">Loading Template Details...</div>';
 
-        try {
-            const repoPath = data.path || data._path;
-            let templateData = this._templateCache[repoPath];
+                try {
+                    const repoPath = data.path || data._path;
+                    let templateData = this._templateCache[repoPath];
 
-            if (!templateData) {
-                const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
-                const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Fetch failed');
-                templateData = await response.json();
-                this._templateCache[repoPath] = templateData;
-            }
-
-            let html = `<h3 style="margin: 0 0 8px 0; color: #a855f7;">${templateData.name}</h3>`;
-            if (templateData.description) {
-                html += `<p style="color: #9ca3af; font-size: 0.86rem; line-height: 1.4; margin-bottom: 14px;">${templateData.description}</p>`;
-            }
-
-            html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 18px;">📥 Install Template</button>`;
-
-            html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 12px;">Fields &amp; Options</div>`;
-
-            const metadata = templateData.metadata || {};
-            const fieldsObj = metadata.fields || {};
-            const fieldOrder = metadata.fieldOrder || Object.keys(fieldsObj);
-
-            if (fieldOrder.length > 0) {
-                fieldOrder.forEach(fieldId => {
-                    const field = fieldsObj[fieldId];
-                    if (!field) return;
-
-                    if (field.type === 'group') {
-                        html += `<div style="margin-top: 14px; margin-bottom: 8px; font-weight:bold; color:#a855f7; border-bottom:1px solid rgba(168,85,247,0.3); padding-bottom:4px; font-size:0.84rem;">📁 ${field.label || fieldId}</div>`;
-                        return;
+                    if (!templateData) {
+                        const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+                        const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error('Fetch failed');
+                        templateData = await response.json();
+                        this._templateCache[repoPath] = templateData;
                     }
 
-                    html += `<div style="margin-bottom: 10px; background: rgba(0,0,0,0.18); padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">`;
-                    html += `<div style="font-weight:600; font-size:0.85rem;">${field.label || fieldId} <span style="font-size:0.72rem; color:#9ca3af; font-weight:normal; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:5px;">${field.type}</span></div>`;
-
-                    if (field.description) {
-                        html += `<div style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">${field.description}</div>`;
+                    let html = `<h3 style="margin: 0 0 8px 0; color: #a855f7;">${templateData.name}</h3>`;
+                    if (templateData.description) {
+                        html += `<p style="color: #9ca3af; font-size: 0.86rem; line-height: 1.4; margin-bottom: 14px;">${templateData.description}</p>`;
                     }
 
-                    if (field.options && Array.isArray(field.options)) {
-                        html += `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">`;
-                        field.options.forEach(opt => {
-                            html += `<span style="font-size:0.75rem; background:rgba(124,58,237,0.2); color:#d8b4fe; border:1px solid rgba(124,58,237,0.4); padding:2px 8px; border-radius:12px;">${opt}</span>`;
+                    html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 18px;">📥 Install Template</button>`;
+
+                    html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 12px;">Fields &amp; Options</div>`;
+
+                    const metadata = templateData.metadata || {};
+                    const fieldsObj = metadata.fields || {};
+                    const fieldOrder = metadata.fieldOrder || Object.keys(fieldsObj);
+
+                    if (fieldOrder.length > 0) {
+                        fieldOrder.forEach(fieldId => {
+                            const field = fieldsObj[fieldId];
+                            if (!field) return;
+
+                            if (field.type === 'group') {
+                                html += `<div style="margin-top: 14px; margin-bottom: 8px; font-weight:bold; color:#a855f7; border-bottom:1px solid rgba(168,85,247,0.3); padding-bottom:4px; font-size:0.84rem;">📁 ${field.label || fieldId}</div>`;
+                                return;
+                            }
+
+                            html += `<div style="margin-bottom: 10px; background: rgba(0,0,0,0.18); padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">`;
+                            html += `<div style="font-weight:600; font-size:0.85rem;">${field.label || fieldId} <span style="font-size:0.72rem; color:#9ca3af; font-weight:normal; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:5px;">${field.type}</span></div>`;
+
+                            if (field.description) {
+                                html += `<div style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">${field.description}</div>`;
+                            }
+
+                            if (field.options && Array.isArray(field.options)) {
+                                html += `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">`;
+                                field.options.forEach(opt => {
+                                    html += `<span style="font-size:0.75rem; background:rgba(124,58,237,0.2); color:#d8b4fe; border:1px solid rgba(124,58,237,0.4); padding:2px 8px; border-radius:12px;">${opt}</span>`;
+                                });
+                                html += `</div>`;
+                            }
+
+                            html += `</div>`;
                         });
-                        html += `</div>`;
+                    } else {
+                        html += `<div style="color:#9ca3af; font-style:italic;">No fields defined.</div>`;
                     }
 
-                    html += `</div>`;
-                });
-            } else {
-                html += `<div style="color:#9ca3af; font-style:italic;">No fields defined.</div>`;
-            }
+                    if (templateData.structure) {
+                        html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top: 20px; margin-bottom: 12px;">Folder Structure</div>`;
+                        if (window.templateManager && window.templateManager.parseAndRenderFolderTree) {
+                            html += `<div style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); overflow-x: auto;">`;
+                            html += window.templateManager.parseAndRenderFolderTree(templateData.structure);
+                            html += `</div>`;
+                        } else {
+                            html += `<pre style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;">${templateData.structure}</pre>`;
+                        }
+                    }
 
-            if (templateData.structure) {
-                html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top: 20px; margin-bottom: 12px;">Folder Structure</div>`;
-                if (window.templateManager && window.templateManager.parseAndRenderFolderTree) {
-                    html += `<div style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); overflow-x: auto;">`;
-                    html += window.templateManager.parseAndRenderFolderTree(templateData.structure);
-                    html += `</div>`;
-                } else {
-                    html += `<pre style="background: rgba(0,0,0,0.18); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;">${templateData.structure}</pre>`;
+                    contentArea.innerHTML = html;
+                } catch (error) {
+                    contentArea.innerHTML = `<div style="color:#ef4444; padding:20px;">Error loading template details: ${error.message}</div>`;
                 }
-            }
+            },
 
-            contentArea.innerHTML = html;
-        } catch (error) {
-            contentArea.innerHTML = `<div style="color:#ef4444; padding:20px;">Error loading template details: ${error.message}</div>`;
-        }
-    },
+            // Open the facet search modal
+            openModal() {
+                const modal = document.getElementById('facetSearchModal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                    this._initColumnSplitters();
+                }
+            },
 
-    // Open the facet search modal
-    openModal() {
-        const modal = document.getElementById('facetSearchModal');
-        if (modal) {
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            this._initColumnSplitters();
-        }
-    },
+            // Launch File Sidecar Scanner Wizard directly from Facet Search
+            openFileScanner() {
+                this.closeScanOptionsDropdown();
+                this.closeRightPanel();
+                this.closeExportDropdown();
 
-    // Launch File Sidecar Scanner Wizard directly from Facet Search
-    openFileScanner() {
-        this.closeScanOptionsDropdown();
-        this.closeRightPanel();
-        this.closeExportDropdown();
+                // Flag to prevent switchMainTab('discover') from re-opening facet search table
+                window._isLaunchingFileScanner = true;
 
-        // Flag to prevent switchMainTab('discover') from re-opening facet search table
-        window._isLaunchingFileScanner = true;
+                const modal = document.getElementById('facetSearchModal');
+                if (modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+                if (this.tabulatorInstance) {
+                    this._syncColumnStateFromTabulator(true, null);
+                    this.tabulatorInstance.destroy();
+                    this.tabulatorInstance = null;
+                }
+                this.masterData = [];
+                this.activeFilters = {};
+                this.textSearchQuery = '';
+                this._hasFileSidecars = false;
+                this.isTemplateHub = false;
 
-        const modal = document.getElementById('facetSearchModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-        if (this.tabulatorInstance) {
-            this._syncColumnStateFromTabulator(true, null);
-            this.tabulatorInstance.destroy();
-            this.tabulatorInstance = null;
-        }
-        this.masterData = [];
-        this.activeFilters = {};
-        this.textSearchQuery = '';
-        this._hasFileSidecars = false;
-        this.isTemplateHub = false;
+                // Switch main tab to discover and launch wizard
+                if (typeof window.switchMainTab === 'function') {
+                    window.switchMainTab('discover');
+                }
 
-        // Switch main tab to discover and launch wizard
-        if (typeof window.switchMainTab === 'function') {
-            window.switchMainTab('discover');
-        }
+                if (window.fileScanner && typeof window.fileScanner.startWizard === 'function') {
+                    window.fileScanner.startWizard();
+                }
 
-        if (window.fileScanner && typeof window.fileScanner.startWizard === 'function') {
-            window.fileScanner.startWizard();
-        }
-
-        setTimeout(() => {
-            window._isLaunchingFileScanner = false;
-        }, 600);
-    },
+                setTimeout(() => {
+                    window._isLaunchingFileScanner = false;
+                }, 600);
+            },
 
     // Close the facet search modal and clean up Tabulator (prompting to save temporary scan if needed)
     async closeSearch(options = {}) {
-        await this.promptUnsavedScanIfNeeded();
-        this.closeRightPanel();
-        this.closeScanOptionsDropdown();
-        this.closeExportDropdown();
+                await this.promptUnsavedScanIfNeeded();
+                this.closeRightPanel();
+                this.closeScanOptionsDropdown();
+                this.closeExportDropdown();
 
-        const modal = document.getElementById('facetSearchModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-        // Persist current column order, widths, and sorters before destroying Tabulator
-        if (this.tabulatorInstance) {
-            this._syncColumnStateFromTabulator(true, null);
-            this.tabulatorInstance.destroy();
-            this.tabulatorInstance = null;
-        }
-        this.masterData = [];
-        this.activeFilters = {};
-        this.textSearchQuery = '';
-        this._hasFileSidecars = false;
-        this.isTemplateHub = false;
+                const modal = document.getElementById('facetSearchModal');
+                if (modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+                // Persist current column order, widths, and sorters before destroying Tabulator
+                if (this.tabulatorInstance) {
+                    this._syncColumnStateFromTabulator(true, null);
+                    this.tabulatorInstance.destroy();
+                    this.tabulatorInstance = null;
+                }
+                this.masterData = [];
+                this.activeFilters = {};
+                this.textSearchQuery = '';
+                this._hasFileSidecars = false;
+                this.isTemplateHub = false;
 
-        // Return to Create Project tab (unless an explicit action like launching fileScanner or switching to another tab is active)
-        if (!window._isLaunchingFileScanner && !options.skipTabSwitch && typeof window.switchMainTab === 'function') {
-            const targetTab = options.targetTab || 'create';
-            window.switchMainTab(targetTab);
-        }
-    },
+                // Return to Create Project tab (unless an explicit action like launching fileScanner or switching to another tab is active)
+                if (!window._isLaunchingFileScanner && !options.skipTabSwitch && typeof window.switchMainTab === 'function') {
+                    const targetTab = options.targetTab || 'create';
+                    window.switchMainTab(targetTab);
+                }
+            },
 
-    // Close on overlay click (outside modal window)
-    handleOverlayClick(event) {
-        if (event.target === document.getElementById('facetSearchModal')) {
-            this.closeSearch();
-        }
-    }
-};
+            // Close on overlay click (outside modal window)
+            handleOverlayClick(event) {
+                if (event.target === document.getElementById('facetSearchModal')) {
+                    this.closeSearch();
+                }
+            }
+        };
 
-// Export to window
-window.facetSearch = facetSearch;
+        // Export to window
+        window.facetSearch = facetSearch;

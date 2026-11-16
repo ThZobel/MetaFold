@@ -1,9 +1,10 @@
-// Knowledge Graph with 3 Views (Bundling, Folder Tree, Arc)
+// Knowledge Graph with 4 Views (Bundling, Folder Tree, Arc, Lineage Tree)
 class MetaFoldKnowledgeGraph {
     constructor(containerId) {
         this.containerId = containerId;
         this.container = document.getElementById(containerId);
-        this.currentView = 'bundling'; // default view
+        const selector = document.getElementById('kg-view-selector');
+        this.currentView = (selector && selector.value) ? selector.value : 'bundling';
     }
 
     render(data) {
@@ -16,35 +17,14 @@ class MetaFoldKnowledgeGraph {
             return;
         }
 
-        this.container.innerHTML = `
-            <div style="height: 100%; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div>
-                        <h4 style="margin: 0; color: #e0e0e0; font-size: 16px;">🌌 Knowledge Graph</h4>
-                        <p style="margin: 2px 0 0 0; color: #9ca3af; font-size: 12px;" id="kg-view-desc">Physical folder structure and logical lineage</p>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div id="kg-tree-actions" style="display: ${this.currentView === 'tree' ? 'flex' : 'none'}; gap: 5px; margin-right: 15px;">
-                            <button id="kg-btn-expand" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 12px; background: #374151; color: #fff; border: 1px solid #4b5563; cursor: pointer;">Expand All</button>
-                            <button id="kg-btn-collapse" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 12px; background: #374151; color: #fff; border: 1px solid #4b5563; cursor: pointer;">Collapse All</button>
-                        </div>
-                        <span style="color: #9ca3af; font-size: 13px;">View Mode:</span>
-                        <select id="kg-view-selector" class="form-control" style="background: #374151; color: #fff; border: 1px solid #4b5563; border-radius: 4px; padding: 6px 12px; font-size: 13px; cursor: pointer; outline: none;">
-                            <option value="bundling" ${this.currentView === 'bundling' ? 'selected' : ''}>Combined Graph (Hierarchical Edge Bundling)</option>
-                            <option value="tree" ${this.currentView === 'tree' ? 'selected' : ''}>Project Structure (Folder Hierarchy)</option>
-                            <option value="arc" ${this.currentView === 'arc' ? 'selected' : ''}>Chronological Lineage (Arc Diagram)</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="kg-svg-container" style="flex: 1; position: relative; overflow: hidden; background: #111827;"></div>
-            </div>
-        `;
-
         const selector = document.getElementById('kg-view-selector');
-        selector.addEventListener('change', (e) => {
-            this.currentView = e.target.value;
-            this.drawView();
-        });
+        if (selector) {
+            selector.value = this.currentView;
+            selector.onchange = (e) => {
+                this.currentView = e.target.value;
+                this.drawView();
+            };
+        }
 
         this.drawView();
     }
@@ -122,22 +102,37 @@ class MetaFoldKnowledgeGraph {
     }
 
     drawView() {
+        const descEl = document.getElementById('vizSubtitle') || document.getElementById('kg-view-desc');
+        const actionDiv = document.getElementById('kg-tree-actions');
+        const kgActionBar = document.getElementById('kg-action-bar');
+        const lineageActionBar = document.getElementById('lineage-action-bar');
+
+        if (actionDiv) actionDiv.style.display = this.currentView === 'tree' ? 'flex' : 'none';
+        if (kgActionBar) kgActionBar.innerHTML = '';
+        if (lineageActionBar) lineageActionBar.innerHTML = '';
+
+        if (this.currentView === 'lineagetree') {
+            if (descEl) descEl.textContent = 'Collapsible Data Lineage Tree (Click nodes to expand/collapse or inspect)';
+            if (window.renderMetaFoldLineageTree) {
+                window.renderMetaFoldLineageTree(this.containerId, this.data);
+            } else {
+                this.container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af;">Lineage Tree module not loaded.</div>';
+            }
+            return;
+        }
+
+        this.container.innerHTML = `<div id="kg-svg-container" style="width: 100%; height: 100%; position: relative; overflow: hidden; background: #111827;"></div>`;
         const svgContainer = document.getElementById('kg-svg-container');
         if (!svgContainer) return;
-        svgContainer.innerHTML = '';
-        
-        const descEl = document.getElementById('kg-view-desc');
-        const actionDiv = document.getElementById('kg-tree-actions');
-        if (actionDiv) actionDiv.style.display = this.currentView === 'tree' ? 'flex' : 'none';
 
         if (this.currentView === 'bundling') {
-            if(descEl) descEl.innerText = "Folder hierarchy mapped circularly, lineage shown as central curves";
+            if (descEl) descEl.textContent = 'Folder hierarchy mapped circularly, lineage shown as central curves';
             this.drawEdgeBundling(svgContainer);
         } else if (this.currentView === 'tree') {
-            if(descEl) descEl.innerText = "Interactive folder structure (Click to expand/collapse)";
+            if (descEl) descEl.textContent = 'Interactive folder structure (Click to expand/collapse)';
             this.drawCollapsibleTree(svgContainer);
         } else if (this.currentView === 'arc') {
-            if(descEl) descEl.innerText = "Chronological project timeline with lineage arcs";
+            if (descEl) descEl.textContent = 'Chronological project timeline with lineage arcs';
             this.drawArcDiagram(svgContainer);
         }
     }

@@ -4,35 +4,29 @@
 const visualizationManager = {
     initialized: false,
     currentData: null,
-    currentVisualizationType: 'knowledgegraph', // Default to Knowledge Graph
+    currentVisualizationType: 'mermaidlineage', // Default to interactive Mermaid Lineage Graph
     usesFallback: false,
     activeFilters: null, // Store active filters from search
 
 
     // Available visualization types
     visualizationTypes: {
-        dashboard: {
-            name: 'Analytics Dashboard',
-            icon: '📊',
-            description: 'D3.js charts for metadata analysis',
-            requiresLibrary: 'd3'
-        },
-        lineagetree: {
-            name: 'Lineage Tree',
-            icon: '??',
-            description: 'D3.js hierarchical tree',
-            requiresLibrary: 'd3'
+        mermaidlineage: {
+            name: 'Lineage Graph',
+            icon: '🕸️',
+            description: 'Interactive clickable Mermaid project lineage flowchart',
+            requiresLibrary: null
         },
         knowledgegraph: {
             name: 'Knowledge Graph',
             icon: '🌌',
-            description: 'D3.js semantic graph',
+            description: 'D3.js semantic graph & collapsible trees',
             requiresLibrary: 'd3'
         },
-        metadatatree: {
-            name: 'Metadata Tree',
-            icon: '🏷️',
-            description: 'Legacy metadata graph',
+        dashboard: {
+            name: 'Analytics Dashboard',
+            icon: '📊',
+            description: 'D3.js charts for metadata analysis',
             requiresLibrary: 'd3'
         },
         tree: {
@@ -42,6 +36,12 @@ const visualizationManager = {
             requiresLibrary: null
         }
     },
+
+    mermaidRootPath: null,
+    mermaidInspectedPath: null,
+    mermaidHistory: [],
+    mermaidScope: 'direct',
+    mermaidShowRelated: true,
 
     // Initialize the visualization manager
     init() {
@@ -84,14 +84,12 @@ const visualizationManager = {
     // Get available visualization types based on loaded libraries
     getAvailableTypes() {
         const availability = this.checkAvailableLibraries();
-        const availableTypes = [];
+        const availableTypes = ['mermaidlineage'];
 
         // D3.js availability
         if (availability.d3) {
-            availableTypes.push('dashboard');
-            availableTypes.push('lineagetree');
             availableTypes.push('knowledgegraph');
-            availableTypes.push('metadatatree');
+            availableTypes.push('dashboard');
         }
 
         // Tree view always available
@@ -102,20 +100,26 @@ const visualizationManager = {
 
     // Set the current visualization type
     setVisualizationType(type) {
+        if (type === 'lineagetree') {
+            type = 'knowledgegraph';
+            const kgSel = document.getElementById('kg-view-selector');
+            if (kgSel) kgSel.value = 'lineagetree';
+        }
+        if (type === 'metadatatree') {
+            type = 'knowledgegraph';
+        }
+
         const availableTypes = this.getAvailableTypes();
 
         if (!availableTypes.includes(type)) {
             console.warn(`⚠️ Visualization type "${type}" not available. Available: ${availableTypes.join(', ')}`);
-            // Fallback to first available type
             type = availableTypes[0] || 'tree';
         }
-
-        // ENHANCED: Cleanup previous visualization
 
         this.currentVisualizationType = type;
         console.log(`📊 Visualization type set to: ${type}`);
 
-        // Update UI buttons
+        // Update UI buttons & context controls
         this.updateVisualizationTypeButtons();
 
         // Re-render current data if available
@@ -128,7 +132,6 @@ const visualizationManager = {
     updateVisualizationTypeButtons() {
         const availableTypes = this.getAvailableTypes();
 
-        // Update button states
         Object.keys(this.visualizationTypes).forEach(type => {
             const button = document.getElementById(type + 'TypeBtn');
             if (button) {
@@ -143,6 +146,30 @@ const visualizationManager = {
                 }
             }
         });
+
+        const isKG = this.currentVisualizationType === 'knowledgegraph';
+        const isMermaid = this.currentVisualizationType === 'mermaidlineage';
+
+        const kgWrap = document.getElementById('kg-view-selector-wrap');
+        if (kgWrap) kgWrap.style.display = isKG ? 'flex' : 'none';
+
+        const mermaidControls = document.getElementById('mermaid-lineage-controls');
+        if (mermaidControls) mermaidControls.style.display = isMermaid ? 'flex' : 'none';
+
+        const kgTreeActions = document.getElementById('kg-tree-actions');
+        if (kgTreeActions) {
+            const kgSel = document.getElementById('kg-view-selector');
+            kgTreeActions.style.display = (isKG && kgSel && kgSel.value === 'tree') ? 'flex' : 'none';
+        }
+
+        const kgActionBar = document.getElementById('kg-action-bar');
+        if (kgActionBar && !isKG) kgActionBar.innerHTML = '';
+
+        const lineageActionBar = document.getElementById('lineage-action-bar');
+        if (lineageActionBar && !isKG) lineageActionBar.innerHTML = '';
+
+        const folderLabel = document.getElementById('showFolderLinksLabel');
+        if (folderLabel) folderLabel.style.display = (isKG || isMermaid) ? 'flex' : 'none';
     },
 
     renderActiveFilters() {
@@ -332,32 +359,65 @@ const visualizationManager = {
     },
 
     // NEW: Visualize filtered projects from Facet Search
-    visualizeFilteredProjects(filteredProjects, filters) {
+    visualizeFilteredProjects(filteredProjects, filters, options = {}) {
         try {
             console.log(`📁 Visualizing ${filteredProjects.length} filtered projects...`, filters);
 
-            // Rebuild the network data using ONLY the filtered projects
-            // We use the global statistics if available since statistics are overall
             const statistics = window.projectScanner ? window.projectScanner.statistics : {};
+            const poolProjects = Array.isArray(options.fullProjectPool) && options.fullProjectPool.length > 0
+                ? options.fullProjectPool
+                : filteredProjects;
 
-            const visualizationData = this.createProjectNetworkData(filteredProjects, statistics);
+            const visualizationData = this.createProjectNetworkData(poolProjects, statistics);
 
             this.currentData = visualizationData;
             this.activeFilters = filters;
 
-            // Set type to knowledge graph if currently on an incompatible view
-            if (this.currentVisualizationType === 'dashboard' || this.currentVisualizationType === 'jsoncrack') {
-                this.currentVisualizationType = 'knowledgegraph';
+            if (Object.prototype.hasOwnProperty.call(options, 'rootProjectPath')) {
+                this.mermaidRootPath = options.rootProjectPath || null;
+                this.mermaidInspectedPath = this.mermaidRootPath;
+                this.mermaidHistory = [];
+            } else if (filteredProjects.length === 1 && filteredProjects[0]?.path) {
+                this.mermaidRootPath = filteredProjects[0].path;
+                this.mermaidInspectedPath = this.mermaidRootPath;
+                this.mermaidHistory = [];
+            } else {
+                this.mermaidRootPath = null;
+                this.mermaidInspectedPath = null;
+                this.mermaidHistory = [];
             }
 
-            this.renderVisualization(visualizationData);
-            this.updateVisualizationTypeButtons();
+            if (options.preferredView) {
+                this.currentVisualizationType = options.preferredView;
+            } else if (filteredProjects.length === 1) {
+                this.currentVisualizationType = 'mermaidlineage';
+            } else if (this.currentVisualizationType === 'dashboard' || this.currentVisualizationType === 'jsoncrack') {
+                this.currentVisualizationType = 'mermaidlineage';
+            }
 
-            this.showSuccess(`Visualizing subset of ${filteredProjects.length} projects`);
+            this.updateVisualizationTypeButtons();
+            this.renderVisualization(visualizationData);
+
+            this.showSuccess(this.mermaidRootPath
+                ? `Visualizing lineage for "${poolProjects.find(p => p.path === this.mermaidRootPath)?.name || 'project'}"`
+                : `Loaded ${filteredProjects.length} projects — select a project for Mermaid Lineage`);
         } catch (error) {
             console.error('❌ Error visualizing filtered projects:', error);
             this.showError('Error: ' + error.message);
         }
+    },
+
+    // Open interactive Mermaid Lineage view focused on a specific project
+    visualizeProjectLineage(projectPath, allProjects = null) {
+        const pool = (Array.isArray(allProjects) && allProjects.length > 0)
+            ? allProjects
+            : (window.projectScanner?.projects || window.facetSearch?.masterData || []);
+        const target = pool.find(p => p.path === projectPath) || null;
+        this.visualizeFilteredProjects(target ? [target] : pool, {}, {
+            preferredView: 'mermaidlineage',
+            rootProjectPath: projectPath,
+            fullProjectPool: pool
+        });
     },
 
     focusNode(nodeId) {
@@ -582,18 +642,21 @@ const visualizationManager = {
 
             // Route to appropriate visualization method
             switch (this.currentVisualizationType) {
+                case 'mermaidlineage':
+                    this.renderMermaidLineageVisualization(data);
+                    break;
                 case 'dashboard':
                     this.renderDashboardVisualization(data);
                     break;
                 case 'tree':
                     this.renderTreeVisualization(data);
                     break;
-                case 'lineagetree':
-                    this.renderLineageTreeVisualization(data);
+                case 'lineagetree': {
+                    const kgSel = document.getElementById('kg-view-selector');
+                    if (kgSel) kgSel.value = 'lineagetree';
+                    this.renderKnowledgeGraphVisualization(data);
                     break;
-                case 'metadatatree':
-                    this.renderMetadataTreeVisualization(data);
-                    break;
+                }
                 case 'knowledgegraph':
                     this.renderKnowledgeGraphVisualization(data);
                     break;
@@ -888,17 +951,13 @@ const visualizationManager = {
             </div>
         `).join('');
 
+        const subtitleEl = document.getElementById('vizSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = `Analytics Dashboard — ${isProjectData ? totalProjects + ' projects' : 'template metadata'}`;
+        }
+
         container.innerHTML = `
-            <div style="height: 100vh; display: flex; flex-direction: column; min-height: 600px; background-color: #1e1e2e;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(59,130,246,0.05)); flex-shrink: 0;">
-                    <div>
-                        <h4 style="margin: 0; color: #e0e0e0; font-size: 18px;">📊 Metadata Analytics Dashboard</h4>
-                        <p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 12px;">Visual insights into your ${isProjectData ? totalProjects + ' scanned projects' : 'template metadata'}</p>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()" title="Copy JSON">📋 Copy JSON</button>
-                    </div>
-                </div>
+            <div style="height: 100%; display: flex; flex-direction: column; background-color: #1e1e2e;">
                 <div style="flex: 1; overflow-y: auto; padding: 20px; position: relative;" id="dashboardScrollContainer">
                     ${!isProjectData ? `
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">
@@ -1367,24 +1426,15 @@ const visualizationManager = {
             return;
         }
 
+        const subtitleEl = document.getElementById('vizSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = 'Collapsible JSON Tree structure';
+        }
+
         container.innerHTML = `
-            <div style="height: 100vh; display: flex; flex-direction: column; min-height: 600px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); flex-shrink: 0;">
-                    <div>
-                        <h4 style="margin: 0; color: #e0e0e0;">🌳 Tree View</h4>
-                        <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 12px;">Collapsible tree structure of your JSON data</p>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()" title="Copy JSON">
-                            📋 Copy
-                        </button>
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()" title="Export">
-                            💾 Export
-                        </button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow: auto; position: relative; min-height: 500px;">
-                    <div id="jsonTreeView" style="height: 100%; overflow: auto; padding: 20px; min-height: 500px;">
+            <div style="height: 100%; display: flex; flex-direction: column;">
+                <div style="flex: 1; overflow: auto; position: relative;">
+                    <div id="jsonTreeView" style="height: 100%; overflow: auto; padding: 20px;">
                         ${this.createJsonTreeHTML(data)}
                     </div>
                 </div>
@@ -1817,21 +1867,15 @@ const visualizationManager = {
             return;
         }
 
+        const subtitleEl = document.getElementById('vizSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = 'Knowledge Graph — choose layout mode in the dropdown';
+        }
+
         container.innerHTML = `
-            <div style="height: 100vh; display: flex; flex-direction: column; min-height: 600px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05)); flex-shrink: 0;">
-                    <div>
-                        <h4 style="margin: 0; color: #e0e0e0;">🌌 Knowledge Graph</h4>
-                        <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 12px;">Hierarchical tree: Metadata Categories → Values → Projects &nbsp;|&nbsp; Scroll to zoom, drag to pan, click nodes to collapse</p>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <div id="kg-action-bar" style="display: flex; gap: 10px; align-items: center;"></div>
-                        <div id="kgLegend" style="display: flex; gap: 12px; font-size: 11px; color: #9ca3af;"></div>
-                        <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()" title="Copy JSON">📋 Copy</button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow: hidden; position: relative; min-height: 500px;">
-                    <div id="knowledgeGraphContainer" style="width: 100%; height: 100%; min-height: 500px;"></div>
+            <div style="height: 100%; display: flex; flex-direction: column;">
+                <div style="flex: 1; overflow: hidden; position: relative;">
+                    <div id="knowledgeGraphContainer" style="width: 100%; height: 100%;"></div>
                 </div>
             </div>
         `;
@@ -1843,16 +1887,13 @@ const visualizationManager = {
     renderLineageTreeVisualization(data) {
         const container = document.getElementById('visualizationContent');
         if (!container) return;
-        container.innerHTML = `<div style="height: 100vh; display: flex; flex-direction: column; min-height: 600px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); flex-shrink: 0;">
-                <div>
-                    <h4 style="margin: 0; color: #e0e0e0;">🌱 Lineage Tree</h4>
-                    <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 12px;">Collapsible Data Lineage</p>
-                </div>
-                <div id="lineage-action-bar" style="display:flex; gap:10px;"></div>
-            </div>
-            <div style="flex: 1; overflow: hidden; position: relative; min-height: 500px;">
-                <div id="lineageTreeContainer" style="width: 100%; height: 100%; min-height: 500px;"></div>
+        const subtitleEl = document.getElementById('vizSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = 'Collapsible Data Lineage Tree';
+        }
+        container.innerHTML = `<div style="height: 100%; display: flex; flex-direction: column;">
+            <div style="flex: 1; overflow: hidden; position: relative;">
+                <div id="lineageTreeContainer" style="width: 100%; height: 100%;"></div>
             </div>
         </div>`;
         setTimeout(() => {
@@ -1870,6 +1911,605 @@ const visualizationManager = {
             window.renderMetaFoldKnowledgeGraph('knowledgeGraphContainer', data);
         } else {
             console.error('Knowledge Graph module not loaded!');
+        }
+    },
+
+    // =================== INTERACTIVE MERMAID LINEAGE VIEW ===================
+
+    async renderMermaidLineageVisualization(data) {
+        const container = document.getElementById('visualizationContent');
+        if (!container) return;
+
+        const projects = Array.isArray(data?.projects) && data.projects.length > 0
+            ? data.projects
+            : (window.projectScanner?.projects || []);
+
+        if (!projects || projects.length === 0) {
+            container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af;">No projects loaded for Mermaid Lineage visualization.</div>';
+            return;
+        }
+
+        // Resolve root project only if explicitly chosen (or single project)
+        let rootProject = this.mermaidRootPath
+            ? projects.find(p => p.path === this.mermaidRootPath)
+            : null;
+        if (!rootProject && projects.length === 1) {
+            rootProject = projects[0];
+            this.mermaidRootPath = rootProject.path;
+        }
+
+        // Populate & bind unified header controls
+        const rootSelect = document.getElementById('mermaidRootSelect');
+        if (rootSelect) {
+            const placeholderOpt = `<option value="" ${!rootProject ? 'selected' : ''}>-- Projekt auswählen --</option>`;
+            rootSelect.innerHTML = placeholderOpt + projects.map(p => {
+                const selected = rootProject && p.path === rootProject.path ? 'selected' : '';
+                return `<option value="${this.escapeHtml(p.path)}" ${selected}>📁 ${this.escapeHtml(p.name || p.displayName || p.path)}</option>`;
+            }).join('');
+            rootSelect.style.borderColor = !rootProject ? '#f59e0b' : 'rgba(139,92,246,0.35)';
+            rootSelect.onchange = () => {
+                if (rootSelect.value) {
+                    this._focusMermaidRoot(rootSelect.value, data);
+                } else {
+                    this.mermaidRootPath = null;
+                    this.renderMermaidLineageVisualization(data);
+                }
+            };
+        }
+
+        const scopeSelect = document.getElementById('mermaidScopeSelect');
+        if (scopeSelect) {
+            scopeSelect.value = this.mermaidScope || 'direct';
+            scopeSelect.onchange = () => {
+                this.mermaidScope = scopeSelect.value;
+                this.renderMermaidLineageVisualization(data);
+            };
+        }
+
+        const relatedToggle = document.getElementById('mermaidRelatedToggle');
+        if (relatedToggle) {
+            relatedToggle.checked = this.mermaidShowRelated !== false;
+            relatedToggle.onchange = () => {
+                this.mermaidShowRelated = relatedToggle.checked;
+                this.renderMermaidLineageVisualization(data);
+            };
+        }
+
+        if (!rootProject) {
+            const subtitleEl = document.getElementById('vizSubtitle');
+            if (subtitleEl) {
+                subtitleEl.textContent = 'Kein Projekt ausgewählt — bitte ein Startprojekt für den Lineage-Graph wählen';
+            }
+
+            // Sort projects with lineage links first so user can click right away
+            const sortedPicks = [...projects].sort((a, b) => {
+                const aHas = ((a.lineage?.lineage_links?.length || 0) + (a.lineage?.related_links?.length || 0)) > 0 ? 1 : 0;
+                const bHas = ((b.lineage?.lineage_links?.length || 0) + (b.lineage?.related_links?.length || 0)) > 0 ? 1 : 0;
+                return bHas - aHas;
+            });
+
+            container.innerHTML = `
+                <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #111827; padding: 28px; overflow-y: auto;">
+                    <div style="max-width: 620px; width: 100%; background: rgba(30, 30, 46, 0.92); border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 12px; padding: 24px; box-shadow: 0 12px 32px rgba(0,0,0,0.45); text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🕸️</div>
+                        <h4 style="margin: 0 0 8px 0; color: #fef08a; font-size: 1.08rem;">Bitte zuerst ein Projekt auswählen</h4>
+                        <p style="margin: 0 0 16px 0; color: #cbd5e1; font-size: 0.85rem; line-height: 1.45;">
+                            In der Facet Search wurde noch kein einzelnes Projekt markiert. Wähle ein Startprojekt oben im Dropdown oder direkt hier aus, um dessen klickbaren Mermaid-Lineage-Graphen zu öffnen:
+                        </p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 240px; overflow-y: auto; padding: 6px;">
+                            ${sortedPicks.slice(0, 30).map(p => {
+                const linkCount = (p.lineage?.lineage_links?.length || 0) + (p.lineage?.related_links?.length || 0);
+                const safePathJs = String(p.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return `<button type="button" class="btn btn-secondary btn-sm" onclick="visualizationManager.mermaidRootPath='${safePathJs}'; visualizationManager.renderMermaidLineageVisualization(visualizationManager.currentData);" style="padding: 5px 10px; font-size: 0.78rem; border-color: ${linkCount > 0 ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.16)'}; color: ${linkCount > 0 ? '#6ee7b7' : '#e2e8f0'};">📁 ${this.escapeHtml(p.displayName || p.name)}${linkCount > 0 ? ` (${linkCount})` : ''}</button>`;
+            }).join('')}
+                        </div>
+                        <div style="margin-top: 16px; display: flex; justify-content: center; gap: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="window.switchMainTab?.('discover'); window.facetSearch?.openModal?.();" style="padding: 5px 12px; font-size: 0.8rem;">
+                                🔍 Zurück zur Facet Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        this.mermaidRootPath = rootProject.path;
+
+        const subtitleEl = document.getElementById('vizSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = `Mermaid Lineage focused on "${rootProject.name || rootProject.displayName}" — click any node to focus & open`;
+        }
+
+        const showRelated = this.mermaidShowRelated !== false;
+        const scope = this.mermaidScope || 'direct';
+
+        // Build ancestor/descendant/connected sets
+        const projByPath = new Map();
+        projects.forEach(p => { if (p && p.path) projByPath.set(p.path, p); });
+
+        const ancestorsSet = new Set();
+        const descendantsSet = new Set();
+
+        const collectAncestors = (proj) => {
+            if (!proj || ancestorsSet.has(proj.path)) return;
+            ancestorsSet.add(proj.path);
+            (proj.lineage?.lineage_links || []).forEach(l => {
+                const parent = projByPath.get(l.source_path);
+                if (parent) collectAncestors(parent);
+            });
+        };
+
+        const collectDescendants = (proj) => {
+            if (!proj || descendantsSet.has(proj.path)) return;
+            descendantsSet.add(proj.path);
+            projects.forEach(child => {
+                if (child.lineage?.lineage_links?.some(l => l.source_path === proj.path)) {
+                    collectDescendants(child);
+                }
+            });
+        };
+
+        collectAncestors(rootProject);
+        collectDescendants(rootProject);
+        const directSet = new Set([...ancestorsSet, ...descendantsSet]);
+
+        const graphSet = new Set(directSet);
+        if (scope === 'full') {
+            const visitFull = (proj) => {
+                if (!proj || graphSet.has(proj.path)) return;
+                graphSet.add(proj.path);
+                (proj.lineage?.lineage_links || []).forEach(l => {
+                    const parent = projByPath.get(l.source_path);
+                    if (parent) visitFull(parent);
+                });
+                projects.forEach(child => {
+                    if (child.lineage?.lineage_links?.some(l => l.source_path === proj.path)) {
+                        visitFull(child);
+                    }
+                });
+                if (showRelated) {
+                    (proj.lineage?.related_links || []).forEach(rl => {
+                        const target = projByPath.get(rl.target_path);
+                        if (target) visitFull(target);
+                    });
+                    projects.forEach(other => {
+                        if (other.lineage?.related_links?.some(rl => rl.target_path === proj.path)) {
+                            visitFull(other);
+                        }
+                    });
+                }
+            };
+            // Seed full traversal from direct lineage nodes
+            Array.from(directSet).forEach(pPath => {
+                const p = projByPath.get(pPath);
+                if (p) {
+                    (p.lineage?.lineage_links || []).forEach(l => visitFull(projByPath.get(l.source_path)));
+                    projects.forEach(child => {
+                        if (child.lineage?.lineage_links?.some(l => l.source_path === p.path)) visitFull(child);
+                    });
+                    if (showRelated) {
+                        (p.lineage?.related_links || []).forEach(rl => visitFull(projByPath.get(rl.target_path)));
+                        projects.forEach(other => {
+                            if (other.lineage?.related_links?.some(rl => rl.target_path === p.path)) visitFull(other);
+                        });
+                    }
+                }
+            });
+        } else if (showRelated) {
+            // In Direct scope, include 1-hop related_to neighbors of direct nodes
+            Array.from(directSet).forEach(pPath => {
+                const p = projByPath.get(pPath);
+                if (!p) return;
+                (p.lineage?.related_links || []).forEach(rl => {
+                    if (rl.target_path && projByPath.has(rl.target_path)) graphSet.add(rl.target_path);
+                });
+                projects.forEach(other => {
+                    if (other.lineage?.related_links?.some(rl => rl.target_path === p.path)) {
+                        graphSet.add(other.path);
+                    }
+                });
+            });
+        }
+
+        const subProjects = Array.from(graphSet).map(p => projByPath.get(p)).filter(Boolean);
+        const nodeIdByPath = new Map();
+        const projByNodeId = new Map();
+        subProjects.forEach((p, idx) => {
+            const nid = `mf_node_${idx}`;
+            nodeIdByPath.set(p.path, nid);
+            projByNodeId.set(nid, p);
+        });
+
+        // Build Mermaid flowchart with high-contrast colors per relationship type
+        let mermaidDef = 'graph TD;\n';
+        mermaidDef += '    classDef root fill:#f59e0b,stroke:#fef08a,stroke-width:3px,color:#111827,font-weight:bold;\n';
+        mermaidDef += '    classDef direct fill:#059669,stroke:#6ee7b7,stroke-width:2px,color:#ffffff,font-weight:500;\n';
+        mermaidDef += '    classDef related fill:#db2777,stroke:#f9a8d4,stroke-width:2px,stroke-dasharray:5 3,color:#ffffff;\n';
+        mermaidDef += '    classDef indirect fill:#334155,stroke:#64748b,stroke-width:1px,color:#e2e8f0;\n\n';
+
+        subProjects.forEach(p => {
+            const nid = nodeIdByPath.get(p.path);
+            const rawLabel = (p.displayName || p.name || 'Project').replace(/"/g, "'").replace(/[\r\n]+/g, ' ');
+            let cls = 'indirect';
+            if (p.path === rootProject.path) cls = 'root';
+            else if (directSet.has(p.path)) cls = 'direct';
+            else cls = 'related';
+            mermaidDef += `    ${nid}["${rawLabel}"]:::${cls}\n`;
+        });
+
+        const edgeSeen = new Set();
+        let edgeIndex = 0;
+        const directEdgeIndices = [];
+        const relatedEdgeIndices = [];
+        subProjects.forEach(p => {
+            const targetId = nodeIdByPath.get(p.path);
+            (p.lineage?.lineage_links || []).forEach(l => {
+                const sourceId = nodeIdByPath.get(l.source_path);
+                if (sourceId && targetId && sourceId !== targetId) {
+                    const key = `d:${sourceId}->${targetId}`;
+                    if (!edgeSeen.has(key)) {
+                        edgeSeen.add(key);
+                        mermaidDef += `    ${sourceId} --> ${targetId}\n`;
+                        directEdgeIndices.push(edgeIndex++);
+                    }
+                }
+            });
+            if (showRelated) {
+                (p.lineage?.related_links || []).forEach(rl => {
+                    const relTargetId = nodeIdByPath.get(rl.target_path);
+                    if (relTargetId && targetId && relTargetId !== targetId) {
+                        const key = `r:${[targetId, relTargetId].sort().join('--')}`;
+                        if (!edgeSeen.has(key)) {
+                            edgeSeen.add(key);
+                            mermaidDef += `    ${targetId} -.-> ${relTargetId}\n`;
+                            relatedEdgeIndices.push(edgeIndex++);
+                        }
+                    }
+                });
+            }
+        });
+
+        if (directEdgeIndices.length > 0) {
+            mermaidDef += `\n    linkStyle ${directEdgeIndices.join(',')} stroke:#34d399,stroke-width:2.5px;\n`;
+        }
+        if (relatedEdgeIndices.length > 0) {
+            mermaidDef += `    linkStyle ${relatedEdgeIndices.join(',')} stroke:#f472b6,stroke-width:2px,stroke-dasharray:6 4;\n`;
+        }
+
+        // Count direct parents & children for focused project bar
+        const parentCount = (rootProject.lineage?.lineage_links || []).filter(l => projByPath.has(l.source_path)).length;
+        const childCount = projects.filter(p => p.lineage?.lineage_links?.some(l => l.source_path === rootProject.path)).length;
+        const relatedCount = (rootProject.lineage?.related_links || []).filter(l => projByPath.has(l.target_path)).length;
+
+        const safeRootPathJs = String(rootProject.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const canGoBack = Array.isArray(this.mermaidHistory) && this.mermaidHistory.length > 0;
+        const inspectedProj = (this.mermaidInspectedPath && projByPath.get(this.mermaidInspectedPath)) || rootProject;
+        this.mermaidInspectedPath = inspectedProj.path;
+
+        container.innerHTML = `
+            <div style="height: 100%; display: flex; flex-direction: column; background: #111827;">
+                <!-- Focused Project Quick-Action Bar -->
+                <div id="mermaidFocusBar" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px; background: rgba(139, 92, 246, 0.1); border-bottom: 1px solid rgba(139, 92, 246, 0.25); flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;">
+                        <button type="button" id="mermaidBackBtn" class="btn btn-secondary btn-sm" onclick="visualizationManager.goBackMermaidLineage()" ${canGoBack ? '' : 'disabled'} title="Zurück zum vorherigen Fokus (Strg+Z)" style="padding: 3px 9px; font-size: 0.76rem; ${canGoBack ? 'color: #f3f4f6; border-color: rgba(139,92,246,0.5);' : 'opacity: 0.45; cursor: not-allowed;'}">
+                            ⬅️ Back${canGoBack ? ` (${this.mermaidHistory.length})` : ''}
+                        </button>
+                        <span style="font-size: 0.78rem; font-weight: 700; color: #fef08a; text-transform: uppercase;">🎯 Focus:</span>
+                        <strong style="color: #f3f4f6; font-size: 0.92rem;">${this.escapeHtml(rootProject.displayName || rootProject.name)}</strong>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">⬆️ ${parentCount} Parent(s) · ⬇️ ${childCount} Child(ren) · 🔀 ${relatedCount} Related</span>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="visualizationManager.openProjectInFacetSearch('${safeRootPathJs}')" style="padding: 4px 10px; font-size: 0.78rem; background: #8b5cf6; border-color: #8b5cf6;" title="Open &amp; inspect this project in Facet Search">
+                            🔍 Open in Facet Search
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="window.electronAPI?.openFolder?.('${safeRootPathJs}')" style="padding: 4px 9px; font-size: 0.78rem;" title="Open project folder">
+                            📁 Folder
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="window.exportLineage?.('${safeRootPathJs}')" style="padding: 4px 9px; font-size: 0.78rem;" title="Export standalone HTML/JSON lineage report">
+                            🌐 Export HTML
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Legend + Zoom/Pan Controls -->
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 5px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: #9ca3af; flex-shrink: 0;">
+                    <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;border:1px solid #fef08a;margin-right:4px;vertical-align:middle;"></span>Focused Root</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#059669;border:1px solid #6ee7b7;margin-right:4px;vertical-align:middle;"></span>Direct Lineage (<code>--&gt;</code>)</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#db2777;border:1px dashed #f9a8d4;margin-right:4px;vertical-align:middle;"></span>Related (<code>-.-&gt;</code>)</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <span>💡 Click = inspect metadata · Double-click = focus &amp; zoom · Strg+Z = back</span>
+                        <div style="display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 1px 4px;">
+                            <button type="button" id="mermaidZoomOutBtn" title="Zoom out" style="background:none;border:none;color:#e5e7eb;cursor:pointer;padding:1px 5px;font-size:12px;">➖</button>
+                            <span id="mermaidZoomLabel" style="min-width:38px;text-align:center;color:#cbd5e1;font-variant-numeric:tabular-nums;">100%</span>
+                            <button type="button" id="mermaidZoomInBtn" title="Zoom in" style="background:none;border:none;color:#e5e7eb;cursor:pointer;padding:1px 5px;font-size:12px;">➕</button>
+                            <button type="button" id="mermaidZoomFitBtn" title="Fit &amp; center graph" style="background:none;border:none;color:#c4b5fd;cursor:pointer;padding:1px 6px;font-size:11px;border-left:1px solid rgba(255,255,255,0.12);margin-left:2px;">⊡ Fit</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Split Viewport: Mermaid Canvas (Left) + Reused Project Details (Right) -->
+                <div style="flex: 1; display: flex; overflow: hidden; min-height: 0;">
+                    <div id="mermaidLineageSvgWrap" style="flex: 1; overflow: hidden; position: relative; cursor: grab; user-select: none; min-width: 0;">
+                        <div id="mermaidPanStage" style="position: absolute; left: 0; top: 0; transform-origin: 0 0;">
+                            <div style="color: #9ca3af; font-size: 0.85rem; padding: 24px;">Rendering Mermaid lineage...</div>
+                        </div>
+                    </div>
+
+                    <div id="mermaidRightPanel" style="width: 390px; max-width: 42vw; border-left: 1px solid rgba(255,255,255,0.1); background: #181825; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
+                            <span id="mermaidRightPanelTitle" style="font-size: 0.82rem; font-weight: 700; color: #e2e8f0;">📋 Project Details</span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button type="button" id="mermaidFocusHereBtn" class="btn btn-secondary btn-sm" style="display: none; padding: 2px 8px; font-size: 0.72rem; color: #fef08a; border-color: rgba(245,158,11,0.45);" title="Focus Mermaid Lineage graph on this project">
+                                    🎯 Focus Graph Here
+                                </button>
+                            </div>
+                        </div>
+                        <div id="mermaidRightPanelContent" style="flex: 1; overflow-y: auto; padding: 12px;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Ensure Ctrl+Z / Cmd+Z shortcut is active for Mermaid navigation
+        this._ensureMermaidUndoShortcut();
+
+        // Populate initial Project Details on the right (reusing Facet Search panel renderer)
+        this._showMermaidProjectDetails(inspectedProj, rootProject.path);
+
+        const svgWrap = document.getElementById('mermaidLineageSvgWrap');
+        if (!svgWrap) return;
+
+        if (!window.mermaid) {
+            svgWrap.innerHTML = `<div style="color:#f87171;">Mermaid.js not loaded.</div>`;
+            return;
+        }
+
+        try {
+            window.mermaid.initialize({
+                startOnLoad: false,
+                theme: 'dark',
+                securityLevel: 'loose',
+                flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' }
+            });
+            const renderId = 'mf_live_mermaid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+            const rendered = await window.mermaid.render(renderId, mermaidDef);
+            const liveWrap = document.getElementById('mermaidLineageSvgWrap');
+            const panStage = document.getElementById('mermaidPanStage');
+            if (!liveWrap || !panStage) return;
+            panStage.innerHTML = rendered.svg;
+
+            const svgEl = panStage.querySelector('svg');
+            if (svgEl) {
+                svgEl.style.maxWidth = 'none';
+                svgEl.style.display = 'block';
+
+                // Pan & Zoom state
+                let scale = 1;
+                let tx = 0;
+                let ty = 0;
+                let didDrag = false;
+                const zoomLabel = document.getElementById('mermaidZoomLabel');
+
+                const applyTransform = () => {
+                    panStage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+                    if (zoomLabel) zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+                };
+
+                const fitAndCenter = () => {
+                    const wrapW = liveWrap.clientWidth || 800;
+                    const wrapH = liveWrap.clientHeight || 500;
+                    const bbox = svgEl.getBoundingClientRect();
+                    const rawW = (bbox.width / (scale || 1)) || svgEl.viewBox?.baseVal?.width || 400;
+                    const rawH = (bbox.height / (scale || 1)) || svgEl.viewBox?.baseVal?.height || 300;
+                    const pad = 40;
+                    const fitScale = Math.min(1.15, Math.max(0.25, Math.min((wrapW - pad) / rawW, (wrapH - pad) / rawH)));
+                    scale = fitScale;
+                    tx = Math.max(16, (wrapW - rawW * scale) / 2);
+                    ty = Math.max(16, (wrapH - rawH * scale) / 2);
+                    applyTransform();
+                };
+
+                const zoomAt = (factor, clientX, clientY) => {
+                    const rect = liveWrap.getBoundingClientRect();
+                    const cx = clientX !== undefined ? (clientX - rect.left) : (rect.width / 2);
+                    const cy = clientY !== undefined ? (clientY - rect.top) : (rect.height / 2);
+                    const newScale = Math.min(3.5, Math.max(0.15, scale * factor));
+                    const ratio = newScale / scale;
+                    tx = cx - (cx - tx) * ratio;
+                    ty = cy - (cy - ty) * ratio;
+                    scale = newScale;
+                    applyTransform();
+                };
+
+                // Initial fit
+                requestAnimationFrame(fitAndCenter);
+
+                // Wheel zoom
+                liveWrap.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+                    zoomAt(factor, e.clientX, e.clientY);
+                }, { passive: false });
+
+                // Drag to pan
+                let isDragging = false;
+                let startX = 0;
+                let startY = 0;
+                let startTx = 0;
+                let startTy = 0;
+
+                liveWrap.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    isDragging = true;
+                    didDrag = false;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startTx = tx;
+                    startTy = ty;
+                    liveWrap.style.cursor = 'grabbing';
+                });
+
+                const onMouseMove = (e) => {
+                    if (!isDragging) return;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                        didDrag = true;
+                    }
+                    tx = startTx + dx;
+                    ty = startTy + dy;
+                    applyTransform();
+                };
+
+                const onMouseUp = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    liveWrap.style.cursor = 'grab';
+                    setTimeout(() => { didDrag = false; }, 30);
+                };
+
+                if (typeof this._mermaidPanCleanup === 'function') {
+                    this._mermaidPanCleanup();
+                }
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+                this._mermaidPanCleanup = () => {
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                };
+
+                // Toolbar zoom buttons
+                document.getElementById('mermaidZoomInBtn')?.addEventListener('click', () => zoomAt(1.2));
+                document.getElementById('mermaidZoomOutBtn')?.addEventListener('click', () => zoomAt(0.83));
+                document.getElementById('mermaidZoomFitBtn')?.addEventListener('click', fitAndCenter);
+
+                // Single click = inspect metadata in right panel; Double click = focus & zoom Mermaid graph on node
+                const highlightSelectedNode = (selectedNodeEl) => {
+                    svgEl.querySelectorAll('.node').forEach(n => {
+                        n.style.filter = '';
+                    });
+                    if (selectedNodeEl) {
+                        selectedNodeEl.style.filter = 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.85))';
+                    }
+                };
+
+                svgEl.querySelectorAll('.node').forEach(nodeEl => {
+                    const domId = nodeEl.id || '';
+                    const match = domId.match(/(mf_node_\d+)/);
+                    const nid = match ? match[1] : null;
+                    const targetProj = nid ? projByNodeId.get(nid) : null;
+                    if (!targetProj) return;
+
+                    if (targetProj.path === inspectedProj.path) {
+                        highlightSelectedNode(nodeEl);
+                    }
+
+                    nodeEl.style.cursor = 'pointer';
+                    nodeEl.setAttribute('title', `Click: Show metadata for "${targetProj.displayName || targetProj.name}" · Double-click: Focus & zoom graph`);
+                    nodeEl.addEventListener('click', (e) => {
+                        if (didDrag) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.mermaidInspectedPath = targetProj.path;
+                        highlightSelectedNode(nodeEl);
+                        this._showMermaidProjectDetails(targetProj, rootProject.path);
+                    });
+                    nodeEl.addEventListener('dblclick', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this._focusMermaidRoot(targetProj.path, data);
+                    });
+                });
+            }
+        } catch (err) {
+            console.error('Mermaid live render error:', err);
+            svgWrap.innerHTML = `<div style="color:#f87171;">Failed to render Mermaid lineage: ${this.escapeHtml(err.message)}</div>`;
+        }
+    },
+
+    _focusMermaidRoot(targetPath, data = null) {
+        if (!targetPath) return;
+        if (this.mermaidRootPath && this.mermaidRootPath !== targetPath) {
+            if (!Array.isArray(this.mermaidHistory)) this.mermaidHistory = [];
+            if (this.mermaidHistory[this.mermaidHistory.length - 1] !== this.mermaidRootPath) {
+                this.mermaidHistory.push(this.mermaidRootPath);
+            }
+        }
+        this.mermaidRootPath = targetPath;
+        this.mermaidInspectedPath = targetPath;
+        this.renderMermaidLineageVisualization(data || this.currentData);
+    },
+
+    goBackMermaidLineage() {
+        if (!Array.isArray(this.mermaidHistory) || this.mermaidHistory.length === 0) return;
+        const prevPath = this.mermaidHistory.pop();
+        if (prevPath) {
+            this.mermaidRootPath = prevPath;
+            this.mermaidInspectedPath = prevPath;
+            this.renderMermaidLineageVisualization(this.currentData);
+        }
+    },
+
+    _ensureMermaidUndoShortcut() {
+        if (this._mermaidUndoBound) return;
+        this._mermaidUndoBound = true;
+        window.addEventListener('keydown', (e) => {
+            if (this.currentVisualizationType !== 'mermaidlineage') return;
+            const vizTab = document.getElementById('visualizeTabContent');
+            if (vizTab && vizTab.offsetParent === null) return;
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+                if (Array.isArray(this.mermaidHistory) && this.mermaidHistory.length > 0) {
+                    e.preventDefault();
+                    this.goBackMermaidLineage();
+                }
+            }
+        });
+    },
+
+    _showMermaidProjectDetails(project, currentRootPath = null) {
+        const contentEl = document.getElementById('mermaidRightPanelContent');
+        const focusBtn = document.getElementById('mermaidFocusHereBtn');
+        const titleEl = document.getElementById('mermaidRightPanelTitle');
+        if (!contentEl || !project) return;
+
+        if (titleEl) {
+            titleEl.textContent = `📋 ${project.displayName || project.name || 'Project Details'}`;
+        }
+        if (focusBtn) {
+            const isDifferentFromRoot = currentRootPath && project.path !== currentRootPath;
+            focusBtn.style.display = isDifferentFromRoot ? 'inline-block' : 'none';
+            focusBtn.onclick = () => this._focusMermaidRoot(project.path, this.currentData);
+        }
+
+        if (window.facetSearch && typeof window.facetSearch.showProjectDetails === 'function') {
+            if ((!window.facetSearch.masterData || window.facetSearch.masterData.length === 0) && Array.isArray(this.currentData?.projects)) {
+                window.facetSearch.masterData = this.currentData.projects;
+            }
+            window.facetSearch.showProjectDetails(project, { targetContentEl: contentEl });
+        } else {
+            contentEl.innerHTML = `<div style="color:#9ca3af;">Facet Search details renderer not available.</div>`;
+        }
+    },
+
+    openProjectInFacetSearch(projectPath) {
+        if (!projectPath) return;
+        if (window.switchMainTab) {
+            window.switchMainTab('discover');
+        }
+        if (window.facetSearch) {
+            if (typeof window.facetSearch.openModal === 'function') {
+                window.facetSearch.openModal();
+            }
+            setTimeout(() => {
+                if (typeof window.facetSearch.selectAndInspectProjectByPath === 'function') {
+                    window.facetSearch.selectAndInspectProjectByPath(projectPath);
+                }
+            }, 120);
         }
     },
 
