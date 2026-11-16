@@ -334,21 +334,23 @@ class OMEROProxyServer {
      * Validate and return an allowed local CORS origin
      */
     getAllowedOrigin(req) {
-        const defaultOrigin = `http://localhost:${this.port}`;
         const origin = req && req.headers ? req.headers.origin : null;
-        if (!origin || typeof origin !== 'string') return defaultOrigin;
-        const allowedOrigins = [
-            `http://localhost:${this.port}`,
-            `https://localhost:${this.port}`,
-            `http://127.0.0.1:${this.port}`,
-            `https://127.0.0.1:${this.port}`,
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
-        ];
-        const idx = allowedOrigins.indexOf(origin);
-        return idx !== -1 ? allowedOrigins[idx] : defaultOrigin;
+        switch (origin) {
+            case 'http://localhost:3000':
+                return 'http://localhost:3000';
+            case 'https://localhost:3000':
+                return 'https://localhost:3000';
+            case 'http://127.0.0.1:3000':
+                return 'http://127.0.0.1:3000';
+            case 'https://127.0.0.1:3000':
+                return 'https://127.0.0.1:3000';
+            case 'http://localhost:8080':
+                return 'http://localhost:8080';
+            case 'http://127.0.0.1:8080':
+                return 'http://127.0.0.1:8080';
+            default:
+                return 'http://localhost:3000';
+        }
     }
 
     /**
