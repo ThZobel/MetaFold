@@ -4737,7 +4737,7 @@ const facetSearch = {
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
             `;
             changelog.forEach(entry => {
-                const esc = (window.markdownLite && window.markdownLite.escapeHtml) || escHtml;
+                const esc = escHtml;
                 const ts = entry.timestamp ? esc(new Date(entry.timestamp).toLocaleString()) : '';
                 const user = entry.user ? ` · ${esc(entry.user)}` : '';
                 let details = '';
