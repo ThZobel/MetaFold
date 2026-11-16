@@ -34,7 +34,7 @@
   "dependencies": {},
   "devDependencies": {
     "electron": "^38.2.2",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "com.thzobel.metafold",
