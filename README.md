@@ -1,6 +1,4 @@
-<div align="center">
-
-<img src="assets/MetafoldGrafikPurple.png" alt="MetaFold – Capture. Find. Connect." width="640" />
+![MetaFold – Capture. Find. Connect.](assets/MetafoldGrafikPurple.png)
 
 # Capture. Find. Connect.
 
@@ -8,8 +6,6 @@
 *Less thinking about metadata. More focus on science.*
 
 [Download Release](https://github.com/ThZobel/MetaFold/releases) · [Installation Guide](INSTALL.md) · [Documentation](https://metafold-docs.readthedocs.io/en/latest/) · [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
-
-</div>
 
 ---
 
@@ -20,6 +16,7 @@
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Documentation & Community](#documentation--community)
+- [Acknowledgements & License](#acknowledgements--license)
 
 ---
 
@@ -39,15 +36,15 @@ Scientists should focus on their research — not on metadata standards, folder 
 
 ```mermaid
 flowchart TB
-    A["🔬 Scientific Work<br/><small>Experiments · Samples · Microscopy · Analysis</small>"]
-    B["⚡ MetaFold<br/><small>Capture · Find · Connect<br/>Local-first · Inheritance · Lineage</small>"]
+    A["🔬 Scientific Work<br/>Experiments · Samples · Microscopy · Analysis"]
+    B["⚡ MetaFold<br/>Capture · Find · Connect<br/>Local-first · Inheritance · Lineage"]
 
     A --> B
 
-    B --> C["📓 ELNs<br/><small>elabFTW · RSpace</small>"]
-    B --> D["🖼️ Imaging<br/><small>OMERO · BioFormats</small>"]
-    B --> E["🤖 Automation & AI<br/><small>n8n · RO-Crate · LLMs</small>"]
-    B --> F["📁 Local & Repos<br/><small>Folders · JSON</small>"]
+    B --> C["📓 ELNs<br/>elabFTW · RSpace"]
+    B --> D["🖼️ Imaging<br/>OMERO · BioFormats"]
+    B --> E["🤖 Automation & AI<br/>n8n · RO-Crate · LLMs"]
+    B --> F["📁 Local & Repos<br/>Folders · JSON"]
 
     style A fill:#1e293b,color:#f8fafc,stroke:#475569
     style B fill:#6d28d9,color:#ffffff,stroke:#8b5cf6
@@ -86,11 +83,10 @@ flowchart TB
 - 🐛 **[Issues](https://github.com/ThZobel/MetaFold/issues)** & 💬 **[Discussions](https://github.com/ThZobel/MetaFold/discussions)** — Feedback, bug reports, and community exchange
 - 🌐 **[NFDI4BioImage](https://nfdi4bioimage.de/)** — Developed as part of the NFDI4BioImage initiative
 
-<details>
-<summary>Acknowledgements & License</summary>
+---
+
+## Acknowledgements & License
 
 - **Inspiration:** Inspired by the [RDM-Desktop Tool](https://github.com/tomio13/RDM-Desktop) by T. Haraszti ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
 - **Development:** Built with the assistance of [claude.ai](https://claude.ai/) as part of **NFDI4BioImage**.
 - **License:** See [LICENSE](LICENSE).
-
-</details>
