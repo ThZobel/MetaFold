@@ -180,8 +180,8 @@ Open local Readme.html to see all project Metadata and directly open Links to yo
 
 <!--
 - 📚 **[Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)** 
--->
 — Setup guides, template tutorials, and integration references
+-->
 - 🐛 **[Issues](https://github.com/ThZobel/MetaFold/issues)** & 💬 **[Discussions](https://github.com/ThZobel/MetaFold/discussions)** — Feedback, bug reports, and community exchange
 
 ---
@@ -189,5 +189,5 @@ Open local Readme.html to see all project Metadata and directly open Links to yo
 ## Acknowledgements & License
 
 - **Inspiration:** Inspired by the [RDM-Desktop Tool](https://github.com/tomio13/RDM-Desktop) by T. Haraszti ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
-- **Development:** Built with the assistance of [claude.ai](https://claude.ai/) as part of **NFDI4BioImage**.
+- **Development:** Built with the assistance of AI using different modals.
 - **License:** See [LICENSE](LICENSE).
