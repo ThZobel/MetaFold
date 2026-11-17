@@ -6,6 +6,11 @@
 
 [Download Release](https://github.com/ThZobel/MetaFold/releases) · [Installation Guide](INSTALL.md) · [Documentation](https://metafold-docs.readthedocs.io/en/latest/) · [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
 
+
+> [!NOTE]
+> **Built with AI — driven by scientific workflows.**  
+> MetaFold is 100% AI “vibe-coded”: its code is generated through iterative prompting and AI-assisted development, guided by human-defined requirements and practical research needs.
+
 ---
 
 ## Contents
