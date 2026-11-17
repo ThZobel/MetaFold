@@ -63,9 +63,9 @@ MetaFold includes example templates in the [`/templates`](https://github.com/ThZ
 
 ### Method 1: Import via User Interface (Recommended)
 
-1. Launch **MetaFold**.
-2. Open the **Action Menu** (top bar) and select **More → Import Template**.
-3. Download the desired `.json` template file from [`/templates`](https://github.com/ThZobel/MetaFold/tree/main/templates).
+1. Download the desired `.json` template file from [`/templates`](https://github.com/ThZobel/MetaFold/tree/main/templates).
+2. Launch **MetaFold**.
+3. Open the **Action Menu** by clicking on "Templ. Options" and select **More → Import Template**.
 4. Select the downloaded `.json` file in the import dialog.
 5. Start creating projects with your imported template.
 
