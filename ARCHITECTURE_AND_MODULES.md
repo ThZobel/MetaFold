@@ -1,612 +1,238 @@
-# MetaFold Architecture & Module Documentation
+# MetaFold – Architecture & Module Reference (AI Agent Guide)
 
-## Overview
-This document outlines the architecture of the MetaFold application, focusing on its component-based structure, key JavaScript modules, and the dynamic loading system. The application was refactored from a monolithic `index.html` into a modular, component-driven Electron app.
-
----
-
-## 1. File Structure
-
-### Entry Point
-- **`src/index.html`** — The main application shell. Defines layout containers (`.sidebar`, `.main-content`, `.right-sidebar`) and mount points for dynamically loaded components. Loads all CSS and JavaScript in the correct dependency order. Does **not** contain inline UI content.
-
-### Component Directory (`src/components/`)
-UI parts are separated into HTML files and injected at runtime:
-
-#### `src/components/sidebars/`
-| File | Description |
-|------|-------------|
-| `left-sidebar.html` | Template selection list and category navigation |
-| `right-sidebar.html` | "Project Info" (path preview) and "Integrations" (elabFTW, OMERO, RSpace, n8n) panels |
-
-#### `src/components/tabs/`
-| File | Description |
-|------|-------------|
-| `create-project-tab.html` | Main project creation form (Metadata Editor) |
-| `discover-projects-tab.html` | Project scanner and browser interface with trigger button for the Facet Search |
-| `visualize-data-tab.html` | JSONCrack visualization tab |
-
-#### `src/components/modals/`
-| File | Description |
-|------|-------------|
-| `settings-modal.html` | Comprehensive settings dialog (General, elabFTW, OMERO, RSpace, n8n) |
-| `login-modal.html` | User login / switch-user interface |
-| `template-modal.html` | Modal for creating and editing templates |
-| `omero-password-modal.html` | OMERO password prompt modal |
-| `facet-search-modal.html` | Full-screen Facet Search modal (Filter Sidebar + Tabulator results table) |
-
-#### `src/components/panels/`
-| File | Description |
-|------|-------------|
-| `slide-out-panel.html` | Slide-out detail panel |
-
-### CSS Directory (`src/css/`)
-Key stylesheets:
-| File | Scope |
-|------|-------|
-| `base.css` | Core design tokens and base styles (dark mode default) |
-| `light-theme.css` | **Light Mode** overrides (activated via `.light-mode` on `<body>`) |
-| `components.css`, `components-extra.css` | Component-level styles |
-| `integrations.css` | Integration card styles (elabFTW, OMERO, RSpace, n8n) |
-| `layout-override.css` | Forces full-width layout |
-| `responsive.css` | Responsive adjustments |
-| `projectScanner.css`, `project_navigator.css` | Discovery tab styles |
-| `userManagement.css`, `login-modal.css` | User system styles |
-| `dragDrop.css`, `experimentFormDrag.css` | Drag & drop interactions |
-| `storageIndicator.css` | Storage usage indicator styles |
-| `sidebar-resize.css` | Resizable sidebar logic |
-| `sticky-actions.css` | Sticky action bar in project creation |
-| `main-content-footer.css` | Footer area styling |
-| `right-sidebar.css` | Right sidebar panels |
-| `metadata-table.css` | Metadata display tables |
-| `facetSearch.css` | Facet Search modal, Tabulator theme overrides (dark + light mode), filter chips, column selector |
-| `fileScanner.css` | Styles for the File Sidecar Scanner wizard, progress bar, and results table |
+This document serves as the structural and functional map of **MetaFold** for AI agents and developers. It describes the current runtime architecture, directory layout, module responsibilities, and core data workflows.
 
 ---
 
-## 2. Component Loading System
+## 1. High-Level Architecture & Runtime Model
 
-- **`src/js/componentLoader.js`** — Core logic for fetching HTML files (`loadComponent`) and injecting them into specific DOM mount points. Handles error logging.
-- **`src/js/init_components.js`** — Orchestrates the loading sequence: Settings Modal → Left Sidebar → Tabs → Right Sidebar → Template Modal → Slide-out Panel → **Facet Search Modal**. Calls `componentLoader.loadComponent()` for each UI part and initialises the corresponding JavaScript logic *after* HTML injection (e.g. `facetSearch.init()` after the modal is loaded).
+MetaFold is a modular, local-first **Electron** application for Research Data Management (RDM), experiment folder creation, metadata capture, data lineage visualization, and lab notebook/repository integration (eLabFTW, OMERO, RSpace, n8n).
 
----
-
-## 3. Key JavaScript Modules
-
-### Core Logic
-| Module | Purpose |
-|--------|---------|
-| `main.js` | Electron main process: Window creation, system integrations (e.g., OMERO Proxy), and secure IPC endpoints (e.g. `write-to-clipboard` to bypass Renderer context limits). |
-| `preload.js` | ContextBridge: Securely exposes native functions (`window.electronAPI`) like file system access and clipboard operations to the frontend. |
-| `app.js` | Main application initialisation, startup sequence, and Admin account checks |
-| `projectManager.js` | Project creation logic, path generation, file system interactions, batch file writing (`ReadyToImport.json`). Always injects user/group `provenance` metadata. Supports dynamic folder structures via `[fieldName]` placeholders. |
-| `templateManager.js` | Template loading, saving, selection, rendering; dynamically toggles UI modes (e.g. `writeFilesOnly`, `multipleFolders`) |
-| `experimentForm.js` | Dynamic metadata form, drag & drop field ordering, filename preview, integration toggle management. Supports advanced field types (e.g. `email` with validation, `rating` with 5-star UI) and groups fields under Accordion UIs. Outputs nested JSON payloads for hierarchical metadata export. |
-| `metadataLoader.js` | Loads and parses existing project metadata files |
-| `shared/schemaVersion.js` | Shared (Main + Renderer) schema contract helper: defines `SCHEMA_VERSION` (`"0.1"`), `SCHEMA_TYPES`, `RESERVED_PROJECT_KEYS`, `getSchemaVersion()` (`"0.0"` legacy fallback), and `isReservedProjectKey()`. |
-
-### Sidebar & Integrations
-| Module | Purpose |
-|--------|---------|
-| `sidebarIntegration.js` | Manages Right Sidebar interactivity: shows/hides integration cards (elabFTW, OMERO, RSpace, n8n) based on settings, toggle switches, `loadRSpaceFolders()`, "Copy Path" |
-| `elabftwCategoryManager.js` | Manages elabFTW experiment template selection dropdown; loads templates from API; saves/restores selected template ID per MetaFold template; patches `projectManager`, `templateManager`, `settingsManager` |
-| `integrationOptionsFix.js` | Ensures integration options are correctly shown/hidden based on active category and global settings |
-| `rspaceIntegration.js` | API communication with RSpace (fetching documents, creating content) |
-
-### Settings & Configuration
-| Module | Purpose |
-|--------|---------|
-| `settingsManager.js` | Central settings store using `localStorage`; secure credential storage (API keys, passwords) via DPAPI + user-specific entropy; n8n settings support |
-| `globalHandlers.js` | Bridge between HTML `onclick` events and logic modules. Contains safety checks to prevent crash loops if managers aren't loaded yet |
-
-### Security & User Profiles
-| Module | Purpose |
-|--------|---------|
-| `secureStorage.js` | DPAPI-based encryption for sensitive credentials; auto-initializes Admin account on first launch |
-| `securityGuard.js`, `securityUI.js` | Additional security layers and UI for credential management |
-| `userManager.js` | Login logic, Admin account management, clears password cache on logout (delegates CRUD to profileManager). Bootstraps `profileManager` during initialization. |
-| `profileManager.js` | RDM-compliant user/group profiles, ORCID validation, Provenance generation. Profiles are saved exclusively to `users.json` and `groups.json` in the central `Templates` directory. |
-| `loginModal.js` | Login UI, caches user password for entropy after successful login |
-| `userManagementModal.js` | Admin UI for managing users, groups, and RDM profile fields. Performs input validation (e.g., ORCID, Email). |
-| `adminPasswordManager.js` | Admin-specific password operations |
-
-### Project Discovery & Facet Search
-| Module | Purpose |
-|--------|---------|
-| `projectScanner.js` | Scans the file system for existing MetaFold projects; extracts dynamic integration links; manages list/grid UI and generates the Summary JSON export |
-| `fileScanner.js` | File Sidecar Scanner: wizard for finding microscopy files, inheriting parent metadata, and extracting OME-XML via BioFormats |
-| `facetSearch.js` | **Stateful singleton** managing the entire Facet Search feature (see Section 4) |
-| `visualizationManager.js` | Interactive data visualization for discovered projects (JSONCrack and D3-based graphs like Lineage Tree & Knowledge Graph) |
-| `projectMetadataEnhancer.js` | Enriches scanned project data with additional metadata (complexity, completeness) |
-| `projectValidation.js` | Validates project structure and metadata completeness |
-
-### UI & UX
-| Module | Purpose |
-|--------|---------|
-| `themeManager.js` | Light/Dark Mode toggle; persists choice in `localStorage`; applies `.light-mode` class to `<body>` on load to prevent FOUC |
-| `templateModal.js` | Template creation/editing dialog logic |
-| `metadataEditor.js` | Inline metadata editing within the form |
-| `mainContentFooterManager.js`, `tabFooterControl.js` | Footer bar with action buttons |
-| `footerMessagesManager.js` | Status messages and notifications in the footer area |
-| `sidebarResizeManager.js` | Drag-to-resize for sidebars |
-| `enhancedActions.js` | Extended action menu (import/export templates, bulk operations) |
-| `settingsBulkOperations.js` | Bulk settings import/export |
-| `debug.js` | Developer debug utilities |
-| `utils.js` | Shared helper functions |
-
-### Storage
-| Module | Purpose |
-|--------|---------|
-| `storage.js` | Abstraction layer over Electron's file system and localStorage for user/group-scoped data paths |
-
----
-
-## 4. Facet Search Module & Template Hub (`facetSearch.js`)
-
-The Facet Search is a dedicated full-screen modal for searching and filtering projects across a MetaFold Summary JSON export. It also doubles as the **Community Template Hub** for downloading shared templates from GitHub.
-
-### Architecture
-`facetSearch` is a singleton object exposed as `window.facetSearch`. It manages all state internally and renders into the `facet-search-modal.html` component.
-
-### State
-| Property | Type | Description |
-|----------|------|-------------|
-| `masterData` | `Array` | All projects loaded from the Summary JSON (with `flatMeta` added) |
-| `activeFilters` | `Object` | Currently active facet filters (`{ key: [value, ...] }`) |
-| `visibleColumns` | `Array` | Metadata keys currently visible as table columns |
-| `allAvailableKeys` | `Array` | All metadata keys found across all projects (sorted by frequency) |
-| `tabulatorInstance` | `Tabulator\|null` | Live Tabulator.js table instance; `null` when modal is closed |
-| `_resizeObserver` | `ResizeObserver\|null` | Watches container size changes to trigger Tabulator redraws |
-| `hiddenKeys` | `Array` | Keys hidden by the user via the context menu or manage categories modal |
-| `metadataTypes` | `Object` | Stores types of metadata fields (e.g. text, select) inferred from original metadata for display in the Manage Categories modal |
-
-### Key Methods
-| Method | Description |
-|--------|-------------|
-| `init()` | Registers ESC-key listener and document-level click listener to auto-close the column selector dropdown |
-| `loadSummaryFile()` | Opens a file dialog, parses the Summary JSON, flattens metadata, builds `masterData`, then opens the modal |
-| `openModal()` / `closeSearch()` | Shows/hides the modal overlay; `closeSearch()` disconnects ResizeObserver, destroys the Tabulator instance and resets state |
-| `updateUI()` | Calls `renderSidebar()` + `renderResults()` — the single source of truth for UI re-renders |
-| `renderSidebar(facets)` | Builds the filter chip groups in the left sidebar |
-| `renderResults(results)` | Creates or updates the Tabulator table: first call builds a new instance, subsequent calls use `replaceData()` + double-`requestAnimationFrame` → `redraw(true)` |
-| `toggleFilter(key, value)` | Activates/deactivates a facet filter and calls `updateUI()` |
-| `toggleColumn(key)` | Shows/hides a column via Tabulator's `showColumn()`/`hideColumn()` — no table rebuild needed |
-| `exportCsv()` | Triggers Tabulator's built-in CSV download (BOM-prefixed for Excel compatibility) |
-| `handleOverlayClick(event)` | Closes modal when user clicks the dark backdrop |
-| `_keyToField(key)` | Converts a metadata key (e.g. `Sample.Laser_Line`) to a safe Tabulator field name (`meta__Sample_Laser_Line`) |
-| `_buildTableData(results)` | Transforms project objects into flat Tabulator row data; joins array values with `"; "` |
-| `_extractUrls(project)` | Extracts OMERO and elabFTW URLs from multiple possible data structures (`integrations.*`, `flatMeta` HTTP-link fallback) |
-| `_buildColumns()` | Builds Tabulator column definitions: fixed columns (Name, Path, Created) + dynamic metadata columns + hidden-but-downloadable URL columns (OMERO, elabFTW) + Actions column |
-
-### Tabulator.js Integration
-The results table uses **Tabulator.js 6.3** (loaded from cdnjs CDN) with the midnight dark theme.
-
-- **Layout**: `fitColumns` — all columns fill the container width
-- **Fixed row height**: `rowHeight: 38` — prevents rows from growing unpredictably after re-renders
-- **Destroy + recreate on filter**: Every `renderResults()` call destroys the existing Tabulator instance and creates a fresh one. This is as fast as the first render and guarantees identical, consistent appearance after every filter click (`replaceData()` + `redraw(true)` caused cached row-height bugs and gray backgrounds)
-- **No explicit height** — the container (`flex: 1; min-height: 0; overflow: auto`) handles scrolling
-- **Column visibility**: toggled live without re-rendering data
-- **CSV export**: Tabulator's native downloader; URL columns are `visible: false, download: true` so they appear only in the export file, not in the UI
-- **Actions column**: `download: false` — shows folder-open and integration-link buttons in the table but is excluded from CSV
-- **Theming**: CSS overrides in `facetSearch.css` apply MetaFold's dark navy/purple palette over the midnight base theme; full light-mode overrides included
-
-### Data Flow
 ```
-loadSummaryFile()
-  └─► parse JSON → build masterData (with flatMeta)
-  └─► build allAvailableKeys + visibleColumns
-  └─► renderColumnSelector()
-  └─► openModal()
-  └─► updateUI()
-        ├─► renderSidebar(facets)   — left panel: filter chips
-        └─► renderResults(filtered) — right panel: Tabulator table
-
-[Filter chip clicked]
-  └─► toggleFilter(key, value) → updateUI()
-        ├─► renderSidebar()         — sidebar re-renders
-        └─► renderResults()         — replaceData() + double-RAF → redraw(true)
-
-[Column checkbox toggled]
-  └─► toggleColumn(key) → showColumn() / hideColumn()  (no data reload)
-
-[Column header clicked]
-  └─► Tabulator sorts natively (no custom logic needed)
-
-[Export button clicked]
-  └─► exportCsv() → Tabulator downloads CSV
-
-[Close / ESC / backdrop click]
-  └─► closeSearch() → ResizeObserver.disconnect() → destroy tabulatorInstance → reset state
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Electron Main Process (src/main.js)                                       │
+│  ├─ File System, Project Creation, Recursive Scanner, 2-Pass Lineage      │
+│  ├─ Project Metadata Store (src/js/main/projectMetadataStore.js)          │
+│  ├─ README HTML Generator + Integration Links (src/js/main/integration*)  │
+│  ├─ Native PKZIP Engine (zlib), BioFormats CLI Spawner, Webhook Sender    │
+│  ├─ Electron safeStorage (DPAPI) Credential Encryption                    │
+│  └─ Local OMERO Proxy Server (src/js/proxyManager.js)                     │
+└───────────────────────────────────▲───────────────────────────────────────┘
+                                    │ IPC (ContextBridge)
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ Preload Bridge (src/preload.js)                                           │
+│  └─ Exposes window.electronAPI & window.utils                             │
+└───────────────────────────────────▲───────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ Renderer Process (src/index.html)                                         │
+│  ├─ Dynamic HTML Component Loader (componentLoader.js + init_components)  │
+│  ├─ Window-scoped Vanilla JS Modules (src/js/*.js)                        │
+│  └─ Shared UMD Modules (src/js/shared/schemaVersion.js, markdownLite.js)  │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Community Template Hub & Simplified Contribution Workflow
-MetaFold includes a community template sharing and discovery system:
-1. `app.openTemplateHub()` is triggered (via sidebar or settings).
-2. It fetches the remote `templates-index.json` from the `MetaFold-Templates` repository.
-3. Templates are categorized according to the **4 Fixed Categories**: `Systems`, `Protocols`, `Experiments`, `Workflows`.
-4. Collections are discovered dynamically from GitHub (`General`, `REMBI`, `NFDI4BioImage`, etc.).
-5. Users can publish templates via the simplified upload modal (`uploadModal.js`), which validates required fields, derives the GitHub target path automatically, and opens a pre-formatted GitHub Issue.
-6. The preview panel in the Template Hub provides an "Install Template" button to download templates into the local template directory.
+### Key Architectural Principles
+1. **No Frontend Bundler**: Renderer scripts are loaded directly in `src/index.html` in dependency order and attach singletons to `window.*` (except the pre-built JSONCrack bundle in `src/build/`).
+2. **Dynamic HTML Partials**: `src/index.html` is a shell. At `DOMContentLoaded`, `src/js/init_components.js` fetches all 10 HTML partials from `src/components/` in parallel via `window.componentLoader.load()` and then initializes the corresponding JS controllers.
+3. **Shared UMD Modules (`src/js/shared/`)**: Modules in `src/js/shared/` use a UMD pattern so they run identically in Node.js (`require` in `main.js`) and in the browser (`window.*` in Renderer).
+4. **Ignore Legacy Backup Files**: The repository contains legacy backup files (`src/js/backup/`, `src/js/omero/backup/`, `*_backup.js`, `*_old*.js`, `*_WITH_USER_ENTROPY.js`, `working-visualization-manager.js`). **Only files loaded in `src/index.html` or required by `src/main.js` are active.** Never edit backup files.
 
+---
+
+## 2. Directory & Component Structure
+
+### 2.1 Entry Points & Packaging (`src/`)
 | File | Role |
 |------|------|
-| `src/js/communityManager.js` | **Central Service**: dynamic index fetching, caching, 4 fixed categories, collection extraction, tag normalization, and reusable TagPicker component. |
-| `src/components/modals/template-modal.html` | Tab 3 "Community & Sharing" with 4 fixed categories, collection dropdown, and interactive tag chips. |
-| `src/js/templateModal.js` | Form controller binding Tab 3 to `communityManager` (`populateForm`, `collectCommunityData`). |
-| `src/components/modals/upload-template-modal.html` | Streamlined upload assistant with category selector, dynamic collection dropdown, proposed collection form, description textarea, tag picker, and target path badge. |
-| `src/js/uploadModal.js` | Upload modal controller: validates mandatory description, formats GitHub Issue markdown (including proposed collections), and initiates GitHub submission. |
-| `src/components/modals/facet-search-modal.html` | Modal HTML structure (overlay, header with action buttons, filter sidebar, results container) |
-| `src/css/facetSearch.css` | All styling: Tabulator theme overrides (dark + light mode), modal layout, filter chips, column selector dropdown |
-| `src/index.html` | Mounts Tabulator CDN, registers `communityManager.js`, `templateModal.js`, `uploadModal.js` |
-| `src/js/init_components.js` | Loads `facet-search-modal.html` and calls `facetSearch.init()` |
+| `src/main.js` | Electron Main process entry point, native menus, and all `ipcMain.handle` endpoints. |
+| `src/preload.js` | ContextBridge exposing `window.electronAPI` (IPC) and `window.utils` (path/template helpers). |
+| `src/index.html` | Application shell, CSS imports, mount containers, and `<script>` load order. |
+| `src/package.json` | Dependencies and standard `electron-builder` config (Electron 38 for Windows 10/11, macOS, Linux). |
+| `src/electron-builder-win7.json` | Legacy build config pinning Electron `22.3.27` for Windows 7 SP1 (`npm run build-win7`). |
+
+### 2.2 HTML Components (`src/components/`)
+Injected at startup by `src/js/init_components.js`:
+
+| Mount Container (`index.html`) | Component File | Purpose |
+|--------------------------------|----------------|---------|
+| `#left-sidebar-container` | `components/sidebars/left-sidebar.html` | User switch, 4 template categories, template list (`#sidebar-template-view`), and Discovery project preview (`#sidebar-project-view`). |
+| `#right-sidebar-container` | `components/sidebars/right-sidebar.html` | Path preview ("Project Info") and integration cards (eLabFTW, OMERO, RSpace, n8n). |
+| `#createTabContent` | `components/tabs/create-project-tab.html` | Target path, project name, dynamic metadata form, and folder structure preview. |
+| `#discoverTabContent` | `components/tabs/discover-projects-tab.html` | Project scanner, Living User Index, Facet Search view, and File Sidecar Scanner wizard. |
+| `#visualizeTabContent` | `components/tabs/visualize-data-tab.html` | Visualization container (Lineage Tree, Knowledge Graph, Metadata Graph, JSONCrack). |
+| `#settings-modal-container` | `components/modals/settings-modal.html` | Settings tabs (General, Templates, eLabFTW, OMERO, RSpace, n8n, Plugins/BioFormats, RO-Crate, Security). |
+| `#facet-search-modal-container` | `components/modals/facet-search-modal.html` | Full-screen Facet Search & Community Template Hub modal. |
+| `#templateModal` | `components/modals/template-modal.html` | 3-tab modal for creating/editing templates (Metadata Fields, Folder Structure, Community & Sharing). |
+| `#upload-modal-container` | `components/modals/upload-template-modal.html` | Assistant for publishing templates to the `MetaFold-Templates` GitHub repository. |
+| `#slide-out-panel-container` | `components/panels/slide-out-panel.html` | Slide-out detail panel. |
+| *(Loaded dynamically)* | `components/modals/login-modal.html` & `omero-password-modal.html` | User login dialog and OMERO password prompt. |
+
+### 2.3 Stylesheets (`src/css/`)
+- **Core & Layout**: `base.css` (dark theme defaults & tokens), `light-theme.css` (`body.light-mode` overrides), `components.css`, `components-extra.css`, `layout-override.css`, `responsive.css`, `sidebar-resize.css`, `right-sidebar.css`, `main-content-footer.css`, `sticky-actions.css`.
+- **Feature-Specific**: `modals.css`, `login-modal.css`, `userManagement.css`, `integrations.css`, `experimentFormDrag.css`, `dragDrop.css`, `enhanced-actions.css`, `metadata-table.css`, `projectScanner.css`, `projectScanner-export.css`, `facetSearch.css`, `fileScanner.css`, `roCrate.css`.
 
 ---
 
-## 5. Integrations
+## 3. JavaScript Module Reference
 
-### elabFTW (Electronic Lab Notebook)
-- **Settings tab**: Server URL, API Key, default template ID, overwrite/versioning options.
-- **Right Sidebar card** (`#elabftwIntegration`):
-  - Toggle switch (`#sendToElabFTW`) to enable per project.
-  - **Template dropdown** (`#elabftwProjectCategory`): Fetches available experiment templates from the elabFTW API and displays them as a `<select>`. The selected template is saved per MetaFold template.
-  - "🔄 Refresh Templates" link calls `loadElabFTWTemplates()`.
-  - "Fetch next ID" checkbox for auto-numbering folder names.
-  - "Update Existing ID" field for updating an existing experiment.
+### 3.1 Main Process & Backend Modules
+| File | Exposed / Exported | Responsibilities |
+|------|--------------------|------------------|
+| `src/main.js` | Main Process | Window lifecycle, file/folder creation, recursive project scanning (`scan-metafold-projects`), 2-pass lineage resolution, ID dictionary harvesting, Living User Index persistence (`user_index.json`), native PKZIP (`createZipBuffer`/`readZipBuffer`), BioFormats `showinf` execution, webhook dispatch, and `safeStorage` encryption. |
+| `src/js/main/projectMetadataStore.js` | `createProjectMetadataStore` | Mutex-locked (`withProjectLock`) reading, diffing, patching, changelog calculation, atomic saving, README regeneration, and User Index sync for existing projects (`update-project-metadata` IPC). Automatically syncs `[[Project]]` mentions in notes/text with the `related_to` field. |
+| `src/js/main/integrationLinks.js` | `integrationLinks` | Single source of truth for resolving and rendering the "Integration Links" block (eLabFTW, OMERO, RSpace) inside `<ProjectName>-README.html`. |
+| `src/js/proxyManager.js` | `OMEROProxyServer` | Local HTTP proxy server bridging Renderer requests to OMERO webclient APIs; handles CSRF tokens, session cookies, and RFC 6454 `Origin`/`Referer` header sanitization. |
 
-### OMERO (Image Data Management)
-- **Settings tab**: Server URL, username, group, dataset options.
-- **Right Sidebar card** (`#omeroIntegration`): Connect button, group/project dropdowns, metadata format toggle.
-- **Core Logic**: Supports creating standalone Datasets OR full Projects. Key-Value annotations are dynamically attached via `/webclient/annotate_map/` depending on the target object type.
-  - **Namespaces**: To keep annotations organized in OMERO, metadata is automatically split into distinct Map Annotations:
-    - **Groups**: Fields belonging to a template group are uploaded under a namespace named exactly after the group (e.g., `Microscopy`). Internal metadata (`provenance`, `_metafold`) is safely ignored during group parsing.
-    - **Flat Fields**: Template fields without an explicit group use the namespace `MetaFold Annotation`.
-    - **System Metadata**: Post-upload integration links and paths (e.g., OMERO Link, elabFTW Link, Project Local Path) use the namespace `System Metadata by MetaFold`.
+### 3.2 Shared Modules (Main + Renderer)
+| File | Global / Export | Responsibilities |
+|------|-----------------|------------------|
+| `src/js/shared/schemaVersion.js` | `window.metafoldSchema` | Defines `SCHEMA_VERSION` (`"0.1"`), `SCHEMA_TYPES`, `RESERVED_PROJECT_KEYS`, `getSchemaVersion()` (`"0.0"` fallback), and `isReservedProjectKey()`. |
+| `src/js/shared/markdownLite.js` | `window.markdownLite` | Safe, HTML-escaped micro-markdown parser/renderer supporting headings, lists, interactive task checkboxes (`- [ ]`), `#tags`, `[[Project Name]]` mentions, URLs, and clickable Windows/UNC paths. |
 
-### RSpace (Electronic Lab Notebook)
-- **Settings tab**: Server URL, API key.
-- **Right Sidebar card** (`#rspaceIntegration`): Folder selector dropdown with refresh, document name, tags.
+### 3.3 App Bootstrap, UI Shell & Utilities
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/app.js` | `window.app` | Startup orchestration (`app.init()`), component initialization locking, user/storage bootstrap, and `openTemplateHub()`. |
+| `src/js/componentLoader.js` | `window.componentLoader` | Fetches HTML files and injects them into DOM containers. |
+| `src/js/init_components.js` | *(DOMContentLoaded)* | Parallel-loads all 10 HTML components and triggers `.init()` on UI controllers. |
+| `src/js/globalHandlers.js` | `window.*` | Global `onclick` handlers (`switchMainTab`, `createProject`, `editCurrentTemplate`, recursive sidebar metadata rendering). |
+| `src/js/themeManager.js` | `window.ThemeManager` | Toggles Dark/Light mode (`body.light-mode`), persists `metafold_theme` in `localStorage`. |
+| `src/js/sidebarResizeManager.js` | `window.sidebarResizeManager` | Drag-to-resize behavior for left and right sidebars. |
+| `src/js/mainContentFooterManager.js` | `window.mainContentFooterManager` | Manages the sticky action bar in the main content footer. |
+| `src/js/footerMessagesManager.js` | `window.footerMessagesManager` | Displays/hides status, info, success, and error banners in the footer. |
+| `src/js/tabFooterControl.js` | `window.tabFooterControl` | Shows/hides footer action buttons depending on the active main tab. |
+| `src/js/utils.js` | `window.utils` | Shared frontend helper functions (DOM, string formatting, debounce). |
+| `src/js/debug.js` | `window.debug` | Developer diagnostic helpers in DevTools console. |
 
-### n8n (Workflow Automation)
-- **Settings tab** (`🤖 n8n`): Enable/disable toggle, Instance ID, Global Webhook URL, Authentication type (None / Bearer Token / Basic Auth), SSL verification toggle.
-- **Right Sidebar card** (`#n8nIntegration`): Toggle switch (`#sendToN8n`), status text, auto-trigger info badge.
-- **Integration logic** (`experimentForm.js`): Reads `#sendToN8n` toggle, includes it in `integrations.n8n`. Webhook fires on project creation.
+### 3.4 Templates & Community Hub
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/templateManager.js` | `window.templateManager` | Loads, saves, filters, and renders templates from `~/MetaFold/Templates/`; manages active template state and UI modes (`writeFilesOnly`, `multipleFolders`). |
+| `src/js/templateTypeManager.js` | `window.templateTypeManager` | Manages the 4 customizable local template categories (`category1`–`category4`). |
+| `src/js/templateModal.js` | `window.templateModal` | Controller for the 3-tab Template Editor modal (metadata fields, dynamic folder structure tags `[Field Label]`, community sharing metadata). |
+| `src/js/communityManager.js` | `window.communityManager` | Fetches & caches `templates-index.json` from GitHub (`MetaFold-Templates`), manages the 4 fixed community categories (`Systems`, `Protocols`, `Experiments`, `Workflows`), collections, and `TagPicker`. |
+| `src/js/uploadModal.js` | `window.uploadModal` | Validates and formats templates for one-click submission to GitHub Issues. |
+| `src/js/enhancedActions.js` | `window.enhancedActions` | Bulk template import/export menus and template action helpers. |
 
-### BioFormats / File Sidecar Scanner
-- **Settings tab** (`🔌 Plugins`): Enable/disable toggles for the File Scanner and BioFormats OME-XML extraction. Configuration of searched file extensions and path to `showinf` / `showinf.bat` with auto-detect feature.
-- **Discover Tab tile**: Trigger button to open the 3-step File Scanner wizard (hidden by default unless enabled).
-- **Core Logic** (`fileScanner.js`): Recursively finds microscopy files, inherits project metadata (ISA) from parent directories, spawns a `showinf` background process to extract OME-XML, and writes a `.metafold-sidecar.json` next to each file.
-- **IPC Handlers**: `list-files-recursive`, `bioformats-detect`, `bioformats-read-omexml` (uses direct `java` classpath execution when formats JARs are present to prevent Windows path quoting/space issues, falling back to batch file execution if needed).
+### 3.5 Project Creation, Forms & Inline Editing
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/projectManager.js` | `window.projectManager` | Orchestrates project creation, resolves dynamic `[Field]` folder placeholders (`processDynamicFolderStructure`), injects RDM provenance, writes `<ProjectName>-metadata.json` & `<ProjectName>-README.html`, and triggers active integrations. |
+| `src/js/experimentForm.js` | `window.experimentForm` | Renders the dynamic metadata form from template definitions (text, number, date, dropdown, checkbox, email, 5-star `rating`, `id_anchor`, `derived_from`, `related_to`, and collapsible `group` accordions). Collects nested JSON payloads (`collectData()`). |
+| `src/js/metadataEditor.js` | `window.metadataEditor` | Field builder and drag-and-drop ordering inside the Template Modal and form. |
+| `src/js/codeScannerModal.js` | `window.codeScannerModal` | Webcam scanner for QR codes, DataMatrix, and 1D lab barcodes via native `BarcodeDetector` + `@zxing/library` (`src/js/vendor/zxing.min.js`). |
+| `src/js/metadataLoader.js` | `window.metadataLoader` | Loads existing `<ProjectName>-metadata.json` files back into the Create Project form to update metadata or retroactively push to integrations. |
+| `src/js/projectInlineEditor.js` | `window.projectInlineEditor` | In-place editing of project metadata, project renaming, field addition/deletion, and integration re-sync inside the Discovery Details Panel (`#facetRightPanel`). |
+| `src/js/noteComposer.js` | `window.noteComposer` | Modal and micro-markdown toolbar for adding/editing categorized lab notes (`general`, `observation`, `deviation`, `retrospective`) with `#tag` and `[[Project]]` autocomplete and live task-checkbox toggling. |
+| `src/js/projectValidation.js` | `window.projectValidation` | Input validation for project names, paths, and required metadata fields. |
 
----
+### 3.6 Project Discovery, Facet Search & File Sidecar Scanner
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/projectScanner.js` | `window.projectScanner` | UI controller for scanning directories, managing the Living User Index (`user_index.json`), ISA parent metadata inheritance toggle, and summary JSON exports. |
+| `src/js/facetSearch.js` | `window.facetSearch` | Stateful singleton powering both the **Discover Projects** table/filter view (via **Tabulator.js 6.3**), the right-hand Project Details & Notes inspector (`#facetRightPanel`), and the **Community Template Hub** modal. |
+| `src/js/fileScanner.js` | `window.fileScanner` | 3-step File Sidecar Scanner wizard: finds microscopy files recursively, inherits parent project metadata, extracts OME-XML via BioFormats `showinf`, and writes `.metafold-sidecar.json` files. |
+| `src/js/projectMetadataEnhancer.js` | `window.projectMetadataEnhancer` | Computes metadata completeness and complexity metrics for scanned projects. |
 
-## 6. Light Mode
+### 3.7 Data Lineage, Visualization & RO-Crate Export
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/visualizationManager.js` | `window.visualizationManager` | Orchestrates the Visualization view, node selection action bars (`#kg-action-bar`, `#lineage-action-bar`), interactive **Connect Mode** (visual linking of projects), and **Lineage Export** (Metadata JSON + offline HTML dashboard with pre-rendered Mermaid SVG via `src/js/vendor/mermaid.min.js`, or Full Data Harvest). |
+| `src/js/lineageTree.js` | `window.MetaFoldLineageTree` | D3.js horizontal (left-to-right) collapsible tidy tree visualizing `derived_from` project ancestry and folder links. |
+| `src/js/knowledgeGraph.js` | `window.MetaFoldKnowledgeGraph` | D3.js multi-view graph (Hierarchical Edge Bundling, Folder Tree, Arc Diagram, Lineage Tree). |
+| `src/js/metadataGraph.js` | `window.MetaFoldMetadataGraph` | Interactive D3.js tree grouping projects by shared metadata keys and values. |
+| `src/js/roCrateManager.js` | `window.roCrateManager` | Transforms projects and lineage subgraphs into **FAIR RO-Crate 1.1** (`ro-crate-metadata.json` + HTML preview) via a guided Pre-Flight Export Wizard. |
+| `src/js/roCrateValidator.js` | `window.roCrateValidator` | In-memory structural validator checking RO-Crate 1.1 compliance (License, Dates, ORCID, connected lineage entities). |
 
-- **Implementation**: CSS-class-based (`body.light-mode`).
-- **File**: `src/css/light-theme.css` – ~549 lines of override rules covering all major UI regions.
-- **Facet Search light mode**: `src/css/facetSearch.css` contains dedicated `body.light-mode` overrides for the modal window, header, sidebar, chips, group titles, column selector dropdown, close button, and the Tabulator table.
-- **Persistence**: `localStorage.getItem('metafold_theme')` → `'light'` or `'dark'` (default).
-- **Toggle**: `window.toggleTheme()` (exposed by `themeManager.js`), called from a button in the left sidebar with icon `#themeToggleIcon` (☀️ / 🌙).
-- **FOUC prevention**: `ThemeManager.init()` runs immediately on script load, before `DOMContentLoaded`.
+### 3.8 Lab Integrations (eLabFTW, OMERO, RSpace, n8n)
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/sidebarIntegration.js` | `window.sidebarIntegration` | Controls Right Sidebar integration cards, toggle switches, path copy, and RSpace folder loading. |
+| `src/js/integrationOptionsFix.js` | *(Defer Script)* | Synchronizes integration card visibility with the active template category and global settings. |
+| `src/js/metadataLinksManager.js` | `window.metadataLinksManager` | Records external URLs (`elabftw`, `omero`, `rspace`) in `metafold_integration.external_links` and triggers README link updates. |
+| `src/js/elabftwCategoryManager.js` | `window.elabftwCategoryManager` | Fetches eLabFTW experiment templates via API, populates `#elabftwProjectCategory`, and persists template selection per MetaFold template. |
+| `src/js/rspaceIntegration.js` | `window.rspaceIntegration` | Communicates with RSpace API (fetches folder trees, creates structured lab notebook documents). |
+| `src/js/omeroPasswordPrompt.js` | `window.omeroPasswordPrompt` | Displays on-demand password prompt when connecting to OMERO without a stored password. |
+| `src/js/omero/metaFoldOMEROIntegration.js` | `window.metaFoldOMEROIntegration` | High-level coordinator for OMERO project/dataset creation and map annotation upload. |
+| `src/js/omero/omeroAuth.js` & `omeroAPI.js` | `window.omeroAuth`, `window.omeroAPI` | Session authentication (via local proxy + webclient fallback) and REST/webclient API calls. |
+| `src/js/omero/omeroGroups.js`, `omeroProjects.js`, `omeroDatasetCreation.js` | `window.omeroGroups`, etc. | Fetches OMERO groups/projects and creates remote Projects and Datasets. |
+| `src/js/omero/omeroAnnotations.js` & `omeroTemplateSync.js` | `window.omeroAnnotations`, etc. | Splits metadata into OMERO Map Annotation namespaces (Group names, `MetaFold Annotation` for flat fields, `System Metadata by MetaFold` for links/paths). |
+| `src/js/omero/omeroUIIntegration.js`, `omeroEventHandlers.js`, `omeroPerformancePatch.js` | `window.omeroUIIntegration`, etc. | Binds OMERO dropdowns, connection buttons, and caching to the Right Sidebar and Settings UI. |
 
----
-
-## 7. Security Architecture
-
-| Layer | Mechanism |
-|-------|-----------|
-| Credential encryption | DPAPI (Windows) + User-specific entropy |
-| Password cache | In-memory only, 30-minute TTL, never written to localStorage |
-| Cache lifecycle | Set on login (`loginModal.js`), cleared on logout/user-switch (`userManager.js`, `settingsManager.switchToUser()`) |
-| Admin auto-init | `secureStorage.js` creates Admin account on first `init()` if password system is enabled |
-| Cross-user protection | Entropy mismatch blocks decryption with `ENTROPY_ERROR` |
-
----
-
-## 8. User Profiles & RDM Provenance
-
-MetaFold implements an RDM-compliant (Research Data Management) user and group system, heavily inspired by the ISA-JSON standard (Investigation, Study, Assay).
-
-### Local Data Store
-Instead of simple strings, users and groups are stored as rich objects in local JSON files via the `profileManager.js`:
-- **`groups.json`**: Contains group metadata such as PI Name, PI ORCID, Institution, Department, ROR (Research Organization Registry), and Funding Info.
-- **`users.json`**: Contains user metadata such as First/Last Name, Email, ORCID, Affiliation, and Role (e.g., PI, PostDoc, PhD Student), plus a reference to their primary group.
-
-### Passwords & Security Separation
-To maintain a secure, local-first architecture without a central database:
-- **Passwords are never stored in the profile JSONs.**
-- The `secureStorage.js` (DPAPI) manages authentication.
-- When profiles are exported/imported across devices, they do not include passwords. Users must set a new password on the new device upon first login.
-
-### Provenance Tracking (Self-Contained Data)
-When a project is created via the UI, the `profileManager.js` generates a `provenance` block containing the current user's and group's metadata. 
-This block is automatically injected into the `ReadyToImport.json`. 
-- **Inheritance**: Subfolders created as part of the project structure do not need their own JSON files; they implicitly inherit the provenance from the parent project's `ReadyToImport.json`.
-- **Sidecars**: For single-file extraction (e.g., File Sidecar Scanner), the provenance is injected into the `.metafold-sidecar.json`.
-This ensures that every metadata file is self-contained and FAIR, retaining its creator context even if moved independently of the application.
-
----
-
-## 9. External Dependencies (CDN)
-
-All external libraries are loaded via CDN in `index.html`. No local bundling.
-
-| Library | Version | Purpose |
-|---------|---------|---------|
-| Tabulator.js | 6.3.0 | Results table in Facet Search (sorting, column management, CSV export) |
-| JSONCrack (via iframe) | — | Visualisation tab |
-| React + ReactDOM | 18.3.1 | Used in specific sub-features |
-| D3.js | 7.8.5 | Fallback visualization |
-
----
-
-## 10. Data Linking & Lineage (Knowledge Graph)
-
-MetaFold allows linking projects dynamically to create a comprehensive Knowledge Graph and Data Lineage representation.
-
-### ID Dictionary & Autocomplete
-To facilitate linking, the application scans existing projects for custom IDs and builds a dictionary for autocomplete.
-- **Location**: The ID dictionary is saved within the user's specific template directory, typically:
-  `C:\Users\Thomas Zobel\MetaFold\Templates\System\Admin\id_dictionary_admin.json` (or similar, depending on group/user).
-- **Filtering**: The scanner extracts fields explicitly typed as `id_anchor` as well as the overarching `projectName`. It strictly ignores auto-generated UUIDs (like `metafold_project_id`) using regex, ensuring the autocomplete remains clean and relevant for researchers.
-- **Data Structure**: Entries in the `id_dictionary` are saved as objects (e.g. `{ id: "BPAE-Cells", type: "project" }` or `{ id: "cell-42", type: "id_anchor" }`). If a project name collides with an explicitly assigned `id_anchor`, the `id_anchor` takes precedence.
-- **UI Representation**: In the `derived_from` field, these options are presented via a native HTML `<datalist>`. They are visually distinguished using emojis in the `label` attribute (`📁 Projekt` vs `⚓ ID`), removing redundancy while ensuring the input captures the raw string.
-
-### Metadata Linking Logic
-Projects are linked via two specific metadata field types:
-- **`id_anchor`**: Defines the unique identifier *provided* by the current project (e.g., `"cell-42"`).
-- **`derived_from`**: An array or string of identifiers that this project *builds upon* (e.g., `"cell-42", "stain-01"`).
-- **Lineage Extraction (`main.js`)**: A two-pass algorithm runs during folder scanning. Pass 1 maps absolute paths to their provided IDs. Pass 2 resolves all `derived_from` references into absolute paths to build the complete `lineage` object.
-
-### Interactive Visualizations
-- **D3.js integration**: Visualized as a hierarchical Lineage Tree or a semantic Knowledge Graph (`visualizationManager.js`).
-- **Interactive Action Bar**: Clicking a node in either graph dynamically injects an Action Bar into the header, providing buttons for:
-  - **View Details**: Opens the metadata inspector modal.
-  - **Open Folder**: Opens Windows Explorer to the specific project path.
-  - **Export Lineage**: (See below).
-
-### Subgraph Extraction (Lineage Export)
-- **`exportLineage`**: Clicking "Export Lineage" on a graph node opens a custom **Export Options Modal** offering two modes (Metadata Only vs Full Data Harvest) and two scopes:
-  - **Direct Lineage Only**: Strictly traces upwards (ancestors) and downwards (descendants) from the selected project.
-  - **Entire Connected Graph**: Uses a flood-fill algorithm to capture the entire weakly connected component, including siblings and cousins.
-- **Dual Export (JSON & HTML)**: The feature creates an isolated JSON bundle of the graph dependency chain, alongside a rich, interactive HTML dashboard. The HTML view includes:
-  - A Kahn's Algorithm-based **Topological Sort** to display projects chronologically from origin to end.
-  - A **Mermaid.js Flowchart** at the top with clickable anchor nodes that scroll to detailed project cards. The flowchart is **pre-rendered as an inline SVG** directly by MetaFold at export time using a bundled local Mermaid instance (`src/js/vendor/mermaid.min.js`), making the exported HTML file 100% self-contained and offline-compatible (no CDN or internet connection required). The flowchart is **color-coded**: the root project is highlighted, direct lineage nodes have a primary color, and indirect projects are muted.
-  - Buttons for **"Copy Path"**, **"Open README"**, and direct integration links (OMERO/eLabFTW).
-- **Full Data Harvest**: When selected, this mode automatically finds all subdirectories across the exported projects and presents a subfolder selection modal. It then physically copies all selected data into a new standalone directory, while dynamically rewriting internal HTML links to be portable relative paths.
+### 3.9 Users, Groups, RDM Provenance & Security
+| File | Global | Responsibilities |
+|------|--------|------------------|
+| `src/js/storage.js` | `window.storage` | File-system and `localStorage` abstraction scoped to the active user and group (`~/MetaFold/Templates/`). |
+| `src/js/profileManager.js` | `window.profileManager` | Manages RDM user/group profiles in `users.json` and `groups.json` (ORCID, ROR, Role, PI, Department), generates the `provenance` block for projects, and handles scoped `.zip` / `.json` profile + template export/import. |
+| `src/js/userManager.js` | `window.userManager` | Manages active user session, login/logout lifecycle, and Admin checks. |
+| `src/js/loginModal.js` | `window.loginModal` | Startup login modal with existing-user guard (`findExistingUser`) and in-memory password entropy caching. |
+| `src/js/userManagementModal.js` | `window.userManagementModal` | Admin UI for creating/editing users & groups, validating ORCID/Email, and triggering individual or global exports. |
+| `src/js/settingsManager.js` | `window.settingsManager` | Central settings store per user; coordinates with `secureStorage` to encrypt/decrypt API keys and passwords. |
+| `src/js/secureStorage.js` & `secureIntegration.js` | `window.secureStorage`, `window.secureIntegration` | Wraps Electron `safeStorage` (Windows DPAPI / macOS Keychain) combined with user-specific password entropy (30-min in-memory TTL). |
+| `src/js/securityGuard.js`, `securityUI.js`, `adminPasswordManager.js` | `window.securityGuard`, etc. | Enforces authentication gates, credential migration UI, and admin password management. |
 
 ---
 
-## 11. How to Verify Key Features
+## 4. Core Workflows & Mechanics
 
-### Faceted Search (Column Selector & Multi-Select Filters)
-1. Export a scan summary as JSON (via **💾 Export Summary**).
-2. Click **🏷️ Search Metadata** and load the exported JSON.
-3. Filter by clicking chips in the sidebar — multiple chips per category are supported.
-4. After filter clicks, the table should re-render with correct row heights and full-width columns.
-5. Click **⚙️ Columns** to toggle which metadata fields appear as table columns.
-6. Integration links (🔵 OMERO, 🟢 eLabFTW) are clickable in the Actions column.
+### 4.1 Project Creation & Metadata Structure
+When `projectManager.createProject()` runs:
+1. **Dynamic Folders**: `processDynamicFolderStructure()` replaces `[Field Label]` or `[fieldKey]` placeholders (plus `[User Name]`, `[Project Name]`, `[Date]`) in the template's folder structure with form values. Empty placeholders skip the subfolder line.
+2. **Metadata Payload**: `experimentForm.collectData()` builds the metadata object. Fields inside a template **Group** are nested under their group key (`{ "Microscopy": { ... } }`).
+3. **Envelope & Provenance**: `main.js` writes `<ProjectName>-metadata.json` (and `ReadyToImport.json` when applicable) using schema version `"0.1"` (`src/js/shared/schemaVersion.js`), injecting `provenance` (from `profileManager.js`) and `System.*` tracking fields (`System.ProjectAbsolutePath`, `System.UpdateHistory`, `System.LastUpdatedBy`, `System.LastUpdatedAt`).
+4. **HTML README**: `main.js` generates `<ProjectName>-README.html` with formatted metadata tables, 5-star SVG ratings, rendered micro-markdown notes, and integration links (`src/js/main/integrationLinks.js`).
+5. **Living User Index & ID Dictionary**: The new project is automatically upserted into `~/MetaFold/Templates/user_index.json` and any `id_anchor` / `projectName` is added to the user's `id_dictionary_<user>.json`.
 
-### Light Mode
-1. Click the ☀️/🌙 button in the left sidebar header.
-2. Open the Facet Search modal — all elements (sidebar, chips, dropdown, table) should use light colours.
+### 4.2 Discovery, Inline Editing & Notes (`discover-projects-tab`)
+- **Living User Index**: Opening the **Discover Projects** tab loads `user_index.json` directly into `facetSearch.js` without prompting for a file. Users can scan additional folders (`scan-metafold-projects` IPC) to merge projects into the index, optionally inheriting parent folder metadata (ISA hierarchy).
+- **Facet Search & Tabulator**: `facetSearch.js` flattens project metadata into `flatMeta`, builds multi-select filter chips in the left panel, and renders the results table via **Tabulator.js**. Categories can be hidden/managed via context menu (`facetSearch.hiddenKeys`).
+- **Right Inspector Panel (`#facetRightPanel`)**: Selecting a project in the table opens its details in the right panel:
+  - **Inline Metadata Editing (`projectInlineEditor.js`)**: Edits fields, renames the project, adds/removes fields, and saves atomically via `window.electronAPI.updateProjectMetadata(projectPath, patch, options)` (`projectMetadataStore.js`).
+  - **Categorized Notes & Tasks (`noteComposer.js` + `markdownLite.js`)**: Appends/edits timestamped notes in `notes_log`, supports interactive task checkboxes (`- [ ]` / `- [x]`), `#tags`, and `[[Project Name]]` mentions. Mentioning `[[Project X]]` automatically synchronizes `"Project X"` into the project's `related_to` metadata field.
 
-### ISA Metadata Inheritance
-1. Create a parent project with metadata (e.g., `PI: Zobel`, `Organism: Mouse`).
-2. Create a child project inside the parent folder with its own metadata.
-3. Go to **Discover Projects** tab and check **🧬 Inherit parent metadata (ISA)**.
-4. Click **Scan Projects** — the child project should contain both its own and inherited parent metadata.
-5. `System.Level` should be `1` for the parent and `2` for the child.
+### 4.3 Data Lineage, Connect Mode & Exports
+- **Linking Fields**:
+  - `id_anchor`: Unique identifier provided by a project (e.g., `"sample-01"`).
+  - `derived_from`: Identifiers of upstream parent projects/samples this project builds upon.
+  - `related_to`: Horizontal cross-references (also auto-populated from `[[Project]]` mentions in notes).
+- **Two-Pass Resolution (`main.js`)**: During scanning, Pass 1 maps project paths to their `id_anchor` and `projectName` (ignoring UUIDs). Pass 2 resolves `derived_from` references into `lineage.lineage_links` containing exact `source_path` targets.
+- **Visual Connect Mode (`visualizationManager.js`)**: In the Lineage Tree, clicking **Connect** lets users click a Source node and a Target node to write a new `derived_from` link directly into the target's `*-metadata.json`, append to `System.UpdateHistory`, and regenerate its `README.html`.
+- **Lineage Export & Full Data Harvest**: Clicking **Export Lineage** offers:
+  - *Scope*: **Direct Lineage Only** (ancestors + descendants) vs. **Entire Connected Graph** (weakly connected component).
+  - *Mode*: **Metadata Only** (JSON + 100% offline HTML dashboard with a topologically sorted project list and a pre-rendered inline `<svg>` Mermaid flowchart) vs. **Full Data Harvest** (interactive subfolder selector that physically copies selected data directories and rewrites HTML links to relative paths).
+- **RO-Crate 1.1 Export (`roCrateManager.js` + `roCrateValidator.js`)**: Validates FAIR metadata requirements and exports a standard `ro-crate-metadata.json` (JSON-LD) alongside an HTML preview.
 
-### n8n Integration
-1. Open **Settings** → **🤖 n8n** tab. Enable integration, enter Webhook URL and auth details.
-2. The **n8n card** appears in the right sidebar.
-3. Enable the toggle for a project and create it → webhook fires.
-
-### elabFTW Template Dropdown
-1. Open **Settings** → **elabFTW** tab, enable and configure.
-2. In the right sidebar, the elabFTW card shows a **Template** dropdown.
-3. Click **🔄 Refresh Templates** to load templates from the elabFTW API.
-4. Select a template – it is saved per MetaFold template and restored on re-selection.
-
-### File Sidecar Scanner & BioFormats
-1. Enable the plugin in **Settings** → **🔌 Plugins**.
-2. If BioFormats is installed (Java 8+ required), enable it and click **🔍 Auto-Detect**.
-3. Go to the **Discover Projects** tab and click the new **🔬 File Sidecar Scanner** tile.
-4. Follow the 3-step wizard to select a folder containing microscopy files (e.g., `.czi`, `.tif`) and a root folder for metadata inheritance.
-5. Click **🚀 Scan starten**. The app will process the files and show a results table. Check the file system for `.metafold-sidecar.json` files next to your images.
-
----
-
-## 12. Metadata Schema & Output Format
-
-MetaFold dynamically creates `ReadyToImport.json` (oder `<ProjectName>-metadata.json`) alongside a `<ProjectName>-README.html` representation. AI Agents should be aware of these structural principles:
-
-- **Nested Groups**: Fields placed under a "Group" element in the Template Editor (`experimentForm.js`) are output as nested JSON objects (using the group name as the parent key) in `collectData()`. This creates "Namespaces" compatible with OMERO and other hierarchical systems.
-- **System Fields**: During JSON generation, `main.js` automatically injects `System.ProjectAbsolutePath`, `System.ProjectRelativePath`, `System.UpdateHistory`, `System.LastUpdatedBy`, and `System.LastUpdatedAt`. These fields track provenance, project location, and document modifications natively. They are displayed in the `README.html` under the "System Information" section.
-- **Rating Fields**: Saved as integer values (1-5) in JSON, but are dynamically translated into visual 5-star SVGs in the Form UI and the generated `README.html`.
-- **E-Mail Validation**: Handled both in user/group management (`userManagementModal.js`) and generic template fields (`experimentForm.js`).
-- **Internal Keys**: Keys like `provenance`, `projectName`, `metafold_project_id`, `metafold_integration`, and `System.*` are deliberately hidden from standard metadata iterators in the UI/HTML rendering, ensuring the user only sees relevant experimental data.
+### 4.4 Storage Layout & User/Group Portability
+- **Persistent Data Root**: `~/MetaFold/Templates/` stores:
+  - `users.json` & `groups.json` (RDM profiles, preferences; **never** contains passwords)
+  - `user_index.json` (Living User Index of discovered/created projects)
+  - `id_dictionary_<user>.json` (Autocomplete dictionary for `derived_from`)
+  - `<Group>/<User>/*.json` (Template files)
+- **Portability (`profileManager.js`)**: Users or groups (including their templates) can be exported and imported as a self-contained `.zip` archive (via the built-in `zlib` PKZIP engine in `main.js`), folder, or single `.json` bundle.
+- **Credentials**: Passwords and API keys are encrypted locally in `%APPDATA%/MetaFold` via Electron `safeStorage` (DPAPI) + user password entropy.
 
 ---
 
-## 13. Historical Fixes
+## 5. JSON Schemas, Data Contracts & Testing
 
-### Sidebar & Settings
-- **`src/index.html`**: Added missing `<script src="js/sidebarIntegration.js">`.
-- **`src/js/settingsManager.js`**: Fixed critical syntax error; restored broken template literals.
-- **`src/js/sidebarIntegration.js`**: Implemented `updateSidebarVisibilityFromSettings()` with retry; added `window.loadRSpaceFolders()`; integration cards hidden by default.
-- **`src/js/globalHandlers.js`**: Added safety checks before accessing `settingsManager`.
+All JSON files read or written by MetaFold are formally specified in [`docs/schema/v0.1/`](docs/schema/v0.1/README.md) (JSON Schema Draft 2020-12).
 
-### Facet Search – Modal Migration
-- Moved Facet Search from inline tab content into a dedicated full-screen modal (`facet-search-modal.html`).
-- Replaced manual DOM table construction with **Tabulator.js** for correct multi-value handling, native CSV export, sortable/resizable columns.
-- Fixed CSV export: arrays joined with `"; "`, URLs extracted from multiple data-structure variants, BOM prefix for Excel compatibility.
-- Fixed column-selector dropdown: closes on outside click (capture-phase document listener).
-
-### Facet Search – Table Layout Fix (current session)
-- **Root cause**: After `replaceData()`, Tabulator's `fitColumns` layout could not measure the container's settled size before `redraw(true)` ran, causing rows to have incorrect widths/heights.
-- **Fix 1** (`facetSearch.js`): Replaced single `redraw(true)` call after `replaceData()` with a **double `requestAnimationFrame`** wrapper, ensuring the browser paints and the container settles before layout recalculation.
-- **Fix 2** (`facetSearch.js`): Changed `layout: 'fitColumns'` → `layout: 'fitDataStretch'`, which handles dynamic resizing more robustly.
-- **Fix 3** (`facetSearch.js`): Added `tableBuilt` callback that fires a single RAF-delayed `redraw(true)` on first render, and a **`ResizeObserver`** on the container that triggers `redraw(true)` on size changes (e.g. sidebar filter area toggling). Observer is disconnected in `closeSearch()`.
-- **Fix 4** (`facetSearch.css`): Container now uses `display: flex; flex-direction: column` and the `.tabulator` itself gets `flex: 1; width: 100%` so it always fills the available space.
-- **Fix 5** (`facetSearch.css` + `facet-search-modal.html`): Removed hardcoded dark inline styles from the column-selector dropdown `<div>`; moved all styling to `.column-selector-dropdown` CSS class with full dark/light-mode overrides.
-- **Fix 6** (`facetSearch.css`): Added missing light-mode overrides for: facet chips (`.facet-chip`, `.facet-chip.active`), group titles (`.facet-group-title`), modal subtitle, close button, and active filter badge.
-
-### Facet Search – Category Management (Current Session)
-- **Hide Categories**: Added a context menu (right-click) to facet group titles to allow hiding specific metadata fields from the sidebar. Hidden state is persisted via `settingsManager` (`facetSearch.hiddenKeys`).
-- **Manage Categories Modal**: Added an `👁️ Manage Categories` button that opens a centered modal displaying all available metadata fields (including their native data types inferred from `p.metadata`). Checkboxes allow users to easily toggle visibility, robustly handling keys that are missing in the current scan.
-- **Header Badges & Clearing**: Added active filter count badges and `✖` clear buttons directly to category headers in the sidebar.
-- **Admin Password Safety**: Implemented validation in `userManagementModal.js` to prevent clearing the Admin password, avoiding unintentional startup resets.
-
-### Discovery & Integration (Current Session)
-- **In-Memory Facet Search**: Added `🔍 Search Metadata` button to `projectScanner.js` that bypasses the file selection dialog and loads scanned projects directly from RAM via a new `loadFromProjects()` method in `facetSearch.js`.
-- **In-Memory Visualisation**: Added `📊 Visualisation` button to instantly render the Knowledge Graph/Lineage Tree from scanned RAM data.
-- **ID Dictionary Filtering**: Updated `main.js` to strictly ignore `metafold_project_id` and regex-match UUIDs during ID harvesting (`extractIdValues` & `extractLineage`), keeping the autocomplete clean. Restore string-split logic for array mapping in `derived_from_ids`.
-- **Interactive Graphs**: Injected an Action Bar into `visualizationManager.js` headers (`#kg-action-bar` & `#lineage-action-bar`) which populates dynamically upon node click to offer "View Details", "Open Folder", and "Export Lineage".
-- **Export Lineage Subgraph**: Implemented a recursive graph traversal algorithm (`window.exportLineage`) that captures the full ancestry and progeny of a selected project and saves it as an isolated JSON file.
-
-### Lineage Export Enhancements (Current Session)
-- **Path Resolution Sync**: Changed `visualizationManager.js` to rely entirely on the backend-resolved `lineage_links` rather than repeating the name-based ID lookup. This prevents graph disconnections caused by duplicate project names in nested folder structures.
-- **Export Scope Selection**: Refactored `exportLineage` to calculate both a strictly vertical "Direct Lineage" (via `collectAncestors` and `collectDescendants`) and the full connected graph (via `collectDependencies`). 
-- **Custom Export Modal**: Replaced the native Electron `showMessageBox` with a styled HTML overlay modal for selecting Export Mode (Metadata/Harvest) and Scope (Direct/Full).
-- **Flowchart Color-Coding & Offline SVG Pre-Rendering**: Injected CSS class definitions into the generated Mermaid diagram in `generateLineageHtml` to visually distinguish the root node (purple), direct lineage nodes (blue), and indirect lineage nodes (dark grey). Furthermore, bundled `mermaid.min.js` locally in `src/js/vendor/` and pre-rendered the diagram directly into static, interactive inline `<svg>` during export, removing the external CDN script dependency and ensuring 100% offline functionality.
-- **Harvest Subfolder Selector**: Added an interactive modal during Full Data Harvest that parses the directory tree of all exported projects and lets the user choose exactly which nested folders they want to physically copy over.
-
-### Lineage Graph Connect Mode (Current Session)
-- **Visual Node Linking**: Introduced a "Connect" button in the Lineage Tree Action Bar that activates an interactive connection mode. Users select a Source node, then a Target node, and the visualization establishes a new `derived_from` dependency link.
-- **Strict Metadata Compliance**: When projects are connected visually, the logic bypasses `ReadyToImport.json` flag files in favor of the actual `*-metadata.json` payload files.
-- **Object Formatting & Audit Trails**: Automatically structures the newly inserted `derived_from` field to match MetaFold's internal standards (`{ type: "derived_from", value: [...] }`). Furthermore, it mimics the native "Extend Metadata" behavior by tracking modification timestamps (`lastUpdatedAt`) and the editing user (`lastUpdatedBy`).
-- **README Synchronization**: After writing the updated JSON via DPAPI handlers, the script immediately calls `regenerateReadmeHtml` to ensure the project's visual representation (which relies heavily on HTML rendering for performance during scans) is kept perfectly in sync with the backend graph data.
-
-### 📦 RO-Crate & FAIR Data Workflow (Current Session)
-- **roCrateValidator.js**: In-memory structural validation of RO-Crate JSON-LD objects before export. Checks for RO-Crate 1.1 requirements (License, Dates, Author ORCID, Connected Lineage).
-- **roCrateManager.js**: Constructs the RO-Crate payload, builds the HTML preview, and provides the Pre-Flight Export Wizard UI.
-- **Export UI Integration**: "📦 Export RO-Crate" button injected into the `visualizationManager.js` headers (`#kg-action-bar` & `#lineage-action-bar`) and `projectScanner.js` summary action bar.
-- **Settings UI**: Added a dedicated settings tab for configuring default license and preview HTML generation.
-
-### Sidebar Metadata Viewer (Current Session)
-- **Discovery Tab Preview**: Selecting a project in the Discovery list (or double-clicking a graph node) dynamically hides the Template view in the left sidebar and renders the selected project's full metadata in a dedicated container (`#sidebar-project-view`).
-- **Recursive Metadata Rendering**: Upgraded `globalHandlers.js` to parse and render nested metadata categories (e.g., `Microscopy`, `Biological Sample`) recursively. Nested objects are formatted cleanly with folder icons and distinct borders instead of raw JSON stringification, maintaining the original type logic (URL highlighting, empty states) across all depths.
-- **Active Selection Highlighting**: Clicking a project item adds an `.active` CSS state in `projectScanner.css`, visually highlighting the currently inspected row with a gradient background, border, and glow effect to indicate the active selection.
-
-### Lineage Tree Orientation (Current Session)
-- **Horizontal Left-to-Right Layout**: Reverted the Lineage Tree (`lineageTree.js`) from a top-to-bottom layout to a horizontal (left-to-right) collapsible tidy tree. Projects are now stacked vertically below each other, preventing long project names from creating overly wide layouts and excessive gaps.
-
-### Template List Scrollbar Fix (Current Session)
-- **Root Cause**: When `<div id="sidebar-template-view">` was introduced to wrap `.header` and `#templateList` (to toggle between templates and `#sidebar-project-view`), it lacked flex container styles. Because it defaulted to `display: block` with unconstrained height, `#templateList`'s `flex: 1` had no effect and `#templateList` expanded to its full content height instead of being bounded by the sidebar. Consequently, `#templateList` never overflowed internally to trigger its scrollbar, while `.sidebar` (`overflow: hidden; height: 100vh`) clipped all templates overflowing the viewport.
-- **Fix**:
-  - `src/css/base.css`: Added `#sidebar-template-view` rule (`display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; width: 100%;`) and added `min-height: 0;` plus standard `scrollbar-width` to `#templateList`.
-  - `src/components/sidebars/left-sidebar.html`: Added inline style to `#sidebar-template-view` matching the flex column layout and full height.
-  - `src/js/globalHandlers.js`: Updated `switchMainTab()` to toggle `templateView.style.display = 'flex'` (instead of `'block'`) when switching back from the Discovery tab.
-
-### OMERO Proxy & CSRF Origin Fix (Current Session)
-- **Root Cause**: Connecting to OMERO from external/guest networks triggered `403 CSRF Origin Check failed`. In `proxyManager.js`, `headers.origin` and `headers.referer` contained trailing slashes and malformed paths, causing Django's strict RFC 6454 origin check to fail. Furthermore, the proxy did not refresh `omeroServerUrl` if it was already running, and loopback addresses (`::1` vs `127.0.0.1`) could desynchronize client session cookies.
-- **Fix**:
-  - `src/js/proxyManager.js`: Sanitized `headers.origin` via `new URL().origin` (strictly removing trailing slashes/paths); normalized `headers.referer` to `${origin}/webclient/login/`; synchronized `csrftoken` cookies from `X-CSRFToken` headers; normalized `localhost` loopback addresses in `getClientId()`; ensured `omeroServerUrl` is always updated on `start(settings)` calls even if the proxy was already running.
-  - `src/js/omero/omeroAuth.js`: Added native `Webclient Login` (`/webclient/login/`) fallback strategy to mirror standard browser logins.
-
-### Windows 7 SP1 Legacy Build Support (Current Session)
-- **Root Cause**: Electron 23+ (and the default Electron 38 build) dropped support for Windows 7/8/8.1, embedding `MajorSubsystemVersion = 10.0` in the PE header and linking against Windows 10+ kernel APIs. Attempting to launch the standard installer on Windows 7 SP1 64-bit workstations (e.g., HP Z840) failed with `MetaFold is not a valid Win32 Application`.
-- **Fix**:
-  - `src/electron-builder-win7.json`: Created a dedicated builder configuration pinning `"electronVersion": "22.3.27"` (the final official Electron release supporting Windows 7 SP1) and outputting `${productName}-Setup-${version}-win7.${ext}`.
-  - `src/package.json`: Added `"build-win7"` script (`electron-builder --win --config electron-builder-win7.json`).
-  - `.github/workflows/release.yml`: Added a `Build for Windows 7 (Legacy Electron 22)` step in the Windows CI job so both the modern Windows 10/11 installer (Electron 38) and the Windows 7 SP1 legacy installer (`*-win7.exe`) are built and attached to every GitHub Release.
-
-### Startup & Login Modal Performance Optimization (Current Session)
-- **Root Cause**: Startup and Login Modal rendering were delayed by five compounding bottlenecks: (1) duplicate `DOMContentLoaded` triggers in `app.js` causing `app.init()` to run twice in parallel (destroying and recreating the Login Modal 200ms after first render), (2) synchronous parsing of 3.26 MB `mermaid.min.js` and external CDN scripts before `app.js`, (3) three concurrent unguarded calls to `secureStorage.init()`, (4) sequential `await` loading of all 10 HTML components in `init_components.js`, and (5) redundant `templateManager.init()` disk reads and full-DOM `querySelectorAll('*')` scans during `userManager.setCurrentUser()`.
-- **Fix**:
-  - `src/js/app.js`: Added an `isInitializing` lock at the start of `app.init()`, removed the duplicate 200ms `setTimeout` startup listener, and skipped redundant `storage`/`templateManager` re-initialization when `userManager` has already initialized them.
-  - `src/index.html`: Marked `js/vendor/mermaid.min.js` as `async` and external visualization/table CDN scripts (`d3.min.js`, `dagre-d3.min.js`, `tabulator.min.js`) as `defer`.
-  - `src/js/init_components.js`: Parallelized all 10 HTML component fetches via `Promise.all(...)`.
-  - `src/js/secureStorage.js`, `src/js/secureIntegration.js`, `src/js/settingsManager.js`: Added an in-flight `_initPromise` guard to `secureStorage.init()` and prevented `secureIntegration.js` from overwriting user-specific settings loaded by `app.js`.
-  - `src/js/userManager.js` & `src/js/globalHandlers.js`: Consolidated template loading in `setCurrentUser()` into a single pass, replaced `document.querySelectorAll('*')` in `forceUpdateUserDisplay()` with targeted selectors, and guarded `window.visualizationManager.checkJSONCrackAvailability`.
-
-### User & Group Portability, Profile Import/Export & Login Guarding (Current Session)
-- **Storage Architecture & Portability**:
-  - Templates (`*.json`), project index (`user_index.json`), user profiles (`users.json`), and group profiles (`groups.json`) are stored persistently under `~/MetaFold/Templates/`.
-  - Moving or copying the entire `~/MetaFold/Templates/` folder to another account or machine transfers all templates, the project index, all groups, and all user profiles (including individual `preferences`).
-  - Passwords are tied to the local machine via DPAPI (`safeStorage` in `%APPDATA%/MetaFold`), so imported users simply enter/update their passwords on a new system.
-- **Profile & Template Export/Import Suite (`profileManager.js`, `userManagementModal.js`, `main.js`, `preload.js`)**:
-  - **Scoped Export for Individual Users & Groups**:
-    - Users and Groups can be exported individually (via `📤` buttons on each card in the user/group lists) or globally via `📤 Export...` in the footer.
-    - Single User Export: bundles the user profile, primary group metadata, preferences, and templates created by that user.
-    - Single Group Export: bundles the group profile, all group member profiles, and all templates created under that group.
-  - **Export Modes & Formats**:
-    - **ZIP Package (.zip) (Empfohlen)**: Creates a single portable `.zip` archive containing `metafold-profiles.json`, `users.json`, `groups.json` and a `templates/` subfolder with all associated templates. Powered by a built-in standard PKZIP engine (`createZipBuffer`, `readZipBuffer` via Node.js standard `zlib` in `main.js`), with zero external dependencies and 100% native compatibility with OS tools (Windows Explorer, macOS Archive Utility, Linux unzip/tar).
-    - **Export to Folder**: Creates an uncompressed directory `MetaFold_Export_<scope>_<date>` containing the JSON files and `templates/` folder.
-    - **Single JSON Bundle**: Saves all profiles, groups, and embedded templates into a single `.json` file.
-  - **Unified Import (.zip & .json)**:
-    - `profileManager.importProfiles()` accepts both `.zip` packages and `.json` files.
-    - When importing a `.zip`, profile metadata is merged into `users.json` / `groups.json`, and template files are automatically extracted to `~/MetaFold/Templates/` followed by an immediate hot-reload via `templateManager.init()`.
-- **Streamlined Login Guarding & Clean UX (`loginModal.js`, `login-modal.html`)**:
-  - Gated `loginModal.handleConfirm()` with `findExistingUser()`: entering a non-existent or misspelled username strictly prevents accidental user creation and displays a clean error message without noisy buttons.
-  - Removed all redundant "create user" shortcuts (header button, error message button, dropdown button) from the startup modal.
-  - New user creation is exclusively and intentionally performed via `👥 Manage Users` $\rightarrow$ `➕ Add New User`.
-  - Clicking/focusing `#usernameInput` displays the list of existing users for 1-click selection.
-- **Graceful Discover Projects & Living User Index (`facetSearch.js`, `main.js`)**:
-  - Navigating to **Discover Projects** no longer triggers an automatic JSON file-picker dialog when the index is empty or on a fresh start.
-  - Instead, the search table opens directly in an empty state with a helpful empty placeholder: *"Scan project folders to start"* and a prominent button `📁 Scan Project Folder` to select a directory to scan.
-  - Registered missing Living User Index backend IPC handlers in `main.js`: `load-user-index`, `clear-user-index`, `merge-projects-into-user-index`, and `remove-from-user-index`.
-- **Dynamic Folder Structure Placeholders (`template-modal.html`, `templateModal.js`, `projectManager.js`)**:
-  - In `template-modal.html`, the gray placeholder of `#experimentStructure` includes dynamic folder examples (`[User Name]/`, `[Experiment Type]/`, etc.).
-  - Added an interactive **Dynamic Folder Tags** chip list in the Folder Structure tab showing all Field Labels defined in Tab 1 (Metadata Fields) plus system tags (`[User Name]`, `[Project Name]`, `[Date]`).
-  - Clicking a tag automatically inserts `[Field Label]/` at the current cursor position in `#experimentStructure`.
-  - In `projectManager.js`, `processDynamicFolderStructure()` resolves bracketed tags against metadata field keys or field labels (case-insensitive) as well as system fallbacks. Empty values safely skip the dynamic subfolder line.
-
----
-
-## 14. Version Control & Repository Structure
-
-To ensure a clean repository and prevent issues with GitHub Actions (like missing build files or bloated repositories), the project uses a strict `.gitignore` configuration.
-
-### Git Ignore Strategy
-The following items are deliberately **excluded** from version control:
-- **Build Artifacts:** `src/dist/`, `src/build/`, `dist/`, `out/`, `release/`. (Note: Built assets used by the app, like `build/jsoncrack-viewer.js`, must be included in the `package.json` `files` array to be packaged by `electron-builder`, but the build output folders themselves shouldn't be tracked in Git if they are generated by CI/CD).
-- **Dependencies:** `node_modules/` (heavy and platform-specific).
-- **Temporary Files & Scripts:** The `temp_files/` directory, scratch scripts (`patch.py`, `found_code.txt`), and `.log`/`.tmp` files. Temporary files should *always* be placed in `temp_files/` to ensure they aren't accidentally pushed to the repo.
-- **Local Data:** `MetaFold-Projects-Data*.json` (local project databases) or local `templates/`.
-
-### Best Practices for Agents & Developers
-- Always place temporary notes, scratch HTML/MD files, and ad-hoc scripts in `temp_files/`.
-- Never commit `node_modules` or `dist` folders.
-- Ensure any new build steps (e.g., via Webpack) output to folders that are ignored by Git but explicitly included in `package.json`'s `files` array for `electron-builder`.
-
-## 15. Parallel AI Agents
-
-MetaFold leverages a multi-agent architecture for development and automation. These parallel AI agents are managed by a central Orchestrator (e.g., Antigravity) and operate within strictly defined domains to ensure separation of concerns, security, and high-quality contributions.
-
-### Agent Definitions
-The behavior, system prompts, and rules for the agents are defined in the `.agents/rules/` directory:
-
-- **`frontend-agent` (`frontend_agent.md`)**: Specialized in UI/UX, HTML, CSS, and client-side JavaScript. Ensures consistency across Dark/Light modes, follows the MetaFold component structure, and prioritizes intuitive user experiences for scientists.
-- **`electron-ipc-agent` (`electron_ipc_agent.md`)**: Backend expert focused on the Electron Main Process, `preload.js`, IPC communication, and native Node.js integrations (e.g., local file system, API fetching). Enforces strict security (Context Isolation) and performance.
-- **`qa-test-agent` (`qa_test_agent.md`)**: Quality Assurance expert responsible for validating new features, testing edge cases, preventing regressions, and ensuring that the UI and logic make sense from a domain-specific (scientific workflow) perspective.
-
-### Workflow & Orchestration
-When implementing complex features (such as the Community Template Hub or Metadata preview panels), the Orchestrator delegates tasks concurrently to these subagents:
-1. The **Frontend Agent** builds and styles the UI components.
-2. The **Electron/IPC Agent** handles data retrieval, parsing, and secure IPC exposure.
-3. The **QA Agent** reviews the implementation for bugs, edge cases, and theme consistency.
-The Orchestrator oversees the process, merges the results, and communicates with the user.
-
----
-
-## 16. JSON Schemas & Data Contract (`docs/schema/v0.1/`)
-
-MetaFold's file formats are formally specified in [`docs/schema/v0.1/`](docs/schema/v0.1/README.md) (JSON Schema Draft 2020-12). All future features that read, write, or extend MetaFold JSON files must adhere to this contract.
-
-### Schema Files
-| Schema | `schemaType` | Target Files |
-|---|---|---|
+| Schema File | `schemaType` | Target Files |
+|-------------|--------------|--------------|
 | [`project-metadata.schema.json`](docs/schema/v0.1/project-metadata.schema.json) | `metafold-project-metadata` | `<ProjectName>-metadata.json`, `ReadyToImport.json` |
-| [`template.schema.json`](docs/schema/v0.1/template.schema.json) | `metafold-template` | `~/MetaFold/Templates/*.json` |
-| [`sidecar.schema.json`](docs/schema/v0.1/sidecar.schema.json) | `metafold-sidecar` | `<Project>/.metafold/sidecars/<File>.metafold-sidecar.json` |
+| [`template.schema.json`](docs/schema/v0.1/template.schema.json) | `metafold-template` | `~/MetaFold/Templates/**/*.json` |
+| [`sidecar.schema.json`](docs/schema/v0.1/sidecar.schema.json) | `metafold-sidecar` | `<File>.metafold-sidecar.json` |
 | [`user-index.schema.json`](docs/schema/v0.1/user-index.schema.json) | `metafold-user-index` | `user_index.json` |
 | [`profiles.schema.json`](docs/schema/v0.1/profiles.schema.json) | `metafold-users` / `metafold-groups` | `users.json`, `groups.json` |
 | [`exports.schema.json`](docs/schema/v0.1/exports.schema.json) | `metafold-scan-summary`, `metafold-lineage-export`, `metafold-visualization-export`, `metafold-id-dictionary` | Scanner summaries, lineage/graph exports, ID dictionaries |
 
-### Implementation & Verification Rules for Future Development
-- **Single Source of Truth (`src/js/shared/schemaVersion.js`)**: Always use `SCHEMA_VERSION`, `SCHEMA_TYPES`, `getSchemaVersion()`, and `isReservedProjectKey()` instead of hardcoding version strings or envelope key lists.
-- **Reserved Envelope Keys**: Any new top-level system key added to `<ProjectName>-metadata.json` must be registered in both `RESERVED_PROJECT_KEYS` (`src/js/shared/schemaVersion.js`) and `project-metadata.schema.json` (or use the `System.` prefix) so it is never rendered or exported as a user experiment field.
-- **Legacy Compatibility (`0.0`)**: Files without `schemaVersion` must continue to be treated as `"0.0"` and remain readable across all loaders and scanners.
-- **Contract Tests & Fixtures**: Example fixtures live in `docs/schema/v0.1/fixtures/` (`v0.1/` and `v0.0-legacy/`). Run `node tests/schema-contract.test.js` after any schema or metadata-writer changes.
+### Rules for AI Agents Modifying Data or UI
+1. **Schema Constants**: Always use `src/js/shared/schemaVersion.js` (`SCHEMA_VERSION`, `SCHEMA_TYPES`, `RESERVED_PROJECT_KEYS`, `isReservedProjectKey()`) instead of hardcoding version strings or system key lists.
+2. **Reserved Envelope Keys**: Any new top-level system property in `<ProjectName>-metadata.json` must be added to `RESERVED_PROJECT_KEYS` in `src/js/shared/schemaVersion.js` and `project-metadata.schema.json` (or prefixed with `System.`) so UI iterators and exporters do not treat it as an experimental metadata field.
+3. **Legacy Compatibility (`"0.0"`)**: Files without `schemaVersion` default to `"0.0"` via `getSchemaVersion()` and must remain readable across all loaders and scanners.
+4. **Theme Parity**: Any new UI component or modal must support both Dark Mode (default in `base.css`) and Light Mode (`body.light-mode` in `light-theme.css` or the feature's stylesheet).
+5. **Verification & Tests**:
+   - Schema contract tests: `node tests/schema-contract.test.js`
+   - End-to-End & DOM harness tests: `node tests/e2e/test_runner.js`
+   - Scratch/temporary files created during agent tasks must be placed in `temp_files/` (git-ignored) and cleaned up when done.
