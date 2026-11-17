@@ -75,14 +75,7 @@ flowchart TB
 
 Choose a reusable template, capture your experiment metadata, and generate the project structure.
 
-<!--
-Add the screenshot at assets/screenshots/project-creation.png,
-then remove the comment markers around the image below.
-
-![Create a project from a template](assets/screenshots/project-creation.png)
--->
-
-*Screenshot coming soon.*
+![Create a project from a template](assets/screenshots/1_metafold-main-interface.png)
 
 </details>
 
@@ -91,15 +84,7 @@ then remove the comment markers around the image below.
 
 Build and adapt lightweight metadata forms for your workflows.
 
-<!--
-Add the screenshot at assets/screenshots/template-editor.png,
-then remove the comment markers around the image below.
-
 ![Metadata template editor](assets/screenshots/template-editor.png)
--->
-
-*Screenshot coming soon.*
-
 </details>
 
 <details>
@@ -107,14 +92,7 @@ then remove the comment markers around the image below.
 
 Scan existing project folders, filter by metadata, and open linked records.
 
-<!--
-Add the screenshot at assets/screenshots/faceted-search.png,
-then remove the comment markers around the image below.
-
 ![Faceted metadata search](assets/screenshots/faceted-search.png)
--->
-
-*Screenshot coming soon.*
 
 </details>
 
@@ -123,17 +101,18 @@ then remove the comment markers around the image below.
 
 View project dependencies and follow relationships between source and derived data.
 
-<!--
-Add the screenshot at assets/screenshots/project-lineage.png,
-then remove the comment markers around the image below.
-
-![Project lineage visualization](assets/screenshots/project-lineage.png)
--->
-
-*Screenshot coming soon.*
+![Project lineage visualization](assets/screenshots/readme.png)
 
 </details>
 
+<details>
+<summary><strong>Explore project lineage</strong></summary>
+
+Open local Readme.html to see all project Metadata and directly open Links to your integrations like OMERO & elabFTW.
+
+![Project lineage visualization](assets/screenshots/project-lineage.png)
+
+</details>
 ---
 
 ## Features
