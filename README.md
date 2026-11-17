@@ -101,12 +101,52 @@ Scan existing project folders, filter by metadata, and open linked records.
 
 View project dependencies and follow relationships between source and derived data.
 
-![Project lineage visualization](assets/screenshots/readme.png)
+![Project lineage visualization](assets/screenshots/project-lineage.png)
 
 </details>
 
 <details>
-<summary><strong>Explore project lineage</strong></summary>
+<summary><strong>Local readme.html</strong></summary>
+
+Open local saved readme.html to inspect metadata and directly open your project in your integrations like elbFTW & OMERO.
+![Project lineage visualization](assets/screenshots/readme.png)
+
+</details>
+
+---
+
+## Features
+
+- 📋 **Templates** — Lightweight, customizable JSON metadata forms.
+- ⚡ **Fast Project Creation** — Generate standardized folder structures and metadata files in seconds.
+- 👥 **Group Management** — Multi-user & group-based access.
+- 🔍 **Find (Faceted Search)** — Recursively scan project folders and filter experiments dynamically by any metadata field.
+- 🧬 **Visualize (Mermaid Lineage)** — Explore project dependencies, `derived from` relationships, and interactive knowledge graphs.
+- 🔗 **Connect & Link (elabFTW, OMERO, RSpace)** — Populate local metadata and connected records with the same metadata when creating them, automatically link records across supported systems, and open linked records directly from search results. Later changes are not automatically synchronized.
+- ⚙️ **Workflow Automation (n8n)** — Trigger connected workflows via webhooks.
+- 🖼️ **File Sidecars (BioFormats/bftools)** — Extract imaging metadata into OME-XML sidecar files.
+- 📦 **Export** — Export structured metadata as JSON, export lineage information, and package metadata as RO-Crate for reuse and downstream processing.
+
+---
+
+## Quick Start
+
+1. Download the latest installer for **Windows**, **macOS**, or **Linux** from the [Releases page](https://github.com/ThZobel/MetaFold/releases).
+2. Check the **[Installation & Setup Guide](INSTALL.md)** for platform instructions, building from source, and importing [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates).
+
+---
+
+## Documentation & Community
+
+<!--
+- 📚 **[Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)** 
+-->
+— Setup guides, template tutorials, and integration references
+- 🐛 **[Issues](https://github.com/ThZobel/MetaFold/issues)** & 💬 **[Discussions](https://github.com/ThZobel/MetaFold/discussions)** — Feedback, bug reports, and community exchange
+
+---
+
+## Acknowledgements & License
 
 Open local Readme.html to see all project Metadata and directly open Links to your integrations like OMERO & elabFTW.
 
