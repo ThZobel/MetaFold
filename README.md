@@ -1,257 +1,96 @@
-# MetaFold 🔬
+<div align="center">
 
-**A powerful desktop application for laboratory data management and experiment organization**
+<img src="assets/MetafoldGrafikPurple.png" alt="MetaFold – Capture. Find. Connect." width="640" />
 
-MetaFold simplifies the creation of standardized folder structures and metadata files for life sciences experiments, with seamless integration to electronic lab notebooks, image management systems, and workflow automation tools.
+# Capture. Find. Connect.
 
----
+**Capture what matters. MetaFold connects the rest.**  
+*Less thinking about metadata. More focus on science.*
 
-## ✨ Key Features
+[Download Release](https://github.com/ThZobel/MetaFold/releases) · [Installation Guide](INSTALL.md) · [Documentation](https://metafold-docs.readthedocs.io/en/latest/) · [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
 
-🗂️ **Template-Based Project Creation**
-- Create standardized folder structures from configurable templates
-- Dynamic metadata forms with drag & drop field ordering
-- Support for both folder and experiment templates
-
-👥 **Multi-User Support & RDM Provenance**
-- Secure user management with credential storage
-- **RDM-compliant profiles** (ISA-JSON inspired) with ORCID & Affiliation support
-- **Automated provenance injection** into metadata files for FAIR compliance
-- User-specific templates and settings
-- Group-based access control
-- Admin account with automatic initialization on first launch
-
-🔗 **Laboratory Integrations**
-- **elabFTW**: Direct experiment creation with metadata sync; select experiment templates via dropdown
-- **OMERO**: Project/Dataset creation with map annotations and smart namespaces
-- **RSpace**: Electronic lab notebook integration
-- **n8n**: Workflow automation via webhooks – trigger custom workflows on project creation
-- **BioFormats**: Automated OME-XML extraction via the built-in File Sidecar Scanner
-- **Secure Authentication**: Multi-layer encryption (DPAPI + user-specific entropy) for all credentials
-
-📊 **Project Discovery & Visualization**
-- Recursive scanning of existing projects
-- Interactive data visualization with JSONCrack
-- **Knowledge Graph & Lineage Tree**: Visualize, connect, and explore project dependencies interactively
-- **Lineage Export & Data Harvest**: Export standalone graph dashboards and selectively copy linked raw data
-- **File Sidecar Scanner**: 3-step wizard to scan microscopy files and extract metadata automatically
-
-🎨 **Modern Interface**
-- **Light & Dark Mode** – toggle with a single click, preference is remembered
-- **Sidebar Metadata Viewer** – Instantly inspect fully parsed, recursive project metadata directly in the sidebar
-- Responsive design for different screen sizes
-- Drag & drop functionality
-- Real-time validation and feedback
+</div>
 
 ---
 
-## 🚀 Installation
+## Contents
 
-### Option 1: Pre-built Binaries (Recommended for Most Users)
+- [Why MetaFold?](#why-metafold)
+- [How It Works](#how-it-works)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Documentation & Community](#documentation--community)
 
-**Download the latest release for your operating system:**
+---
 
-1. Visit the [Releases page](https://github.com/ThZobel/MetaFold/releases)
-2. Download the latest release for your platform:
-   - **Windows**: `MetaFold-Setup-x.x.x.exe`
-   - **macOS**: `MetaFold-x.x.x.dmg` or `MetaFold-x.x.x.pkg`
-   - **Linux**: `MetaFold-x.x.x.AppImage` or `MetaFold-x.x.x.deb`
-3. Install the application:
-   - **Windows**: Run the `.exe` installer and follow the setup wizard
-   - **macOS**: Open the `.dmg` file and drag MetaFold to Applications
-   - **Linux**:
-     - For `.AppImage`: Make executable (`chmod +x`) and run directly
-     - For `.deb`: Install with `sudo dpkg -i MetaFold-x.x.x.deb`
-4. Launch MetaFold from your applications menu
+## Why MetaFold?
 
-### Option 2: Development Setup
+Scientists should focus on their research — not on metadata standards, folder schemas, or data management architecture.
 
-For developers who want to run from source:
+**MetaFold** is a lightweight, **local-first** desktop application that lets you document your work as it happens. Standards like ISA or REMBI are handled behind the scenes, while your existing workflows and folder structures stay intact. MetaFold does not replace your ELN, LIMS, or image repository — it connects them.
 
-#### Prerequisites
-- **Node.js** (Latest LTS version)
-- Download from: [https://nodejs.org](https://nodejs.org)
+| ✍️ Capture | 🔍 Find | 🔗 Connect |
+| :--- | :--- | :--- |
+| Document experiments on the fly with simple, reusable templates — no complex setup required. | Scan existing project folders and rediscover experiments via fast faceted metadata search. | Inherit metadata across folders, build data lineage, and sync directly with your lab systems. |
 
-#### Installation Steps
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ThZobel/MetaFold.git
-   cd MetaFold
-   ```
+## How It Works
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```mermaid
+flowchart TB
+    A["🔬 Scientific Work<br/><small>Experiments · Samples · Microscopy · Analysis</small>"]
+    B["⚡ MetaFold<br/><small>Capture · Find · Connect<br/>Local-first · Inheritance · Lineage</small>"]
 
-3. **Start the application**
-   ```bash
-   npm start
-   ```
+    A --> B
 
-#### Building for Production
+    B --> C["📓 ELNs<br/><small>elabFTW · RSpace</small>"]
+    B --> D["🖼️ Imaging<br/><small>OMERO · BioFormats</small>"]
+    B --> E["🤖 Automation & AI<br/><small>n8n · RO-Crate · LLMs</small>"]
+    B --> F["📁 Local & Repos<br/><small>Folders · JSON</small>"]
 
-Create platform-specific executables:
-```bash
-npm run build
+    style A fill:#1e293b,color:#f8fafc,stroke:#475569
+    style B fill:#6d28d9,color:#ffffff,stroke:#8b5cf6
+    style C fill:#1e293b,color:#f8fafc,stroke:#475569
+    style D fill:#1e293b,color:#f8fafc,stroke:#475569
+    style E fill:#1e293b,color:#f8fafc,stroke:#475569
+    style F fill:#1e293b,color:#f8fafc,stroke:#475569
 ```
 
-Builds will be available in the `dist/` folder for Windows, macOS, and Linux.
+*Existing systems stay in charge of their specialized tasks. MetaFold connects them with structured metadata.*
 
 ---
 
-## 📝 Getting Started with Templates
+## Features
 
-### Using Example Templates
-
-MetaFold provides example templates to help you get started quickly:
-
-#### Method 1: Import via User Interface (Recommended)
-
-1. **Launch MetaFold**
-2. **Navigate to the Action Menu**:
-   - Click on the **Action Menu** button (usually in the top bar)
-   - Select **More** → **Import Template**
-3. **Download example templates**:
-   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/templates) on GitHub
-   - Download the `.json` template files you need
-4. **Import the template**:
-   - In the import dialog, select the downloaded `.json` file
-   - The template will be added to your templates list
-5. **Start using the template**:
-   - Create new projects using the imported template
-
-#### Method 2: Manual Installation
-
-1. **Download example templates**:
-   - Visit the [/templates folder](https://github.com/ThZobel/MetaFold/tree/main/templates) on GitHub
-   - Download the `.json` template files you need
-2. **Locate your MetaFold configuration directory**:
-   - **Windows**: `C:\Users\<YourUsername>\MetaFold\<group>\<user>\`
-   - **macOS**: `/Users/<YourUsername>/MetaFold/<group>/<user>/`
-   - **Linux**: `/home/<YourUsername>/MetaFold/<group>/<user>/`
-3. **Copy template files**:
-   - Copy the downloaded `.json` files into the directory above
-4. **Restart MetaFold**:
-   - The templates will be automatically loaded on next launch
-
-**Note**: Replace `<group>` and `<user>` with your actual group and username as configured in MetaFold.
+- 📋 **Templates** — Lightweight, customizable JSON metadata forms with drag-and-drop fields and community templates on GitHub.
+- ⚡ **Fast Project Creation** — Generate standardized folder structures and metadata files in seconds.
+- 👥 **Group Management** — Multi-user & group-based access, ORCID/affiliation provenance, and encrypted local credentials.
+- 🔍 **Find (Faceted Search)** — Recursively scan project folders and filter experiments dynamically by any metadata field.
+- 🧬 **Visualize (Mermaid Lineage)** — Explore project dependencies, `derived from` relationships, and interactive knowledge graphs.
+- 🔗 **Connect & Link (elabFTW, OMERO, RSpace)** — Create experiments or datasets with synced metadata and jump straight from search results to linked systems.
+- 🤖 **Integrations & Automation (n8n, BioFormats, RO-Crate)** — Trigger n8n workflows via webhooks, extract OME-XML sidecars, and export AI-ready JSON & RO-Crates.
 
 ---
 
-## 📖 Documentation
+## Quick Start
 
-For comprehensive documentation, tutorials, and API references, visit:
-
-**📚 [MetaFold Documentation](https://metafold-docs.readthedocs.io/en/latest/)**
-
-The documentation includes:
-- Detailed setup guides
-- Template creation tutorials
-- Integration configuration (elabFTW, OMERO, RSpace, n8n)
-- Advanced features and workflows
-- Troubleshooting guides
+1. Download the latest installer for **Windows**, **macOS**, or **Linux** from the [Releases page](https://github.com/ThZobel/MetaFold/releases).
+2. Check the **[Installation & Setup Guide](INSTALL.md)** for platform instructions, building from source, and importing [example templates](https://github.com/ThZobel/MetaFold/tree/main/templates).
 
 ---
 
-## 🔧 Core Concepts
+## Documentation & Community
 
-### Templates
-Define reusable project structures with:
-- Custom folder hierarchies
-- Metadata schemas with validation
-- Integration settings for elabFTW / OMERO / RSpace / n8n
+- 📚 **[Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)** — Setup guides, template tutorials, and integration references
+- 🐛 **[Issues](https://github.com/ThZobel/MetaFold/issues)** & 💬 **[Discussions](https://github.com/ThZobel/MetaFold/discussions)** — Feedback, bug reports, and community exchange
+- 🌐 **[NFDI4BioImage](https://nfdi4bioimage.de/)** — Developed as part of the NFDI4BioImage initiative
 
-### Projects
-Create standardized experiments with:
-- Automated folder structure generation
-- JSON metadata files
-- Direct integration with lab systems
+<details>
+<summary>Acknowledgements & License</summary>
 
-### Discovery
-Analyze existing projects with:
-- **Recursive project scanning**: Generate statistical analysis and data visualization.
-- **JSON Export**: Export aggregated project metadata for further analysis.
-- **Knowledge Graph**: Interactively explore project lineages, visual link connections, and export dependency subgraphs.
-- **Faceted Search**: Explore exported metadata dynamically via an interactive UI.
-  - **Column Selection**: Customize which metadata fields are visible in the results table independently of active filters.
-  - **Multi-Select Filtering**: Combine multiple filter tags for precise project discovery.
-  - **Integrations**: Directly launch OMERO (🔵) or eLabFTW (🟢) links associated with the discovered projects right from the search results.
+- **Inspiration:** Inspired by the [RDM-Desktop Tool](https://github.com/tomio13/RDM-Desktop) by T. Haraszti ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
+- **Development:** Built with the assistance of [claude.ai](https://claude.ai/) as part of **NFDI4BioImage**.
+- **License:** See [LICENSE](LICENSE).
 
----
-
-## 🔗 Integrations Overview
-
-| Integration | Purpose | Key Feature |
-|---|---|---|
-| **elabFTW** | Electronic lab notebook | Experiment creation; template selection via dropdown |
-| **OMERO** | Image data management | Project/Dataset + map annotation creation |
-| **RSpace** | Electronic lab notebook | Document creation with folder targeting |
-| **n8n** | Workflow automation | Webhook trigger on project creation |
-
-### n8n Workflow Automation
-Connect MetaFold to your [n8n](https://n8n.io) automation server to trigger custom workflows whenever a new project is created. Configure in **Settings → 🤖 n8n**:
-- Enter your webhook URL
-- Choose authentication (None / Bearer Token / Basic Auth)
-- Optionally set an Instance ID for multi-machine setups
-- Enable the n8n toggle per project in the right sidebar
-
-### elabFTW Template Selection
-When elabFTW is enabled, the right sidebar shows a **Template** dropdown populated directly from your elabFTW server. Select the appropriate experiment template per MetaFold project template – the selection is saved and restored automatically.
-
----
-
-## 🎨 Light & Dark Mode
-
-MetaFold supports both **dark mode** (default) and **light mode**:
-- Click the ☀️/🌙 button in the top-left sidebar header to toggle
-- Your preference is saved across sessions
-
----
-
-## 🎯 Target Audience
-
-MetaFold is designed for:
-- **Life Sciences Researchers** organizing experiments
-- **Laboratory Managers** standardizing workflows
-- **Research Data Managers** implementing FAIR principles
-- **NFDI4BioImage** community members
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please check our documentation for:
-- Development setup guides
-- Code contribution guidelines
-- Feature request procedures
-
----
-
-## 📄 License & Acknowledgements
-
-### Inspiration
-MetaFold is inspired by the excellent **RDM-Desktop Tool** by T. Haraszti:
-- Repository: [tomio13/RDM-Desktop](https://github.com/tomio13/RDM-Desktop)
-- License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-
-We thank T. Haraszti for the inspiration and foundation.
-
-### Development
-This project was developed with the assistance of [claude.ai](https://claude.ai/) as part of the **NFDI4BioImage** initiative.
-
----
-
-## 🔗 Links
-
-- 📚 [Full Documentation](https://metafold-docs.readthedocs.io/en/latest/)
-- 📦 [Download Latest Release](https://github.com/ThZobel/MetaFold/releases)
-- 📝 [Example Templates](https://github.com/ThZobel/MetaFold/tree/main/templates)
-- 🐛 [Report Issues](https://github.com/ThZobel/MetaFold/issues)
-- 💬 [Discussions](https://github.com/ThZobel/MetaFold/discussions)
-- 🌐 [NFDI4BioImage](https://nfdi4bioimage.de/)
-
----
-
-*Simplifying laboratory data management, one experiment at a time* ✨
+</details>
