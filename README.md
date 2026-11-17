@@ -38,15 +38,12 @@ MetaFold does not replace your ELN, LIMS, or image repository — it connects th
 
 ```mermaid
 flowchart TB
-    A["🔬 Scientific Work<br/>Experiments · Samples · Microscopy · Analysis"]
-    B["⚡ MetaFold<br/>Capture · Find · Connect<br/>Local-first · Inheritance · Lineage"]
-
-    A --> B
+    A["🔬 Scientific Work"] --> B["⚡ MetaFold"]
 
     B --> C["📓 ELNs<br/>elabFTW · RSpace"]
-    B --> D["🖼️ Imaging<br/>OMERO · BioFormats"]
-    B --> E["🤖 Automation & AI<br/>n8n · RO-Crate · LLMs"]
-    B --> F["📁 Local & Repos<br/>Folders · JSON"]
+    B --> D["🖼️ Imaging<br/>OMERO"]
+    B --> E["⚙️ Automation<br/>n8n"]
+    B --> F["📁 Local & Export<br/>JSON · RO-Crate"]
 
     style A fill:#1e293b,color:#f8fafc,stroke:#475569
     style B fill:#6d28d9,color:#ffffff,stroke:#8b5cf6
@@ -56,6 +53,7 @@ flowchart TB
     style F fill:#1e293b,color:#f8fafc,stroke:#475569
 ```
 
+*MetaFold creates local projects and connected records with matching metadata and automatically links records across supported systems. Later changes are not automatically synchronized.*
 1. **Capture** your experiment using a reusable metadata template.
 2. **Create** your local project and records in connected systems with the same metadata at creation time.
 3. **Connect** those records through links and preserve their relationships.
