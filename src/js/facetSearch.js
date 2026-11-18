@@ -767,13 +767,18 @@ const facetSearch = {
         }
 
         const activeFiltersCopy = this.activeFilters ? { ...this.activeFilters } : {};
+        // Capture actively selected project BEFORE closeSearch() / closeRightPanel() resets this.selectedProjectPath to null
+        const selectedPathBeforeClose = this.selectedProjectPath
+            || this.lastSelectedProjectPath
+            || window.projectScanner?.selectedProjectPath
+            || null;
 
         // Close modal without bouncing back to 'create' and switch tab to 'visualize'
         await this.closeSearch({ targetTab: 'visualize' });
 
         // Always start in Mermaid Lineage Graph when coming from Facet Search
-        const fullPool = scannerProjects.length > 0 ? scannerProjects : (Array.isArray(this.masterData) ? this.masterData : fullProjects);
-        const explicitRootPath = this.selectedProjectPath
+        const fullPool = scannerProjects.length > 0 ? scannerProjects : (Array.isArray(this.masterData) && this.masterData.length > 0 ? this.masterData : fullProjects);
+        const explicitRootPath = selectedPathBeforeClose
             || (fullProjects.length === 1 ? fullProjects[0]?.path : null);
 
         window.visualizationManager.visualizeFilteredProjects(fullProjects, activeFiltersCopy, {
@@ -3946,6 +3951,7 @@ const facetSearch = {
         const customContainer = options && options.targetContentEl ? options.targetContentEl : null;
         if (!customContainer) {
             this.selectedProjectPath = targetPath;
+            this.lastSelectedProjectPath = targetPath;
         }
 
         const isSidecar = rowData._type === 'file_sidecar';

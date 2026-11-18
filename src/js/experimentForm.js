@@ -411,10 +411,8 @@ const experimentForm = {
         const tr = document.createElement('tr');
         tr.className = 'draggable-field';
         tr.setAttribute('data-field-name', fieldName);
-        tr.setAttribute('draggable', 'true');
-
-        // Add drag event listeners
-        this.addFieldDragEventListeners(tr, fieldName);
+        // ❌ Drag & Drop is disabled in the Create Project form so selecting text inside inputs never drags rows.
+        // Field reordering is exclusively done in the Template Editor (metadataEditor.js).
 
         // Check if field belongs to a group (nested)
         if (fieldName.includes('.')) {
@@ -1951,6 +1949,12 @@ const experimentForm = {
         const extractValues = (obj, prefix = '') => {
             if (!obj || typeof obj !== 'object') return;
             for (const [key, val] of Object.entries(obj)) {
+                if (key === 'extra_fields' || key === 'metadata') {
+                    if (val && typeof val === 'object' && !Array.isArray(val)) {
+                        extractValues(val, prefix);
+                    }
+                    continue;
+                }
                 if (key === 'schemaVersion' || key === 'schemaType' || key === 'template' ||
                     key === 'templateInfo' || key === 'integrations' || key === 'provenance' ||
                     key === 'created_at' || key === 'updated_at' || key === 'previous_names' ||
@@ -1972,6 +1976,9 @@ const experimentForm = {
         extractValues(metadata);
         if (metadata.metadata) {
             extractValues(metadata.metadata);
+        }
+        if (metadata.extra_fields) {
+            extractValues(metadata.extra_fields);
         }
 
         // Iterate over flatValues and populate matching inputs

@@ -1937,8 +1937,12 @@ ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
         const templatesDir = await ensureTemplatesDirectory(userInfo);
         const files = await fs.readdir(templatesDir);
 
-        // Alle JSON-Dateien finden
-        const jsonFiles = files.filter(file => file.endsWith('.json'));
+        // Alle JSON-Dateien finden (ohne user_index.json und id_dictionary_*.json)
+        const jsonFiles = files.filter(file =>
+            file.endsWith('.json') &&
+            file !== 'user_index.json' &&
+            !file.startsWith('id_dictionary_')
+        );
         console.log(`📂 Found ${jsonFiles.length} JSON files in ${templatesDir}`);
 
         const templates = [];
@@ -3205,40 +3209,62 @@ function getUserIdRegistryPath(userInfo) {
     return path.join(registryDir, `id_dictionary_${safeUsername}.json`);
 }
 
-function extractIdValues(obj, result = []) {
+function extractIdValues(obj, result = [], fallbackProjectName = '') {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    for (const [key, val] of Object.entries(obj || {})) {
-        const lowerKey = key.toLowerCase();
-        if (lowerKey === 'metafold_project_id' || key === 'schemaVersion' || key === 'schemaType' || key === 'template' || key === 'templateInfo' || key === 'provenance') continue;
-        const isIdField = (val && val.type === 'id_anchor') || lowerKey === 'id_anchor';
-        const isProjectName = lowerKey === 'projectname';
+    const skipKeys = new Set([
+        'metafold_project_id', 'schemaversion', 'schematype', 'template',
+        'templateinfo', 'provenance', 'metafold_integration', 'integrations',
+        'changelog', 'notes_log', 'previous_names', 'created_at', 'updated_at',
+        'notes_markdown', 'hypothesis_or_goal', 'community', '_metafold', 'elabftw'
+    ]);
 
-        if (isIdField) {
-            let idVal = '';
-            if (val && typeof val === 'object' && val.value && typeof val.value === 'string') {
-                idVal = val.value.trim();
-            } else if (typeof val === 'string') {
-                idVal = val.trim();
-            }
-            if (idVal && !uuidRegex.test(idVal) && !result.some(item => (item.id || item) === idVal)) {
-                result.push({ id: idVal, type: 'id_anchor' });
-            }
+    const addId = (rawVal, type) => {
+        if (!rawVal || typeof rawVal !== 'string') return;
+        const clean = rawVal.trim();
+        if (!clean || clean === '[object Object]' || uuidRegex.test(clean)) return;
+        const existingIdx = result.findIndex(item => (item.id || item) === clean);
+        if (existingIdx === -1) {
+            result.push({ id: clean, type });
+        } else if (type === 'id_anchor' && result[existingIdx].type !== 'id_anchor') {
+            result[existingIdx] = { id: clean, type: 'id_anchor' };
         }
+    };
 
-        if (isProjectName) {
-            let projVal = '';
-            if (typeof val === 'string') {
-                projVal = val.trim();
-            }
-            if (projVal && !result.some(item => (item.id || item) === projVal)) {
-                result.push({ id: projVal, type: 'project' });
-            }
-        }
+    if (fallbackProjectName) {
+        addId(fallbackProjectName, 'project');
+    }
 
-        if (val && typeof val === 'object' && !Array.isArray(val)) {
-            extractIdValues(val, result);
+    function walk(node) {
+        if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+        for (const [key, val] of Object.entries(node)) {
+            const lowerKey = key.toLowerCase();
+            if (skipKeys.has(lowerKey) || key.startsWith('System.')) continue;
+
+            const isIdField = (val && typeof val === 'object' && val.type === 'id_anchor') ||
+                lowerKey === 'id_anchor' ||
+                lowerKey === 'lineage_id' ||
+                lowerKey.endsWith('_id_anchor');
+            const isProjectName = lowerKey === 'projectname';
+
+            if (isIdField) {
+                if (val && typeof val === 'object' && typeof val.value === 'string') {
+                    addId(val.value, 'id_anchor');
+                } else if (typeof val === 'string') {
+                    addId(val, 'id_anchor');
+                }
+            } else if (isProjectName) {
+                if (typeof val === 'string') {
+                    addId(val, 'project');
+                } else if (val && typeof val === 'object' && typeof val.value === 'string') {
+                    addId(val.value, 'project');
+                }
+            } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+                walk(val);
+            }
         }
     }
+
+    walk(obj);
     return result;
 }
 
@@ -3246,13 +3272,33 @@ ipcMain.handle('load-id-dictionary', async (event, userInfo) => {
     try {
         const fsSync = require('fs');
         const filePath = getUserIdRegistryPath(userInfo);
-        let ids = [];
+        const idMap = new Map();
+
+        const addDictId = (rawId, type = 'id_anchor') => {
+            if (!rawId || typeof rawId !== 'string') return;
+            const clean = rawId.trim();
+            if (!clean || clean === '[object Object]') return;
+            if (!idMap.has(clean) || (type === 'id_anchor' && idMap.get(clean).type !== 'id_anchor')) {
+                idMap.set(clean, { id: clean, type });
+            }
+        };
+
         if (fsSync.existsSync(filePath)) {
-            const data = fsSync.readFileSync(filePath, 'utf8');
-            ids = JSON.parse(data);
+            try {
+                const data = fsSync.readFileSync(filePath, 'utf8');
+                const parsed = JSON.parse(data);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(item => {
+                        if (typeof item === 'string') addDictId(item, 'id_anchor');
+                        else if (item && item.id) addDictId(item.id, item.type || 'id_anchor');
+                    });
+                }
+            } catch (readErr) {
+                console.warn('⚠️ Could not parse ID dictionary file:', readErr.message);
+            }
         }
 
-        // Also harvest tags from user_index.json
+        // Also harvest project names, id_anchors, and tags from user_index.json
         const tagsSet = new Set();
         const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
         try {
@@ -3267,6 +3313,27 @@ ipcMain.handle('load-id-dictionary', async (event, userInfo) => {
                 }
                 const projs = Array.isArray(uIndex) ? uIndex : (uIndex.projects || []);
                 projs.forEach(p => {
+                    if (!p) return;
+                    if (p.hasMetadata !== false && p.name) {
+                        addDictId(p.name, 'project');
+                    }
+                    if (p.metadata && p.metadata.projectName && typeof p.metadata.projectName === 'string') {
+                        addDictId(p.metadata.projectName, 'project');
+                    }
+                    if (p.metadata) {
+                        const extracted = extractIdValues(p.metadata);
+                        extracted.forEach(item => addDictId(item.id, item.type));
+                    }
+                    if (p.lineage && Array.isArray(p.lineage.provides_ids)) {
+                        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                        p.lineage.provides_ids.forEach(pid => {
+                            if (pid && !uuidRegex.test(String(pid))) {
+                                const isProjName = pid === p.name || pid === p.metadata?.projectName;
+                                addDictId(String(pid), isProjName ? 'project' : 'id_anchor');
+                            }
+                        });
+                    }
+
                     const harvestFromObj = (o) => {
                         if (!o || typeof o !== 'object') return;
                         for (const [k, v] of Object.entries(o)) {
@@ -3293,12 +3360,16 @@ ipcMain.handle('load-id-dictionary', async (event, userInfo) => {
                         if (Array.isArray(p.tags)) p.tags.forEach(x => { if (typeof x === 'string' && x !== '[object Object]') tagsSet.add(x.trim()); });
                         else if (typeof p.tags === 'string' && p.tags !== '[object Object]') p.tags.split(',').forEach(x => tagsSet.add(x.trim()));
                     }
+                    if (p.lineage && Array.isArray(p.lineage.tags)) {
+                        p.lineage.tags.forEach(x => { if (typeof x === 'string' && x !== '[object Object]') tagsSet.add(x.trim()); });
+                    }
                 });
             }
         } catch (tErr) {
-            console.warn('⚠️ Could not harvest tags from user_index in load-id-dictionary:', tErr.message);
+            console.warn('⚠️ Could not harvest IDs/tags from user_index in load-id-dictionary:', tErr.message);
         }
 
+        const ids = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
         const tagsList = Array.from(tagsSet).filter(Boolean).sort().map(t => ({ id: t, type: 'tag' }));
         return { success: true, ids, tags: tagsList };
     } catch (err) {
@@ -3352,10 +3423,38 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
     try {
         const fsSync = require('fs');
         let totalExtracted = [];
+        const extractedTagsSet = new Set();
+        const scannedProjectDirs = [];
+        const tagKeyRegex = /(?:^|[_\s.-])(tags?|keywords?)(?:$|[_\s.-])/i;
+        const skipDirs = new Set(['node_modules', '.git', '.vscode', 'dist', 'build', '__pycache__']);
+
         let debugInfo = {
             scannedFiles: [],
             errors: [],
             directoriesScanned: 0
+        };
+
+        const extractTagsFromObj = (o) => {
+            if (!o || typeof o !== 'object') return;
+            for (const [k, v] of Object.entries(o)) {
+                if (tagKeyRegex.test(k) || (v && typeof v === 'object' && v.type === 'tags')) {
+                    const rawVal = (v && typeof v === 'object' && v.value !== undefined) ? v.value : v;
+                    if (Array.isArray(rawVal)) {
+                        rawVal.forEach(x => {
+                            const t = typeof x === 'string' ? x.trim() : (x && typeof x === 'object' ? String(x.id || x.name || '').trim() : '');
+                            if (t && t !== '[object Object]') extractedTagsSet.add(t);
+                        });
+                    } else if (typeof rawVal === 'string' && rawVal !== '[object Object]') {
+                        rawVal.split(',').forEach(x => {
+                            const t = x.trim();
+                            if (t) extractedTagsSet.add(t);
+                        });
+                    }
+                }
+                if (typeof v === 'object' && v !== null && !Array.isArray(v) && v.value === undefined) {
+                    extractTagsFromObj(v);
+                }
+            }
         };
 
         function scanDir(currentPath) {
@@ -3365,16 +3464,52 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
                 for (const entry of entries) {
                     const fullPath = path.join(currentPath, entry.name);
 
-                    if (entry.isDirectory() && recursive) {
-                        scanDir(fullPath);
+                    if (entry.isDirectory()) {
+                        if (recursive && !skipDirs.has(entry.name)) {
+                            scanDir(fullPath);
+                        }
                     } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+                        const lowerName = entry.name.toLowerCase();
+                        if (lowerName.endsWith('.metafold-sidecar.json') ||
+                            lowerName === 'user_index.json' ||
+                            lowerName.startsWith('id_dictionary_') ||
+                            lowerName === 'package.json' ||
+                            lowerName === 'package-lock.json') {
+                            continue;
+                        }
+
                         debugInfo.scannedFiles.push(fullPath);
                         console.log(`[harvestIdsFromFolder] Found JSON file: ${fullPath}`);
                         try {
                             const content = fsSync.readFileSync(fullPath, 'utf8');
                             const json = JSON.parse(content);
                             console.log(`[harvestIdsFromFolder] Successfully parsed JSON: ${fullPath}`);
-                            extractIdValues(json, totalExtracted);
+
+                            let fallbackProjName = '';
+                            if (entry.name.endsWith('-metadata.json')) {
+                                fallbackProjName = entry.name.slice(0, -'-metadata.json'.length).trim() || path.basename(currentPath);
+                                scannedProjectDirs.push({ dir: currentPath, metaFile: entry.name });
+                            } else if (entry.name === 'ReadyToImport.json' || json.schemaType === 'metafold-project-metadata' || json.projectName || json.extra_fields) {
+                                fallbackProjName = (typeof json.projectName === 'string' && json.projectName.trim()) ? json.projectName.trim() : path.basename(currentPath);
+                                if (entry.name === 'ReadyToImport.json') {
+                                    scannedProjectDirs.push({ dir: currentPath, metaFile: entry.name });
+                                }
+                            }
+
+                            extractIdValues(json, totalExtracted, fallbackProjName);
+                            extractTagsFromObj(json);
+                            const allTextParts = [
+                                json.notes_markdown || '',
+                                json.hypothesis_or_goal || '',
+                                ...(Array.isArray(json.notes_log) ? json.notes_log.map(n => n?.text || '') : []),
+                                collectAllMarkdownAndFieldText(json)
+                            ];
+                            const combinedText = allTextParts.filter(Boolean).join('\n');
+                            if (combinedText && markdownLite && typeof markdownLite.extractTags === 'function') {
+                                markdownLite.extractTags(combinedText).forEach(t => {
+                                    if (t) extractedTagsSet.add(t.trim());
+                                });
+                            }
                         } catch (e) {
                             debugInfo.errors.push(`Parse error in ${fullPath}: ${e.message}`);
                             console.error(`[harvestIdsFromFolder] Error parsing JSON ${fullPath}:`, e);
@@ -3389,34 +3524,118 @@ ipcMain.handle('harvest-ids-from-folder', async (event, dirPath, recursive, user
 
         scanDir(dirPath);
 
-        if (totalExtracted.length > 0) {
-            const filePath = getUserIdRegistryPath(userInfo);
-            let currentIds = [];
-            if (fsSync.existsSync(filePath)) {
+        // 1. Update id_dictionary_<user>.json
+        const filePath = getUserIdRegistryPath(userInfo);
+        let currentIds = [];
+        if (fsSync.existsSync(filePath)) {
+            try {
+                currentIds = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
+                currentIds = currentIds.map(item => typeof item === 'string' ? { id: item, type: 'id_anchor' } : item);
+            } catch (e) { }
+        }
+
+        const initialCount = currentIds.length;
+        const idMap = new Map();
+        currentIds.forEach(item => { if (item && item.id) idMap.set(item.id, item); });
+
+        totalExtracted.forEach(item => {
+            if (item && item.id && (item.type === 'id_anchor' || !idMap.has(item.id))) {
+                idMap.set(item.id, item);
+            }
+        });
+
+        const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+        if (totalExtracted.length > 0 || !fsSync.existsSync(filePath)) {
+            fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
+        }
+
+        // 2. Also merge discovered projects and tags into user_index.json so Living User Index stays in sync
+        let newTagsCount = 0;
+        let totalTags = extractedTagsSet.size;
+        try {
+            const templatesDir = await ensureTemplatesDirectory(userInfo);
+            const indexPath = path.join(templatesDir, 'user_index.json');
+            let existingProjects = [];
+            let existingCustomTags = [];
+            if (fsSync.existsSync(indexPath)) {
                 try {
-                    currentIds = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
-                    currentIds = currentIds.map(item => typeof item === 'string' ? { id: item, type: 'id_anchor' } : item);
-                } catch (e) { }
+                    const rawIdx = JSON.parse(fsSync.readFileSync(indexPath, 'utf8'));
+                    existingProjects = Array.isArray(rawIdx) ? rawIdx : (rawIdx.projects || []);
+                    existingCustomTags = Array.isArray(rawIdx.customTags) ? rawIdx.customTags : [];
+                } catch (_) { }
             }
 
-            const initialCount = currentIds.length;
-
-            const idMap = new Map();
-            currentIds.forEach(item => idMap.set(item.id, item));
-
-            totalExtracted.forEach(item => {
-                if (item.type === 'id_anchor' || !idMap.has(item.id)) {
-                    idMap.set(item.id, item);
+            const beforeTagsSet = new Set(existingCustomTags.map(t => String(t).trim()).filter(Boolean));
+            existingProjects.forEach(p => {
+                if (p?.lineage?.tags) p.lineage.tags.forEach(t => beforeTagsSet.add(String(t).trim()));
+                if (p?.metadata) {
+                    const prevSize = extractedTagsSet.size;
+                    // collect existing project tags into beforeTagsSet
+                    const walkExistingTags = (o) => {
+                        if (!o || typeof o !== 'object') return;
+                        for (const [k, v] of Object.entries(o)) {
+                            if (tagKeyRegex.test(k) || (v && typeof v === 'object' && v.type === 'tags')) {
+                                const rv = (v && typeof v === 'object' && v.value !== undefined) ? v.value : v;
+                                if (Array.isArray(rv)) rv.forEach(x => { if (typeof x === 'string') beforeTagsSet.add(x.trim()); });
+                                else if (typeof rv === 'string') rv.split(',').forEach(x => beforeTagsSet.add(x.trim()));
+                            }
+                            if (typeof v === 'object' && v !== null && !Array.isArray(v) && v.value === undefined) walkExistingTags(v);
+                        }
+                    };
+                    walkExistingTags(p.metadata);
                 }
             });
 
-            const newArray = Array.from(idMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+            const pathMap = new Map();
+            for (const p of existingProjects) {
+                if (p && p.path) pathMap.set(path.resolve(p.path).toLowerCase(), p);
+            }
 
-            fsSync.writeFileSync(filePath, JSON.stringify(newArray, null, 2), 'utf8');
-            return { success: true, newCount: newArray.length - initialCount, total: newArray.length, foundCount: totalExtracted.length, debugInfo };
+            for (const item of scannedProjectDirs) {
+                try {
+                    const parsedProj = await parseMetaFoldProject(item.dir, item.metaFile);
+                    if (parsedProj) {
+                        parsedProj.hasMetadata = true;
+                        pathMap.set(path.resolve(parsedProj.path).toLowerCase(), parsedProj);
+                    }
+                } catch (_) { }
+            }
+
+            const mergedProjects = Array.from(pathMap.values());
+            populateLineageForProjects(mergedProjects);
+
+            const mergedCustomTags = Array.from(new Set([...existingCustomTags, ...Array.from(extractedTagsSet)])).filter(Boolean).sort();
+            const allAfterTags = new Set(beforeTagsSet);
+            extractedTagsSet.forEach(t => {
+                if (t && !beforeTagsSet.has(t)) newTagsCount++;
+                if (t) allAfterTags.add(t);
+            });
+            totalTags = allAfterTags.size;
+
+            if (scannedProjectDirs.length > 0 || newTagsCount > 0) {
+                await fs.writeFile(indexPath, JSON.stringify({
+                    schemaVersion: metafoldSchema.SCHEMA_VERSION,
+                    schemaType: metafoldSchema.SCHEMA_TYPES.USER_INDEX,
+                    version: metafoldSchema.SCHEMA_VERSION,
+                    updatedAt: new Date().toISOString(),
+                    customTags: mergedCustomTags,
+                    projects: mergedProjects
+                }, null, 2), 'utf8');
+            }
+        } catch (idxErr) {
+            console.warn('⚠️ Could not update user_index.json during harvest-ids-from-folder:', idxErr.message);
         }
 
-        return { success: true, newCount: 0, total: 0, foundCount: 0, debugInfo };
+        const projectCount = scannedProjectDirs.length || debugInfo.scannedFiles.length;
+        return {
+            success: true,
+            newCount: Math.max(0, newArray.length - initialCount),
+            total: newArray.length,
+            foundCount: projectCount,
+            newTagsCount,
+            totalTags,
+            debugInfo
+        };
     } catch (err) {
         console.error('Error harvesting IDs:', err);
         return { success: false, error: err.message };

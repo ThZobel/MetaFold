@@ -498,9 +498,16 @@ const projectManager = {
                     const metadataStr = JSON.stringify(payload, null, 2);
                     const filePath = targetPath + (targetPath.includes('\\') ? '\\' : '/') + customFileName;
                     await window.electronAPI.writeFile(filePath, metadataStr);
+                    const ui = window.userManager?.getCurrentUserInfo?.() || { username: 'default' };
                     if (window.electronAPI.upsertUserIndexProject) {
-                        const ui = window.userManager?.getCurrentUserInfo?.() || null;
                         await window.electronAPI.upsertUserIndexProject(targetPath, null, ui).catch(() => { });
+                    }
+                    if (window.electronAPI.saveIdValues) {
+                        await window.electronAPI.saveIdValues(payload, ui).catch(() => { });
+                        if (window.experimentForm) {
+                            window.experimentForm._idDictionaryItems = null;
+                            window.experimentForm._tagDictionaryItems = null;
+                        }
                     }
                 }
                 successCount++;
@@ -768,8 +775,11 @@ const projectManager = {
                 // NEW: Harvest IDs from the new project metadata (and refresh living user index badge)
                 if (window.electronAPI && window.electronAPI.saveIdValues && experimentMetadata) {
                     try {
+                        const effectiveProjectName = (conflictResolution.extend && conflictResolution.existingProjectName)
+                            ? conflictResolution.existingProjectName
+                            : finalProjectName;
                         const harvestResult = await window.electronAPI.saveIdValues(
-                            experimentMetadata,
+                            { ...experimentMetadata, projectName: effectiveProjectName },
                             window.userManager?.getCurrentUserInfo() || { username: 'default' }
                         );
                         if (harvestResult && harvestResult.success && harvestResult.newCount > 0) {

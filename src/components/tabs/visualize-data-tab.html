@@ -55,7 +55,12 @@
 
                 <!-- Mermaid Lineage Controls -->
                 <div id="mermaid-lineage-controls" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <select id="mermaidRootSelect" class="form-control" title="Select root project for lineage graph" style="max-width: 210px; background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; outline: none;"></select>
+                    <div id="mermaidRootSearchWrap" style="position: relative; display: flex; align-items: center; min-width: 220px; max-width: 260px;">
+                        <input type="text" id="mermaidRootSearchInput" class="form-control" autocomplete="off" placeholder="🔍 Projekt suchen / wählen..." title="Tippen zum Suchen &amp; Filtern oder Pfeiltasten/Klick zum Auswählen" style="width: 100%; background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 24px 4px 8px; font-size: 12px; outline: none;">
+                        <span id="mermaidRootSearchToggle" style="position: absolute; right: 7px; color: #9ca3af; font-size: 10px; cursor: pointer; user-select: none;" title="Projektliste öffnen">▼</span>
+                        <div id="mermaidRootSearchDropdown" style="display: none; position: fixed; z-index: 100005; background: #1e293b; border: 1px solid rgba(139,92,246,0.5); border-radius: 7px; box-shadow: 0 10px 28px rgba(0,0,0,0.65); max-height: 260px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0;"></div>
+                        <select id="mermaidRootSelect" class="form-control" style="display: none;"></select>
+                    </div>
                     <select id="mermaidScopeSelect" class="form-control" title="Lineage depth scope" style="background: #262638; color: #f3f4f6; border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; outline: none;">
                         <option value="direct">Direct Lineage</option>
                         <option value="full">Full Connected Graph</option>

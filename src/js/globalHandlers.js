@@ -152,12 +152,26 @@ window.switchMainTab = function (tabName) {
             if (window.visualizationManager) {
                 window.visualizationManager.init();
 
+                const activeFocusPath = window.facetSearch?.selectedProjectPath
+                    || window.facetSearch?.lastSelectedProjectPath
+                    || window.projectScanner?.selectedProjectPath
+                    || null;
+                if (activeFocusPath) {
+                    window.visualizationManager.mermaidRootPath = activeFocusPath;
+                    window.visualizationManager.mermaidInspectedPath = activeFocusPath;
+                }
+
                 // Show/hide scanned projects button (fallback to Living User Index if no manual scan yet)
                 const scannedBtn = document.getElementById('visualizeScannedBtn');
                 if (window.projectScanner && window.projectScanner.projects && window.projectScanner.projects.length > 0) {
                     if (scannedBtn) {
                         scannedBtn.style.display = 'inline-block';
                         scannedBtn.textContent = `📁 Projects (${window.projectScanner.projects.length})`;
+                    }
+                    if (!window.visualizationManager.currentData?.projects?.length) {
+                        window.visualizationManager.loadFromScannedProjects();
+                    } else if (activeFocusPath) {
+                        window.visualizationManager.renderVisualization(window.visualizationManager.currentData);
                     }
                 } else if (window.electronAPI?.loadUserIndex) {
                     const userInfo = window.userManager?.getCurrentUserInfo?.() || null;
@@ -169,6 +183,11 @@ window.switchMainTab = function (tabName) {
                             if (scannedBtn) {
                                 scannedBtn.style.display = 'inline-block';
                                 scannedBtn.textContent = `📚 Indexed Projects (${res.projects.length})`;
+                            }
+                            if (!window.visualizationManager.currentData?.projects?.length) {
+                                window.visualizationManager.loadFromScannedProjects();
+                            } else if (activeFocusPath) {
+                                window.visualizationManager.renderVisualization(window.visualizationManager.currentData);
                             }
                         } else if (scannedBtn) {
                             scannedBtn.style.display = 'none';

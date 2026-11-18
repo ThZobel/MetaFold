@@ -881,7 +881,7 @@ const metadataEditor = {
         }
     },
 
-    // Process loaded JSON data (enhanced to handle fieldOrder)
+    // Process loaded JSON data (enhanced to handle fieldOrder and v0.1 project metadata schema)
     processJsonData(jsonData) {
         try {
             // Check if it's an elabFTW export
@@ -899,16 +899,71 @@ const metadataEditor = {
 
                 // Info message
                 alert(`JSON Schema loaded successfully!\nTitle: ${jsonData.title || 'Unknown'}\nFields: ${Object.keys(metadata.fields || metadata).length}`);
+            } else if (jsonData.metadata && (jsonData.metadata.fields || typeof jsonData.metadata === 'object') && (jsonData.schemaType === 'metafold-template' || jsonData.type === 'experiment')) {
+                // Full template JSON file loaded directly
+                this.processJsonData(jsonData.metadata);
             } else {
-                // Normal metadata JSON - check for enhanced format
+                // Normal metadata JSON or v0.1 Project Metadata JSON - check for enhanced format
                 if (jsonData.fields && jsonData.fieldOrder) {
                     // Enhanced format with field order
                     this.loadMetadataIntoEditor(jsonData);
                 } else {
-                    // Legacy format - convert to enhanced
+                    // Unpack v0.1 project metadata or legacy flat metadata, stripping reserved envelope/system keys
+                    const cleanFields = {};
+                    const fieldOrder = [];
+                    const isReserved = (k) => (window.metafoldSchema && typeof window.metafoldSchema.isReservedProjectKey === 'function')
+                        ? window.metafoldSchema.isReservedProjectKey(k)
+                        : (k === 'schemaVersion' || k === 'schemaType' || k === 'metafold_project_id' || k === 'projectName' || k === 'created_at' || k === 'updated_at' || k === 'previous_names' || k === 'template' || k === 'templateInfo' || k === 'provenance' || k === 'metafold_integration' || k === 'integrations' || k === 'notes_markdown' || k === 'notes_log' || k === 'hypothesis_or_goal' || k === 'changelog' || k === 'community' || k.startsWith('System.') || k.startsWith('_'));
+
+                    const unpackSource = (srcObj) => {
+                        if (!srcObj || typeof srcObj !== 'object') return;
+                        Object.entries(srcObj).forEach(([key, val]) => {
+                            if (key === 'extra_fields' || key === 'metadata') {
+                                if (val && typeof val === 'object' && !Array.isArray(val)) unpackSource(val);
+                                return;
+                            }
+                            if (isReserved(key)) return;
+                            if (!val || typeof val !== 'object' || Array.isArray(val)) return;
+
+                            // Check if it's a nested group container (object whose children are field objects with .type or .value)
+                            const isNestedGroup = !('type' in val) && !('value' in val) &&
+                                Object.values(val).some(sub => sub && typeof sub === 'object' && ('type' in sub || 'value' in sub));
+
+                            if (isNestedGroup) {
+                                const groupKey = key.endsWith('_group') ? key : `${key}_group`;
+                                if (!cleanFields[groupKey]) {
+                                    cleanFields[groupKey] = {
+                                        type: 'group',
+                                        label: key,
+                                        description: '',
+                                        position: fieldOrder.length + 1
+                                    };
+                                    fieldOrder.push(groupKey);
+                                }
+                                Object.entries(val).forEach(([subKey, subVal]) => {
+                                    if (subVal && typeof subVal === 'object' && !isReserved(subKey)) {
+                                        cleanFields[subKey] = { ...subVal, type: subVal.type || 'text', label: subVal.label || subKey };
+                                        if (!fieldOrder.includes(subKey)) fieldOrder.push(subKey);
+                                    }
+                                });
+                            } else {
+                                cleanFields[key] = { ...val, type: val.type || 'text', label: val.label || key };
+                                if (!fieldOrder.includes(key)) fieldOrder.push(key);
+                            }
+                        });
+                    };
+
+                    unpackSource(jsonData);
+
+                    // Sort by field.position if present
+                    const hasPositions = fieldOrder.some(k => typeof cleanFields[k]?.position === 'number');
+                    if (hasPositions) {
+                        fieldOrder.sort((a, b) => (cleanFields[a]?.position ?? 9999) - (cleanFields[b]?.position ?? 9999));
+                    }
+
                     const enhancedMetadata = {
-                        fields: jsonData,
-                        fieldOrder: Object.keys(jsonData)
+                        fields: cleanFields,
+                        fieldOrder: fieldOrder
                     };
                     this.loadMetadataIntoEditor(enhancedMetadata);
                 }

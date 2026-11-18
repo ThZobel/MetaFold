@@ -345,6 +345,16 @@ const visualizationManager = {
 
             console.log(`📊 Processing ${projects.length} scanned projects for visualization...`);
 
+            // Preserve actively selected project from Faceted Search or Project Scanner as "In Focus" root
+            const activeSelectedPath = window.facetSearch?.selectedProjectPath
+                || window.facetSearch?.lastSelectedProjectPath
+                || window.projectScanner?.selectedProjectPath
+                || null;
+            if (activeSelectedPath && projects.some(p => p.path === activeSelectedPath)) {
+                this.mermaidRootPath = activeSelectedPath;
+                this.mermaidInspectedPath = activeSelectedPath;
+            }
+
             // Create comprehensive visualization data structure
             const visualizationData = this.createProjectNetworkData(projects, statistics);
 
@@ -373,8 +383,17 @@ const visualizationManager = {
             this.currentData = visualizationData;
             this.activeFilters = filters;
 
-            if (Object.prototype.hasOwnProperty.call(options, 'rootProjectPath')) {
-                this.mermaidRootPath = options.rootProjectPath || null;
+            const fallbackActivePath = window.facetSearch?.selectedProjectPath
+                || window.facetSearch?.lastSelectedProjectPath
+                || window.projectScanner?.selectedProjectPath
+                || null;
+
+            if (Object.prototype.hasOwnProperty.call(options, 'rootProjectPath') && options.rootProjectPath) {
+                this.mermaidRootPath = options.rootProjectPath;
+                this.mermaidInspectedPath = this.mermaidRootPath;
+                this.mermaidHistory = [];
+            } else if (fallbackActivePath && poolProjects.some(p => p.path === fallbackActivePath)) {
+                this.mermaidRootPath = fallbackActivePath;
                 this.mermaidInspectedPath = this.mermaidRootPath;
                 this.mermaidHistory = [];
             } else if (filteredProjects.length === 1 && filteredProjects[0]?.path) {
@@ -1916,6 +1935,242 @@ const visualizationManager = {
 
     // =================== INTERACTIVE MERMAID LINEAGE VIEW ===================
 
+    _mermaidSearchState: {
+        activeIndex: -1,
+        filteredProjects: [],
+        outsideHandler: null,
+        scrollHandler: null
+    },
+
+    _bindMermaidRootSearchCombobox(projects, rootProject, data) {
+        const searchInput = document.getElementById('mermaidRootSearchInput');
+        const toggleBtn = document.getElementById('mermaidRootSearchToggle');
+        const dropdown = document.getElementById('mermaidRootSearchDropdown');
+        const rootSelect = document.getElementById('mermaidRootSelect');
+
+        if (rootSelect) {
+            const placeholderOpt = `<option value="" ${!rootProject ? 'selected' : ''}>-- Projekt auswählen --</option>`;
+            rootSelect.innerHTML = placeholderOpt + projects.map(p => {
+                const selected = rootProject && p.path === rootProject.path ? 'selected' : '';
+                return `<option value="${this.escapeHtml(p.path)}" ${selected}>📁 ${this.escapeHtml(p.name || p.displayName || p.path)}</option>`;
+            }).join('');
+        }
+
+        if (!searchInput || !dropdown) return;
+
+        const currentDisplay = rootProject ? (rootProject.displayName || rootProject.name || rootProject.path) : '';
+        if (document.activeElement !== searchInput) {
+            searchInput.value = currentDisplay;
+        }
+        searchInput.style.borderColor = !rootProject ? '#f59e0b' : 'rgba(139,92,246,0.35)';
+
+        const positionDropdown = () => {
+            if (dropdown.style.display === 'none') return;
+            const rect = searchInput.getBoundingClientRect();
+            if (rect.width === 0 && rect.height === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            dropdown.style.left = `${Math.max(8, rect.left)}px`;
+            dropdown.style.top = `${rect.bottom + 4}px`;
+            dropdown.style.width = `${Math.max(260, rect.width)}px`;
+        };
+
+        const closeDropdown = (restoreValue = true) => {
+            dropdown.style.display = 'none';
+            this._mermaidSearchState.activeIndex = -1;
+            if (restoreValue) {
+                const activeRoot = this.mermaidRootPath ? projects.find(p => p.path === this.mermaidRootPath) : null;
+                searchInput.value = activeRoot ? (activeRoot.displayName || activeRoot.name || activeRoot.path) : '';
+            }
+        };
+
+        const selectProject = (proj) => {
+            dropdown.style.display = 'none';
+            this._mermaidSearchState.activeIndex = -1;
+            if (proj && proj.path) {
+                searchInput.value = proj.displayName || proj.name || proj.path;
+                this._focusMermaidRoot(proj.path, data);
+            } else {
+                searchInput.value = '';
+                this.mermaidRootPath = null;
+                this.renderMermaidLineageVisualization(data);
+            }
+        };
+
+        const updateHighlight = (scrollIntoView = true) => {
+            const items = dropdown.querySelectorAll('.mermaid-root-search-item');
+            items.forEach((el, idx) => {
+                const isActive = idx === this._mermaidSearchState.activeIndex;
+                el.style.background = isActive ? 'rgba(139, 92, 246, 0.28)' : 'transparent';
+                if (isActive && scrollIntoView && typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ block: 'nearest' });
+                }
+            });
+        };
+
+        const renderDropdownList = (queryStr = '') => {
+            const q = (queryStr || '').trim().toLowerCase();
+            const filtered = projects.filter(p => {
+                if (!p) return false;
+                if (!q) return true;
+                const name = String(p.displayName || p.name || '').toLowerCase();
+                const pPath = String(p.path || '').toLowerCase();
+                return name.includes(q) || pPath.includes(q);
+            });
+
+            this._mermaidSearchState.filteredProjects = filtered;
+            if (this._mermaidSearchState.activeIndex >= filtered.length) {
+                this._mermaidSearchState.activeIndex = filtered.length > 0 ? 0 : -1;
+            } else if (this._mermaidSearchState.activeIndex < 0 && q && filtered.length > 0) {
+                this._mermaidSearchState.activeIndex = 0;
+            }
+
+            dropdown.innerHTML = '';
+
+            if (filtered.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.style.cssText = 'padding: 8px 12px; font-size: 12px; color: #94a3b8; font-style: italic;';
+                emptyEl.textContent = 'Kein passendes Projekt gefunden';
+                dropdown.appendChild(emptyEl);
+            } else {
+                filtered.forEach((p, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'mermaid-root-search-item';
+                    const isCurrentRoot = rootProject && p.path === rootProject.path;
+                    const isActive = idx === this._mermaidSearchState.activeIndex;
+                    const linkCount = (p.lineage?.lineage_links?.length || 0) + (p.lineage?.related_links?.length || 0);
+                    row.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 8px;
+                        padding: 6px 10px;
+                        font-size: 12px;
+                        color: ${isCurrentRoot ? '#fef08a' : '#e2e8f0'};
+                        font-weight: ${isCurrentRoot ? '600' : '400'};
+                        cursor: pointer;
+                        background: ${isActive ? 'rgba(139, 92, 246, 0.28)' : 'transparent'};
+                    `;
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                    labelSpan.textContent = `📁 ${p.displayName || p.name || p.path}`;
+                    row.appendChild(labelSpan);
+
+                    if (linkCount > 0 || isCurrentRoot) {
+                        const badge = document.createElement('span');
+                        badge.style.cssText = 'font-size: 10px; color: #6ee7b7; background: rgba(16,185,129,0.16); padding: 1px 6px; border-radius: 999px; flex-shrink: 0;';
+                        badge.textContent = isCurrentRoot ? '🎯 Focus' : `${linkCount} links`;
+                        row.appendChild(badge);
+                    }
+
+                    row.addEventListener('mouseenter', () => {
+                        this._mermaidSearchState.activeIndex = idx;
+                        updateHighlight(false);
+                    });
+                    row.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectProject(p);
+                    });
+
+                    dropdown.appendChild(row);
+                });
+            }
+
+            dropdown.style.display = 'block';
+            positionDropdown();
+        };
+
+        searchInput.onfocus = () => {
+            searchInput.select();
+            renderDropdownList('');
+        };
+        searchInput.onclick = () => {
+            if (dropdown.style.display === 'none') {
+                renderDropdownList('');
+            }
+        };
+        searchInput.oninput = () => {
+            renderDropdownList(searchInput.value);
+        };
+        searchInput.onkeydown = (e) => {
+            const isOpen = dropdown.style.display !== 'none';
+            const items = this._mermaidSearchState.filteredProjects || [];
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!isOpen) {
+                    renderDropdownList(searchInput.value === currentDisplay ? '' : searchInput.value);
+                    return;
+                }
+                if (items.length > 0) {
+                    this._mermaidSearchState.activeIndex = (this._mermaidSearchState.activeIndex + 1) % items.length;
+                    updateHighlight(true);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!isOpen) {
+                    renderDropdownList(searchInput.value === currentDisplay ? '' : searchInput.value);
+                    return;
+                }
+                if (items.length > 0) {
+                    this._mermaidSearchState.activeIndex = (this._mermaidSearchState.activeIndex - 1 + items.length) % items.length;
+                    updateHighlight(true);
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (isOpen && items.length > 0) {
+                    const idx = this._mermaidSearchState.activeIndex >= 0 ? this._mermaidSearchState.activeIndex : 0;
+                    selectProject(items[idx]);
+                    searchInput.blur();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeDropdown(true);
+                searchInput.blur();
+            }
+        };
+
+        if (toggleBtn) {
+            toggleBtn.onmousedown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dropdown.style.display !== 'none') {
+                    closeDropdown(true);
+                } else {
+                    searchInput.focus();
+                    renderDropdownList('');
+                }
+            };
+        }
+
+        if (!this._mermaidSearchState.outsideHandler) {
+            this._mermaidSearchState.outsideHandler = (e) => {
+                const wrap = document.getElementById('mermaidRootSearchWrap');
+                const dd = document.getElementById('mermaidRootSearchDropdown');
+                if (wrap && wrap.contains(e.target)) return;
+                if (dd && dd.contains(e.target)) return;
+                if (dd && dd.style.display !== 'none') {
+                    closeDropdown(true);
+                }
+            };
+            document.addEventListener('mousedown', this._mermaidSearchState.outsideHandler, true);
+        }
+
+        if (!this._mermaidSearchState.scrollHandler) {
+            this._mermaidSearchState.scrollHandler = (e) => {
+                const dd = document.getElementById('mermaidRootSearchDropdown');
+                if (!dd || dd.style.display === 'none') return;
+                if (e && e.target && (e.target === dd || dd.contains(e.target))) return;
+                positionDropdown();
+            };
+            window.addEventListener('resize', this._mermaidSearchState.scrollHandler, true);
+            window.addEventListener('scroll', this._mermaidSearchState.scrollHandler, true);
+        }
+    },
+
     async renderMermaidLineageVisualization(data) {
         const container = document.getElementById('visualizationContent');
         if (!container) return;
@@ -1929,33 +2184,29 @@ const visualizationManager = {
             return;
         }
 
-        // Resolve root project only if explicitly chosen (or single project)
+        // Resolve root project: check mermaidRootPath, then active selection from Faceted Search / Project Scanner, or single project
         let rootProject = this.mermaidRootPath
             ? projects.find(p => p.path === this.mermaidRootPath)
             : null;
+        if (!rootProject) {
+            const activeCandidate = window.facetSearch?.selectedProjectPath
+                || window.facetSearch?.lastSelectedProjectPath
+                || window.projectScanner?.selectedProjectPath
+                || null;
+            if (activeCandidate) {
+                rootProject = projects.find(p => p.path === activeCandidate) || null;
+                if (rootProject) {
+                    this.mermaidRootPath = rootProject.path;
+                }
+            }
+        }
         if (!rootProject && projects.length === 1) {
             rootProject = projects[0];
             this.mermaidRootPath = rootProject.path;
         }
 
-        // Populate & bind unified header controls
-        const rootSelect = document.getElementById('mermaidRootSelect');
-        if (rootSelect) {
-            const placeholderOpt = `<option value="" ${!rootProject ? 'selected' : ''}>-- Projekt auswählen --</option>`;
-            rootSelect.innerHTML = placeholderOpt + projects.map(p => {
-                const selected = rootProject && p.path === rootProject.path ? 'selected' : '';
-                return `<option value="${this.escapeHtml(p.path)}" ${selected}>📁 ${this.escapeHtml(p.name || p.displayName || p.path)}</option>`;
-            }).join('');
-            rootSelect.style.borderColor = !rootProject ? '#f59e0b' : 'rgba(139,92,246,0.35)';
-            rootSelect.onchange = () => {
-                if (rootSelect.value) {
-                    this._focusMermaidRoot(rootSelect.value, data);
-                } else {
-                    this.mermaidRootPath = null;
-                    this.renderMermaidLineageVisualization(data);
-                }
-            };
-        }
+        // Populate & bind searchable project combobox and header controls
+        this._bindMermaidRootSearchCombobox(projects, rootProject, data);
 
         const scopeSelect = document.getElementById('mermaidScopeSelect');
         if (scopeSelect) {
@@ -1975,16 +2226,50 @@ const visualizationManager = {
             };
         }
 
+        const showFolderLinks = document.getElementById('showFolderLinksToggle')?.checked || false;
+
+        // Pre-compute folder parent-child relationships across all projects when toggle is active
+        const folderParentByPath = new Map(); // childPath -> parentPath
+        const folderChildrenByPath = new Map(); // parentPath -> Set<childPath>
+        if (showFolderLinks) {
+            const normPath = (pStr) => String(pStr || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+            const normEntries = projects
+                .filter(p => p && p.path)
+                .map(p => ({ proj: p, norm: normPath(p.path) }));
+
+            normEntries.forEach(({ proj, norm }) => {
+                let closestParent = null;
+                let maxLen = 0;
+                normEntries.forEach(candidate => {
+                    if (candidate.proj.path !== proj.path &&
+                        norm.startsWith(candidate.norm + '/') &&
+                        candidate.norm.length > maxLen) {
+                        closestParent = candidate.proj;
+                        maxLen = candidate.norm.length;
+                    }
+                });
+                if (closestParent) {
+                    folderParentByPath.set(proj.path, closestParent.path);
+                    if (!folderChildrenByPath.has(closestParent.path)) {
+                        folderChildrenByPath.set(closestParent.path, new Set());
+                    }
+                    folderChildrenByPath.get(closestParent.path).add(proj.path);
+                }
+            });
+        }
+
         if (!rootProject) {
             const subtitleEl = document.getElementById('vizSubtitle');
             if (subtitleEl) {
                 subtitleEl.textContent = 'Kein Projekt ausgewählt — bitte ein Startprojekt für den Lineage-Graph wählen';
             }
 
-            // Sort projects with lineage links first so user can click right away
+            // Sort projects with lineage/folder links first so user can click right away
             const sortedPicks = [...projects].sort((a, b) => {
-                const aHas = ((a.lineage?.lineage_links?.length || 0) + (a.lineage?.related_links?.length || 0)) > 0 ? 1 : 0;
-                const bHas = ((b.lineage?.lineage_links?.length || 0) + (b.lineage?.related_links?.length || 0)) > 0 ? 1 : 0;
+                const aFolderCount = showFolderLinks ? ((folderParentByPath.has(a.path) ? 1 : 0) + (folderChildrenByPath.get(a.path)?.size || 0)) : 0;
+                const bFolderCount = showFolderLinks ? ((folderParentByPath.has(b.path) ? 1 : 0) + (folderChildrenByPath.get(b.path)?.size || 0)) : 0;
+                const aHas = ((a.lineage?.lineage_links?.length || 0) + (a.lineage?.related_links?.length || 0) + aFolderCount) > 0 ? 1 : 0;
+                const bHas = ((b.lineage?.lineage_links?.length || 0) + (b.lineage?.related_links?.length || 0) + bFolderCount) > 0 ? 1 : 0;
                 return bHas - aHas;
             });
 
@@ -1994,11 +2279,12 @@ const visualizationManager = {
                         <div style="font-size: 2rem; margin-bottom: 8px;">🕸️</div>
                         <h4 style="margin: 0 0 8px 0; color: #fef08a; font-size: 1.08rem;">Bitte zuerst ein Projekt auswählen</h4>
                         <p style="margin: 0 0 16px 0; color: #cbd5e1; font-size: 0.85rem; line-height: 1.45;">
-                            In der Facet Search wurde noch kein einzelnes Projekt markiert. Wähle ein Startprojekt oben im Dropdown oder direkt hier aus, um dessen klickbaren Mermaid-Lineage-Graphen zu öffnen:
+                            In der Facet Search wurde noch kein einzelnes Projekt markiert. Wähle ein Startprojekt oben im Suchfeld oder direkt hier aus, um dessen klickbaren Mermaid-Lineage-Graphen zu öffnen:
                         </p>
                         <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 240px; overflow-y: auto; padding: 6px;">
                             ${sortedPicks.slice(0, 30).map(p => {
-                const linkCount = (p.lineage?.lineage_links?.length || 0) + (p.lineage?.related_links?.length || 0);
+                const fCount = showFolderLinks ? ((folderParentByPath.has(p.path) ? 1 : 0) + (folderChildrenByPath.get(p.path)?.size || 0)) : 0;
+                const linkCount = (p.lineage?.lineage_links?.length || 0) + (p.lineage?.related_links?.length || 0) + fCount;
                 const safePathJs = String(p.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 return `<button type="button" class="btn btn-secondary btn-sm" onclick="visualizationManager.mermaidRootPath='${safePathJs}'; visualizationManager.renderMermaidLineageVisualization(visualizationManager.currentData);" style="padding: 5px 10px; font-size: 0.78rem; border-color: ${linkCount > 0 ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.16)'}; color: ${linkCount > 0 ? '#6ee7b7' : '#e2e8f0'};">📁 ${this.escapeHtml(p.displayName || p.name)}${linkCount > 0 ? ` (${linkCount})` : ''}</button>`;
             }).join('')}
@@ -2030,6 +2316,7 @@ const visualizationManager = {
 
         const ancestorsSet = new Set();
         const descendantsSet = new Set();
+        const folderLinkedSet = new Set();
 
         const collectAncestors = (proj) => {
             if (!proj || ancestorsSet.has(proj.path)) return;
@@ -2038,6 +2325,13 @@ const visualizationManager = {
                 const parent = projByPath.get(l.source_path);
                 if (parent) collectAncestors(parent);
             });
+            if (showFolderLinks && folderParentByPath.has(proj.path)) {
+                const fParent = projByPath.get(folderParentByPath.get(proj.path));
+                if (fParent) {
+                    folderLinkedSet.add(fParent.path);
+                    collectAncestors(fParent);
+                }
+            }
         };
 
         const collectDescendants = (proj) => {
@@ -2048,6 +2342,15 @@ const visualizationManager = {
                     collectDescendants(child);
                 }
             });
+            if (showFolderLinks && folderChildrenByPath.has(proj.path)) {
+                folderChildrenByPath.get(proj.path).forEach(childPath => {
+                    const fChild = projByPath.get(childPath);
+                    if (fChild) {
+                        folderLinkedSet.add(fChild.path);
+                        collectDescendants(fChild);
+                    }
+                });
+            }
         };
 
         collectAncestors(rootProject);
@@ -2068,6 +2371,24 @@ const visualizationManager = {
                         visitFull(child);
                     }
                 });
+                if (showFolderLinks) {
+                    if (folderParentByPath.has(proj.path)) {
+                        const fp = projByPath.get(folderParentByPath.get(proj.path));
+                        if (fp) {
+                            folderLinkedSet.add(fp.path);
+                            visitFull(fp);
+                        }
+                    }
+                    if (folderChildrenByPath.has(proj.path)) {
+                        folderChildrenByPath.get(proj.path).forEach(cp => {
+                            const fc = projByPath.get(cp);
+                            if (fc) {
+                                folderLinkedSet.add(fc.path);
+                                visitFull(fc);
+                            }
+                        });
+                    }
+                }
                 if (showRelated) {
                     (proj.lineage?.related_links || []).forEach(rl => {
                         const target = projByPath.get(rl.target_path);
@@ -2088,6 +2409,12 @@ const visualizationManager = {
                     projects.forEach(child => {
                         if (child.lineage?.lineage_links?.some(l => l.source_path === p.path)) visitFull(child);
                     });
+                    if (showFolderLinks) {
+                        if (folderParentByPath.has(p.path)) visitFull(projByPath.get(folderParentByPath.get(p.path)));
+                        if (folderChildrenByPath.has(p.path)) {
+                            folderChildrenByPath.get(p.path).forEach(cp => visitFull(projByPath.get(cp)));
+                        }
+                    }
                     if (showRelated) {
                         (p.lineage?.related_links || []).forEach(rl => visitFull(projByPath.get(rl.target_path)));
                         projects.forEach(other => {
@@ -2125,6 +2452,7 @@ const visualizationManager = {
         let mermaidDef = 'graph TD;\n';
         mermaidDef += '    classDef root fill:#f59e0b,stroke:#fef08a,stroke-width:3px,color:#111827,font-weight:bold;\n';
         mermaidDef += '    classDef direct fill:#059669,stroke:#6ee7b7,stroke-width:2px,color:#ffffff,font-weight:500;\n';
+        mermaidDef += '    classDef folder fill:#2563eb,stroke:#93c5fd,stroke-width:2px,color:#ffffff,font-weight:500;\n';
         mermaidDef += '    classDef related fill:#db2777,stroke:#f9a8d4,stroke-width:2px,stroke-dasharray:5 3,color:#ffffff;\n';
         mermaidDef += '    classDef indirect fill:#334155,stroke:#64748b,stroke-width:1px,color:#e2e8f0;\n\n';
 
@@ -2133,6 +2461,7 @@ const visualizationManager = {
             const rawLabel = (p.displayName || p.name || 'Project').replace(/"/g, "'").replace(/[\r\n]+/g, ' ');
             let cls = 'indirect';
             if (p.path === rootProject.path) cls = 'root';
+            else if (showFolderLinks && folderLinkedSet.has(p.path) && !(p.lineage?.lineage_links?.some(l => directSet.has(l.source_path)))) cls = 'folder';
             else if (directSet.has(p.path)) cls = 'direct';
             else cls = 'related';
             mermaidDef += `    ${nid}["${rawLabel}"]:::${cls}\n`;
@@ -2141,6 +2470,7 @@ const visualizationManager = {
         const edgeSeen = new Set();
         let edgeIndex = 0;
         const directEdgeIndices = [];
+        const folderEdgeIndices = [];
         const relatedEdgeIndices = [];
         subProjects.forEach(p => {
             const targetId = nodeIdByPath.get(p.path);
@@ -2155,6 +2485,19 @@ const visualizationManager = {
                     }
                 }
             });
+            if (showFolderLinks && folderParentByPath.has(p.path)) {
+                const fParentPath = folderParentByPath.get(p.path);
+                const sourceId = nodeIdByPath.get(fParentPath);
+                if (sourceId && targetId && sourceId !== targetId) {
+                    const directKey = `d:${sourceId}->${targetId}`;
+                    const folderKey = `f:${sourceId}->${targetId}`;
+                    if (!edgeSeen.has(directKey) && !edgeSeen.has(folderKey)) {
+                        edgeSeen.add(folderKey);
+                        mermaidDef += `    ${sourceId} -. "📁" .-> ${targetId}\n`;
+                        folderEdgeIndices.push(edgeIndex++);
+                    }
+                }
+            }
             if (showRelated) {
                 (p.lineage?.related_links || []).forEach(rl => {
                     const relTargetId = nodeIdByPath.get(rl.target_path);
@@ -2173,6 +2516,9 @@ const visualizationManager = {
         if (directEdgeIndices.length > 0) {
             mermaidDef += `\n    linkStyle ${directEdgeIndices.join(',')} stroke:#34d399,stroke-width:2.5px;\n`;
         }
+        if (folderEdgeIndices.length > 0) {
+            mermaidDef += `    linkStyle ${folderEdgeIndices.join(',')} stroke:#60a5fa,stroke-width:2px,stroke-dasharray:4 3;\n`;
+        }
         if (relatedEdgeIndices.length > 0) {
             mermaidDef += `    linkStyle ${relatedEdgeIndices.join(',')} stroke:#f472b6,stroke-width:2px,stroke-dasharray:6 4;\n`;
         }
@@ -2181,6 +2527,9 @@ const visualizationManager = {
         const parentCount = (rootProject.lineage?.lineage_links || []).filter(l => projByPath.has(l.source_path)).length;
         const childCount = projects.filter(p => p.lineage?.lineage_links?.some(l => l.source_path === rootProject.path)).length;
         const relatedCount = (rootProject.lineage?.related_links || []).filter(l => projByPath.has(l.target_path)).length;
+        const folderRelCount = showFolderLinks
+            ? ((folderParentByPath.has(rootProject.path) ? 1 : 0) + (folderChildrenByPath.get(rootProject.path)?.size || 0))
+            : 0;
 
         const safeRootPathJs = String(rootProject.path || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const canGoBack = Array.isArray(this.mermaidHistory) && this.mermaidHistory.length > 0;
@@ -2197,7 +2546,7 @@ const visualizationManager = {
                         </button>
                         <span style="font-size: 0.78rem; font-weight: 700; color: #fef08a; text-transform: uppercase;">🎯 Focus:</span>
                         <strong style="color: #f3f4f6; font-size: 0.92rem;">${this.escapeHtml(rootProject.displayName || rootProject.name)}</strong>
-                        <span style="font-size: 0.75rem; color: #94a3b8;">⬆️ ${parentCount} Parent(s) · ⬇️ ${childCount} Child(ren) · 🔀 ${relatedCount} Related</span>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">⬆️ ${parentCount} Parent(s) · ⬇️ ${childCount} Child(ren) · 🔀 ${relatedCount} Related${showFolderLinks ? ` · 📁 ${folderRelCount} Folder` : ''}</span>
                     </div>
                     <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                         <button type="button" class="btn btn-primary btn-sm" onclick="visualizationManager.openProjectInFacetSearch('${safeRootPathJs}')" style="padding: 4px 10px; font-size: 0.78rem; background: #8b5cf6; border-color: #8b5cf6;" title="Open &amp; inspect this project in Facet Search">
@@ -2217,6 +2566,7 @@ const visualizationManager = {
                     <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
                         <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;border:1px solid #fef08a;margin-right:4px;vertical-align:middle;"></span>Focused Root</span>
                         <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#059669;border:1px solid #6ee7b7;margin-right:4px;vertical-align:middle;"></span>Direct Lineage (<code>--&gt;</code>)</span>
+                        ${showFolderLinks ? `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2563eb;border:1px dashed #93c5fd;margin-right:4px;vertical-align:middle;"></span>Ordner-Beziehung (<code>-. 📁 .-&gt;</code>)</span>` : ''}
                         <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#db2777;border:1px dashed #f9a8d4;margin-right:4px;vertical-align:middle;"></span>Related (<code>-.-&gt;</code>)</span>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
