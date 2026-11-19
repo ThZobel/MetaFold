@@ -990,12 +990,14 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
         // ✅ FIX: Metadaten-JSON erstellen mit korrektem Dateinamen UND projectName
         if (metadata && Object.keys(metadata).length > 0) {
-            let metadataFilename = `${projectName}-metadata.json`;
-            let metadataPath = path.join(projectPath, metadataFilename);
+            let metadataFilename = options.metadataFilePath ? path.basename(options.metadataFilePath) : `${projectName}-metadata.json`;
+            let metadataPath = options.metadataFilePath ? path.resolve(options.metadataFilePath) : path.join(projectPath, metadataFilename);
             const nowIso = new Date().toISOString();
             const templateRef = options.templateInfo
                 ? metafoldSchema.buildTemplateRef(options.templateInfo, options.templateName)
-                : (options.templateName ? metafoldSchema.buildTemplateRef(null, options.templateName) : null);
+                : (options.templateName && options.templateName !== 'Loaded Project' && options.templateName !== 'Unknown Template'
+                    ? metafoldSchema.buildTemplateRef(null, options.templateName)
+                    : null);
 
             let enhancedMetadata = {
                 schemaVersion: metafoldSchema.SCHEMA_VERSION,
@@ -1007,6 +1009,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 ...(templateRef ? { template: templateRef } : {})
             };
             let isExtending = false;
+            const extendChanges = [];
 
             if (options.extend) {
                 try {
@@ -1015,9 +1018,10 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     try {
                         existingContent = await fs.readFile(actualMetadataPath, 'utf8');
                     } catch (_) {
-                        // Fallback: look for any *-metadata.json in projectPath
+                        // Fallback: look for any *-metadata.json or ReadyToImport.json in projectPath
                         const entries = await fs.readdir(projectPath);
-                        const metaFile = entries.find(f => f.endsWith('-metadata.json') && !f.startsWith('.'));
+                        const metaFile = entries.find(f => f.endsWith('-metadata.json') && !f.startsWith('.'))
+                            || entries.find(f => f === 'ReadyToImport.json');
                         if (metaFile) {
                             actualMetadataPath = path.join(projectPath, metaFile);
                             metadataPath = actualMetadataPath;
@@ -1031,24 +1035,50 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     }
 
                     const existingMetadata = JSON.parse(existingContent);
-                    const currentUser = options.userInfo?.username || 'Unknown';
-                    const currentDate = new Date().toISOString();
+                    const currentUser = options.userInfo?.username || 'User';
+                    const currentGroup = options.userInfo?.groupname || 'Unknown';
+                    const currentDate = nowIso;
+                    const existingOriginalTplName = existingMetadata.template?.name || existingMetadata.templateInfo?.name || 'Experiment Metadata';
+                    const incomingTplName = (options.templateName && options.templateName !== 'Loaded Project' && options.templateName !== 'Unknown Template')
+                        ? options.templateName
+                        : null;
 
-                    // Track updates and intelligently merge fields
-                    const mergedMetadata = { ...existingMetadata };
-                    const hasExtraFields = existingMetadata.extra_fields && typeof existingMetadata.extra_fields === 'object';
-                    const hasMetadataWrapper = existingMetadata.metadata && typeof existingMetadata.metadata === 'object';
+                    // Tag existing fields with their original templateName before merging so they keep their section
+                    const tagExistingTemplateNames = (container) => {
+                        if (!container || typeof container !== 'object' || Array.isArray(container)) return;
+                        for (const [k, v] of Object.entries(container)) {
+                            if (metafoldSchema.isReservedProjectKey(k)) continue;
+                            if (v && typeof v === 'object' && !Array.isArray(v)) {
+                                if ('value' in v) {
+                                    if (!v.templateName) v.templateName = existingOriginalTplName;
+                                } else {
+                                    tagExistingTemplateNames(v);
+                                }
+                            }
+                        }
+                    };
+
+                    // Track updates and intelligently merge fields without losing old values
+                    const mergedMetadata = JSON.parse(JSON.stringify(existingMetadata));
+                    tagExistingTemplateNames(mergedMetadata);
+                    const hasExtraFields = mergedMetadata.extra_fields && typeof mergedMetadata.extra_fields === 'object';
+                    const hasMetadataWrapper = mergedMetadata.metadata && typeof mergedMetadata.metadata === 'object';
 
                     if (hasExtraFields) {
-                        mergedMetadata.extra_fields = { ...existingMetadata.extra_fields };
+                        tagExistingTemplateNames(mergedMetadata.extra_fields);
                     }
                     if (hasMetadataWrapper) {
-                        mergedMetadata.metadata = { ...existingMetadata.metadata };
+                        tagExistingTemplateNames(mergedMetadata.metadata);
                     }
 
+                    const itemKey = (v) => (v && typeof v === 'object')
+                        ? String(v.id || v.name || JSON.stringify(v)).trim()
+                        : String(v).trim();
+
                     // Helper to merge a single field or nested group
-                    const mergeField = (targetContainer, key, newField, oldFieldTarget = null) => {
+                    const mergeField = (targetContainer, key, newField, oldFieldTarget = null, recordChanges = false, keyPrefix = '') => {
                         if (!newField || typeof newField !== 'object') return;
+                        const fieldPath = keyPrefix ? `${keyPrefix}.${key}` : key;
 
                         // Check if group (object of fields without own .value)
                         const isGroup = !('value' in newField) && Object.values(newField).some(v => v && typeof v === 'object' && 'value' in v);
@@ -1058,7 +1088,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                             }
                             const oldGroup = (oldFieldTarget && oldFieldTarget[key] && typeof oldFieldTarget[key] === 'object') ? oldFieldTarget[key] : {};
                             for (const [subKey, subField] of Object.entries(newField)) {
-                                mergeField(targetContainer[key], subKey, subField, oldGroup);
+                                mergeField(targetContainer[key], subKey, subField, oldGroup, recordChanges, fieldPath);
                             }
                             return;
                         }
@@ -1070,36 +1100,90 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                             return; // Keep existing value if user left new field empty
                         }
 
-                        const oldField = (oldFieldTarget && oldFieldTarget[key]) || targetContainer[key];
+                        const oldField = (oldFieldTarget && oldFieldTarget[key])
+                            || targetContainer[key]
+                            || (recordChanges && existingMetadata.extra_fields?.[key])
+                            || (recordChanges && existingMetadata.metadata?.[key]);
                         let isUpdated = false;
                         let isModified = false;
+                        let isAdded = false;
                         let mergedValue = newField.value;
+                        const oldValue = oldField ? oldField.value : undefined;
+                        const oldHasValue = oldValue !== undefined && oldValue !== null &&
+                            (Array.isArray(oldValue) ? oldValue.length > 0 : oldValue !== '');
 
-                        if (!oldField) {
+                        if (!oldField || !oldHasValue) {
                             isUpdated = true;
-                            targetContainer[key] = { ...newField };
+                            isAdded = true;
+                            isModified = false;
+                            targetContainer[key] = { ...(oldField || {}), ...newField, value: mergedValue };
+                            delete targetContainer[key].isModified;
+                            delete targetContainer[key].previousValue;
+                            if (recordChanges) {
+                                extendChanges.push({
+                                    field: fieldPath,
+                                    label: newField.label || key,
+                                    from: null,
+                                    to: mergedValue,
+                                    op: 'added'
+                                });
+                            }
                         } else {
-                            const oldValue = oldField.value;
                             if (Array.isArray(oldValue)) {
                                 const newArray = Array.isArray(mergedValue) ? mergedValue : [mergedValue];
-                                const mergedArray = [...new Set([...oldValue, ...newArray])];
-                                if (mergedArray.length !== oldValue.length || !mergedArray.every(v => oldValue.includes(v))) {
-                                    isUpdated = true;
-                                    isModified = true;
-                                    mergedValue = mergedArray;
+                                if (options.extendMode === 'edit') {
+                                    const oldKeys = oldValue.map(itemKey);
+                                    const newKeys = newArray.map(itemKey);
+                                    if (oldKeys.length !== newKeys.length || oldKeys.some((k, idx) => k !== newKeys[idx])) {
+                                        isUpdated = true;
+                                        isModified = true;
+                                        mergedValue = newArray;
+                                    } else {
+                                        mergedValue = oldValue;
+                                    }
+                                } else {
+                                    const seenKeys = new Set();
+                                    const mergedArray = [];
+                                    for (const item of [...oldValue, ...newArray]) {
+                                        const k = itemKey(item);
+                                        if (k && !seenKeys.has(k)) {
+                                            seenKeys.add(k);
+                                            mergedArray.push(item);
+                                        }
+                                    }
+                                    const oldKeys = oldValue.map(itemKey);
+                                    const mergedKeys = mergedArray.map(itemKey);
+                                    if (mergedKeys.length !== oldKeys.length || mergedKeys.some((k, idx) => k !== oldKeys[idx])) {
+                                        isUpdated = true;
+                                        isModified = true;
+                                        mergedValue = mergedArray;
+                                    } else {
+                                        mergedValue = oldValue;
+                                    }
                                 }
                             } else {
-                                if (mergedValue !== oldValue) {
+                                if (JSON.stringify(mergedValue) !== JSON.stringify(oldValue)) {
                                     isUpdated = true;
                                     isModified = true;
                                 }
                             }
+
                             if (isUpdated) {
                                 targetContainer[key] = {
                                     ...oldField,
                                     ...newField,
-                                    value: mergedValue
+                                    value: mergedValue,
+                                    previousValue: oldValue
                                 };
+                                if (recordChanges) {
+                                    extendChanges.push({
+                                        field: fieldPath,
+                                        label: newField.label || oldField.label || key,
+                                        from: oldValue,
+                                        to: mergedValue,
+                                        op: 'modified'
+                                    });
+                                }
                             }
                         }
 
@@ -1108,10 +1192,14 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                             targetContainer[key].lastUpdatedAt = currentDate;
                             if (isModified) {
                                 targetContainer[key].isModified = true;
+                                delete targetContainer[key].isAdded;
                             }
-                            if (options.templateName) {
-                                targetContainer[key].templateName = options.templateName;
+                            if (isAdded) {
+                                targetContainer[key].isAdded = true;
                             }
+                            targetContainer[key].templateName = isAdded
+                                ? (incomingTplName || newField.templateName || (oldField && oldField.templateName) || existingOriginalTplName)
+                                : ((oldField && oldField.templateName) || newField.templateName || incomingTplName || existingOriginalTplName);
                         }
                     };
 
@@ -1123,22 +1211,37 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
 
                         // 1. Merge into extra_fields if present
                         if (hasExtraFields) {
-                            mergeField(mergedMetadata.extra_fields, key, newField, existingMetadata.extra_fields);
+                            mergeField(mergedMetadata.extra_fields, key, newField, existingMetadata.extra_fields, false);
                         }
 
                         // 2. Merge into metadata wrapper if present
                         if (hasMetadataWrapper) {
-                            mergeField(mergedMetadata.metadata, key, newField, existingMetadata.metadata);
+                            mergeField(mergedMetadata.metadata, key, newField, existingMetadata.metadata, false);
                         }
 
-                        // 3. Always merge into root level of mergedMetadata
-                        mergeField(mergedMetadata, key, newField, existingMetadata);
+                        // 3. Always merge into root level of mergedMetadata (record changes once)
+                        mergeField(mergedMetadata, key, newField, existingMetadata, true);
                     });
 
-                    // Keep system keys updated
+                    // Preserve or update notes_markdown non-destructively
+                    if (typeof enhancedMetadata.notes_markdown === 'string' &&
+                        enhancedMetadata.notes_markdown.trim() !== '' &&
+                        enhancedMetadata.notes_markdown !== existingMetadata.notes_markdown) {
+                        const prevNotes = existingMetadata.notes_markdown || '';
+                        mergedMetadata.notes_markdown = enhancedMetadata.notes_markdown;
+                        extendChanges.push({
+                            field: 'notes_markdown',
+                            label: 'Notes (Markdown)',
+                            from: prevNotes.slice(0, 100),
+                            to: enhancedMetadata.notes_markdown.slice(0, 100),
+                            op: prevNotes ? 'modified' : 'added'
+                        });
+                    }
+
+                    // Keep system keys & original authorship updated without losing provenance
                     mergedMetadata.schemaVersion = metafoldSchema.SCHEMA_VERSION;
                     mergedMetadata.schemaType = metafoldSchema.SCHEMA_TYPES.PROJECT_METADATA;
-                    if (enhancedMetadata.provenance) mergedMetadata.provenance = enhancedMetadata.provenance;
+                    mergedMetadata.provenance = existingMetadata.provenance || enhancedMetadata.provenance;
                     if (enhancedMetadata.projectName) mergedMetadata.projectName = enhancedMetadata.projectName;
                     mergedMetadata.created_at = existingMetadata.created_at || enhancedMetadata.created_at || nowIso;
                     mergedMetadata.updated_at = nowIso;
@@ -1152,7 +1255,7 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                         enhancedMetadata.metafold_project_id = existingMetadata.metafold_project_id;
                     }
                     isExtending = true;
-                    console.log(`✅ Extending existing metadata for ${projectName}`);
+                    console.log(`✅ Extending existing metadata for ${projectName} (${extendChanges.length} change(s))`);
                 } catch (err) {
                     console.warn(`⚠️ Could not read existing metadata for extension, creating new: ${err.message}`);
                 }
@@ -1162,6 +1265,18 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 enhancedMetadata.metafold_project_id = require('crypto').randomUUID();
             }
 
+            // Remove legacy duplicate path fields if present so paths only live under System.*
+            delete enhancedMetadata['Project Absolute Path'];
+            delete enhancedMetadata['Project Relative Path'];
+            if (enhancedMetadata.metadata && typeof enhancedMetadata.metadata === 'object') {
+                delete enhancedMetadata.metadata['Project Absolute Path'];
+                delete enhancedMetadata.metadata['Project Relative Path'];
+            }
+            if (enhancedMetadata.extra_fields && typeof enhancedMetadata.extra_fields === 'object') {
+                delete enhancedMetadata.extra_fields['Project Absolute Path'];
+                delete enhancedMetadata.extra_fields['Project Relative Path'];
+            }
+
             // Inject paths
             enhancedMetadata['System.ProjectAbsolutePath'] = {
                 label: 'Project Absolute Path',
@@ -1169,15 +1284,24 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                 value: projectPath,
                 position: 900
             };
-            enhancedMetadata['System.ProjectRelativePath'] = {
-                label: 'Project Relative Path',
-                type: 'text',
-                value: path.relative(basePath, projectPath) || '.',
-                position: 901
-            };
+            if (!isExtending || !enhancedMetadata['System.ProjectRelativePath']) {
+                enhancedMetadata['System.ProjectRelativePath'] = {
+                    label: 'Project Relative Path',
+                    type: 'text',
+                    value: path.relative(basePath, projectPath) || '.',
+                    position: 901
+                };
+            }
 
-            // Inject update history if extending
-            if (isExtending && options.userInfo) {
+            // Inject update history & changelog if extending
+            if (isExtending) {
+                const histUser = options.userInfo?.username || 'User';
+                const histGroup = options.userInfo?.groupname || 'Unknown';
+                const incomingTplForAction = (options.templateName && options.templateName !== 'Loaded Project' && options.templateName !== 'Unknown Template')
+                    ? options.templateName
+                    : null;
+                const actionLabel = options.action || (incomingTplForAction ? `Metadata Extended (${incomingTplForAction})` : 'Metadata Extended');
+
                 if (!enhancedMetadata['System.UpdateHistory']) {
                     enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
                 }
@@ -1186,17 +1310,32 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     ? enhancedMetadata['System.UpdateHistory'].value
                     : [];
 
-                const updateEntry = {
-                    date: new Date().toISOString(),
-                    user: options.userInfo.username || 'Unknown',
-                    group: options.userInfo.groupname || 'Unknown',
-                    action: 'Metadata Extended'
-                };
-
-                historyArray.push(updateEntry);
+                historyArray.push({
+                    date: nowIso,
+                    user: histUser,
+                    group: histGroup,
+                    action: actionLabel,
+                    templateName: incomingTplForAction,
+                    changesCount: extendChanges.length,
+                    changes: extendChanges
+                });
                 enhancedMetadata['System.UpdateHistory'] = { value: historyArray, type: 'history' };
-                enhancedMetadata['System.LastUpdatedBy'] = { value: updateEntry.user, type: 'user' };
-                enhancedMetadata['System.LastUpdatedAt'] = { value: updateEntry.date, type: 'date' };
+                enhancedMetadata['System.LastUpdatedBy'] = { value: histUser, type: 'user' };
+                enhancedMetadata['System.LastUpdatedAt'] = { value: nowIso, type: 'date' };
+
+                if (!Array.isArray(enhancedMetadata.changelog)) {
+                    enhancedMetadata.changelog = [];
+                }
+                enhancedMetadata.changelog.unshift({
+                    timestamp: nowIso,
+                    user: histUser,
+                    group: histGroup,
+                    action: actionLabel,
+                    changes: extendChanges
+                });
+                if (enhancedMetadata.changelog.length > 100) {
+                    enhancedMetadata.changelog = enhancedMetadata.changelog.slice(0, 100);
+                }
             }
 
             // Sync [[Project]] mentions in notes and fields into related_to before cleaning empty fields
@@ -1217,21 +1356,31 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
                     const val = field.value;
                     if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
                         delete enhancedMetadata[key];
-                    } else if (!field.templateName && options.templateName) {
+                    } else if (!field.templateName && options.templateName && options.templateName !== 'Loaded Project' && options.templateName !== 'Unknown Template') {
                         // Tag base template fields with their template name
                         field.templateName = options.templateName;
                     }
                 }
             });
 
-            // Erstelle Metadaten-JSON mit ${projectName}-metadata.json
+            // Resolve & persist any existing integration links (from metadata or existing README)
+            const integrationLinksModule = require('./js/main/integrationLinks.js');
+            const isStandaloneNewFile = options.skipFolder && !isExtending;
+            const resolvedLinks = await integrationLinksModule.resolveIntegrationLinksForProject(
+                isStandaloneNewFile ? null : projectPath,
+                enhancedMetadata
+            );
+            integrationLinksModule.persistIntegrationLinksIntoDocument(enhancedMetadata, resolvedLinks);
+
+            // Erstelle/Aktualisiere Metadaten-JSON mit ${projectName}-metadata.json
             await fs.writeFile(metadataPath, JSON.stringify(enhancedMetadata, null, 2), 'utf8');
             console.log(`✅ Metadata file ${isExtending ? 'updated' : 'created'} with projectName: ${metadataFilename}`);
 
-            // Erstelle README.html mit enhanced Metadaten
-            const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName);
-            const existingReadme = await findReadmeFile(projectPath);
-            const readmeFilename = existingReadme || `${projectName}-README.html`;
+            // Erstelle/Aktualisiere README.html mit enhanced Metadaten & Integration Links
+            const readmeHtml = generateReadmeHtmlWithMetadata(enhancedMetadata, projectName, null, null, { integrationLinks: resolvedLinks });
+            const sanitizedReadmeProj = projectName ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim() : 'Project';
+            const existingReadme = isStandaloneNewFile ? null : await findReadmeFile(projectPath, projectName);
+            const readmeFilename = existingReadme || `${sanitizedReadmeProj}-README.html`;
             const readmePath = path.join(projectPath, readmeFilename);
             await fs.writeFile(readmePath, readmeHtml, 'utf8');
             console.log(`✅ README file ${isExtending ? 'updated' : 'created'}: ${readmeFilename}`);
@@ -1243,6 +1392,9 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
             } catch (indexErr) {
                 console.warn('⚠️ Could not update user_index.json for project:', indexErr.message);
             }
+
+            // Store final merged metadata for response
+            metadata = enhancedMetadata;
         }
 
         // Adjust success message based on created content
@@ -1266,7 +1418,9 @@ ipcMain.handle('create-project', async (event, basePath, projectName, structure,
             message: message,
             projectPath: normalizedPath,
             hasStructure: hasStructure,
-            hasMetadata: hasMetadata
+            hasMetadata: hasMetadata,
+            metadata: hasMetadata ? metadata : null,
+            metadataPath: (options.metadataFilePath ? path.resolve(options.metadataFilePath) : path.join(normalizedPath, `${projectName}-metadata.json`))
         };
     } catch (error) {
         console.error('Error creating project:', error);
@@ -1288,9 +1442,53 @@ ipcMain.handle('create-folders', async (event, targetPath, structure) => {
 // Open folder in explorer
 ipcMain.handle('open-folder', async (event, folderPath) => {
     try {
-        await shell.openPath(folderPath);
+        if (!folderPath || typeof folderPath !== 'string') {
+            return { success: false, message: 'No folder path provided' };
+        }
+        const resolvedPath = path.resolve(folderPath);
+        const errMsg = await shell.openPath(resolvedPath);
+        if (errMsg) {
+            console.error('❌ Failed to open folder:', resolvedPath, errMsg);
+            return { success: false, message: errMsg };
+        }
         return { success: true };
     } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Open file with default application
+ipcMain.handle('open-file', async (event, filePath) => {
+    try {
+        if (!filePath || typeof filePath !== 'string') {
+            return { success: false, message: 'No file path provided' };
+        }
+        const resolvedPath = path.resolve(filePath);
+        await fs.access(resolvedPath);
+        const errMsg = await shell.openPath(resolvedPath);
+        if (errMsg) {
+            console.error('❌ Failed to open file:', resolvedPath, errMsg);
+            return { success: false, message: errMsg };
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Error in open-file handler:', error);
+        return { success: false, message: error.message };
+    }
+});
+
+// Show and highlight file/item in its parent folder in Explorer
+ipcMain.handle('show-item-in-folder', async (event, itemPath) => {
+    try {
+        if (!itemPath || typeof itemPath !== 'string') {
+            return { success: false, message: 'No item path provided' };
+        }
+        const resolvedPath = path.resolve(itemPath);
+        await fs.access(resolvedPath);
+        shell.showItemInFolder(resolvedPath);
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Error in show-item-in-folder handler:', error);
         return { success: false, message: error.message };
     }
 });
@@ -1581,15 +1779,22 @@ ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, pr
         console.log('  elabFTW URL:', elabftwUrl || 'none');
         console.log('  OMERO URL:', omeroUrl || 'none');
 
-        // Generate complete README.html with metadata and integration links
-        const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl);
+        const integrationLinksModule = require('./js/main/integrationLinks.js');
+        const overrides = integrationLinksModule.linksFromArgs({ elabftwUrl, omeroUrl });
+        const resolvedLinks = await integrationLinksModule.resolveIntegrationLinksForProject(projectPath, metadata, overrides);
+
+        // Generate complete README.html with metadata, update history, and integration links
+        const readmeHtml = generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl, omeroUrl, {
+            integrationLinks: resolvedLinks
+        });
 
         // Construct the README filename
         const sanitizedProjectName = projectName
             ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
             : 'Project';
 
-        const readmeFilename = `${sanitizedProjectName}-README.html`;
+        const existingReadme = await findReadmeFile(projectPath);
+        const readmeFilename = existingReadme || `${sanitizedProjectName}-README.html`;
         const readmePath = path.join(projectPath, readmeFilename);
 
         // Write the README file
@@ -1614,129 +1819,54 @@ ipcMain.handle('regenerate-readme-html', async (event, projectPath, metadata, pr
     }
 });
 
-// Insert integration links into existing README.html
-// Insert integration links into existing README.html
+// Insert integration links into existing README.html (and regenerate from metadata JSON when available)
 ipcMain.handle('insert-links-into-readme', async (event, projectPath, elabftwUrl, omeroUrl, projectName = null, rspaceUrl = null, omeroGroupName = null) => {
     try {
         console.log(`✨ IPC: Inserting integration links into README: ${projectPath}`);
 
-        // Construct the correct README filename with project name
+        const integrationLinksModule = require('./js/main/integrationLinks.js');
+        const existingReadme = await findReadmeFile(projectPath, projectName);
         const sanitizedProjectName = projectName
             ? projectName.replace(/[<>:"/\\|?*]/g, '_').trim()
             : path.basename(projectPath); // Fallback: use folder name
-
-        const readmeFilename = `${sanitizedProjectName}-README.html`;
+        const readmeFilename = existingReadme || `${sanitizedProjectName}-README.html`;
         const readmePath = path.join(projectPath, readmeFilename);
 
-        // Read existing README.html
-        let htmlContent = await fs.readFile(readmePath, 'utf8');
-
-        // Create integration links HTML
-        let linksHtml = `
-            <section class="section integration-section">
-                <h2 class="section-title">
-                    <span class="section-icon">🔗</span>
-                    Integration Links
-                </h2>
-                <div class="integration-links">`;
-
-        if (elabftwUrl) {
-            linksHtml += `
-                    <a href="${elabftwUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
-                        <span class="link-icon">🧪</span>
-                        <span class="link-text">Open in elabFTW</span>
-                    </a>`;
+        let diskResult = null;
+        try {
+            diskResult = await projectMetadataStore.readProjectMetadataFromDisk(projectPath, projectName);
+        } catch (_) {
+            diskResult = null;
         }
 
-        if (omeroUrl) {
-            linksHtml += `
-                    <a href="${omeroUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
-                        <span class="link-icon">🔵</span>
-                        <div class="link-content" style="display:flex; flex-direction:column;">
-                            <span class="link-text">Open in OMERO</span>
-                            ${omeroGroupName ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">(Group: ${omeroGroupName})</span>` : ''}
-                        </div>
-                    </a>`;
-        }
+        const diskDoc = diskResult ? diskResult.rawDoc : null;
+        const overrides = integrationLinksModule.linksFromArgs({
+            elabftwUrl,
+            omeroUrl,
+            rspaceUrl,
+            omeroGroupName
+        });
+        const resolvedLinks = await integrationLinksModule.resolveIntegrationLinksForProject(projectPath, diskDoc, overrides, projectName);
 
-        if (rspaceUrl) {
-            linksHtml += `
-                    <a href="${rspaceUrl}" class="integration-link" target="_blank" rel="noopener noreferrer">
-                        <span class="link-icon">📝</span>
-                        <span class="link-text">Open in RSpace</span>
-                    </a>`;
-        }
-
-        linksHtml += `
-                </div>
-            </section>`;
-
-        // Add CSS for integration links if not already present
-        const integrationCSS = `
-        /* Integration Links Styles */
-        .integration-section {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-left: 4px solid #22c55e;
-        }
-
-        .integration-links {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .integration-link {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            text-decoration: none;
-            color: #e0e0e0;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .integration-link:hover {
-            background: rgba(34, 197, 94, 0.1);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            border-color: rgba(34, 197, 94, 0.3);
-        }
-
-        .integration-link:visited {
-            color: #e0e0e0;
-        }
-
-        .link-icon {
-            font-size: 1.5rem;
-            margin-right: 15px;
-            min-width: 30px;
-        }
-
-        .link-text {
-            font-size: 1rem;
-            font-weight: 500;
-        }`;
-
-        // Insert CSS if not already present
-        if (!htmlContent.includes('integration-section')) {
-            htmlContent = htmlContent.replace('</style>', integrationCSS + '\n        </style>');
-        }
-
-        // Insert links section after the header and before other content
-        // Look for the main content start
-        const contentStart = htmlContent.indexOf('<main class="content">');
-        if (contentStart !== -1) {
-            const insertPosition = htmlContent.indexOf('>', contentStart) + 1;
-            htmlContent = htmlContent.slice(0, insertPosition) + linksHtml + htmlContent.slice(insertPosition);
+        let htmlContent;
+        if (diskDoc) {
+            if (integrationLinksModule.persistIntegrationLinksIntoDocument(diskDoc, resolvedLinks)) {
+                await fs.writeFile(diskResult.metadataPath, JSON.stringify(diskDoc, null, 2), 'utf8');
+            }
+            const effectiveProjectName = diskResult.projectName || projectName || path.basename(projectPath);
+            htmlContent = generateReadmeHtmlWithMetadata(diskDoc, effectiveProjectName, elabftwUrl, omeroUrl, {
+                integrationLinks: resolvedLinks,
+                rspaceUrl
+            });
+        } else {
+            htmlContent = await fs.readFile(readmePath, 'utf8');
+            htmlContent = integrationLinksModule.replaceIntegrationLinksInHtml(htmlContent, resolvedLinks);
         }
 
         // Write updated README
         await fs.writeFile(readmePath, htmlContent, 'utf8');
 
-        console.log(`✅ IPC: Integration links inserted successfully into README.html`);
+        console.log(`✅ IPC: Integration links and history updated in README.html: ${readmePath}`);
 
         return {
             success: true,
@@ -4334,6 +4464,7 @@ ipcMain.handle('check-directory-exists', async (event, directoryPath) => {
                     isDirectory: true,
                     hasMetafoldData: hasMetafoldData,
                     existingProjectName: existingProjectName,
+                    metafoldFiles: metafoldFiles,
                     created: stats.birthtime || stats.ctime,
                     modified: stats.mtime
                 };
@@ -5130,34 +5261,49 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
     if (metadata && Object.keys(metadata).length > 0) {
         let hasMetadata = false;
 
+        // Combine flat fields with envelope containers (extra_fields / metadata) for display
+        const fieldsSource = {};
+        if (metadata.extra_fields && typeof metadata.extra_fields === 'object') {
+            Object.assign(fieldsSource, metadata.extra_fields);
+        }
+        if (metadata.metadata && typeof metadata.metadata === 'object') {
+            Object.assign(fieldsSource, metadata.metadata);
+        }
+        Object.entries(metadata).forEach(([k, v]) => {
+            if (!metafoldSchema.isReservedProjectKey(k)) {
+                fieldsSource[k] = v;
+            }
+        });
+
         // Group fields by templateName
         const fieldsByTemplate = {};
 
-        Object.entries(metadata).forEach(([key, fieldInfo]) => {
-            // Skip special internal fields from being rendered as normal fields
-            if (metafoldSchema.isReservedProjectKey(key)) {
+        Object.entries(fieldsSource).forEach(([key, fieldInfo]) => {
+            // Skip special internal fields & legacy duplicate path keys from being rendered as normal fields
+            if (metafoldSchema.isReservedProjectKey(key) ||
+                key === 'Project Absolute Path' ||
+                key === 'Project Relative Path') {
                 return;
             }
             if (fieldInfo && typeof fieldInfo === 'object') {
                 if (!fieldInfo.type) {
-                    // It's a nested group
+                    // It's a nested group — partition its children by their own templateName
                     const groupKey = key;
-                    // Try to guess a template name from its children
-                    let tplName = 'Experiment Metadata';
-                    const children = Object.values(fieldInfo);
-                    if (children.length > 0 && children[0].templateName) {
-                        tplName = children[0].templateName;
-                    }
-
-                    if (!fieldsByTemplate[tplName]) {
-                        fieldsByTemplate[tplName] = { normal: [] };
-                    }
-                    // Add the group itself
-                    fieldsByTemplate[tplName].normal.push([groupKey, { type: 'group', label: groupKey }]);
-
-                    // Add all children
+                    const childrenByTpl = {};
                     Object.entries(fieldInfo).forEach(([subKey, subFieldInfo]) => {
-                        fieldsByTemplate[tplName].normal.push([subKey, subFieldInfo]);
+                        if (!subFieldInfo || typeof subFieldInfo !== 'object') return;
+                        const childTpl = subFieldInfo.templateName || 'Experiment Metadata';
+                        if (!childrenByTpl[childTpl]) {
+                            childrenByTpl[childTpl] = [];
+                        }
+                        childrenByTpl[childTpl].push([subKey, subFieldInfo]);
+                    });
+                    Object.entries(childrenByTpl).forEach(([tplName, childEntries]) => {
+                        if (!fieldsByTemplate[tplName]) {
+                            fieldsByTemplate[tplName] = { normal: [] };
+                        }
+                        fieldsByTemplate[tplName].normal.push([groupKey, { type: 'group', label: groupKey }]);
+                        childEntries.forEach(entry => fieldsByTemplate[tplName].normal.push(entry));
                     });
                 } else {
                     const tplName = fieldInfo.templateName || 'Experiment Metadata';
@@ -5181,6 +5327,16 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                     <div class="no-metadata">No metadata fields have been filled out yet.</div>
                 </section>`;
         } else {
+            const escHtml = markdownLite.escapeHtml;
+            const formatPrevValue = (pv) => {
+                if (pv === undefined || pv === null || pv === '') return '';
+                if (Array.isArray(pv)) {
+                    return pv.map(item => (item && typeof item === 'object') ? (item.name || item.id || JSON.stringify(item)) : String(item)).join(', ');
+                }
+                if (typeof pv === 'object') return '';
+                return String(pv);
+            };
+
             templateNames.forEach(tplName => {
                 const fields = fieldsByTemplate[tplName];
 
@@ -5216,9 +5372,13 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
                     let sectionUpdater = null;
                     let sectionUpdateDate = null;
+                    let hasModifiedInSection = false;
 
                     // Find latest updater for the entire template section
                     finalFields.forEach(([key, fieldInfo]) => {
+                        if (fieldInfo.isModified) {
+                            hasModifiedInSection = true;
+                        }
                         if (fieldInfo.lastUpdatedBy) {
                             if (!sectionUpdateDate || new Date(fieldInfo.lastUpdatedAt) > new Date(sectionUpdateDate)) {
                                 sectionUpdater = fieldInfo.lastUpdatedBy;
@@ -5229,17 +5389,18 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
 
                     let headerExtra = '';
                     if (sectionUpdater) {
+                        const verb = hasModifiedInSection ? 'Updated' : 'Extended';
                         headerExtra = `
                         <div style="font-size: 0.8rem; font-weight: normal; color: #9ca3af; margin-top: 6px; display: flex; align-items: center; gap: 5px;">
-                            <span style="background: rgba(168, 85, 247, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc;">👤 Extended by ${sectionUpdater}</span>
-                            <span>on ${new Date(sectionUpdateDate).toLocaleString()}</span>
+                            <span style="background: rgba(168, 85, 247, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc;">👤 ${verb} by ${escHtml(sectionUpdater)}</span>
+                            <span>on ${escHtml(new Date(sectionUpdateDate).toLocaleString())}</span>
                         </div>`;
                     }
 
                     htmlContent += `
                 <section class="section">
                     <h2 class="section-title" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <div><span class="section-icon">📊</span>${tplName}</div>
+                        <div><span class="section-icon">📊</span>${escHtml(tplName)}</div>
                         ${headerExtra}
                     </h2>
                     <div class="metadata-grid">`;
@@ -5248,9 +5409,9 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                         if (fieldInfo.type === 'group') {
                             htmlContent += `
                         <div class="metadata-item" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(168, 85, 247, 0.1)); flex-direction: column; align-items: flex-start; gap: 5px;">
-                            <div class="metadata-label" style="font-size: 1rem; color: #c084fc; flex: none; width: 100%; border: none; padding: 0;">${fieldInfo.label}</div>`;
+                            <div class="metadata-label" style="font-size: 1rem; color: #c084fc; flex: none; width: 100%; border: none; padding: 0;">${escHtml(fieldInfo.label)}</div>`;
                             if (fieldInfo.description) {
-                                htmlContent += `<div class="metadata-description" style="margin-top: 0;">${fieldInfo.description}</div>`;
+                                htmlContent += `<div class="metadata-description" style="margin-top: 0;">${escHtml(fieldInfo.description)}</div>`;
                             }
                             htmlContent += `</div>`;
                             return;
@@ -5263,19 +5424,22 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                         let formattedValue;
                         if (fieldInfo.type === 'checkbox') {
                             formattedValue = value ? '✅ Yes' : '❌ No';
+                        } else if (Array.isArray(value)) {
+                            const itemsText = value.map(item => (item && typeof item === 'object') ? (item.name || item.id || JSON.stringify(item)) : String(item)).filter(Boolean);
+                            formattedValue = itemsText.length > 0 ? escHtml(itemsText.join(', ')) : '<em>Not filled</em>';
                         } else if (fieldInfo.type === 'date' && value) {
                             try {
                                 const dateObj = new Date(value);
                                 if (!isNaN(dateObj.getTime())) {
-                                    formattedValue = dateObj.toLocaleDateString('en-US');
+                                    formattedValue = escHtml(dateObj.toLocaleDateString('en-US'));
                                 } else {
-                                    formattedValue = value || '<em>Not filled</em>';
+                                    formattedValue = escHtml(value) || '<em>Not filled</em>';
                                 }
                             } catch (e) {
-                                formattedValue = value || '<em>Not filled</em>';
+                                formattedValue = escHtml(value) || '<em>Not filled</em>';
                             }
                         } else if (fieldInfo.type === 'textarea' && value && value.length > 50) {
-                            formattedValue = `\n> ${value.replace(/\n/g, '\n> ')}`;
+                            formattedValue = `<div style="white-space: pre-wrap;">${escHtml(value)}</div>`;
                         } else if (fieldInfo.type === 'rating') {
                             const val = parseInt(value) || 0;
                             let starsHtml = '';
@@ -5287,29 +5451,35 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                             }
                             formattedValue = `<div style="display: flex; align-items: center;">${starsHtml} <span style="margin-left: 8px;">(${val}/5)</span></div>`;
                         } else if (fieldInfo.type === 'url' || (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://')))) {
-                            formattedValue = `<a href="${value}" target="_blank" style="color: #a855f7; text-decoration: underline;">${value}</a>`;
+                            const safeUrl = markdownLite.sanitizeUrl(value) || '';
+                            formattedValue = safeUrl
+                                ? `<a href="${escHtml(safeUrl)}" target="_blank" style="color: #a855f7; text-decoration: underline;">${escHtml(value)}</a>`
+                                : escHtml(value);
                         } else {
-                            formattedValue = value || '<em>Not filled</em>';
+                            formattedValue = (value !== undefined && value !== null && value !== '') ? escHtml(String(value)) : '<em>Not filled</em>';
                         }
 
                         htmlContent += `
                         <div class="metadata-item">
-                            <div class="metadata-label">${label}</div>
+                            <div class="metadata-label">${escHtml(label)}</div>
                             <div class="metadata-content">
                                 <div class="metadata-value">${formattedValue}</div>`;
 
                         if (fieldInfo.description) {
-                            htmlContent += `<div class="metadata-description">${fieldInfo.description}</div>`;
+                            htmlContent += `<div class="metadata-description">${escHtml(fieldInfo.description)}</div>`;
                         }
 
                         htmlContent += `</div>`; // Close metadata-content
 
-                        // Show modification info as a third column
-                        if (fieldInfo.isModified && fieldInfo.lastUpdatedBy && fieldInfo.lastUpdatedAt) {
+                        // Show modification info inline as a third column only when an existing value changed
+                        // (Newly added fields in extended sections already show "Extended by ..." in the section header)
+                        if (fieldInfo.isModified && fieldInfo.lastUpdatedAt) {
+                            const prevText = formatPrevValue(fieldInfo.previousValue);
                             htmlContent += `
                             <div style="flex: 0 0 250px; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 15px; margin-left: 15px; display: flex; flex-direction: column; justify-content: center; font-size: 0.85rem; color: #9ca3af;">
-                                <div style="color: #c084fc; margin-bottom: 2px;">🔄 Modified by ${fieldInfo.lastUpdatedBy}</div>
-                                <div>on ${new Date(fieldInfo.lastUpdatedAt).toLocaleString()}</div>
+                                <div style="color: #c084fc; margin-bottom: 2px;">🔄 Modified by ${escHtml(fieldInfo.lastUpdatedBy || 'User')}</div>
+                                <div>on ${escHtml(new Date(fieldInfo.lastUpdatedAt).toLocaleString())}</div>
+                                ${prevText ? `<div style="font-size: 0.78rem; color: #6b7280; margin-top: 2px; word-break: break-word;">Prev: ${escHtml(prevText.slice(0, 60))}</div>` : ''}
                             </div>`;
                         }
 
@@ -5502,13 +5672,20 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
     </body>
     </html>`;
 
-    if (options && options.integrationLinks) {
-        try {
-            const integrationLinksModule = require('./js/main/integrationLinks.js');
-            htmlContent = integrationLinksModule.replaceIntegrationLinksInHtml(htmlContent, options.integrationLinks);
-        } catch (e) {
-            console.warn('⚠️ Error applying integrationLinks in generateReadmeHtmlWithMetadata:', e.message);
+    try {
+        const integrationLinksModule = require('./js/main/integrationLinks.js');
+        const fromArgs = integrationLinksModule.linksFromArgs({
+            elabftwUrl,
+            omeroUrl,
+            rspaceUrl: options?.rspaceUrl || null
+        });
+        const fromMeta = integrationLinksModule.normalizeIntegrationLinks(metadata);
+        const effectiveLinks = integrationLinksModule.mergeIntegrationLinks(options?.integrationLinks, fromMeta, fromArgs);
+        if (integrationLinksModule.hasAnyLink(effectiveLinks)) {
+            htmlContent = integrationLinksModule.replaceIntegrationLinksInHtml(htmlContent, effectiveLinks);
         }
+    } catch (e) {
+        console.warn('⚠️ Error applying integrationLinks in generateReadmeHtmlWithMetadata:', e.message);
     }
 
     return htmlContent;
@@ -5772,10 +5949,23 @@ function generateReadmeWithMetadata(metadata, projectName = null) {
 }
 
 
-// Helper function to find README file in project directory
-async function findReadmeFile(projectPath) {
+// Helper function to find README file in project directory (optionally preferring projectName-README.html)
+async function findReadmeFile(projectPath, preferredProjectName = null) {
     try {
         const entries = await fs.readdir(projectPath, { withFileTypes: true });
+
+        if (preferredProjectName) {
+            const sanitized = preferredProjectName.replace(/[<>:"/\\|?*]/g, '_').trim();
+            const expectedName = `${sanitized}-README.html`.toLowerCase();
+            const exactReadme = entries.find(entry =>
+                entry.isFile() &&
+                entry.name.toLowerCase() === expectedName
+            );
+            if (exactReadme) {
+                console.log(`📖 Found exact README file: ${exactReadme.name} in ${projectPath}`);
+                return exactReadme.name;
+            }
+        }
 
         // Look for *-README.html pattern
         const readmeFile = entries.find(entry =>

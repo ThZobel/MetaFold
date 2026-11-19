@@ -1101,7 +1101,7 @@ const experimentForm = {
                     el.value = before + spacer + trimmed + after;
                     const newPos = before.length + spacer.length + trimmed.length;
                     el.focus();
-                    try { el.setSelectionRange(newPos, newPos); } catch (_) {}
+                    try { el.setSelectionRange(newPos, newPos); } catch (_) { }
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                     return;
@@ -2091,6 +2091,19 @@ const experimentForm = {
             targetPathInput.value = parts.join(window.electronAPI?.platform === 'win32' ? '\\' : '/');
         }
 
+        // Ensure "Skip folder creation / Extend existing project" mode is enabled for loaded projects
+        const onlyIntCb = document.getElementById('onlyIntegrations');
+        if (onlyIntCb) {
+            onlyIntCb.checked = true;
+        }
+        const extendHint = document.getElementById('extendProjectHint');
+        if (extendHint) {
+            const safeProjName = (window.appUtils?.escapeHtml ? window.appUtils.escapeHtml(projectName) : projectName);
+            extendHint.style.display = 'block';
+            extendHint.style.color = '#34d399';
+            extendHint.innerHTML = `✅ Loaded existing project: <strong>${safeProjName}</strong> — updates &amp; template extensions will be merged without data loss.`;
+        }
+
         // Render form structure with normalized fields
         this.render(normalized);
 
@@ -2108,11 +2121,14 @@ const experimentForm = {
         }
 
         // Pre-configure right sidebar integrations if present in metadata
-        if (rawMetadata.integrations) {
+        const integLinks = rawMetadata.metafold_integration?.external_links || rawMetadata.integrations;
+        if (integLinks) {
             const elabToggle = document.getElementById('sendToElabFTW');
             const omeroToggle = document.getElementById('sendToOMERO');
-            if (elabToggle && rawMetadata.integrations.elabftw) elabToggle.checked = true;
-            if (omeroToggle && rawMetadata.integrations.omero) omeroToggle.checked = true;
+            const rspaceToggle = document.getElementById('sendToRSpace');
+            if (elabToggle && integLinks.elabftw) elabToggle.checked = true;
+            if (omeroToggle && integLinks.omero) omeroToggle.checked = true;
+            if (rspaceToggle && integLinks.rspace) rspaceToggle.checked = true;
         }
 
         console.log('✅ Loaded project rendered successfully in center form');
@@ -2128,15 +2144,42 @@ const experimentForm = {
             'projectName', 'name', 'projectId', 'metafold_project_id', 'id',
             'templateInfo', 'integrations', 'metafold_integration',
             'provenance', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
-            'previous_names', 'notes_log', 'changelog'
+            'previous_names', 'notes_log', 'changelog', 'elabftw', 'extra_fields',
+            'metadata', 'community', '_metafold'
         ]);
 
-        const sourceObj = rawMetadata.metadata || rawMetadata.fields || rawMetadata;
+        const shouldIgnoreKey = (k) => {
+            if (!k) return true;
+            if (metaIgnore.has(k)) return true;
+            if (k.startsWith('System.') || k.startsWith('_')) return true;
+            if (window.metafoldSchema && typeof window.metafoldSchema.isReservedProjectKey === 'function') {
+                return window.metafoldSchema.isReservedProjectKey(k);
+            }
+            return false;
+        };
+
+        const sourceObj = {};
+        if (rawMetadata.extra_fields && typeof rawMetadata.extra_fields === 'object') {
+            Object.assign(sourceObj, rawMetadata.extra_fields);
+        }
+        if (rawMetadata.metadata && typeof rawMetadata.metadata === 'object') {
+            Object.assign(sourceObj, rawMetadata.metadata);
+        }
+        if (rawMetadata.fields && typeof rawMetadata.fields === 'object') {
+            Object.assign(sourceObj, rawMetadata.fields);
+        }
+        if (rawMetadata && typeof rawMetadata === 'object') {
+            for (const [k, v] of Object.entries(rawMetadata)) {
+                if (!shouldIgnoreKey(k)) {
+                    sourceObj[k] = v;
+                }
+            }
+        }
 
         const processEntries = (obj, parentCategory = null) => {
             if (!obj || typeof obj !== 'object') return;
             for (const [key, rawVal] of Object.entries(obj)) {
-                if (metaIgnore.has(key)) continue;
+                if (shouldIgnoreKey(key)) continue;
 
                 const fullKey = parentCategory ? `${parentCategory}.${key}` : key;
 
@@ -2182,7 +2225,12 @@ const experimentForm = {
                     value: val,
                     defaultValue: val,
                     unit,
-                    options
+                    options,
+                    templateName: rawVal?.templateName || null,
+                    description: rawVal?.description || '',
+                    required: Boolean(rawVal?.required),
+                    min: rawVal?.min,
+                    max: rawVal?.max
                 };
                 fieldOrder.push(fullKey);
             }
@@ -2295,6 +2343,7 @@ const experimentForm = {
             if (fieldInfo.term) fieldData.term = fieldInfo.term;
             if (fieldInfo.valueTerm) fieldData.valueTerm = fieldInfo.valueTerm;
             if (fieldInfo.description) fieldData.description = fieldInfo.description;
+            if (fieldInfo.templateName) fieldData.templateName = fieldInfo.templateName;
 
             if (currentGroupObj) {
                 currentGroupObj[fieldName] = fieldData;

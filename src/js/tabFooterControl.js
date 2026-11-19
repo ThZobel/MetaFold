@@ -45,15 +45,28 @@
             const currentTmpl = window.templateManager?.currentTemplate;
             const isLoadedProject = currentTmpl?.isLoadedProject === true;
             const hasTemplate = !!currentTmpl && !isLoadedProject;
+            const isExtendMode = !!(window.projectManager?.extendContext?.active);
 
-            // Show Create Project specific buttons only when a normal template is active
-            if (createProjectBtn) createProjectBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+            // Show Create/Extend Project specific buttons only when a normal template is active
+            if (createProjectBtn) {
+                createProjectBtn.style.display = hasTemplate ? 'inline-block' : 'none';
+                if (hasTemplate) {
+                    if (isExtendMode) {
+                        createProjectBtn.innerHTML = '<span>➕</span> Extend Project';
+                    } else {
+                        const isWriteFiles = !!(currentTmpl.options?.writeFilesOnly || currentTmpl.options?.multipleFolders);
+                        createProjectBtn.innerHTML = isWriteFiles ? '<span>📝</span> Write Files' : '<span>🎯</span> Create Project';
+                    }
+                    createProjectBtn.style.background = '';
+                    createProjectBtn.style.borderColor = '';
+                }
+            }
             if (editTemplateBtn) editTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
             if (clearTemplateBtn) clearTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
             if (saveTemplateBtn) saveTemplateBtn.style.display = hasTemplate ? 'inline-block' : 'none';
 
-            // Show Update / Send buttons when an existing project is loaded
-            if (updateProjectBtn) updateProjectBtn.style.display = isLoadedProject ? 'inline-block' : 'none';
+            // Show Send & Update button when an existing project is loaded (single button: sends if selected, otherwise updates)
+            if (updateProjectBtn) updateProjectBtn.style.display = 'none';
             if (updateAndSendBtn) updateAndSendBtn.style.display = isLoadedProject ? 'inline-block' : 'none';
 
             // Hide standalone Send to Integrations button

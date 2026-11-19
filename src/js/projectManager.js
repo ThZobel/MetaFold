@@ -117,6 +117,174 @@ const projectManager = {
         console.log('ProjectManager initialized');
     },
 
+    // Explicit Extend / Update Project context (selected via "Extend / Update Existing Project")
+    extendContext: null,
+
+    /**
+     * Activate explicit Extend / Update Mode for a target project JSON file.
+     * Allows picking any template in the sidebar afterwards to merge fields non-destructively.
+     */
+    setExtendContext({ filePath, fileName, projectDir, projectName, existingMetadata }) {
+        this.extendContext = {
+            active: true,
+            filePath,
+            fileName: fileName || (filePath ? filePath.split(/[\\/]/).pop() : ''),
+            projectDir,
+            projectName,
+            existingMetadata: existingMetadata || {}
+        };
+        this.applyExtendContextToForm();
+    },
+
+    /**
+     * Exit Extend Project Mode and restore normal Create Project inputs.
+     */
+    clearExtendContext(resetInputs = true) {
+        const wasActive = !!(this.extendContext && this.extendContext.active);
+        this.extendContext = null;
+
+        const headerTitle = document.getElementById('setupHeaderTitle');
+        const headerSubtitle = document.getElementById('setupHeaderSubtitle');
+        const deselectBtn = document.getElementById('deselectTemplateBtn');
+        if (headerTitle) headerTitle.textContent = '🎯 Project Configuration';
+        if (headerSubtitle) headerSubtitle.textContent = 'Configure your project location and details';
+        if (deselectBtn) {
+            deselectBtn.innerHTML = '<span>✕</span> Deselect Template';
+            deselectBtn.title = 'Deselect template and return to start view';
+        }
+
+        const folderStructureSection = document.getElementById('folderStructureSection');
+        if (folderStructureSection) folderStructureSection.style.display = '';
+
+        const extendPrompt = document.getElementById('extendSelectTemplatePrompt');
+        if (extendPrompt) extendPrompt.style.display = 'none';
+
+        const targetPathInput = document.getElementById('targetPath');
+        if (targetPathInput) {
+            targetPathInput.readOnly = false;
+            targetPathInput.style.opacity = '';
+            targetPathInput.title = 'Enter or browse for the base directory';
+        }
+
+        const browseBtn = document.getElementById('browseTargetPathBtn');
+        if (browseBtn) {
+            browseBtn.disabled = false;
+            browseBtn.style.opacity = '';
+        }
+
+        const projectNameInput = document.getElementById('projectName');
+        if (projectNameInput) {
+            projectNameInput.readOnly = false;
+            projectNameInput.style.opacity = '';
+            projectNameInput.title = 'Enter a name for your project';
+        }
+
+        const currentTmpl = window.templateManager?.currentTemplate;
+        const onlyIntContainer = document.getElementById('onlyIntegrationsContainer');
+        if (onlyIntContainer) {
+            onlyIntContainer.style.display = currentTmpl?.options?.writeFilesOnly ? 'none' : 'flex';
+        }
+
+        if (wasActive && resetInputs) {
+            if (currentTmpl && !currentTmpl.isLoadedProject) {
+                if (window.experimentForm?.resetFormForNewTemplate) {
+                    window.experimentForm.resetFormForNewTemplate();
+                }
+                if (currentTmpl.type === 'experiment' && currentTmpl.metadata && window.experimentForm?.render) {
+                    window.experimentForm.render(currentTmpl.metadata);
+                }
+                if (targetPathInput) {
+                    targetPathInput.value = currentTmpl.projectDefaults?.targetPath || '';
+                }
+                if (projectNameInput) {
+                    projectNameInput.value = currentTmpl.projectDefaults?.projectName || '';
+                }
+            } else {
+                if (targetPathInput) targetPathInput.value = '';
+                if (projectNameInput) projectNameInput.value = '';
+            }
+        }
+
+        this.updatePathPreview();
+        if (typeof window.updateFooterVisibility === 'function') {
+            window.updateFooterVisibility();
+        }
+    },
+
+    /**
+     * Reuse the standard Project Configuration block for Extend Project Mode:
+     * lock target path/name, prefill matching template fields, and update header/footer.
+     */
+    applyExtendContextToForm() {
+        if (!this.extendContext || !this.extendContext.active) return;
+
+        const currentTpl = window.templateManager?.currentTemplate;
+        const hasNormalTemplate = !!(currentTpl && !currentTpl.isLoadedProject);
+
+        const placeholderEl = document.getElementById('templatePlaceholder');
+        const detailsEl = document.getElementById('templateDetails');
+        if (placeholderEl) placeholderEl.style.display = 'none';
+        if (detailsEl) detailsEl.style.display = 'block';
+
+        const headerTitle = document.getElementById('setupHeaderTitle');
+        const headerSubtitle = document.getElementById('setupHeaderSubtitle');
+        const deselectBtn = document.getElementById('deselectTemplateBtn');
+        if (headerTitle) headerTitle.textContent = '➕ Extend Project';
+        if (headerSubtitle) {
+            headerSubtitle.textContent = hasNormalTemplate
+                ? `Adding metadata from "${currentTpl.name}" to existing project`
+                : 'Select a template on the left to add metadata fields to this project';
+        }
+        if (deselectBtn) {
+            deselectBtn.innerHTML = '<span>✕</span> Exit Extend';
+            deselectBtn.title = 'Exit Extend Project mode and return to start view';
+        }
+
+        const folderStructureSection = document.getElementById('folderStructureSection');
+        if (folderStructureSection) folderStructureSection.style.display = 'none';
+
+        const extendPrompt = document.getElementById('extendSelectTemplatePrompt');
+        if (extendPrompt) extendPrompt.style.display = hasNormalTemplate ? 'none' : 'block';
+
+        const targetPathInput = document.getElementById('targetPath');
+        if (targetPathInput) {
+            targetPathInput.value = this.extendContext.projectDir || '';
+            targetPathInput.readOnly = true;
+            targetPathInput.style.opacity = '0.85';
+            targetPathInput.title = 'Directory of the project being extended (use Browse to choose a different project folder)';
+        }
+
+        const browseBtn = document.getElementById('browseTargetPathBtn');
+        if (browseBtn) {
+            browseBtn.disabled = false;
+            browseBtn.style.opacity = '';
+        }
+
+        const projectNameInput = document.getElementById('projectName');
+        if (projectNameInput) {
+            projectNameInput.value = this.extendContext.projectName || '';
+            projectNameInput.readOnly = true;
+            projectNameInput.style.opacity = '0.85';
+            projectNameInput.title = 'Locked to the existing project name';
+        }
+
+        const onlyIntContainer = document.getElementById('onlyIntegrationsContainer');
+        if (onlyIntContainer) onlyIntContainer.style.display = 'none';
+
+        const extendHint = document.getElementById('extendProjectHint');
+        if (extendHint) extendHint.style.display = 'none';
+
+        if (hasNormalTemplate && window.experimentForm?.populateForm) {
+            const existing = this.extendContext.existingMetadata;
+            window.experimentForm.populateForm(existing?.metadata || existing);
+        }
+
+        this.updatePathPreview();
+        if (typeof window.updateFooterVisibility === 'function') {
+            window.updateFooterVisibility();
+        }
+    },
+
     // Setup event listeners
     setupEventListeners() {
         // Listen for path and name changes
@@ -124,36 +292,48 @@ const projectManager = {
         const projectName = document.getElementById('projectName');
 
         if (targetPath) {
-            targetPath.addEventListener('input', () => this.updatePathPreview());
+            const onPathChanged = () => {
+                this.updatePathPreview();
+            };
+            targetPath.addEventListener('input', onPathChanged);
+            targetPath.addEventListener('change', onPathChanged);
         }
         if (projectName) {
             projectName.addEventListener('input', () => this.updatePathPreview());
         }
     },
 
-    // Browse for target directory
+    // Browse for target directory (in Extend Mode, resolves & switches to the chosen project folder)
     async browsePath() {
         if (window.electronAPI && window.electronAPI.selectFolder) {
             try {
                 const selectedPath = await window.electronAPI.selectFolder();
-                if (selectedPath) {
-                    document.getElementById('targetPath').value = selectedPath;
-                    this.updatePathPreview();
+                if (!selectedPath) return;
 
-                    if (document.getElementById('onlyIntegrations')?.checked) {
-                        this.checkAndAutoFillExistingProject();
-                    } else if (window.electronAPI.listDirectory) {
-                        try {
-                            const files = await window.electronAPI.listDirectory(selectedPath);
-                            const jsonFiles = files.filter(f => f.name.endsWith('.json'));
-                            if (jsonFiles.length > 0) {
-                                if (window.metadataLoader && typeof window.metadataLoader.promptToLoadFromFolder === 'function') {
-                                    window.metadataLoader.promptToLoadFromFolder(selectedPath, jsonFiles);
-                                }
+                if (this.extendContext?.active && window.metadataLoader?.resolveProjectFromFolder) {
+                    const resolved = await window.metadataLoader.resolveProjectFromFolder(selectedPath);
+                    if (resolved) {
+                        this.setExtendContext(resolved);
+                        this.showSuccess(`Extend Project switched to "${resolved.projectName}".`);
+                    }
+                    return;
+                }
+
+                document.getElementById('targetPath').value = selectedPath;
+                this.updatePathPreview();
+
+                const onlyIntChecked = document.getElementById('onlyIntegrations')?.checked;
+                if (!onlyIntChecked && window.electronAPI.listDirectory) {
+                    try {
+                        const files = await window.electronAPI.listDirectory(selectedPath);
+                        const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+                        if (jsonFiles.length > 0) {
+                            if (window.metadataLoader && typeof window.metadataLoader.promptToLoadFromFolder === 'function') {
+                                window.metadataLoader.promptToLoadFromFolder(selectedPath, jsonFiles);
                             }
-                        } catch (e) {
-                            console.warn("Could not list directory for metadata files", e);
                         }
+                    } catch (e) {
+                        console.warn("Could not list directory for metadata files", e);
                     }
                 }
             } catch (error) {
@@ -230,23 +410,49 @@ const projectManager = {
 
     // Update path preview
     updatePathPreview() {
-        const basePath = document.getElementById('targetPath').value.trim();
-        const projectName = document.getElementById('projectName').value.trim();
+        const basePath = document.getElementById('targetPath')?.value?.trim() || '';
+        const projectName = document.getElementById('projectName')?.value?.trim() || '';
         const preview = document.getElementById('fullPathPreview');
         const sidebarProjectName = document.getElementById('rsProjectName');
+        const separator = window.utils && window.utils.getPathSeparator ?
+            window.utils.getPathSeparator() : '/';
+
+        if (this.extendContext && this.extendContext.active) {
+            if (sidebarProjectName) {
+                sidebarProjectName.textContent = this.extendContext.projectName || '-';
+            }
+            if (preview) {
+                preview.textContent = `${this.extendContext.filePath} (Extending existing project)`;
+                preview.style.fontStyle = 'italic';
+                preview.style.color = '#a855f7';
+            }
+            return;
+        }
 
         if (sidebarProjectName) {
             sidebarProjectName.textContent = projectName || '-';
         }
 
         if (preview) {
-            if (basePath && projectName) {
-                // Use platform-appropriate path separator
-                const separator = window.utils && window.utils.getPathSeparator ?
-                    window.utils.getPathSeparator() : '/';
-                preview.textContent = basePath + separator + projectName;
+            const skipFolderChecked = document.getElementById('onlyIntegrations')?.checked || false;
+            if (skipFolderChecked) {
+                if (basePath) {
+                    const cleanBase = basePath.replace(/[\\/]+$/, '');
+                    const pName = projectName || '<ProjectName>';
+                    preview.textContent = `${cleanBase}${separator}${pName}-metadata.json (No project subfolder)`;
+                } else {
+                    preview.textContent = `Cloud Only (${projectName || '<ProjectName>'} → Integrations only)`;
+                }
+                preview.style.fontStyle = 'italic';
+                preview.style.color = '#a855f7';
+            } else if (basePath && projectName) {
+                preview.textContent = basePath.replace(/[\\/]+$/, '') + separator + projectName;
+                preview.style.fontStyle = 'normal';
+                preview.style.color = '';
             } else {
                 preview.textContent = 'Choose directory and project name';
+                preview.style.fontStyle = 'normal';
+                preview.style.color = '';
             }
         }
 
@@ -260,12 +466,10 @@ const projectManager = {
         }
     },
 
-    // Toggle Skip Project Folder / Extend Existing Project Mode
+    // Toggle Skip Folder Creation mode (creates JSON & HTML directly in Base Directory without a subfolder)
     toggleIntegrationsOnlyMode() {
         const checkbox = document.getElementById('onlyIntegrations');
         const targetPath = document.getElementById('targetPath');
-        const pathPreview = document.getElementById('fullPathPreview');
-        const pathStatus = document.getElementById('pathStatus');
         const projectNameSection = document.getElementById('projectNameSection');
         const selectMetadataBtn = document.getElementById('selectMetadataBtn');
         const extendHint = document.getElementById('extendProjectHint');
@@ -273,7 +477,6 @@ const projectManager = {
         if (!checkbox || !targetPath) return;
 
         if (checkbox.checked) {
-            // Enable "Skip Folder / Extend Project" mode:
             if (projectNameSection) {
                 const titleElement = projectNameSection.querySelector('h4');
                 const subtitleElement = projectNameSection.querySelector('.section-subtitle');
@@ -287,17 +490,16 @@ const projectManager = {
                 }
             }
 
-            // Do NOT display selectMetadataBtn
             if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
+            if (extendHint) {
+                extendHint.style.display = 'block';
+                extendHint.style.color = '#a78bfa';
+                extendHint.innerHTML = '💡 Creates <code>{ProjectName}-metadata.json</code> and <code>{ProjectName}-README.html</code> directly in Base Directory without creating a project subfolder.';
+            }
 
-            if (extendHint) extendHint.style.display = 'block';
-
-            // Check if selected directory already has a metadata file and auto-fill project name
-            this.checkAndAutoFillExistingProject();
-
-            console.log('📄 Skip Project Folder / Extend Mode ENABLED');
+            this.updatePathPreview();
+            console.log('📄 Skip Project Folder mode ENABLED');
         } else {
-            // Disable mode: Restore normal Project Name labels
             if (projectNameSection) {
                 const titleElement = projectNameSection.querySelector('h4');
                 const subtitleElement = projectNameSection.querySelector('.section-subtitle');
@@ -314,13 +516,8 @@ const projectManager = {
             if (selectMetadataBtn) selectMetadataBtn.style.display = 'none';
             if (extendHint) extendHint.style.display = 'none';
 
-            if (pathPreview) {
-                this.updatePathPreview();
-                pathPreview.style.fontStyle = 'normal';
-                pathPreview.style.color = '';
-            }
-
-            console.log('📄 Skip Project Folder / Extend Mode DISABLED');
+            this.updatePathPreview();
+            console.log('📄 Skip Project Folder mode DISABLED');
         }
     },
 
@@ -345,18 +542,41 @@ const projectManager = {
                 if (projectNameInput) {
                     projectNameInput.value = dirCheck.existingProjectName;
                 }
+                const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : (dirPath.includes('\\') ? '\\' : '/');
+                const existingMetaPath = `${dirPath.replace(/[\\/]+$/, '')}${sep}${dirCheck.existingProjectName}-metadata.json`;
+                const tplKey = window.templateManager?.currentTemplate?.id || window.templateManager?.currentTemplate?.name || 'none';
+                const autoFillKey = `${existingMetaPath}::${tplKey}`;
+                if (this._lastAutoFilledProjectFile !== autoFillKey && window.electronAPI.readFile) {
+                    try {
+                        const existingStr = await window.electronAPI.readFile(existingMetaPath);
+                        if (existingStr) {
+                            const parsedMeta = JSON.parse(existingStr);
+                            if (window.metadataLoader) {
+                                window.metadataLoader.loadedMetadata = parsedMeta;
+                                window.metadataLoader.loadedFilePath = existingMetaPath;
+                                window.metadataLoader.loadedFileName = `${dirCheck.existingProjectName}-metadata.json`;
+                            }
+                            if (window.experimentForm && typeof window.experimentForm.populateForm === 'function') {
+                                window.experimentForm.populateForm(parsedMeta.metadata || parsedMeta);
+                            }
+                            this._lastAutoFilledProjectFile = autoFillKey;
+                        }
+                    } catch (readErr) {
+                        console.warn('⚠️ Could not prefill form from existing metadata file:', readErr.message);
+                    }
+                }
                 if (extendHint) {
                     extendHint.style.display = 'block';
                     extendHint.style.color = '#34d399';
-                    extendHint.innerHTML = `✅ Existing project detected: <strong>${dirCheck.existingProjectName}</strong> — metadata will be merged &amp; extended.`;
+                    extendHint.innerHTML = `✅ Existing project detected: <strong>${dirCheck.existingProjectName}</strong> — metadata will be merged &amp; extended without overwriting.`;
                 }
                 if (pathPreview) {
-                    const sep = window.utils && window.utils.getPathSeparator ? window.utils.getPathSeparator() : '/';
                     pathPreview.textContent = `${dirPath}${sep}${dirCheck.existingProjectName}-metadata.json (Extending existing project)`;
                     pathPreview.style.fontStyle = 'italic';
                     pathPreview.style.color = '#34d399';
                 }
             } else {
+                this._lastAutoFilledProjectFile = null;
                 if (extendHint) {
                     extendHint.style.display = 'block';
                     extendHint.style.color = '#a78bfa';
@@ -543,26 +763,31 @@ const projectManager = {
             return this.executeBatchFileWrite(template);
         }
 
-        const onlyIntegrations = document.getElementById('onlyIntegrations')?.checked || false;
+        const isExplicitExtend = !!(this.extendContext && this.extendContext.active);
+        const onlyIntegrations = isExplicitExtend ? false : (document.getElementById('onlyIntegrations')?.checked || false);
 
         // Base Path is required only if NOT in integrations-only mode
-        const basePath = document.getElementById('targetPath').value.trim();
-        const originalProjectName = document.getElementById('projectName').value.trim();
+        const basePath = isExplicitExtend
+            ? this.extendContext.projectDir
+            : document.getElementById('targetPath').value.trim();
+        const originalProjectName = isExplicitExtend
+            ? this.extendContext.projectName
+            : document.getElementById('projectName').value.trim();
 
         if (!originalProjectName) {
             this.showError('Please enter a project name!');
             return;
         }
 
-        if (!onlyIntegrations && !basePath) {
-            this.showError('Please choose a base directory (or enable "Only send to integrations")!');
+        if (!isExplicitExtend && !onlyIntegrations && !basePath) {
+            this.showError('Please choose a base directory (or enable "Skip folder creation")!');
             return;
         }
 
         // Check Electron availability (only required for local folders)
         const isElectron = !!(window.electronAPI && window.electronAPI.createProject);
 
-        if (!onlyIntegrations && !isElectron) {
+        if ((isExplicitExtend || !onlyIntegrations) && !isElectron) {
             console.error('❌ Not running in Electron mode!');
             this.showError('Project creation is only available in the Electron app, not in browser mode.');
             return;
@@ -578,10 +803,20 @@ const projectManager = {
             // Better: use a modal or global loading indicator if available, but for now we proceed
 
             // *** ONLY CHECK CONFLICTS IF CREATING LOCAL FOLDER OR SKIPPING FOLDER IN BASE PATH ***
-            const isCloudOnly = onlyIntegrations && !basePath;
-            const skipFolder = onlyIntegrations && !!basePath;
+            const isCloudOnly = !isExplicitExtend && onlyIntegrations && !basePath;
+            const skipFolder = isExplicitExtend || (onlyIntegrations && !!basePath);
 
-            if (!isCloudOnly) {
+            if (isExplicitExtend) {
+                finalProjectName = this.extendContext.projectName;
+                finalProjectPath = this.extendContext.projectDir;
+                conflictResolution = {
+                    proceed: true,
+                    wasRenamed: false,
+                    overwrite: false,
+                    extend: true,
+                    existingProjectName: this.extendContext.projectName
+                };
+            } else if (!isCloudOnly) {
                 // *** NEUE KONFLIKT-PRÜFUNG ***
                 conflictResolution = await this.checkDirectoryAndResolveConflicts(basePath, originalProjectName, skipFolder);
 
@@ -746,7 +981,8 @@ const projectManager = {
                     skipFolder: skipFolder,
                     userInfo: userInfo,
                     templateName: template ? template.name : 'Unknown Template',
-                    templateInfo: templateRef
+                    templateInfo: templateRef,
+                    ...(isExplicitExtend && this.extendContext.filePath ? { metadataFilePath: this.extendContext.filePath } : {})
                 };
 
                 const projectNameToUse = (conflictResolution.extend && conflictResolution.existingProjectName)
@@ -797,14 +1033,21 @@ const projectManager = {
                     window.projectScanner.updateIndexBadge();
                 }
 
-                let successMessage = result.message;
+                let successMessage = isExplicitExtend
+                    ? `Project "${finalProjectName}" extended with template "${template.name}"!`
+                    : result.message;
+
+                // Refresh Extend Context cached metadata after local merge
+                if (isExplicitExtend && result.metadata && this.extendContext) {
+                    this.extendContext.existingMetadata = result.metadata;
+                }
 
                 // Add information about name change if applicable
                 if (conflictResolution.wasRenamed) {
                     successMessage += ` (Renamed from "${originalProjectName}" to avoid conflicts)`;
                 } else if (conflictResolution.overwrite) {
                     successMessage += ` (Overwrote existing directory)`;
-                } else if (conflictResolution.extend) {
+                } else if (conflictResolution.extend && !isExplicitExtend) {
                     successMessage += ` (Extended existing metadata)`;
                 }
 
@@ -1114,13 +1357,24 @@ const projectManager = {
                     };
 
                     const projectData = {
-                        metadata: experimentMetadata || {},
+                        metadata: result.metadata || experimentMetadata || {},
                         projectName: finalProjectName,
                         basePath: basePath,
-                        template: template
+                        template: template,
+                        metadataPath: result.metadataPath || (isExplicitExtend ? this.extendContext.filePath : null)
                     };
 
                     await this.processIntegrationLinksPostUpload(projectData, result.projectPath, uploadResults);
+
+                    // If in explicit Extend Mode, refresh extendContext.existingMetadata from disk/links update
+                    if (isExplicitExtend && this.extendContext?.filePath && window.electronAPI?.readFile) {
+                        try {
+                            const updatedStr = await window.electronAPI.readFile(this.extendContext.filePath);
+                            if (updatedStr) {
+                                this.extendContext.existingMetadata = JSON.parse(updatedStr);
+                            }
+                        } catch (_) { /* ignore refresh error */ }
+                    }
                 } catch (linkError) {
                     console.error('❌ Error processing integration links (non-critical):', linkError);
                 }
@@ -1849,11 +2103,11 @@ const projectManager = {
 
     // =================== METADATA LINKS MANAGEMENT ===================
 
-    async handleEnhancedMetadataUpload(originalMetadata, projectPath, uploadResults) {
+    async handleEnhancedMetadataUpload(originalMetadata, projectPath, uploadResults, projectName = null, metadataFilePath = null) {
         console.log('🔗 projectManager: Starting enhanced metadata upload with integration links');
 
         try {
-            if (!window.metadataLinksManager || !window.metadataLinksManager.shouldAddIntegrationInfo(uploadResults.elabftw, uploadResults.omero)) {
+            if (!window.metadataLinksManager || !window.metadataLinksManager.shouldAddIntegrationInfo(uploadResults.elabftw, uploadResults.omero, uploadResults.rspace)) {
                 console.log('🔗 projectManager: No successful uploads to process - skipping enhanced upload');
                 return;
             }
@@ -1862,7 +2116,9 @@ const projectManager = {
                 originalMetadata,
                 projectPath,
                 uploadResults.elabftw,
-                uploadResults.omero
+                uploadResults.omero,
+                uploadResults.rspace,
+                { projectName, filePath: metadataFilePath }
             );
 
             const integrationFields = window.metadataLinksManager.createIntegrationFields(
@@ -2061,7 +2317,9 @@ const projectManager = {
             await this.handleEnhancedMetadataUpload(
                 projectData.metadata,
                 projectPath,
-                uploadResults
+                uploadResults,
+                projectData.projectName,
+                projectData.metadataPath || null
             );
 
             // 🔗 SIMPLE: Insert links into existing README.html
@@ -2371,27 +2629,39 @@ const projectManager = {
             // Check if directory exists
             const dirCheck = await window.electronAPI.checkDirectoryExists(originalPath);
 
-            // If we are skipping folder, and it doesn't have metadata, we can just proceed (or if directory doesn't exist at all).
-            if (!dirCheck.exists || (skipFolder && !dirCheck.hasMetafoldData)) {
+            // When skipping folder creation in normal mode, check whether the EXACT project JSON exists.
+            // Other projects' *-metadata.json files in the same directory must NOT hijack the user's new Project Name!
+            if (skipFolder) {
+                const sanitizedName = originalProjectName.replace(/[<>:"/\\|?*]/g, '_').trim();
+                const targetFileLower = `${sanitizedName}-metadata.json`.toLowerCase();
+                const rawTargetFileLower = `${originalProjectName}-metadata.json`.toLowerCase();
+                const matchingFile = Array.isArray(dirCheck.metafoldFiles)
+                    ? dirCheck.metafoldFiles.find(f => {
+                        const fl = f.toLowerCase();
+                        return fl === targetFileLower || fl === rawTargetFileLower;
+                    })
+                    : null;
+
+                if (!dirCheck.exists || !matchingFile) {
+                    console.log(`✅ Standalone file mode: no existing "${sanitizedName}-metadata.json" in ${originalPath}, creating new files`);
+                    return {
+                        proceed: true,
+                        projectName: originalProjectName,
+                        projectPath: originalPath,
+                        extend: false
+                    };
+                }
+
+                // Exact file exists -> ask confirmation dialog (Cancel / Overwrite / Extend Metadata / Use Different Name)
+                dirCheck.hasMetafoldData = true;
+                dirCheck.existingProjectName = matchingFile.replace(/-metadata\.json$/i, '');
+            } else if (!dirCheck.exists) {
                 // Directory doesn't exist - safe to proceed
                 console.log('✅ Path is safe to proceed');
                 return {
                     proceed: true,
                     projectName: originalProjectName,
                     projectPath: originalPath
-                };
-            }
-
-            // If user opted to skip folder creation / extend project, and MetaFold metadata already exists in the folder:
-            if (skipFolder && dirCheck.hasMetafoldData) {
-                const projectNameToExtend = dirCheck.existingProjectName || originalProjectName;
-                console.log(`➕ Skip folder / extend mode: extending existing metadata for "${projectNameToExtend}"`);
-                return {
-                    proceed: true,
-                    projectName: projectNameToExtend,
-                    projectPath: originalPath,
-                    extend: true,
-                    existingProjectName: projectNameToExtend
                 };
             }
 

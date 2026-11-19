@@ -577,3 +577,33 @@ body.light-mode {
     border-color: #e5e7eb !important;
     color: #1f2937 !important;
 }
+
+/* =========================================
+   CREATE ACTION TILES & EXTEND PROMPT
+   ========================================= */
+.light-mode .create-action-tile {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #1f2937 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-mode .create-action-tile:hover {
+    background: #f9fafb !important;
+    border-color: #7c3aed !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light-mode .create-action-tile-title {
+    color: #1f2937 !important;
+}
+
+.light-mode .create-action-tile-desc,
+.light-mode .extend-select-template-prompt {
+    color: #4b5563 !important;
+}
+
+.light-mode .extend-select-template-prompt {
+    background: #ffffff !important;
+    border-color: rgba(124, 58, 237, 0.35) !important;
+}

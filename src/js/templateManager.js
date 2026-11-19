@@ -1018,8 +1018,8 @@ const templateManager = {
         }
     },
 
-    // Deselect current template and return to placeholder/welcome view
-    deselectTemplate() {
+    // Deselect current template (optionally exiting Extend Mode as well)
+    deselectTemplate(exitExtend = true) {
         console.log('🔄 Deselecting current template...');
         this.selectedIndex = -1;
         this.currentTemplate = null;
@@ -1027,16 +1027,6 @@ const templateManager = {
         // Reset form completely
         if (window.experimentForm && window.experimentForm.resetFormForNewTemplate) {
             window.experimentForm.resetFormForNewTemplate();
-        }
-
-        const detailsElement = document.getElementById('templateDetails');
-        const placeholderElement = document.getElementById('templatePlaceholder');
-
-        if (detailsElement) {
-            detailsElement.style.display = 'none';
-        }
-        if (placeholderElement) {
-            placeholderElement.style.display = 'block';
         }
 
         const preview = document.getElementById('folderPreview');
@@ -1049,10 +1039,29 @@ const templateManager = {
             experimentFormDiv.style.display = 'none';
         }
 
+        if (exitExtend && window.projectManager?.extendContext?.active) {
+            window.projectManager.clearExtendContext(true);
+        }
+
+        const detailsElement = document.getElementById('templateDetails');
+        const placeholderElement = document.getElementById('templatePlaceholder');
+        const stayInExtend = !exitExtend && window.projectManager?.extendContext?.active;
+
+        if (!stayInExtend) {
+            if (detailsElement) {
+                detailsElement.style.display = 'none';
+            }
+            if (placeholderElement) {
+                placeholderElement.style.display = 'block';
+            }
+        }
+
         this.renderList();
         this.updateTemplateInfo();
 
-        if (typeof window.updateFooterVisibility === 'function') {
+        if (stayInExtend && typeof window.projectManager.applyExtendContextToForm === 'function') {
+            window.projectManager.applyExtendContextToForm();
+        } else if (typeof window.updateFooterVisibility === 'function') {
             window.updateFooterVisibility();
         } else {
             const createProjectBtn = document.getElementById('createProjectBtn');
@@ -1069,9 +1078,9 @@ const templateManager = {
 
         if (!template) return;
 
-        // If clicking the already-selected template, toggle deselect
+        // If clicking the already-selected template, toggle deselect (keep Extend Mode active if in Extend Mode)
         if (this.selectedIndex === index && this.currentTemplate) {
-            this.deselectTemplate();
+            this.deselectTemplate(!window.projectManager?.extendContext?.active);
             return;
         }
 
@@ -1114,6 +1123,12 @@ const templateManager = {
 
         if (placeholderElement) {
             placeholderElement.style.display = 'none';
+        }
+
+        // Switch back to Create Project view if user selected a template while viewing another tab (e.g. visualize)
+        const createTabContent = document.getElementById('createTabContent');
+        if (createTabContent && !createTabContent.classList.contains('active') && typeof window.switchMainTab === 'function') {
+            window.switchMainTab('create');
         }
 
         const preview = document.getElementById('folderPreview');
@@ -1215,8 +1230,11 @@ const templateManager = {
             if (fetchNextIdInput) fetchNextIdInput.checked = false;
         }
 
-        // NEW: Restore Project Defaults (Path & Name)
-        if (this.currentTemplate.projectDefaults) {
+        // If Extend Mode is active, preserve Extend target path/name & prefill matching fields;
+        // otherwise restore template project defaults (Path & Name)
+        if (window.projectManager?.extendContext?.active && typeof window.projectManager.applyExtendContextToForm === 'function') {
+            window.projectManager.applyExtendContextToForm();
+        } else if (this.currentTemplate.projectDefaults) {
             const targetPathEl = document.getElementById('targetPath');
             const projectNameEl = document.getElementById('projectName');
             

@@ -1,13 +1,23 @@
 <!-- Empty / Welcome State when no template is selected -->
-<div id="templatePlaceholder" class="template-placeholder-card" style="display: block; padding: 50px 30px; text-align: center; max-width: 640px; margin: 40px auto; background: rgba(255, 255, 255, 0.02); border: 2px dashed rgba(139, 92, 246, 0.3); border-radius: 16px;">
-    <div style="font-size: 3.2rem; margin-bottom: 16px; opacity: 0.9;">🎯</div>
-    <h3 style="font-size: 1.35rem; margin-bottom: 10px; color: #f3f4f6; font-weight: 600;">Select a Template to Begin</h3>
-    <p style="color: #9ca3af; font-size: 0.95rem; margin-bottom: 24px; line-height: 1.6;">
-        Select a template from the list on the left, or load an existing metadata file to edit its fields and sync with integrations.
-    </p>
-    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-        <button type="button" class="btn btn-primary" onclick="metadataLoader.loadMetadataForCreation()" style="padding: 10px 20px; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; font-weight: 500;">
-            <span>📂</span> Load Existing Metadata (.json)
+<div id="templatePlaceholder" class="template-placeholder-card" style="display: block; padding: 42px 30px; text-align: center; max-width: 820px; margin: 40px auto; background: rgba(255, 255, 255, 0.02); border: 2px dashed rgba(139, 92, 246, 0.3); border-radius: 16px;">
+    <div style="font-size: 3rem; margin-bottom: 14px; opacity: 0.9;">🎯</div>
+    <h3 style="font-size: 1.35rem; margin-bottom: 12px; color: #f3f4f6; font-weight: 600;">Select a Template on the left to Begin</h3>
+    <div style="color: #9ca3af; font-size: 0.95rem; margin-bottom: 22px;">or</div>
+    <div class="create-action-tiles">
+        <button type="button" class="create-action-tile" onclick="metadataLoader.startExtendProjectFlow()">
+            <span class="create-action-tile-icon">➕</span>
+            <span class="create-action-tile-title">Extend Project</span>
+            <span class="create-action-tile-desc">Add metadata from another template to an existing project</span>
+        </button>
+        <button type="button" class="create-action-tile" onclick="metadataLoader.loadMetadataForCreation()">
+            <span class="create-action-tile-icon">📂</span>
+            <span class="create-action-tile-title">Load Project</span>
+            <span class="create-action-tile-desc">Load an existing project to edit or send to integrations</span>
+        </button>
+        <button type="button" class="create-action-tile" onclick="switchMainTab('discover')">
+            <span class="create-action-tile-icon">📁</span>
+            <span class="create-action-tile-title">Discover Projects</span>
+            <span class="create-action-tile-desc">Browse, search, and visualize your existing projects</span>
         </button>
     </div>
 </div>
@@ -16,10 +26,10 @@
     <div class="project-setup enhanced-setup">
         <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
-                <h3>🎯 Project Configuration</h3>
-                <p>Configure your project location and details</p>
+                <h3 id="setupHeaderTitle">🎯 Project Configuration</h3>
+                <p id="setupHeaderSubtitle">Configure your project location and details</p>
             </div>
-            <button type="button" class="btn btn-secondary btn-small" onclick="templateManager.deselectTemplate()" title="Deselect template and return to start view" style="padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;">
+            <button type="button" id="deselectTemplateBtn" class="btn btn-secondary btn-small" onclick="templateManager.deselectTemplate(true)" title="Deselect template and return to start view" style="padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;">
                 <span>✕</span> Deselect Template
             </button>
         </div>
@@ -74,7 +84,7 @@
                         <h4>Base Directory</h4>
                         <span class="section-subtitle">Where to create your project</span>
                     </div>
-                    <button class="browse-btn" onclick="projectManager.browsePath()" title="Browse for folder">
+                    <button id="browseTargetPathBtn" class="browse-btn" onclick="projectManager.browsePath()" title="Browse for folder">
                         <span>📁</span>
                         Browse
                     </button>
@@ -90,7 +100,7 @@
                         style="cursor: pointer; width: 16px; height: 16px; accent-color: #7c3aed;">
                     <label for="onlyIntegrations"
                         style="margin-left: 8px; font-size: 0.9em; color: #e0e0e0; cursor: pointer; user-select: none;">
-                        📄 Skip folder creation / Extend existing project
+                        📄 Skip folder creation (create JSON &amp; HTML directly in Base Directory)
                     </label>
                 </div>
             </div>
@@ -136,7 +146,7 @@
                     <div class="input-status" id="nameStatus"></div>
                 </div>
                 <div id="extendProjectHint" style="display: none; margin-top: 8px; font-size: 0.85em; color: #a78bfa; line-height: 1.4;">
-                    💡 If a metadata JSON already exists in the selected folder, your project will be extended and no new folder will be created.
+                    💡 Creates {ProjectName}-metadata.json and {ProjectName}-README.html directly in the Base Directory without creating a project subfolder.
                 </div>
             </div>
 
@@ -508,9 +518,13 @@
         }
     </script>
 
-    <div class="folder-structure">
+    <div id="folderStructureSection" class="folder-structure">
         <h3>📋 Structure Preview:</h3>
         <div id="folderPreview" class="folder-tree"></div>
+    </div>
+
+    <div id="extendSelectTemplatePrompt" class="extend-select-template-prompt" style="display: none;">
+        👈 Select a template from the left sidebar to add its metadata fields to this project.
     </div>
 
     <!-- Metadata Form for Experiments - VEREINFACHT (Buttons entfernt) -->

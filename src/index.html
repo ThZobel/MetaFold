@@ -67,26 +67,6 @@
 
         <!-- RIGHT MAIN CONTENT - Enhanced with JSONCrack Integration -->
         <div class="main-content">
-            <div class="header">
-                <h1>🚀 Project Manager</h1>
-                <p>Create, manage and visualize your project templates</p>
-            </div>
-
-            <!-- Main Content Tabs (PRESERVED) -->
-            <div class="main-tabs">
-                <button class="main-tab active" onclick="switchMainTab('create')" id="createTab">
-                    🎯 Create Project
-                </button>
-                <button class="main-tab" onclick="switchMainTab('discover')" id="discoverTab">
-                    📁 Discover Projects
-                </button>
-                <!-- Temporary inactivated
-                <button class="main-tab" onclick="switchMainTab('visualize')" id="visualizeTab">
-                    📊 Visualize Data
-                </button>
-                -->
-            </div>
-
             <!-- Scrollable Content Wrapper -->
             <div class="main-content-wrapper">
 
@@ -125,11 +105,11 @@
                             💾 Update Project
                         </button>
 
-                        <!-- Update & Send to Integrations Button -->
+                        <!-- Send & Update Button for Loaded Existing Projects -->
                         <button id="updateAndSendBtn" class="btn btn-primary"
                             onclick="metadataLoader.saveLoadedProject(true)"
-                            style="display: none; background: linear-gradient(135deg, #059669, #047857); border-color: #059669;">
-                            🚀 Update &amp; Send to Integrations
+                            style="display: none;">
+                            🚀 Send &amp; Update
                         </button>
 
                         <button id="editTemplateBtn" class="btn btn-secondary" onclick="editCurrentTemplate()">✏️

@@ -32,8 +32,14 @@ function withProjectLock(projectPath, fn) {
 /**
  * Finds the metadata file in a project folder.
  */
-async function findMetadataFileInDirectory(projectPath) {
+async function findMetadataFileInDirectory(projectPath, preferredProjectName = null) {
     const entries = await fs.readdir(projectPath, { withFileTypes: true });
+    if (preferredProjectName) {
+        const sanitized = preferredProjectName.replace(/[<>:"/\\|?*]/g, '_').trim();
+        const exactName = `${sanitized}-metadata.json`.toLowerCase();
+        const exactFile = entries.find(e => e.isFile() && e.name.toLowerCase() === exactName);
+        if (exactFile) return exactFile.name;
+    }
     let file = entries.find(e => e.isFile() && e.name.endsWith('-metadata.json') && !e.name.startsWith('.'));
     if (!file) {
         file = entries.find(e => e.isFile() && e.name === 'ReadyToImport.json');
@@ -45,8 +51,8 @@ async function findMetadataFileInDirectory(projectPath) {
  * Reads project metadata from disk.
  * Supports both flat format and the elabFTW envelope format ({ extra_fields, ... }).
  */
-async function readProjectMetadataFromDisk(projectPath) {
-    const metadataFilename = await findMetadataFileInDirectory(projectPath);
+async function readProjectMetadataFromDisk(projectPath, preferredProjectName = null) {
+    const metadataFilename = await findMetadataFileInDirectory(projectPath, preferredProjectName);
     if (!metadataFilename) {
         throw new Error(`No metadata JSON file found in "${projectPath}"`);
     }

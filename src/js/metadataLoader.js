@@ -93,7 +93,132 @@ const metadataLoader = {
         }
     },
 
-    // NEW: Load metadata for project creation
+    // Resolve a MetaFold project file inside a chosen folder
+    async resolveProjectFromFolder(folderPath) {
+        if (!folderPath || !window.electronAPI?.listDirectory || !window.electronAPI?.readFile) {
+            this.showError('Folder reading API is not available.');
+            return null;
+        }
+
+        const cleanDir = folderPath.replace(/[\\/]+$/, '');
+        const sep = cleanDir.includes('\\') ? '\\' : '/';
+        const entries = await window.electronAPI.listDirectory(cleanDir);
+        const files = Array.isArray(entries) ? entries.filter(f => f && f.isFile) : [];
+
+        let candidateFiles = files.filter(f =>
+            f.name.endsWith('-metadata.json') &&
+            !f.name.startsWith('.') &&
+            !f.name.endsWith('.metafold-sidecar.json')
+        );
+        if (candidateFiles.length === 0) {
+            candidateFiles = files.filter(f => f.name === 'ReadyToImport.json');
+        }
+
+        if (candidateFiles.length === 0) {
+            this.showError('No MetaFold project found in the selected folder.');
+            return null;
+        }
+
+        let chosenFile = candidateFiles[0];
+        if (candidateFiles.length > 1 && window.electronAPI.showMessageBox) {
+            const labels = candidateFiles.map(f => f.name.replace(/-metadata\.json$/i, ''));
+            const msgResult = await window.electronAPI.showMessageBox({
+                type: 'question',
+                title: 'Select Project',
+                message: 'Multiple projects found in this folder.\nWhich project do you want to extend?',
+                buttons: ['Cancel', ...labels],
+                defaultId: 1,
+                cancelId: 0
+            });
+            if (!msgResult || msgResult.response === 0) {
+                return null;
+            }
+            chosenFile = candidateFiles[msgResult.response - 1] || candidateFiles[0];
+        }
+
+        const filePath = `${cleanDir}${sep}${chosenFile.name}`;
+        const rawStr = await window.electronAPI.readFile(filePath);
+        if (!rawStr) {
+            this.showError('Could not read project metadata from the selected folder.');
+            return null;
+        }
+
+        let metadata;
+        try {
+            metadata = JSON.parse(rawStr);
+        } catch (parseErr) {
+            this.showError('Invalid metadata file in folder: ' + parseErr.message);
+            return null;
+        }
+
+        if (!metadata || !this.validateMetadata(metadata)) {
+            this.showError('Invalid MetaFold project metadata in the selected folder.');
+            return null;
+        }
+
+        this.loadedMetadata = metadata;
+        this.loadedFilePath = filePath;
+        this.loadedFileName = chosenFile.name;
+
+        const projectName = this.getProjectName();
+        return {
+            filePath,
+            fileName: chosenFile.name,
+            projectDir: cleanDir,
+            projectName,
+            existingMetadata: metadata
+        };
+    },
+
+    // Explicit workflow: Select an existing project folder and enter Extend Project Mode
+    // (Allows choosing ANY template in the left sidebar afterwards to combine templates & merge fields)
+    async startExtendProjectFlow() {
+        try {
+            console.log('➕ Opening folder dialog to select project for extension...');
+
+            if (!window.electronAPI || typeof window.electronAPI.selectFolder !== 'function') {
+                this.showError('Folder selection is only available in the Electron app.');
+                return;
+            }
+
+            const selectedFolder = await window.electronAPI.selectFolder();
+            if (!selectedFolder) {
+                console.log('📁 Folder selection cancelled');
+                return;
+            }
+
+            const resolved = await this.resolveProjectFromFolder(selectedFolder);
+            if (!resolved) {
+                return;
+            }
+
+            // Switch to Create Project tab
+            if (typeof window.switchMainTab === 'function') {
+                window.switchMainTab('create');
+            }
+
+            // If a standalone "Loaded Project" view is currently open, clear it so a template can be chosen
+            if (window.templateManager?.currentTemplate?.isLoadedProject) {
+                window.templateManager.deselectTemplate(false);
+            }
+
+            if (window.projectManager && typeof window.projectManager.setExtendContext === 'function') {
+                window.projectManager.setExtendContext(resolved);
+            }
+
+            const hasActiveNormalTemplate = !!(window.templateManager?.currentTemplate && !window.templateManager.currentTemplate.isLoadedProject);
+            if (hasActiveNormalTemplate) {
+                this.showSuccess(`Extend Project active for "${resolved.projectName}" with template "${window.templateManager.currentTemplate.name}".`);
+            } else {
+                this.showSuccess(`Extend Project active for "${resolved.projectName}". Select a template on the left.`);
+            }
+        } catch (error) {
+            console.error('❌ Error starting extend project flow:', error);
+            this.showError('Error loading project for extension: ' + error.message);
+        }
+    },
+
+    // NEW: Load metadata for offline review & direct integration sending ("Load & Send")
     async loadMetadataForCreation() {
         try {
             console.log('📥 Opening file dialog to load metadata for creation...');
@@ -104,6 +229,11 @@ const metadataLoader = {
             if (!result || result.success === false) {
                 console.log('📁 No file selected or error');
                 return;
+            }
+
+            // Ensure Extend Mode does not collide with Load & Send mode
+            if (window.projectManager && typeof window.projectManager.clearExtendContext === 'function') {
+                window.projectManager.clearExtendContext(false);
             }
 
             const metadata = result.content;
@@ -138,12 +268,12 @@ const metadataLoader = {
         }
     },
 
-    // Save changes to loaded existing project (and optionally send to integrations)
+    // Save changes to loaded existing project non-destructively (and optionally send to integrations)
     async saveLoadedProject(sendToIntegrations = false) {
         try {
-            console.log('💾 Saving loaded project changes...');
-            if (!this.loadedFilePath) {
-                alert('No file path found for the loaded project.');
+            console.log('💾 Saving loaded project changes non-destructively...');
+            if (!this.loadedFilePath || this.loadedFilePath === 'Unknown location' || this.loadedFilePath === 'Selected metadata file') {
+                alert('No valid file path found for the loaded project.');
                 return;
             }
 
@@ -153,65 +283,80 @@ const metadataLoader = {
             if (updateAndSendBtn) updateAndSendBtn.disabled = true;
 
             // 1. Collect form data from experimentForm
-            const collected = window.experimentForm ? window.experimentForm.collectData() : {};
-
-            // 2. Build updated metadata structure
-            const updatedMetadata = { ...this.loadedMetadata };
-
-            // Update project name if edited
-            const nameInput = document.getElementById('projectName');
-            if (nameInput && nameInput.value.trim()) {
-                updatedMetadata.projectName = nameInput.value.trim();
-            }
-
-            // Update timestamp
-            updatedMetadata.updated_at = new Date().toISOString();
-
-            // Merge collected metadata fields
-            if (collected && Object.keys(collected).length > 0) {
-                if (updatedMetadata.metadata && typeof updatedMetadata.metadata === 'object') {
-                    updatedMetadata.metadata = { ...updatedMetadata.metadata, ...collected };
-                } else {
-                    updatedMetadata.metadata = collected;
-                }
-            }
+            const collected = (window.experimentForm ? window.experimentForm.collectData() : null) || {};
 
             // Check if notes_markdown was edited
-            const notesEl = document.getElementById('field_notes_markdown') || 
+            const notesEl = document.getElementById('field_notes_markdown') ||
                             document.querySelector('textarea[data-field-name="notes_markdown"]');
             if (notesEl && notesEl.value !== undefined) {
-                updatedMetadata.notes_markdown = notesEl.value;
+                collected.notes_markdown = notesEl.value;
             }
 
-            // 3. Save JSON to disk
-            const saveRes = await window.electronAPI.saveJsonFile(updatedMetadata, this.loadedFilePath);
-            if (!saveRes || !saveRes.success) {
-                throw new Error(saveRes?.message || 'Failed to save JSON file');
+            const nameInput = document.getElementById('projectName');
+            const projectName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : this.getProjectName();
+            const projectDir = this.loadedFilePath.replace(/[\\/][^\\/]+$/, '');
+            const userInfo = window.userManager?.getCurrentUserInfo?.()
+                || (window.userManager ? { username: window.userManager.currentUser, groupname: window.userManager.currentGroup } : { username: 'User', groupname: 'Unknown' });
+            const existingTemplateName = this.loadedMetadata?.template?.name
+                || this.loadedMetadata?.templateInfo?.name
+                || 'Loaded Project';
+
+            if (!window.electronAPI || typeof window.electronAPI.createProject !== 'function') {
+                throw new Error('Project update API is not available in browser mode.');
             }
 
-            this.loadedMetadata = updatedMetadata;
+            // 2. Non-destructive merge & README regeneration in main process
+            const createRes = await window.electronAPI.createProject(
+                projectDir,
+                projectName,
+                '',
+                collected,
+                {
+                    extend: true,
+                    skipFolder: true,
+                    extendMode: 'edit',
+                    metadataFilePath: this.loadedFilePath,
+                    userInfo,
+                    templateName: existingTemplateName,
+                    action: 'Metadata Updated'
+                }
+            );
 
-            // 4. Update README.html if project folder exists
+            if (!createRes || !createRes.success) {
+                throw new Error(createRes?.message || 'Failed to update project metadata');
+            }
+
+            if (createRes.metadata) {
+                this.loadedMetadata = createRes.metadata;
+            }
+
+            // 3. Update user index badge & autocomplete caches
             try {
-                await this.generateAndSaveReadme();
-            } catch (readmeErr) {
-                console.warn('⚠️ Could not update README:', readmeErr);
-            }
-
-            // 5. Update user index if available
-            try {
+                if (window.electronAPI.saveIdValues && collected) {
+                    await window.electronAPI.saveIdValues({ ...collected, projectName }, userInfo).catch(() => {});
+                }
+                if (window.experimentForm) {
+                    window.experimentForm._idDictionaryItems = null;
+                    window.experimentForm._tagDictionaryItems = null;
+                }
                 if (window.projectScanner && typeof window.projectScanner.updateIndexBadge === 'function') {
                     await window.projectScanner.updateIndexBadge();
                 }
             } catch (_) {}
 
-            console.log('✅ Project saved successfully to disk');
+            console.log('✅ Project metadata & README updated non-destructively');
 
-            // 6. If sendToIntegrations is requested:
-            if (sendToIntegrations) {
+            // 4. Send to integrations if any integration checkbox is selected; otherwise local update only
+            const hasIntegrationSelected = !!(
+                document.getElementById('sendToElabFTW')?.checked ||
+                document.getElementById('sendToOMERO')?.checked ||
+                document.getElementById('sendToRSpace')?.checked
+            );
+
+            if (sendToIntegrations && hasIntegrationSelected) {
                 await this.sendMetadata();
             } else {
-                this.showSuccess(`Project "${updatedMetadata.projectName || 'Metadata'}" updated successfully!`);
+                this.showSuccess(`Project "${projectName || 'Project'}" updated successfully!`);
             }
 
             if (updateBtn) updateBtn.disabled = false;
@@ -231,10 +376,13 @@ const metadataLoader = {
     async promptToLoadFromFolder(folderPath, jsonFiles) {
         if (!jsonFiles || jsonFiles.length === 0) return;
 
-        const targetFile = jsonFiles.find(f => f.name.toLowerCase().includes('metadata')) || jsonFiles[0];
+        const candidateFiles = jsonFiles.filter(f => !f.name.endsWith('.metafold-sidecar.json'));
+        if (candidateFiles.length === 0) return;
+
+        const targetFile = candidateFiles.find(f => f.name.toLowerCase().includes('metadata')) || candidateFiles[0];
 
         const confirmMsg = `Found a metadata file in this folder: ${targetFile.name}\nDo you want to load its metadata into the form?`;
-        
+
         let userConfirmed = false;
 
         // Use Electron's native message box to prevent renderer thread blocking
@@ -263,28 +411,32 @@ const metadataLoader = {
                 const fileContentStr = await window.electronAPI.readFile(filePath);
                 if (fileContentStr) {
                     const metadata = JSON.parse(fileContentStr);
-                    
+
                     this.loadedMetadata = metadata;
                     this.loadedFilePath = filePath;
                     this.loadedFileName = targetFile.name;
 
-                    // Set the project name input
-                    const projectNameInput = document.getElementById('projectName');
-                    if (projectNameInput) {
-                        projectNameInput.value = this.getProjectName();
+                    const projectName = this.getProjectName();
+                    if (window.projectManager && typeof window.projectManager.setExtendContext === 'function') {
+                        window.projectManager.setExtendContext({
+                            filePath,
+                            fileName: targetFile.name,
+                            projectDir: folderPath,
+                            projectName,
+                            existingMetadata: metadata
+                        });
+                    } else {
+                        // Fallback if extend context is unavailable
+                        const projectNameInput = document.getElementById('projectName');
+                        if (projectNameInput) {
+                            projectNameInput.value = projectName;
+                        }
+                        if (window.experimentForm && typeof window.experimentForm.populateForm === 'function' && metadata) {
+                            window.experimentForm.populateForm(metadata.metadata || metadata);
+                        }
                     }
 
-                    // Update preview
-                    if (window.projectManager && window.projectManager.updatePathPreview) {
-                        window.projectManager.updatePathPreview();
-                    }
-
-                    // Populate form
-                    if (window.experimentForm && typeof window.experimentForm.populateForm === 'function' && metadata) {
-                        window.experimentForm.populateForm(metadata.metadata || metadata);
-                    }
-                    
-                    this.showSuccess('Metadata loaded from folder successfully');
+                    this.showSuccess(`Extend Mode active for "${projectName}" — updates & template extensions will be merged without data loss.`);
                 }
             } catch (error) {
                 console.error('❌ Error reading metadata from folder:', error);
@@ -945,7 +1097,7 @@ const metadataLoader = {
 
             // Get project name ONCE at the start
             const projectName = this.getProjectName();
-            const metadata = this.loadedMetadata.metadata || this.loadedMetadata;
+            const metadata = this.loadedMetadata.metadata || this.loadedMetadata.extra_fields || this.loadedMetadata;
 
             console.log('📋 Project name for upload:', projectName);
 
@@ -1019,13 +1171,14 @@ const metadataLoader = {
                 localPath = 'Unknown';
             }
 
-            let enhancedMetadata = metadata;
+            let enhancedMetadata = this.loadedMetadata;
+            let alreadySavedByLinksManager = false;
 
             if (window.metadataLinksManager) {
                 try {
-                    console.log('🔗 Using metadataLinksManager for integration links...');
+                    console.log('🔗 Using metadataLinksManager for non-destructive integration links...');
                     enhancedMetadata = await window.metadataLinksManager.addIntegrationInfo(
-                        metadata,
+                        this.loadedMetadata,
                         localPath,
                         results.elabftw && results.elabftw.success ? {
                             success: true,
@@ -1047,20 +1200,26 @@ const metadataLoader = {
                             success: true,
                             documentId: results.rspace.documentId,
                             url: results.rspace.documentUrl
-                        } : null
+                        } : null,
+                        {
+                            filePath: this.loadedFilePath,
+                            projectName
+                        }
                     );
+                    this.loadedMetadata = enhancedMetadata;
+                    alreadySavedByLinksManager = (localPath !== 'Unknown');
                     console.log('✅ Integration links added via metadataLinksManager');
                 } catch (error) {
                     console.error('❌ Error using metadataLinksManager:', error);
-                    enhancedMetadata = await this.addIntegrationLinksManually(metadata, results);
+                    enhancedMetadata = await this.addIntegrationLinksManually(this.loadedMetadata, results);
                 }
             } else {
                 console.warn('⚠️ metadataLinksManager not available, using fallback');
-                enhancedMetadata = await this.addIntegrationLinksManually(metadata, results);
+                enhancedMetadata = await this.addIntegrationLinksManually(this.loadedMetadata, results);
             }
 
-            // Save enhanced metadata to file
-            const updateSuccess = await this.updateMetadataFile(enhancedMetadata);
+            // Save enhanced metadata to file if not already saved by metadataLinksManager
+            const updateSuccess = alreadySavedByLinksManager ? true : await this.updateMetadataFile(enhancedMetadata);
 
             // Add integration fields to external services
             if (updateSuccess) {
@@ -1148,6 +1307,12 @@ const metadataLoader = {
                         try {
                             let elabftwUrl = results.elabftw?.experimentUrl || null;
                             let omeroUrl = results.omero?.datasetUrl || null;
+                            const rspaceUrl = results.rspace?.documentUrl || null;
+                            const omeroGroupName = enhancedMetadata?.metafold_integration?.external_links?.omero?.group_name
+                                || window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName
+                                || window.omeroAuth?.session?.eventContext?.groupName
+                                || window.omeroAuth?.session?.groupName
+                                || null;
 
                             if (!omeroUrl && results.omero?.dataset?.omeroWebUrl) {
                                 omeroUrl = results.omero.dataset.omeroWebUrl;
@@ -1166,7 +1331,7 @@ const metadataLoader = {
                                 }
                             }
 
-                            if (elabftwUrl || omeroUrl) {
+                            if (elabftwUrl || omeroUrl || rspaceUrl) {
                                 let projectDirectory = localPath;
 
                                 if (projectDirectory === 'Unknown' && this.loadedFilePath && this.loadedFilePath !== 'Unknown location') {
@@ -1179,7 +1344,9 @@ const metadataLoader = {
                                     projectDirectory,
                                     elabftwUrl,
                                     omeroUrl,
-                                    projectName
+                                    projectName,
+                                    rspaceUrl,
+                                    omeroGroupName
                                 );
 
                                 if (insertResult.success) {
@@ -1234,6 +1401,9 @@ const metadataLoader = {
     // Fallback manual integration links adding
     async addIntegrationLinksManually(metadata, results) {
         const enhancedMetadata = JSON.parse(JSON.stringify(metadata));
+        const nowIso = new Date().toISOString();
+        const currentUser = window.userManager?.currentUser || window.userManager?.getCurrentUserInfo?.()?.username || 'User';
+        const currentGroup = window.userManager?.currentGroup || window.userManager?.getCurrentUserInfo?.()?.groupname || 'Unknown';
 
         if (!enhancedMetadata.metafold_integration) {
             enhancedMetadata.metafold_integration = {};
@@ -1241,15 +1411,24 @@ const metadataLoader = {
         if (!enhancedMetadata.metafold_integration.external_links) {
             enhancedMetadata.metafold_integration.external_links = {};
         }
+        if (!Array.isArray(enhancedMetadata.metafold_integration.sync_history)) {
+            enhancedMetadata.metafold_integration.sync_history = [];
+        }
+
+        const syncedServices = [];
 
         // Add elabFTW link
         if (results.elabftw?.success && results.elabftw.experimentUrl) {
             enhancedMetadata.metafold_integration.external_links.elabftw = {
                 url: results.elabftw.experimentUrl,
                 experiment_id: results.elabftw.experimentId,
-                uploaded_at: new Date().toISOString(),
+                user_name: currentUser,
+                uploaded_at: nowIso,
                 status: 'uploaded'
             };
+            const entry = { service: 'elabFTW', url: results.elabftw.experimentUrl, id: String(results.elabftw.experimentId || ''), user: currentUser, timestamp: nowIso };
+            syncedServices.push(entry);
+            enhancedMetadata.metafold_integration.sync_history.push(entry);
         }
 
         // Add OMERO link
@@ -1261,9 +1440,13 @@ const metadataLoader = {
                 url: results.omero.datasetUrl,
                 [omeroIdKey]: String(results.omero.datasetId || ''),
                 object_type: isProject ? 'project' : 'dataset',
-                uploaded_at: new Date().toISOString(),
+                user_name: currentUser,
+                uploaded_at: nowIso,
                 status: 'uploaded'
             };
+            const entry = { service: 'OMERO', url: results.omero.datasetUrl, id: String(results.omero.datasetId || ''), user: currentUser, timestamp: nowIso };
+            syncedServices.push(entry);
+            enhancedMetadata.metafold_integration.sync_history.push(entry);
         }
 
         // Add RSpace link
@@ -1271,9 +1454,51 @@ const metadataLoader = {
             enhancedMetadata.metafold_integration.external_links.rspace = {
                 url: results.rspace.documentUrl,
                 document_id: results.rspace.documentId,
-                uploaded_at: new Date().toISOString(),
+                user_name: currentUser,
+                uploaded_at: nowIso,
                 status: 'uploaded'
             };
+            const entry = { service: 'RSpace', url: results.rspace.documentUrl, id: String(results.rspace.documentId || ''), user: currentUser, timestamp: nowIso };
+            syncedServices.push(entry);
+            enhancedMetadata.metafold_integration.sync_history.push(entry);
+        }
+
+        if (syncedServices.length > 0) {
+            const actionStr = `Sent to Integrations (${syncedServices.map(s => s.service).join(', ')})`;
+            if (!enhancedMetadata['System.UpdateHistory']) {
+                enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
+            }
+            const historyArr = Array.isArray(enhancedMetadata['System.UpdateHistory'].value)
+                ? enhancedMetadata['System.UpdateHistory'].value
+                : [];
+            historyArr.push({
+                date: nowIso,
+                user: currentUser,
+                group: currentGroup,
+                action: actionStr,
+                integrations: syncedServices
+            });
+            enhancedMetadata['System.UpdateHistory'] = { value: historyArr, type: 'history' };
+            enhancedMetadata['System.LastUpdatedBy'] = { value: currentUser, type: 'user' };
+            enhancedMetadata['System.LastUpdatedAt'] = { value: nowIso, type: 'date' };
+
+            if (!Array.isArray(enhancedMetadata.changelog)) {
+                enhancedMetadata.changelog = [];
+            }
+            enhancedMetadata.changelog.unshift({
+                timestamp: nowIso,
+                user: currentUser,
+                group: currentGroup,
+                action: actionStr,
+                changes: syncedServices.map(s => ({
+                    field: `Integration.${s.service}`,
+                    label: s.service,
+                    from: null,
+                    to: s.url || s.id,
+                    op: 'synced'
+                }))
+            });
+            enhancedMetadata.updated_at = nowIso;
         }
 
         return enhancedMetadata;
@@ -1367,23 +1592,32 @@ const metadataLoader = {
             }
 
             try {
-                const result = await window.settingsManager.createElabFTWExperiment(
-                    projectName,
-                    metadata,
-                    '',
-                    categoryFromViewer // Pass specific category ID
-                );
+                const existingExpId = document.getElementById('existingExperimentId')?.value?.trim();
+                let result;
+                if (existingExpId && typeof window.settingsManager.updateExistingElabFTWExperiment === 'function') {
+                    console.log('🧪 Updating existing elabFTW experiment:', existingExpId);
+                    result = await window.settingsManager.updateExistingElabFTWExperiment(existingExpId, metadata);
+                } else {
+                    result = await window.settingsManager.createElabFTWExperiment(
+                        projectName,
+                        metadata,
+                        '',
+                        categoryFromViewer // Pass specific category ID
+                    );
+                }
 
-                if (result.success) {
-                    console.log('✅ elabFTW experiment created:', result.experimentUrl);
+                if (result && result.success) {
+                    const expUrl = result.experimentUrl || result.url;
+                    const expId = result.experimentId || result.id || existingExpId;
+                    console.log('✅ elabFTW experiment synced:', expUrl);
                     return {
                         success: true,
-                        experimentUrl: result.experimentUrl || result.url,
-                        experimentId: result.experimentId || result.id
+                        experimentUrl: expUrl,
+                        experimentId: expId
                     };
                 } else {
-                    console.error('❌ elabFTW creation failed:', result.message);
-                    this.showError('elabFTW: ' + result.message);
+                    console.error('❌ elabFTW creation failed:', result?.message);
+                    this.showError('elabFTW: ' + (result?.message || 'Unknown error'));
                     return null;
                 }
             } finally {

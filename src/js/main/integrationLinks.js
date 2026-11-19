@@ -64,6 +64,17 @@ function linkFromAny(obj) {
         if (!url) return null;
         const link = { url };
         if (obj.group_name || obj.groupName) link.group_name = String(obj.group_name || obj.groupName);
+        if (obj.uploaded_at || obj.uploadedAt || obj.last_synced_at) {
+            link.uploaded_at = String(obj.uploaded_at || obj.uploadedAt || obj.last_synced_at);
+        }
+        if (obj.user_name || obj.userName || obj.sent_by) {
+            link.user_name = String(obj.user_name || obj.userName || obj.sent_by);
+        }
+        if (obj.experiment_id || obj.experimentId) link.experiment_id = String(obj.experiment_id || obj.experimentId);
+        if (obj.dataset_id || obj.datasetId) link.dataset_id = String(obj.dataset_id || obj.datasetId);
+        if (obj.project_id || obj.projectId) link.project_id = String(obj.project_id || obj.projectId);
+        if (obj.document_id || obj.documentId) link.document_id = String(obj.document_id || obj.documentId);
+        if (obj.object_type || obj.objectType) link.object_type = String(obj.object_type || obj.objectType);
         return link;
     }
     return null;
@@ -98,14 +109,19 @@ function normalizeIntegrationLinks(metadata) {
  * Merges several link objects; earlier arguments win.
  */
 function mergeIntegrationLinks(...linkSets) {
+    const extraFields = ['group_name', 'uploaded_at', 'user_name', 'experiment_id', 'dataset_id', 'project_id', 'document_id', 'object_type'];
     const merged = emptyLinks();
     for (const set of linkSets) {
         if (!set) continue;
         for (const key of LINK_KEYS) {
             if (!merged[key] && set[key] && set[key].url) {
                 merged[key] = { ...set[key] };
-            } else if (merged[key] && set[key] && !merged[key].group_name && set[key].group_name && merged[key].url === set[key].url) {
-                merged[key].group_name = set[key].group_name;
+            } else if (merged[key] && set[key] && (!set[key].url || merged[key].url === set[key].url)) {
+                for (const field of extraFields) {
+                    if (!merged[key][field] && set[key][field]) {
+                        merged[key][field] = set[key][field];
+                    }
+                }
             }
         }
     }
@@ -161,10 +177,15 @@ function extractIntegrationLinksFromReadmeHtml(html) {
 /**
  * Reads every *-README.html in the project folder and extracts links.
  */
-async function readIntegrationLinksFromExistingReadmes(projectPath) {
+async function readIntegrationLinksFromExistingReadmes(projectPath, preferredProjectName = null) {
     try {
         const entries = await fs.readdir(projectPath, { withFileTypes: true });
-        const readmes = entries.filter(e => e.isFile() && /-README\.html$/i.test(e.name));
+        let readmes = entries.filter(e => e.isFile() && /-README\.html$/i.test(e.name));
+        if (preferredProjectName) {
+            const sanitized = preferredProjectName.replace(/[<>:"/\\|?*]/g, '_').trim();
+            const expectedName = `${sanitized}-README.html`.toLowerCase();
+            readmes = readmes.filter(e => e.name.toLowerCase() === expectedName);
+        }
         let merged = emptyLinks();
         for (const entry of readmes) {
             try {
@@ -181,24 +202,36 @@ async function readIntegrationLinksFromExistingReadmes(projectPath) {
 /**
  * Resolves the final links for a README (overrides > metadata JSON > existing README).
  */
-async function resolveIntegrationLinksForProject(projectPath, metadata, overrides = null) {
+async function resolveIntegrationLinksForProject(projectPath, metadata, overrides = null, preferredProjectName = null) {
     const fromMeta = normalizeIntegrationLinks(metadata);
-    const fromReadme = projectPath ? await readIntegrationLinksFromExistingReadmes(projectPath) : emptyLinks();
+    const fromReadme = projectPath ? await readIntegrationLinksFromExistingReadmes(projectPath, preferredProjectName) : emptyLinks();
     return mergeIntegrationLinks(overrides, fromMeta, fromReadme);
 }
 
 /**
  * Builds overrides from positional (legacy IPC) arguments.
  */
-function linksFromArgs({ elabftwUrl = null, omeroUrl = null, rspaceUrl = null, omeroGroupName = null } = {}) {
+function linksFromArgs({ elabftwUrl = null, omeroUrl = null, rspaceUrl = null, omeroGroupName = null, uploadedAt = null } = {}) {
     const links = emptyLinks();
-    if (cleanUrl(elabftwUrl)) links.elabftw = { url: cleanUrl(elabftwUrl) };
+    const ts = uploadedAt || new Date().toISOString();
+    if (cleanUrl(elabftwUrl)) links.elabftw = { url: cleanUrl(elabftwUrl), uploaded_at: ts };
     if (cleanUrl(omeroUrl)) {
-        links.omero = { url: cleanUrl(omeroUrl) };
+        links.omero = { url: cleanUrl(omeroUrl), uploaded_at: ts };
         if (omeroGroupName) links.omero.group_name = String(omeroGroupName);
     }
-    if (cleanUrl(rspaceUrl)) links.rspace = { url: cleanUrl(rspaceUrl) };
+    if (cleanUrl(rspaceUrl)) links.rspace = { url: cleanUrl(rspaceUrl), uploaded_at: ts };
     return links;
+}
+
+function formatSentTimestamp(isoStr) {
+    if (!isoStr) return '';
+    try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return String(isoStr);
+        return d.toLocaleString();
+    } catch (_) {
+        return String(isoStr);
+    }
 }
 
 /**
@@ -217,27 +250,56 @@ function renderIntegrationLinksSection(links) {
                 <div class="integration-links">`;
 
     if (links.elabftw && links.elabftw.url) {
+        const metaParts = [];
+        if (links.elabftw.experiment_id) metaParts.push(`ID: ${esc(links.elabftw.experiment_id)}`);
+        if (links.elabftw.user_name) metaParts.push(`by ${esc(links.elabftw.user_name)}`);
+        if (links.elabftw.uploaded_at) metaParts.push(`🕒 Sent: ${esc(formatSentTimestamp(links.elabftw.uploaded_at))}`);
+        const metaHtml = metaParts.length > 0
+            ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">${metaParts.join(' · ')}</span>`
+            : '';
         html += `
                     <a href="${esc(links.elabftw.url)}" class="integration-link" target="_blank" rel="noopener noreferrer">
                         <span class="link-icon">🧪</span>
-                        <span class="link-text">Open in elabFTW</span>
+                        <div class="link-content" style="display:flex; flex-direction:column;">
+                            <span class="link-text">Open in elabFTW</span>
+                            ${metaHtml}
+                        </div>
                     </a>`;
     }
     if (links.omero && links.omero.url) {
+        const metaParts = [];
+        if (links.omero.group_name) metaParts.push(`(Group: ${esc(links.omero.group_name)})`);
+        const omeroId = links.omero.dataset_id || links.omero.project_id;
+        if (omeroId) metaParts.push(`ID: ${esc(omeroId)}`);
+        if (links.omero.user_name) metaParts.push(`by ${esc(links.omero.user_name)}`);
+        if (links.omero.uploaded_at) metaParts.push(`🕒 Sent: ${esc(formatSentTimestamp(links.omero.uploaded_at))}`);
+        const metaHtml = metaParts.length > 0
+            ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">${metaParts.join(' · ')}</span>`
+            : '';
         html += `
                     <a href="${esc(links.omero.url)}" class="integration-link" target="_blank" rel="noopener noreferrer">
                         <span class="link-icon">🔵</span>
                         <div class="link-content" style="display:flex; flex-direction:column;">
                             <span class="link-text">Open in OMERO</span>
-                            ${links.omero.group_name ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">(Group: ${esc(links.omero.group_name)})</span>` : ''}
+                            ${metaHtml}
                         </div>
                     </a>`;
     }
     if (links.rspace && links.rspace.url) {
+        const metaParts = [];
+        if (links.rspace.document_id) metaParts.push(`ID: ${esc(links.rspace.document_id)}`);
+        if (links.rspace.user_name) metaParts.push(`by ${esc(links.rspace.user_name)}`);
+        if (links.rspace.uploaded_at) metaParts.push(`🕒 Sent: ${esc(formatSentTimestamp(links.rspace.uploaded_at))}`);
+        const metaHtml = metaParts.length > 0
+            ? `<span class="link-meta" style="font-size: 0.85em; opacity: 0.8;">${metaParts.join(' · ')}</span>`
+            : '';
         html += `
                     <a href="${esc(links.rspace.url)}" class="integration-link" target="_blank" rel="noopener noreferrer">
                         <span class="link-icon">📝</span>
-                        <span class="link-text">Open in RSpace</span>
+                        <div class="link-content" style="display:flex; flex-direction:column;">
+                            <span class="link-text">Open in RSpace</span>
+                            ${metaHtml}
+                        </div>
                     </a>`;
     }
     html += `

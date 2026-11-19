@@ -1,43 +1,63 @@
 <div class="visualization-container">
-    <div class="visualization-header" style="flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 18px;">
+    <div class="visualization-header"
+        style="flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 18px;">
         <!-- Row 1: Unified Title, Context Subtitle & Global Data/Export Actions -->
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0;">
-                <h3 style="margin: 0; color: #e0e0e0; font-size: 1.05rem; white-space: nowrap;">📊 Data Visualization</h3>
-                <span id="vizSubtitle" style="color: #9ca3af; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Explore your experiment metadata &amp; project lineage</span>
+                <h3 style="margin: 0; color: #e0e0e0; font-size: 1.05rem; white-space: nowrap;">📊 Data Visualization
+                </h3>
+                <span id="vizSubtitle"
+                    style="color: #9ca3af; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Explore
+                    your experiment metadata &amp; project lineage</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromTemplate()" title="Visualize current template metadata">
+                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromTemplate()"
+                    title="Visualize current template metadata">
                     🧪 Template
                 </button>
-                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromScannedProjects()" title="Visualize discovered projects" id="visualizeScannedBtn" style="display: none;">
+                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromScannedProjects()"
+                    title="Visualize discovered projects" id="visualizeScannedBtn" style="display: none;">
                     📁 Scanned
                 </button>
-                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromFile()" title="Load JSON file for visualization">
+                <button class="btn btn-secondary btn-small" onclick="visualizationManager.loadFromFile()"
+                    title="Load JSON file for visualization">
                     📂 Load JSON
                 </button>
-                <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()" title="Copy JSON to clipboard">
+                <button class="btn btn-secondary btn-small" onclick="visualizationManager.copyToClipboard()"
+                    title="Copy JSON to clipboard">
                     📋 Copy
                 </button>
-                <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()" title="Export current visualization">
+                <button class="btn btn-secondary btn-small" onclick="visualizationManager.exportVisualization()"
+                    title="Export current visualization">
                     💾 Export
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="window.switchMainTab('create')"
+                    title="Close visualization and return">
+                    ✕ Close
                 </button>
             </div>
         </div>
 
         <!-- Row 2: View Switcher + Context-Specific Controls in One Bar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
-            <div class="visualization-type-selector" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                <button class="viz-type-btn active" onclick="visualizationManager.setVisualizationType('mermaidlineage')" id="mermaidlineageTypeBtn" title="Interactive clickable Mermaid project lineage flowchart">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <div class="visualization-type-selector"
+                style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <button class="viz-type-btn active"
+                    onclick="visualizationManager.setVisualizationType('mermaidlineage')" id="mermaidlineageTypeBtn"
+                    title="Interactive clickable Mermaid project lineage flowchart">
                     🕸️ Lineage Graph
                 </button>
-                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('knowledgegraph')" id="knowledgegraphTypeBtn" title="Knowledge Graph &amp; Lineage Tree views">
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('knowledgegraph')"
+                    id="knowledgegraphTypeBtn" title="Knowledge Graph &amp; Lineage Tree views">
                     🌌 Knowledge Graph
                 </button>
-                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('dashboard')" id="dashboardTypeBtn" title="Metadata Analytics Dashboard">
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('dashboard')"
+                    id="dashboardTypeBtn" title="Metadata Analytics Dashboard">
                     📊 D3 Dashboard
                 </button>
-                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('tree')" id="treeTypeBtn" title="Collapsible JSON Tree View">
+                <button class="viz-type-btn" onclick="visualizationManager.setVisualizationType('tree')"
+                    id="treeTypeBtn" title="Collapsible JSON Tree View">
                     🌳 JSON Tree
                 </button>
             </div>
@@ -45,7 +65,8 @@
             <div id="vizContextBar" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <!-- Knowledge Graph Mode Dropdown (includes Lineage Tree) -->
                 <div id="kg-view-selector-wrap" style="display: flex; align-items: center; gap: 6px;">
-                    <select id="kg-view-selector" class="form-control" style="background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; outline: none;">
+                    <select id="kg-view-selector" class="form-control"
+                        style="background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; outline: none;">
                         <option value="bundling">Combined Graph (Edge Bundling)</option>
                         <option value="tree">Project Structure (Folder Hierarchy)</option>
                         <option value="arc">Chronological Lineage (Arc Diagram)</option>
@@ -54,18 +75,29 @@
                 </div>
 
                 <!-- Mermaid Lineage Controls -->
-                <div id="mermaid-lineage-controls" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <div id="mermaidRootSearchWrap" style="position: relative; display: flex; align-items: center; min-width: 220px; max-width: 260px;">
-                        <input type="text" id="mermaidRootSearchInput" class="form-control" autocomplete="off" placeholder="🔍 Projekt suchen / wählen..." title="Tippen zum Suchen &amp; Filtern oder Pfeiltasten/Klick zum Auswählen" style="width: 100%; background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 24px 4px 8px; font-size: 12px; outline: none;">
-                        <span id="mermaidRootSearchToggle" style="position: absolute; right: 7px; color: #9ca3af; font-size: 10px; cursor: pointer; user-select: none;" title="Projektliste öffnen">▼</span>
-                        <div id="mermaidRootSearchDropdown" style="display: none; position: fixed; z-index: 100005; background: #1e293b; border: 1px solid rgba(139,92,246,0.5); border-radius: 7px; box-shadow: 0 10px 28px rgba(0,0,0,0.65); max-height: 260px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0;"></div>
+                <div id="mermaid-lineage-controls"
+                    style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div id="mermaidRootSearchWrap"
+                        style="position: relative; display: flex; align-items: center; min-width: 220px; max-width: 260px;">
+                        <input type="text" id="mermaidRootSearchInput" class="form-control" autocomplete="off"
+                            placeholder="🔍 Projekt suchen / wählen..."
+                            title="Tippen zum Suchen &amp; Filtern oder Pfeiltasten/Klick zum Auswählen"
+                            style="width: 100%; background: #262638; color: #f3f4f6; border: 1px solid rgba(139,92,246,0.35); border-radius: 5px; padding: 4px 24px 4px 8px; font-size: 12px; outline: none;">
+                        <span id="mermaidRootSearchToggle"
+                            style="position: absolute; right: 7px; color: #9ca3af; font-size: 10px; cursor: pointer; user-select: none;"
+                            title="Projektliste öffnen">▼</span>
+                        <div id="mermaidRootSearchDropdown"
+                            style="display: none; position: fixed; z-index: 100005; background: #1e293b; border: 1px solid rgba(139,92,246,0.5); border-radius: 7px; box-shadow: 0 10px 28px rgba(0,0,0,0.65); max-height: 260px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0;">
+                        </div>
                         <select id="mermaidRootSelect" class="form-control" style="display: none;"></select>
                     </div>
-                    <select id="mermaidScopeSelect" class="form-control" title="Lineage depth scope" style="background: #262638; color: #f3f4f6; border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; outline: none;">
+                    <select id="mermaidScopeSelect" class="form-control" title="Lineage depth scope"
+                        style="background: #262638; color: #f3f4f6; border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; outline: none;">
                         <option value="direct">Direct Lineage</option>
                         <option value="full">Full Connected Graph</option>
                     </select>
-                    <label style="display: flex; align-items: center; gap: 4px; color: #7dd3fc; font-size: 12px; cursor: pointer; user-select: none;">
+                    <label
+                        style="display: flex; align-items: center; gap: 4px; color: #7dd3fc; font-size: 12px; cursor: pointer; user-select: none;">
                         <input type="checkbox" id="mermaidRelatedToggle" checked>
                         🔀 Related
                     </label>
@@ -73,8 +105,10 @@
 
                 <!-- Tree Expand/Collapse (shown for KG tree mode) -->
                 <div id="kg-tree-actions" style="display: none; gap: 5px;">
-                    <button id="kg-btn-expand" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 12px;">Expand All</button>
-                    <button id="kg-btn-collapse" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 12px;">Collapse All</button>
+                    <button id="kg-btn-expand" class="btn btn-sm btn-secondary"
+                        style="padding: 3px 8px; font-size: 12px;">Expand All</button>
+                    <button id="kg-btn-collapse" class="btn btn-sm btn-secondary"
+                        style="padding: 3px 8px; font-size: 12px;">Collapse All</button>
                 </div>
 
                 <!-- Dynamic Selection Actions (KG / LineageTree) -->
@@ -82,8 +116,10 @@
                 <div id="lineage-action-bar" style="display: flex; gap: 6px; align-items: center;"></div>
                 <div id="kgLegend" style="display: flex; gap: 8px; font-size: 11px; color: #9ca3af;"></div>
 
-                <label id="showFolderLinksLabel" style="display: flex; align-items: center; gap: 5px; color: #e0e0e0; font-size: 12px; cursor: pointer; user-select: none;">
-                    <input type="checkbox" id="showFolderLinksToggle" onchange="if(window.visualizationManager && window.visualizationManager.currentData) window.visualizationManager.renderVisualization(window.visualizationManager.currentData)">
+                <label id="showFolderLinksLabel"
+                    style="display: flex; align-items: center; gap: 5px; color: #e0e0e0; font-size: 12px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="showFolderLinksToggle"
+                        onchange="if(window.visualizationManager && window.visualizationManager.currentData) window.visualizationManager.renderVisualization(window.visualizationManager.currentData)">
                     📁 Ordner-Beziehungen
                 </label>
             </div>
@@ -92,24 +128,31 @@
 
     <div class="visualization-main" style="display: flex; flex: 1; overflow: hidden;">
         <!-- Left Sidebar for Active Filters -->
-        <div id="vizSidebar" class="visualization-sidebar" style="display: none; width: 250px; background: rgba(30,30,46,0.95); border-right: 1px solid rgba(255,255,255,0.1); padding: 15px; overflow-y: auto;">
-            <h4 style="margin: 0 0 15px 0; color: #e0e0e0; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+        <div id="vizSidebar" class="visualization-sidebar"
+            style="display: none; width: 250px; background: rgba(30,30,46,0.95); border-right: 1px solid rgba(255,255,255,0.1); padding: 15px; overflow-y: auto;">
+            <h4
+                style="margin: 0 0 15px 0; color: #e0e0e0; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
                 <span>Active Filters</span>
-                <span id="vizFilterCount" style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+                <span id="vizFilterCount"
+                    style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
             </h4>
             <div id="vizSidebarContent" style="display: flex; flex-direction: column; gap: 10px;">
                 <!-- Filter chips injected here -->
             </div>
-            <button class="btn btn-secondary btn-small" style="width: 100%; margin-top: 15px;" onclick="window.switchMainTab('discover'); if(window.facetSearch) facetSearch.openModal();">
+            <button class="btn btn-secondary btn-small" style="width: 100%; margin-top: 15px;"
+                onclick="window.switchMainTab('discover'); if(window.facetSearch) facetSearch.openModal();">
                 Edit Filters
             </button>
-            <button class="btn btn-secondary btn-small" style="width: 100%; margin-top: 5px; color: #ef4444; border-color: #ef4444;" onclick="visualizationManager.resetFilters()">
+            <button class="btn btn-secondary btn-small"
+                style="width: 100%; margin-top: 5px; color: #ef4444; border-color: #ef4444;"
+                onclick="visualizationManager.resetFilters()">
                 Reset Filters
             </button>
         </div>
 
         <!-- Main Content -->
-        <div class="visualization-content" id="visualizationContent" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div class="visualization-content" id="visualizationContent"
+            style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
             <div class="visualization-placeholder">
                 <svg fill="currentColor" viewBox="0 0 24 24">
                     <path
