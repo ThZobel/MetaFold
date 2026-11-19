@@ -128,15 +128,11 @@ const metadataLinksManager = {
                 enhancedMetadata.metafold_integration = {
                     created_at: enhancedMetadata.created_at || nowIso,
                     local_path: localPath,
-                    external_links: {},
-                    sync_history: []
+                    external_links: {}
                 };
             }
             if (!enhancedMetadata.metafold_integration.external_links || typeof enhancedMetadata.metafold_integration.external_links !== 'object') {
                 enhancedMetadata.metafold_integration.external_links = {};
-            }
-            if (!Array.isArray(enhancedMetadata.metafold_integration.sync_history)) {
-                enhancedMetadata.metafold_integration.sync_history = [];
             }
             if (!enhancedMetadata.metafold_integration.local_path || enhancedMetadata.metafold_integration.local_path === 'Unknown') {
                 enhancedMetadata.metafold_integration.local_path = localPath;
@@ -187,7 +183,6 @@ const metadataLinksManager = {
                     timestamp: nowIso
                 };
                 syncedServices.push(elabSyncEntry);
-                enhancedMetadata.metafold_integration.sync_history.push(elabSyncEntry);
             }
 
             // Add OMERO link info (ENHANCED VERSION with correct object type and username)
@@ -248,7 +243,6 @@ const metadataLinksManager = {
                     timestamp: nowIso
                 };
                 syncedServices.push(omeroSyncEntry);
-                enhancedMetadata.metafold_integration.sync_history.push(omeroSyncEntry);
 
                 console.log('✨ OMERO integration info added:', {
                     [omeroIdKey]: omeroId,
@@ -280,30 +274,12 @@ const metadataLinksManager = {
                     timestamp: nowIso
                 };
                 syncedServices.push(rspaceSyncEntry);
-                enhancedMetadata.metafold_integration.sync_history.push(rspaceSyncEntry);
             }
 
-            // Record integration sync event in System.UpdateHistory & changelog
+            // Record integration sync event in changelog
             if (syncedServices.length > 0) {
                 const actionStr = `Sent to Integrations (${syncedServices.map(s => s.service).join(', ')})`;
                 const syncUser = syncedServices.map(s => s.user).filter(Boolean)[0] || currentUser;
-
-                if (!enhancedMetadata['System.UpdateHistory']) {
-                    enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
-                }
-                const historyArr = Array.isArray(enhancedMetadata['System.UpdateHistory'].value)
-                    ? enhancedMetadata['System.UpdateHistory'].value
-                    : [];
-                historyArr.push({
-                    date: nowIso,
-                    user: syncUser,
-                    group: currentGroup,
-                    action: actionStr,
-                    integrations: syncedServices
-                });
-                enhancedMetadata['System.UpdateHistory'] = { value: historyArr, type: 'history' };
-                enhancedMetadata['System.LastUpdatedBy'] = { value: syncUser, type: 'user' };
-                enhancedMetadata['System.LastUpdatedAt'] = { value: nowIso, type: 'date' };
 
                 if (!Array.isArray(enhancedMetadata.changelog)) {
                     enhancedMetadata.changelog = [];

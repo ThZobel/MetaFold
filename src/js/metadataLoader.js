@@ -1418,9 +1418,6 @@ const metadataLoader = {
         if (!enhancedMetadata.metafold_integration.external_links) {
             enhancedMetadata.metafold_integration.external_links = {};
         }
-        if (!Array.isArray(enhancedMetadata.metafold_integration.sync_history)) {
-            enhancedMetadata.metafold_integration.sync_history = [];
-        }
 
         const syncedServices = [];
 
@@ -1435,7 +1432,6 @@ const metadataLoader = {
             };
             const entry = { service: 'elabFTW', url: results.elabftw.experimentUrl, id: String(results.elabftw.experimentId || ''), user: currentUser, timestamp: nowIso };
             syncedServices.push(entry);
-            enhancedMetadata.metafold_integration.sync_history.push(entry);
         }
 
         // Add OMERO link
@@ -1468,7 +1464,6 @@ const metadataLoader = {
             };
             const entry = { service: 'OMERO', url: results.omero.datasetUrl, id: String(results.omero.datasetId || ''), group: omeroGroupName, user: currentUser, timestamp: nowIso };
             syncedServices.push(entry);
-            enhancedMetadata.metafold_integration.sync_history.push(entry);
         }
 
         // Add RSpace link
@@ -1482,27 +1477,10 @@ const metadataLoader = {
             };
             const entry = { service: 'RSpace', url: results.rspace.documentUrl, id: String(results.rspace.documentId || ''), user: currentUser, timestamp: nowIso };
             syncedServices.push(entry);
-            enhancedMetadata.metafold_integration.sync_history.push(entry);
         }
 
         if (syncedServices.length > 0) {
             const actionStr = `Sent to Integrations (${syncedServices.map(s => s.service).join(', ')})`;
-            if (!enhancedMetadata['System.UpdateHistory']) {
-                enhancedMetadata['System.UpdateHistory'] = { value: [], type: 'history' };
-            }
-            const historyArr = Array.isArray(enhancedMetadata['System.UpdateHistory'].value)
-                ? enhancedMetadata['System.UpdateHistory'].value
-                : [];
-            historyArr.push({
-                date: nowIso,
-                user: currentUser,
-                group: currentGroup,
-                action: actionStr,
-                integrations: syncedServices
-            });
-            enhancedMetadata['System.UpdateHistory'] = { value: historyArr, type: 'history' };
-            enhancedMetadata['System.LastUpdatedBy'] = { value: currentUser, type: 'user' };
-            enhancedMetadata['System.LastUpdatedAt'] = { value: nowIso, type: 'date' };
 
             if (!Array.isArray(enhancedMetadata.changelog)) {
                 enhancedMetadata.changelog = [];

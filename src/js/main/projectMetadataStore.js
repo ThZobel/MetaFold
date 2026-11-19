@@ -335,7 +335,8 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
             const expectedTime = new Date(options.expectedUpdatedAt).getTime();
             const actualTime = new Date(readResult.updatedAt).getTime();
             if (!isNaN(expectedTime) && !isNaN(actualTime) && Math.abs(expectedTime - actualTime) > 1000) {
-                const lastUser = metadata['System.LastUpdatedBy']?.value || rawDoc['System.LastUpdatedBy']?.value || 'Another user';
+                const latestChangelog = Array.isArray(metadata.changelog) ? metadata.changelog[0] : (Array.isArray(rawDoc.changelog) ? rawDoc.changelog[0] : null);
+                const lastUser = latestChangelog?.user || metadata['System.LastUpdatedBy']?.value || rawDoc['System.LastUpdatedBy']?.value || 'Another user';
                 return {
                     success: false,
                     conflict: {
@@ -619,23 +620,6 @@ async function updateProjectMetadata(projectPath, patch, options = {}, context =
             if (metadata.changelog.length > 100) {
                 metadata.changelog = metadata.changelog.slice(0, 100);
             }
-
-            // System Update History
-            if (!metadata['System.UpdateHistory']) {
-                metadata['System.UpdateHistory'] = { value: [], type: 'history' };
-            }
-            const historyList = Array.isArray(metadata['System.UpdateHistory'].value)
-                ? metadata['System.UpdateHistory'].value
-                : [];
-            historyList.push({
-                date: nowIso,
-                user: currentUser,
-                group: currentGroup,
-                action: options.action || 'Metadata Updated'
-            });
-            metadata['System.UpdateHistory'] = { value: historyList, type: 'history' };
-            metadata['System.LastUpdatedBy'] = { value: currentUser, type: 'user' };
-            metadata['System.LastUpdatedAt'] = { value: nowIso, type: 'date' };
         }
 
         // 8. Prepare full JSON document for writing
