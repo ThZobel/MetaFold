@@ -817,6 +817,11 @@ const metaFoldOMEROIntegration = {
                 }
             }
 
+            const resolvedGroupId = datasetResult.groupId || options.groupId || null;
+            const resolvedGroupName = (resolvedGroupId && window.omeroGroups?.getGroupById?.(resolvedGroupId)?.name)
+                || (this.hybridAuth?.session?.groupId == resolvedGroupId ? this.hybridAuth?.session?.groupName : null)
+                || null;
+
             // Ergebnis zusammenstellen
             const result = {
                 success: true,
@@ -826,6 +831,7 @@ const metaFoldOMEROIntegration = {
                     name: datasetResult.datasetName,
                     omeroWebUrl: datasetResult.omeroWebUrl,
                     groupId: datasetResult.groupId,
+                    groupName: resolvedGroupName,
                     projectId: datasetResult.projectId || null,
                     linkedToProject: datasetResult.linkedToProject,
                     verified: datasetResult.verified
@@ -837,6 +843,7 @@ const metaFoldOMEROIntegration = {
                     apiMethod: 'Schnelle Integration',
                     groupContext: options.groupId,
                     actualGroup: datasetResult.groupId,
+                    groupName: resolvedGroupName,
                     projectContext: options.projectId
                 }
             };
@@ -1191,6 +1198,11 @@ const metaFoldOMEROIntegration = {
                 }
             }
 
+            const resolvedGroupId = options.groupId || null;
+            const resolvedGroupName = (resolvedGroupId && window.omeroGroups?.getGroupById?.(resolvedGroupId)?.name)
+                || (this.hybridAuth?.session?.groupId == resolvedGroupId ? this.hybridAuth?.session?.groupName : null)
+                || null;
+
             // Step 3: Final result
             const result = {
                 success: true,
@@ -1200,6 +1212,7 @@ const metaFoldOMEROIntegration = {
                     name: projectName,
                     omeroWebUrl: this.generateOMEROURL(datasetId, options.groupId, objectType),
                     groupId: options.groupId,
+                    groupName: resolvedGroupName,
                     projectId: options.projectId || null,
                     linkedToProject: datasetResult.linkedToProject,
                     verified: datasetResult.verified
@@ -1211,6 +1224,7 @@ const metaFoldOMEROIntegration = {
                     apiMethod: 'Enhanced Integration with Phase 2 Features',
                     groupContext: options.groupId,
                     actualGroup: options.groupId,
+                    groupName: resolvedGroupName,
                     projectContext: options.projectId,
                     featuresUsed: {
                         multiNamespace: annotationResult?.method?.includes('multi_namespace') || false,

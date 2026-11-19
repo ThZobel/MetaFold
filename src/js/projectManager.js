@@ -2379,14 +2379,17 @@ const projectManager = {
                     // ✅ FIX: Use projectData.projectName instead of undefined finalProjectName
                     const projectName = projectData.projectName;
 
-                    let omeroGroupName = null;
-                    if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
-                        omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
-                    } else if (window.omeroAuth?.session?.eventContext?.groupName) {
-                        omeroGroupName = window.omeroAuth.session.eventContext.groupName;
-                    } else if (window.omeroAuth?.session?.groupName) {
-                        omeroGroupName = window.omeroAuth.session.groupName;
+                    let omeroGroupId = uploadResults?.omero?.integration?.actualGroup
+                        || uploadResults?.omero?.integration?.groupContext
+                        || uploadResults?.omero?.dataset?.groupId
+                        || null;
+                    if (!omeroGroupId && omeroUrl) {
+                        const groupMatch = String(omeroUrl).match(/[?&]group=(\d+)/);
+                        if (groupMatch) omeroGroupId = groupMatch[1];
                     }
+                    const omeroGroupName = window.metadataLinksManager?.resolveOMEROGroupName
+                        ? window.metadataLinksManager.resolveOMEROGroupName(omeroGroupId, uploadResults?.omero)
+                        : (uploadResults?.omero?.integration?.groupName || uploadResults?.omero?.dataset?.groupName || null);
 
                     // Insert links if we have any
                     if (elabftwUrl || omeroUrl || rspaceUrl) {

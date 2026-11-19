@@ -1308,10 +1308,17 @@ const metadataLoader = {
                             let elabftwUrl = results.elabftw?.experimentUrl || null;
                             let omeroUrl = results.omero?.datasetUrl || null;
                             const rspaceUrl = results.rspace?.documentUrl || null;
+                            let omeroGroupId = enhancedMetadata?.metafold_integration?.external_links?.omero?.group_id
+                                || results.omero?.integration?.actualGroup
+                                || results.omero?.integration?.groupContext
+                                || results.omero?.dataset?.groupId
+                                || null;
+                            if (!omeroGroupId && omeroUrl) {
+                                const groupMatch = String(omeroUrl).match(/[?&]group=(\d+)/);
+                                if (groupMatch) omeroGroupId = groupMatch[1];
+                            }
                             const omeroGroupName = enhancedMetadata?.metafold_integration?.external_links?.omero?.group_name
-                                || window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName
-                                || window.omeroAuth?.session?.eventContext?.groupName
-                                || window.omeroAuth?.session?.groupName
+                                || window.metadataLinksManager?.resolveOMEROGroupName?.(omeroGroupId, results.omero)
                                 || null;
 
                             if (!omeroUrl && results.omero?.dataset?.omeroWebUrl) {
@@ -1436,15 +1443,30 @@ const metadataLoader = {
             const isProject = results.omero.datasetUrl.includes('show=project-') ||
                               results.omero.projectContext === 'create_new_project';
             const omeroIdKey = isProject ? 'project_id' : 'dataset_id';
+            let omeroGroupId = results.omero.integration?.actualGroup
+                || results.omero.integration?.groupContext
+                || results.omero.dataset?.groupId
+                || results.omero.groupId
+                || null;
+            if (!omeroGroupId && results.omero.datasetUrl) {
+                const groupMatch = String(results.omero.datasetUrl).match(/[?&]group=(\d+)/);
+                if (groupMatch) omeroGroupId = groupMatch[1];
+            }
+            const omeroGroupName = window.metadataLinksManager?.resolveOMEROGroupName?.(omeroGroupId, results.omero)
+                || results.omero.integration?.groupName
+                || results.omero.dataset?.groupName
+                || null;
             enhancedMetadata.metafold_integration.external_links.omero = {
                 url: results.omero.datasetUrl,
                 [omeroIdKey]: String(results.omero.datasetId || ''),
                 object_type: isProject ? 'project' : 'dataset',
                 user_name: currentUser,
+                group_id: omeroGroupId !== null ? String(omeroGroupId) : null,
+                group_name: omeroGroupName,
                 uploaded_at: nowIso,
                 status: 'uploaded'
             };
-            const entry = { service: 'OMERO', url: results.omero.datasetUrl, id: String(results.omero.datasetId || ''), user: currentUser, timestamp: nowIso };
+            const entry = { service: 'OMERO', url: results.omero.datasetUrl, id: String(results.omero.datasetId || ''), group: omeroGroupName, user: currentUser, timestamp: nowIso };
             syncedServices.push(entry);
             enhancedMetadata.metafold_integration.sync_history.push(entry);
         }

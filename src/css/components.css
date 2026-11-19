@@ -47,7 +47,9 @@
     font-weight: 600;
 }
 
-.form-group input, .form-group textarea, .form-group select {
+.form-group input,
+.form-group textarea,
+.form-group select {
     width: 100%;
     padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -72,7 +74,9 @@
 }
 
 /* MESSAGES (RESTORED) */
-.success-message, .error-message, .info-message {
+.success-message,
+.error-message,
+.info-message {
     padding: 15px;
     border-radius: 8px;
     margin-top: 15px;
@@ -141,12 +145,13 @@
     font-weight: bold;
     font-size: 0.7rem;
     flex-shrink: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .template-info {
     flex: 1;
-    min-width: 0; /* Allow text truncation */
+    min-width: 0;
+    /* Allow text truncation */
 }
 
 .template-info h3 {
@@ -317,8 +322,10 @@
 /* Template Type Selector - 2x2 Grid Layout */
 .template-type-selector {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 columns */
-    grid-template-rows: auto auto;   /* 2 rows */
+    grid-template-columns: 1fr 1fr;
+    /* 2 columns */
+    grid-template-rows: auto auto;
+    /* 2 rows */
     gap: 8px;
     margin-top: 15px;
     margin-bottom: 15px;
@@ -399,7 +406,7 @@
     .template-type-selector {
         gap: 6px;
     }
-    
+
     .template-type-btn {
         font-size: 0.8rem;
         padding: 8px 10px;
@@ -411,7 +418,7 @@
     .template-type-selector {
         gap: 5px;
     }
-    
+
     .template-type-btn {
         font-size: 0.75rem;
         padding: 7px 8px;
@@ -423,7 +430,7 @@
     .template-type-selector {
         gap: 4px;
     }
-    
+
     .template-type-btn {
         font-size: 0.7rem;
         padding: 6px;
@@ -437,12 +444,12 @@
     .template-header {
         flex-wrap: wrap;
     }
-    
+
     .template-header-details {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .template-header-details .template-avatar {
         margin: 0 auto 1rem auto;
         width: 40px;
@@ -455,74 +462,75 @@
     .template-header {
         gap: 6px;
     }
-    
+
     .template-avatar {
         width: 18px;
         height: 18px;
         font-size: 0.55rem;
     }
-    
+
     .template-info h3 {
         font-size: 0.8rem;
     }
-    
+
     .template-badge {
         font-size: 0.55rem;
         padding: 1px 2px;
     }
-    
+
     .template-meta {
         font-size: 0.7rem;
     }
 }
 
 <style>
-    /* Current User Display Styling */
+
+/* Current User Display Styling */
+#currentUserDisplay {
+    transition: all 0.3s ease;
+}
+
+#currentUserDisplay:hover {
+    background: rgba(124, 58, 237, 0.15);
+    border-color: rgba(124, 58, 237, 0.4);
+}
+
+/* Switch User Button Styling */
+.btn[onclick="showSwitchUserModal()"] {
+    background: linear-gradient(45deg, #059669, #10b981) !important;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn[onclick="showSwitchUserModal()"]:hover {
+    background: linear-gradient(45deg, #047857, #059669) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+}
+
+/* User Avatar Animation */
+#currentUserAvatar {
+    transition: all 0.3s ease;
+}
+
+#currentUserDisplay:hover #currentUserAvatar {
+    transform: scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
     #currentUserDisplay {
-        transition: all 0.3s ease;
+        margin: 10px 0;
+        padding: 10px;
     }
 
-    #currentUserDisplay:hover {
-        background: rgba(124, 58, 237, 0.15);
-        border-color: rgba(124, 58, 237, 0.4);
-    }
-
-    /* Switch User Button Styling */
     .btn[onclick="showSwitchUserModal()"] {
-        background: linear-gradient(45deg, #059669, #10b981) !important;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        padding: 12px 20px;
+        font-size: 14px;
     }
+}
 
-    .btn[onclick="showSwitchUserModal()"]:hover {
-        background: linear-gradient(45deg, #047857, #059669) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-    }
-
-    /* User Avatar Animation */
-    #currentUserAvatar {
-        transition: all 0.3s ease;
-    }
-
-    #currentUserDisplay:hover #currentUserAvatar {
-        transform: scale(1.1);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        #currentUserDisplay {
-            margin: 10px 0;
-            padding: 10px;
-        }
-        
-        .btn[onclick="showSwitchUserModal()"] {
-            padding: 12px 20px;
-            font-size: 14px;
-        }
-    }
-    </style>
-
-    /* SUCCESS MESSAGE BUTTON FIX - Restore v13 Button Styling */
+</style>
+/* SUCCESS MESSAGE BUTTON FIX - Restore v13 Button Styling */
 /* Add this at the very end of components.css */
 
 /* Apply MetaFold button styling to buttons in success messages */
@@ -567,8 +575,10 @@ select {
     padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05); /* Gleicher Hintergrund wie andere Felder */
-    color: #e0e0e0; /* Weiße Schrift wie andere Felder */
+    background: rgba(255, 255, 255, 0.05);
+    /* Gleicher Hintergrund wie andere Felder */
+    color: #e0e0e0;
+    /* Weiße Schrift wie andere Felder */
     font-size: 14px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -590,14 +600,17 @@ select:focus {
 
 /* Dropdown Options - Dunklerer Hintergrund für bessere Lesbarkeit */
 select option {
-    background: #1a1a2e; /* Dunkler Hintergrund beim Ausklappen */
-    color: #e0e0e0; /* Weiße Schrift */
+    background: #1a1a2e;
+    /* Dunkler Hintergrund beim Ausklappen */
+    color: #e0e0e0;
+    /* Weiße Schrift */
     padding: 8px;
 }
 
 /* Ausgewählte Option im ausgeklappten Dropdown */
 select option:checked {
-    background: #7c3aed; /* Lila Highlight für ausgewählte Option */
+    background: #7c3aed;
+    /* Lila Highlight für ausgewählte Option */
     color: white;
 }
 
@@ -608,7 +621,8 @@ select option:hover {
 
 /* Placeholder/Unausgewählter Zustand */
 select option[value=""] {
-    color: #9ca3af; /* Grau für "-- Select --" */
+    color: #9ca3af;
+    /* Grau für "-- Select --" */
     font-style: italic;
 }
 
@@ -627,7 +641,7 @@ select:disabled {
         color: #e0e0e0;
         background-color: rgba(255, 255, 255, 0.05);
     }
-    
+
     select option {
         background-color: #1a1a2e;
         color: #e0e0e0;

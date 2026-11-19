@@ -218,15 +218,15 @@ const metadataLinksManager = {
                 }
 
                 const omeroIdKey = isProject ? 'project_id' : 'dataset_id';
-                const omeroGroupId = omeroResult.integration?.actualGroup || omeroResult.integration?.groupContext || null;
-                let omeroGroupName = null;
-                if (window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName) {
-                    omeroGroupName = window.metaFoldOMEROIntegration.hybridAuth.session.groupName;
-                } else if (window.omeroAuth?.session?.eventContext?.groupName) {
-                    omeroGroupName = window.omeroAuth.session.eventContext.groupName;
-                } else if (window.omeroAuth?.session?.groupName) {
-                    omeroGroupName = window.omeroAuth.session.groupName;
+                let omeroGroupId = omeroResult.integration?.actualGroup
+                    || omeroResult.integration?.groupContext
+                    || omeroResult.dataset?.groupId
+                    || null;
+                if (!omeroGroupId && omeroUrl) {
+                    const groupMatch = String(omeroUrl).match(/[?&]group=(\d+)/);
+                    if (groupMatch) omeroGroupId = groupMatch[1];
                 }
+                const omeroGroupName = this.resolveOMEROGroupName(omeroGroupId, omeroResult);
 
                 enhancedMetadata.metafold_integration.external_links.omero = {
                     url: omeroUrl,
@@ -439,6 +439,72 @@ const metadataLinksManager = {
         return integrationFields;
     },
     
+    /**
+     * Resolve the OMERO group name for the given group ID (never falling back to
+     * the login session's default group when a different target group ID is set).
+     * @param {string|number|null} groupId - Target OMERO group ID
+     * @param {Object|null} omeroResult - Optional OMERO integration result object
+     * @returns {string|null} Resolved group name or null
+     */
+    resolveOMEROGroupName(groupId, omeroResult = null) {
+        if (omeroResult?.integration?.groupName) {
+            return omeroResult.integration.groupName;
+        }
+        if (omeroResult?.dataset?.groupName) {
+            return omeroResult.dataset.groupName;
+        }
+
+        const targetGroupId = groupId !== undefined && groupId !== null && groupId !== '' && groupId !== 'all'
+            ? String(groupId)
+            : null;
+
+        if (targetGroupId) {
+            const matchedGroup = window.omeroGroups?.getGroupById?.(targetGroupId);
+            if (matchedGroup?.name) {
+                return matchedGroup.name;
+            }
+
+            if (typeof document !== 'undefined') {
+                const groupSelect = document.getElementById('omeroGroupSelect');
+                const option = groupSelect?.querySelector?.(`option[value="${targetGroupId}"]`);
+                if (option?.textContent) {
+                    return option.textContent.replace(/\s*\(current\)\s*$/i, '').trim() || null;
+                }
+            }
+
+            const hybridSession = window.metaFoldOMEROIntegration?.hybridAuth?.session;
+            if (hybridSession?.groupId != null && String(hybridSession.groupId) === targetGroupId && hybridSession.groupName) {
+                return hybridSession.groupName;
+            }
+            const authEventCtx = window.omeroAuth?.session?.eventContext;
+            if (authEventCtx?.groupId != null && String(authEventCtx.groupId) === targetGroupId && authEventCtx.groupName) {
+                return authEventCtx.groupName;
+            }
+            const authSession = window.omeroAuth?.session;
+            if (authSession?.groupId != null && String(authSession.groupId) === targetGroupId && authSession.groupName) {
+                return authSession.groupName;
+            }
+
+            return null;
+        }
+
+        // No explicit groupId provided: use the currently selected UI group if specific
+        if (typeof document !== 'undefined') {
+            const groupSelect = document.getElementById('omeroGroupSelect');
+            if (groupSelect && groupSelect.value && groupSelect.value !== 'all' && groupSelect.value !== 'refresh') {
+                const selectedOption = groupSelect.options?.[groupSelect.selectedIndex];
+                if (selectedOption?.textContent) {
+                    return selectedOption.textContent.replace(/\s*\(current\)\s*$/i, '').trim() || null;
+                }
+            }
+        }
+
+        return window.metaFoldOMEROIntegration?.hybridAuth?.session?.groupName
+            || window.omeroAuth?.session?.eventContext?.groupName
+            || window.omeroAuth?.session?.groupName
+            || null;
+    },
+
     // =================== URL GENERATION ===================
     
     /**

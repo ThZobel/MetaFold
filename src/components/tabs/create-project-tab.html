@@ -1,7 +1,9 @@
 <!-- Empty / Welcome State when no template is selected -->
-<div id="templatePlaceholder" class="template-placeholder-card" style="display: block; padding: 42px 30px; text-align: center; max-width: 820px; margin: 40px auto; background: rgba(255, 255, 255, 0.02); border: 2px dashed rgba(139, 92, 246, 0.3); border-radius: 16px;">
+<div id="templatePlaceholder" class="template-placeholder-card"
+    style="display: block; padding: 42px 30px; text-align: center; max-width: 820px; margin: 40px auto; background: rgba(255, 255, 255, 0.02); border: 2px dashed rgba(139, 92, 246, 0.3); border-radius: 16px;">
     <div style="font-size: 3rem; margin-bottom: 14px; opacity: 0.9;">🎯</div>
-    <h3 style="font-size: 1.35rem; margin-bottom: 12px; color: #f3f4f6; font-weight: 600;">Select a Template on the left to Begin</h3>
+    <h3 style="font-size: 1.35rem; margin-bottom: 12px; color: #f3f4f6; font-weight: 600;">Select a Template on the left
+        to Begin</h3>
     <div style="color: #9ca3af; font-size: 0.95rem; margin-bottom: 22px;">or</div>
     <div class="create-action-tiles">
         <button type="button" class="create-action-tile" onclick="metadataLoader.startExtendProjectFlow()">
@@ -24,12 +26,15 @@
 
 <div id="templateDetails" style="display: none;">
     <div class="project-setup enhanced-setup">
-        <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div class="setup-header"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
                 <h3 id="setupHeaderTitle">🎯 Project Configuration</h3>
                 <p id="setupHeaderSubtitle">Configure your project location and details</p>
             </div>
-            <button type="button" id="deselectTemplateBtn" class="btn btn-secondary btn-small" onclick="templateManager.deselectTemplate(true)" title="Deselect template and return to start view" style="padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;">
+            <button type="button" id="deselectTemplateBtn" class="btn btn-secondary btn-small"
+                onclick="templateManager.deselectTemplate(true)" title="Deselect template and return to start view"
+                style="padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;">
                 <span>✕</span> Deselect Template
             </button>
         </div>
@@ -84,7 +89,8 @@
                         <h4>Base Directory</h4>
                         <span class="section-subtitle">Where to create your project</span>
                     </div>
-                    <button id="browseTargetPathBtn" class="browse-btn" onclick="projectManager.browsePath()" title="Browse for folder">
+                    <button id="browseTargetPathBtn" class="browse-btn" onclick="projectManager.browsePath()"
+                        title="Browse for folder">
                         <span>📁</span>
                         Browse
                     </button>
@@ -95,7 +101,8 @@
                         title="Enter or browse for the base directory">
                     <div class="input-status" id="pathStatus"></div>
                 </div>
-                <div id="onlyIntegrationsContainer" style="margin-top: 10px; display: flex; align-items: center; padding-left: 5px;">
+                <div id="onlyIntegrationsContainer"
+                    style="margin-top: 10px; display: flex; align-items: center; padding-left: 5px;">
                     <input type="checkbox" id="onlyIntegrations" onchange="projectManager.toggleIntegrationsOnlyMode()"
                         style="cursor: pointer; width: 16px; height: 16px; accent-color: #7c3aed;">
                     <label for="onlyIntegrations"
@@ -135,7 +142,8 @@
                         <h4>Project Name</h4>
                         <span class="section-subtitle">Name for your experiment/project</span>
                     </div>
-                    <button id="selectMetadataBtn" class="browse-btn" onclick="metadataLoader.loadMetadataForCreation()" title="Select existing metadata JSON" style="display: none !important;">
+                    <button id="selectMetadataBtn" class="browse-btn" onclick="metadataLoader.loadMetadataForCreation()"
+                        title="Select existing metadata JSON" style="display: none !important;">
                         <span>📄</span>
                         Select JSON
                     </button>
@@ -145,8 +153,10 @@
                         placeholder="My_Experiment_2024..." title="Enter a name for your project">
                     <div class="input-status" id="nameStatus"></div>
                 </div>
-                <div id="extendProjectHint" style="display: none; margin-top: 8px; font-size: 0.85em; color: #a78bfa; line-height: 1.4;">
-                    💡 Creates {ProjectName}-metadata.json and {ProjectName}-README.html directly in the Base Directory without creating a project subfolder.
+                <div id="extendProjectHint"
+                    style="display: none; margin-top: 8px; font-size: 0.85em; color: #a78bfa; line-height: 1.4;">
+                    💡 Creates {ProjectName}-metadata.json and {ProjectName}-README.html directly in the Base Directory
+                    without creating a project subfolder.
                 </div>
             </div>
 
