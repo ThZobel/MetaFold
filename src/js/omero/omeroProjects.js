@@ -32,11 +32,14 @@ const omeroProjects = {
                 console.log(`🚀 Using fast group-specific API for group ${groupId}`);
                 
                 try {
-                    const experimenterId = window.metaFoldOMEROIntegration?.session?.eventContext?.userId || 
-                                         window.omeroAuth?.session?.eventContext?.userId || 
-                                         2;
+                    const experimenterId = window.omeroAuth?.session?.userId ||
+                                         window.omeroAuth?.session?.eventContext?.userId ||
+                                         window.metaFoldOMEROIntegration?.hybridAuth?.session?.userId ||
+                                         null;
                     
-                    const fastUrl = `webclient/api/containers/?id=${experimenterId}&experimenter_id=${experimenterId}&page=0&group=${groupId}`;
+                    const fastUrl = experimenterId
+                        ? `webclient/api/containers/?id=${experimenterId}&experimenter_id=${experimenterId}&page=0&group=${groupId}`
+                        : `api/v0/m/projects/?group=${groupId}&limit=100`;
                     console.log(`🔬 Fast API URL: ${fastUrl}`);
                     
                     const response = await window.omeroAPI.apiRequest(fastUrl);
@@ -44,6 +47,9 @@ const omeroProjects = {
                     if (response && response.projects && Array.isArray(response.projects)) {
                         allProjects = response.projects;
                         console.log(`✅ Fast API loaded ${allProjects.length} projects for group ${groupId}`);
+                    } else if (response && response.data && Array.isArray(response.data)) {
+                        allProjects = response.data;
+                        console.log(`✅ Group API loaded ${allProjects.length} projects for group ${groupId}`);
                     } else {
                         console.log(`ℹ️ Group ${groupId} has no projects (this is normal)`);
                         allProjects = [];

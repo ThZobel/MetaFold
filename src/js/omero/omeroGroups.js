@@ -96,8 +96,10 @@ const omeroGroups = {
             }
             
             if (groups.length === 0) {
-                console.warn('⚠️ No groups endpoint worked, trying fallback...');
-                return await this.getGroupsFallback();
+                this.groups = [];
+                this.cache.groups = null;
+                this.cache.groupsTimestamp = 0;
+                throw new Error('Could not load OMERO groups (not authenticated or no groups available)');
             }
             
             console.log('🔬 Raw groups found:', groups.length);
@@ -129,8 +131,10 @@ const omeroGroups = {
             
         } catch (error) {
             console.error('❌ Error fetching groups:', error);
-            console.log('🔬 Trying fallback method...');
-            return await this.getGroupsFallback();
+            this.groups = [];
+            this.cache.groups = null;
+            this.cache.groupsTimestamp = 0;
+            throw error;
         }
     },
 
@@ -265,8 +269,10 @@ const omeroGroups = {
             }
             
             if (groups.length === 0) {
-                console.warn('⚠️ No groups endpoint worked, trying fallback...');
-                return await this.getGroupsFallback();
+                this.groups = [];
+                this.cache.groups = null;
+                this.cache.groupsTimestamp = 0;
+                throw new Error('Could not load OMERO groups (not authenticated or no groups available)');
             }
             
             console.log('🔬 Raw groups found:', groups.length);
@@ -292,8 +298,10 @@ const omeroGroups = {
             
         } catch (error) {
             console.error('❌ Error fetching groups:', error);
-            console.log('🔬 Trying fallback method...');
-            return await this.getGroupsFallback();
+            this.groups = [];
+            this.cache.groups = null;
+            this.cache.groupsTimestamp = 0;
+            throw error;
         }
     },
 

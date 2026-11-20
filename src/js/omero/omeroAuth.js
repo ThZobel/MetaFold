@@ -332,7 +332,6 @@ const omeroAuth = {
                 }
             } else {
                 // "Don't save" is NOT enabled - use stored password
-                console.log('🔐 Using stored password (Don\'t save is disabled)');
                 const password = await window.settingsManager.get('omero.password');
                 
                 if (!password || password.trim() === '') {
@@ -399,9 +398,7 @@ const omeroAuth = {
                 console.warn('⚠️ Server fetch failed, using default ID (1):', serverError.message);
             }
             
-            // Step 3: Multi-strategy login attempt
-            console.log('🔬 Step 3: Multi-strategy login...');
-            
+            // Step 3: Direct API login (no HTML webclient fallback)
             const loginStrategies = [
                 {
                     name: 'Form-based Login (Django Standard)',
@@ -410,10 +407,6 @@ const omeroAuth = {
                 {
                     name: 'JSON API Login (Alternative)',
                     execute: () => this.attemptJsonLogin(username, password, serverId, csrfToken)
-                },
-                {
-                    name: 'Webclient Login (Browser Equivalent)',
-                    execute: () => this.attemptWebclientLogin(username, password, serverId, csrfToken)
                 }
             ];
             
@@ -431,6 +424,10 @@ const omeroAuth = {
                 } catch (error) {
                     console.warn(`⚠️ ${strategy.name} failed:`, error.message);
                     lastError = error;
+                    // Stop immediately if OMERO explicitly rejected the credentials
+                    if (/Invalid username or password|Connection not available|please check your user name and password/i.test(error.message)) {
+                        throw error;
+                    }
                 }
             }
             
@@ -540,9 +537,19 @@ const omeroAuth = {
         
         if (response.ok || response.status === 302) {
             let loginResult;
-            try {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
                 loginResult = await response.json();
-            } catch (e) {
+                if (loginResult && loginResult.success === false) {
+                    throw new Error(loginResult.message || 'Invalid username or password');
+                }
+            } else {
+                const responseText = await response.text();
+                // Django webclient/login/ returns HTTP 200 with the login form HTML when credentials fail!
+                if (/name=["']password["']/i.test(responseText) ||
+                    /Connection not available|Invalid username or password|Please enter a correct username/i.test(responseText)) {
+                    throw new Error('Invalid username or password');
+                }
                 loginResult = { success: true };
             }
             
@@ -594,7 +601,7 @@ const omeroAuth = {
             } else {
                 return 'CSRF token validation failed - Please refresh and try again';
             }
-        } else if (errorText.includes('Username') || errorText.includes('Password')) {
+        } else if (/user\s*name|password|connection not available/i.test(errorText)) {
             return 'Invalid username or password';
         } else if (status === 403) {
             return 'Access forbidden - Check credentials or contact IT support';
@@ -722,50 +729,22 @@ const omeroAuth = {
 
     // Main login method with enhanced fallback strategies
     async login(username, password) {
-        console.log('🔬 === OMERO ENHANCED LOGIN ===');
+        console.log('🔬 === OMERO LOGIN ===');
         console.log('🔬 Username:', username || 'not provided');
         console.log('🔬 Server:', this.baseUrl);
-        
-        // ✅ SECURITY FIX: Check if "Don't save password" is enabled FIRST!
-        const dontSave = await window.settingsManager?.getDontSaveOmeroPassword?.() || false;
-        console.log('🔐 Security check - Don\'t save password enabled:', dontSave);
-        
-        // Strategy 1: Try session cookie recovery first (ONLY if "Don't save" is NOT enabled)
-        if (!dontSave) {
-            try {
-                console.log('🔬 Strategy 1: Session cookie recovery...');
-                await this.establishSessionFromCookies();
-                console.log('✅ Session recovered from existing cookies');
-                return {
-                    success: true,
-                    session: this.session,
-                    loginMethod: 'Cookie Recovery (Enhanced)'
-                };
-            } catch (cookieError) {
-                console.log('🔬 Cookie recovery failed:', cookieError.message);
-            }
-        } else {
-            console.log('🔐 SECURITY: Skipping session cookie recovery (Don\'t save password enabled)');
-            console.log('🔐 User must provide credentials for every login');
-        }
-        
-        // Strategy 2: Username/Password login
+
+        // Always perform a real credential-based login (no blind cookie-recovery fallback)
         if (username && password) {
-            console.log('🔬 Strategy 2: Credential-based login...');
             return await this.loginWithCredentials(username, password);
         }
-        
-        // ✅ NEW: Strategy 2.5: Try to get password if not provided
+
+        // Get stored or prompted password when username is known
         if (username && !password) {
-            console.log('🔬 Strategy 2.5: Getting password (stored or prompt)...');
             const retrievedPassword = await this.getPassword();
-            
+
             if (retrievedPassword) {
-                console.log('🔬 Password obtained, attempting login...');
                 return await this.loginWithCredentials(username, retrievedPassword);
             } else {
-                console.log('⚠️ No password available (user may have cancelled)');
-                // ❌ REMOVED: No fallback to public group!
                 throw new Error('Password required for OMERO login. Login cancelled by user.');
             }
         }

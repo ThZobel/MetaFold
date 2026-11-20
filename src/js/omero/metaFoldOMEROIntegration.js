@@ -727,11 +727,12 @@ const metaFoldOMEROIntegration = {
                 throw new Error('Keine aktive Session');
             }
 
-            const groupIdNum = parseInt(groupId);
-            const hasAccess = this.session.memberOfGroups.includes(groupIdNum);
+            const groupIdNum = parseInt(groupId, 10);
+            const memberGroups = Array.isArray(this.session.memberOfGroups) ? this.session.memberOfGroups : [];
+            const hasAccess = memberGroups.some(id => parseInt(id, 10) === groupIdNum);
 
             if (!hasAccess) {
-                throw new Error(`Benutzer ist nicht Mitglied der Gruppe ${groupId}. Verfügbare Gruppen: ${this.session.memberOfGroups.join(', ')}`);
+                throw new Error(`Benutzer ist nicht Mitglied der Gruppe ${groupId}. Verfügbare Gruppen: ${memberGroups.join(', ')}`);
             }
 
             console.log('✅ Gruppenzugriff validiert für Gruppe:', groupId);
@@ -874,6 +875,22 @@ const metaFoldOMEROIntegration = {
             console.log('✅ Found valid global omeroAuth session, syncing...');
             const globalSession = window.omeroAuth.session;
 
+            let syncedGroups = globalSession.eventContext?.memberOfGroups || globalSession.memberOfGroups || [];
+            if ((!Array.isArray(syncedGroups) || syncedGroups.length === 0) && window.omeroGroups) {
+                if (!Array.isArray(window.omeroGroups.groups) || window.omeroGroups.groups.length === 0) {
+                    try {
+                        await window.omeroGroups.getGroups?.();
+                    } catch (e) {
+                        console.warn('⚠️ Could not pre-fetch OMERO groups during session sync:', e.message);
+                    }
+                }
+                if (Array.isArray(window.omeroGroups.groups) && window.omeroGroups.groups.length > 0) {
+                    syncedGroups = window.omeroGroups.groups
+                        .map(g => parseInt(g.id, 10))
+                        .filter(id => !isNaN(id));
+                }
+            }
+
             // Sync to hybridAuth session structure
             this.hybridAuth.session = {
                 ...(globalSession.eventContext || {}), // Spread event context if available
@@ -887,7 +904,7 @@ const metaFoldOMEROIntegration = {
                 userId: globalSession.userId,
                 groupId: globalSession.groupId,
                 groupName: globalSession.groupName,
-                memberOfGroups: globalSession.eventContext?.memberOfGroups || globalSession.memberOfGroups || []
+                memberOfGroups: syncedGroups
             };
 
             console.log('✅ Synced session from global omeroAuth');
