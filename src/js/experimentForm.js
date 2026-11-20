@@ -2061,7 +2061,10 @@ const experimentForm = {
                 isLoadedProject: true,
                 metadata: normalized,
                 structure: '',
-                filePath: filePath
+                filePath: filePath,
+                createdBy: rawMetadata.provenance?.creator?.username || rawMetadata.createdBy || null,
+                createdAt: rawMetadata.created_at || rawMetadata.createdAt || rawMetadata.provenance?.createdAt || null,
+                updatedAt: rawMetadata.updated_at || rawMetadata.updatedAt || null
             };
             window.templateManager.selectedIndex = -1;
             window.templateManager.renderList();

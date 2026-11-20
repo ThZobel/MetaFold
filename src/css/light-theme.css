@@ -119,7 +119,6 @@ body.light-mode {
 /* Project Setup and Cards */
 .light-mode .project-setup,
 .light-mode .folder-structure,
-.light-mode .template-item,
 .light-mode .integration-card,
 .light-mode .settings-group,
 .light-mode .modal-content,
@@ -130,7 +129,19 @@ body.light-mode {
     box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
 }
 
-.light-mode .template-item:hover,
+.light-mode .template-item {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.light-mode .template-item:hover {
+    background: #f9fafb !important;
+    border-color: #d1d5db !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+}
+
 .light-mode .metadata-field:hover {
     background: #f9fafb !important;
     border-color: #d1d5db !important;
@@ -140,6 +151,12 @@ body.light-mode {
 .light-mode .template-item.active {
     background: rgba(124, 58, 237, 0.1) !important;
     border-color: #7c3aed !important;
+}
+
+.light-mode #userMenuPopover {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    color: #1f2937 !important;
 }
 
 /* Metadata Fields / Names */

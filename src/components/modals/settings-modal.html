@@ -22,10 +22,21 @@
             <button class="settings-tab" onclick="switchSettingsTab('rocrate')" id="rocrateTab">
                 📦 RO-Crate & FAIR
             </button>
+            <button class="settings-tab" onclick="switchSettingsTab('userGroups')" id="userGroupsTab" style="display: none;">
+                👥 User / Groups
+            </button>
         </div>
 
         <!-- General Settings Tab -->
         <div id="generalSettings" class="settings-tab-content active">
+            <div class="form-group" id="sharedTemplatesToggle" style="display: none;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="showSharedTemplates" checked onchange="templateManager.toggleSharedTemplates()">
+                    <span>🤝 Show shared templates</span>
+                </label>
+                <small>Show templates shared by other users in your group in the template list.</small>
+            </div>
+
             <div class="form-group">
                 <label style="display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" id="userManagementEnabled" onchange="updateUserManagementSetting()">
@@ -1014,6 +1025,21 @@
 
         </div>
         <!-- END: Plugins Settings Tab -->
+
+        <!-- User / Groups Admin Tab -->
+        <div id="userGroupsSettings" class="settings-tab-content">
+            <div class="settings-section" style="padding: 16px; background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px;">
+                <h3 style="margin-top: 0; margin-bottom: 8px; color: #e0e0e0;">👥 User &amp; Group Management</h3>
+                <p style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 16px;">
+                    Manage local users, groups, passwords, and group memberships in the dedicated User &amp; Group Management dialog.
+                </p>
+                <button class="btn btn-primary" onclick="closeSettingsModal(); if (window.userManagementModal?.showWithPasswordSupport) { window.userManagementModal.showWithPasswordSupport(); } else { showSwitchUserModal(); }"
+                    style="background: linear-gradient(135deg, #7c3aed, #6d28d9); border: none; padding: 10px 18px; font-weight: 600;">
+                    👥 Open User &amp; Group Management
+                </button>
+            </div>
+        </div>
+        <!-- END: User / Groups Admin Tab -->
 
         <!-- Settings Actions -->
         <div

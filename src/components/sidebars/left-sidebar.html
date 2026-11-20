@@ -12,7 +12,7 @@
 ">
             <h1 style="margin: 0; font-size: 1.5rem;">MetaFold</h1>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; position: relative;">
             <!-- Theme Toggle -->
             <button class="btn btn-secondary" onclick="window.toggleTheme()"
                 style="padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;"
@@ -26,78 +26,87 @@
                 title="Settings">
                 ⚙️
             </button>
+
+            <!-- Compact User Avatar Button -->
+            <button id="userMenuBtn" class="btn btn-secondary" onclick="toggleUserMenuPopover(event)"
+                style="width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0;"
+                title="User &amp; Account">
+                <span id="currentUserAvatar">U</span>
+            </button>
+
+            <!-- User Popover -->
+            <div id="userMenuPopover" style="
+                display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                right: 0;
+                min-width: 190px;
+                padding: 10px 12px;
+                background: #1e1e2e;
+                border: 1px solid rgba(124, 58, 237, 0.45);
+                border-radius: 8px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                z-index: 1200;
+                text-align: left;
+            ">
+                <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</div>
+                    <div id="currentUserGroup" style="color: #9ca3af; font-size: 0.78rem;">Default</div>
+                </div>
+                <button class="btn btn-secondary" onclick="closeUserMenuPopover(); showSwitchUserModal();"
+                    style="width: 100%; padding: 6px 10px; font-size: 0.8rem; background: rgba(124, 58, 237, 0.2); border: 1px solid rgba(124, 58, 237, 0.4); display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span>🚪</span>
+                    <span>Switch User / Logout</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Current User Display mit integriertem Switch User Button -->
-    <div id="currentUserDisplay" style="
-margin: 15px 0;
-padding: 12px;
-background: rgba(124, 58, 237, 0.1);
-border: 1px solid rgba(124, 58, 237, 0.3);
-border-radius: 8px;
-text-align: center;
-">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
-            <div id="currentUserAvatar" style="
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #7c3aed;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 0.7rem;
-">U</div>
-            <span id="currentUserName" style="color: #a855f7; font-weight: 600; font-size: 0.9rem;">User</span>
-        </div>
-        <div id="currentUserGroup" style="color: #9ca3af; font-size: 0.8rem; margin-bottom: 8px;">Default
-        </div>
+    <!-- Template Management Buttons - NEUE VERSION -->
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="btn" onclick="showTemplateModal()" style="flex: 1;">New Template</button>
+        <button class="more-menu-trigger sidebar-more-btn" onclick="toggleMoreMenu()" id="sidebarMoreMenuTrigger">
+            <span>⚙️</span>
+            <span style="font-size: 0.85rem;">Templ. Options</span>
+        </button>
+    </div>
 
-        <button class="btn btn-secondary" onclick="showSwitchUserModal()"
-            style="padding: 4px 12px; font-size: 0.75rem; background: rgba(124, 58, 237, 0.2); border: 1px solid rgba(124, 58, 237, 0.4); display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 auto;">
-            <span>👥</span>
-            <span>Switch User</span>
+    <!-- Template Type Selector - ENHANCED 4-Category Grid -->
+    <div class="template-type-selector" style="margin-top: 8px;">
+        <!-- Row 1: Category 1 & 2 -->
+        <button class="template-type-btn active" onclick="switchTemplateType('category1')" id="category1TypeBtn"
+            title="Templates for main projects">
+            🎯 Main-Project
+        </button>
+        <button class="template-type-btn" onclick="switchTemplateType('category2')" id="category2TypeBtn"
+            title="Templates for sub-projects">
+            📊 Sub-Project
         </button>
 
-        <!-- Shared Templates Toggle (bestehend - unverändert) -->
-        <div id="sharedTemplatesToggle" style="
-margin-top: 8px; 
-padding: 6px 0; 
-border-top: 1px solid rgba(124, 58, 237, 0.2);
-display: none;
-">
-            <label style="
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    gap: 6px; 
-    font-size: 0.8rem; 
-    color: #9ca3af; 
-    cursor: pointer;
-">
-                <input type="checkbox" id="showSharedTemplates" checked
-                    onchange="templateManager.toggleSharedTemplates()" style="width: auto; transform: scale(0.9);">
-                <span>🤝 Show shared templates</span>
-            </label>
-        </div>
+        <!-- Row 2: Category 3 & 4 -->
+        <button class="template-type-btn" onclick="switchTemplateType('category3')" id="category3TypeBtn"
+            title="Templates for actions">
+            ⚡ Action
+        </button>
+        <button class="template-type-btn" onclick="switchTemplateType('category4')" id="category4TypeBtn"
+            title="Miscellaneous templates">
+            📋 Misc
+        </button>
     </div>
 
-    <!-- Template Search (bestehend - unverändert) -->
-    <div class="template-search" style="margin-bottom: 15px;">
+    <!-- Template Search (placed below the 4 categories) -->
+    <div class="template-search" style="margin-top: 10px; margin-bottom: 4px;">
         <div class="search-container" style="position: relative;">
             <input type="text" id="templateSearchInput" placeholder="🔍 Search templates..."
                 onInput="templateManager.handleSearch()" onFocus="templateManager.showSearchSuggestions()"
                 onBlur="templateManager.hideSearchSuggestions()" style="
            width: 100%;
-           padding: 10px 12px;
+           padding: 8px 12px;
            background: rgba(255, 255, 255, 0.08);
            border: 1px solid rgba(255, 255, 255, 0.2);
            border-radius: 8px;
            color: #e0e0e0;
-           font-size: 14px;
+           font-size: 13px;
            transition: all 0.3s ease;
        ">
 
@@ -123,44 +132,12 @@ display: none;
 
         <!-- Search Status -->
         <div id="searchStatus" style="
-margin-top: 6px;
-font-size: 0.75rem;
+margin-top: 4px;
+font-size: 0.72rem;
 color: #6b7280;
 text-align: center;
 display: none;
 "></div>
-    </div>
-
-    <!-- Template Management Buttons - NEUE VERSION -->
-    <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-        <button class="btn" onclick="showTemplateModal()" style="flex: 1;">New Template</button>
-        <button class="more-menu-trigger sidebar-more-btn" onclick="toggleMoreMenu()" id="sidebarMoreMenuTrigger">
-            <span>⚙️</span>
-            <span style="font-size: 0.85rem;">Templ. Options</span>
-        </button>
-    </div>
-
-    <!-- Template Type Selector - ENHANCED 4-Category Grid -->
-    <div class="template-type-selector" style="margin-top: 15px;">
-        <!-- Row 1: Category 1 & 2 -->
-        <button class="template-type-btn active" onclick="switchTemplateType('category1')" id="category1TypeBtn"
-            title="Templates for main projects">
-            🎯 Main-Project
-        </button>
-        <button class="template-type-btn" onclick="switchTemplateType('category2')" id="category2TypeBtn"
-            title="Templates for sub-projects">
-            📊 Sub-Project
-        </button>
-
-        <!-- Row 2: Category 3 & 4 -->
-        <button class="template-type-btn" onclick="switchTemplateType('category3')" id="category3TypeBtn"
-            title="Templates for actions">
-            ⚡ Action
-        </button>
-        <button class="template-type-btn" onclick="switchTemplateType('category4')" id="category4TypeBtn"
-            title="Miscellaneous templates">
-            📋 Misc
-        </button>
     </div>
 </div>
 

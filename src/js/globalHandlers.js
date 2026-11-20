@@ -450,15 +450,38 @@ window.showStorageMode = function () {
         console.error('Error showing storage mode:', error);
     }
 };
+window.toggleUserMenuPopover = function (event) {
+    if (event) event.stopPropagation();
+    const popover = document.getElementById('userMenuPopover');
+    if (!popover) return;
+    const isVisible = popover.style.display === 'block';
+    popover.style.display = isVisible ? 'none' : 'block';
+};
+
+window.closeUserMenuPopover = function () {
+    const popover = document.getElementById('userMenuPopover');
+    if (popover) {
+        popover.style.display = 'none';
+    }
+};
+
+document.addEventListener('click', (event) => {
+    const popover = document.getElementById('userMenuPopover');
+    const btn = document.getElementById('userMenuBtn');
+    if (!popover || popover.style.display !== 'block') return;
+    if (!popover.contains(event.target) && (!btn || !btn.contains(event.target))) {
+        popover.style.display = 'none';
+    }
+});
+
 window.updateCurrentUserDisplay = function () {
     try {
         const userNameEl = document.getElementById('currentUserName');
         const userGroupEl = document.getElementById('currentUserGroup');
         const userAvatarEl = document.getElementById('currentUserAvatar');
-        const userDisplayEl = document.getElementById('currentUserDisplay');
+        const userMenuBtn = document.getElementById('userMenuBtn');
 
-        if (!userNameEl || !userGroupEl || !userAvatarEl || !userDisplayEl) {
-            console.warn('⚠️ User display elements not found');
+        if (!userNameEl || !userGroupEl || !userAvatarEl) {
             return;
         }
 
@@ -469,31 +492,29 @@ window.updateCurrentUserDisplay = function () {
             isEnabled: false
         };
 
-        console.log('👤 Updating user display:', userInfo);
-
         // Update display elements
-        userNameEl.textContent = userInfo.username || 'User';
+        const displayName = userInfo.username || 'User';
+        userNameEl.textContent = displayName;
         userGroupEl.textContent = userInfo.groupname || 'Default';
 
-        // Update avatar
-        const initials = window.userManager?.getUserInitials ?
-            window.userManager.getUserInitials(userInfo.username) :
-            (userInfo.username ? userInfo.username.substring(0, 2).toUpperCase() : 'U');
+        // Single initial letter for the compact header avatar button
+        const initial = displayName ? displayName.trim().charAt(0).toUpperCase() : 'U';
         const color = window.userManager?.generateUserColor ?
-            window.userManager.generateUserColor(userInfo.username) :
+            window.userManager.generateUserColor(displayName) :
             '#7c3aed';
 
-        userAvatarEl.textContent = initials;
-        userAvatarEl.style.background = color;
+        userAvatarEl.textContent = initial;
+        if (userMenuBtn) {
+            userMenuBtn.style.background = color;
+            userMenuBtn.style.opacity = (userInfo.isEnabled && displayName !== 'User') ? '1' : '0.75';
+            userMenuBtn.title = `${displayName} (${userInfo.groupname || 'Default'})`;
+        }
 
-        // Show/hide user display based on user management status
-        if (userInfo.isEnabled && userInfo.username && userInfo.username !== 'User') {
-            userDisplayEl.style.display = 'block';
-            userDisplayEl.style.opacity = '1';
-        } else {
-            // In simple mode, show minimal info
-            userDisplayEl.style.display = 'block';
-            userDisplayEl.style.opacity = '0.7';
+        // Show/hide Admin User/Groups tab in Settings if present
+        const userGroupsTab = document.getElementById('userGroupsTab');
+        if (userGroupsTab) {
+            const isAdmin = Boolean(userInfo.isEnabled && displayName === 'Admin');
+            userGroupsTab.style.display = isAdmin ? '' : 'none';
         }
     } catch (error) {
         console.error('Error updating user display:', error);
@@ -533,6 +554,23 @@ window.showSettingsModal = async function () {
 
         // Wait for settings to load into fields
         await loadSettingsIntoModal();
+
+        // Sync shared templates toggle & Admin User/Groups tab visibility
+        if (window.templateManager?.updateSharedToggleVisibility) {
+            window.templateManager.updateSharedToggleVisibility();
+        }
+        const sharedCb = document.getElementById('showSharedTemplates');
+        if (sharedCb && window.templateManager?.searchState) {
+            sharedCb.checked = window.templateManager.searchState.showSharedTemplates !== false;
+        }
+        const userGroupsTab = document.getElementById('userGroupsTab');
+        if (userGroupsTab) {
+            const isAdmin = Boolean(window.userManager?.isEnabled?.() && window.userManager?.currentUser === 'Admin');
+            userGroupsTab.style.display = isAdmin ? '' : 'none';
+            if (!isAdmin && userGroupsTab.classList.contains('active')) {
+                window.switchSettingsTab('general');
+            }
+        }
 
         // Also initialize category settings if the function exists (defined in settings-modal.html)
         if (typeof window.initializeCategorySettings === 'function') {

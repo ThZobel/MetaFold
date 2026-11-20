@@ -119,6 +119,14 @@
     color: #e0e0e0;
 }
 
+.integration-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
 .integration-body {
     padding: 12px;
     /* Display controlled by JS/CSS based on state */

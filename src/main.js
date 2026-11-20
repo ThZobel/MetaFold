@@ -951,6 +951,21 @@ ipcMain.handle('select-folders', async () => {
     return null;
 });
 
+// File Dialog (used by profileManager import & BioFormats browse)
+ipcMain.handle('select-file', async (event, options = {}) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: options.properties || ['openFile'],
+        title: options.title || 'Select File',
+        filters: options.filters || undefined,
+        defaultPath: options.defaultPath || undefined
+    });
+
+    if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+        return result.filePaths[0];
+    }
+    return null;
+});
+
 // Show Save Dialog
 ipcMain.handle('show-save-dialog', async (event, options) => {
     const result = await dialog.showSaveDialog(mainWindow, options);

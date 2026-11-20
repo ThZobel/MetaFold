@@ -108,11 +108,11 @@
 .template-item {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 8px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
     position: relative;
 }
 
@@ -126,12 +126,107 @@
     border-color: #7c3aed;
 }
 
-/* Template Header Layout (RESTORED) */
+/* Template Header Layout */
 .template-header {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
+}
+
+/* Logo-style progressive category bars */
+.template-cat-bars {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2.5px;
+    padding-top: 3px;
+    flex-shrink: 0;
+}
+
+.template-cat-bars span {
+    display: block;
+    height: 2.5px;
+    border-radius: 2px;
+}
+
+.template-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+}
+
+.template-title-row h3 {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    line-height: 1.25;
+    min-width: 0;
+    flex: 1;
+}
+
+.template-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.template-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.template-feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    opacity: 0.65;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.template-item:hover .template-feature-icon,
+.template-item.active .template-feature-icon {
+    opacity: 0.95;
+    color: #cbd5e1;
+}
+
+.template-feature-more {
+    font-size: 0.65rem;
+    color: #9ca3af;
+    opacity: 0.75;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.template-accordion-btn {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.85rem;
+    line-height: 1;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.template-accordion-btn:hover {
+    color: #e5e7eb;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.template-accordion-body {
+    margin-top: 4px;
 }
 
 .template-avatar {

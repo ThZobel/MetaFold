@@ -698,9 +698,113 @@ const templateManager = {
         }
     },
 
+    getTemplateCategory(template) {
+        return (template && template.category) ? template.category : 'category1';
+    },
+
+    /**
+     * Build monochrome stylized feature/integration SVG icons for a template card.
+     * Shows folder outline (if template defines folder structure) + up to 2 active integration icons.
+     */
+    getTemplateFeatureIconsHtml(template) {
+        if (!template) return '';
+        const icons = [];
+
+        // 1. Folder structure defined
+        if (template.structure && String(template.structure).trim() !== '') {
+            icons.push(`
+                <span class="template-feature-icon" title="Folder structure defined">
+                    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1.5 4.2A1.2 1.2 0 0 1 2.7 3h3.2l1.4 1.6h6a1.2 1.2 0 0 1 1.2 1.2v6a1.2 1.2 0 0 1-1.2 1.2H2.7a1.2 1.2 0 0 1-1.2-1.2V4.2z"/>
+                    </svg>
+                </span>
+            `);
+        }
+
+        // 2. Active integrations (only when enabled BOTH in Settings AND on this template)
+        const ints = template.integrations || {};
+        const globalSettings = window.settingsManager?.settings || {};
+        const isEnabled = (flagKey, legacyKey, globalSettingKey) => {
+            if (globalSettingKey && globalSettings[globalSettingKey] !== true) {
+                return false;
+            }
+            const val = ints[flagKey] !== undefined ? ints[flagKey] : ints[legacyKey];
+            if (typeof val === 'boolean') return val;
+            return false;
+        };
+
+        const activeIntegrations = [];
+
+        if (isEnabled('omeroEnabled', 'omero', 'omero.enabled')) {
+            activeIntegrations.push({
+                name: 'OMERO',
+                svg: `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                    <circle cx="8" cy="8" r="1.9"/>
+                    <circle cx="8" cy="2.6" r="1.25"/>
+                    <circle cx="12.7" cy="5.3" r="1.25"/>
+                    <circle cx="12.7" cy="10.7" r="1.25"/>
+                    <circle cx="8" cy="13.4" r="1.25"/>
+                    <circle cx="3.3" cy="10.7" r="1.25"/>
+                    <circle cx="3.3" cy="5.3" r="1.25"/>
+                </svg>`
+            });
+        }
+
+        if (isEnabled('elabftwEnabled', 'elabftw', 'elabftw.enabled')) {
+            activeIntegrations.push({
+                name: 'elabFTW',
+                svg: `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 2h4M7 2v3.5L3 12.2A1.3 1.3 0 0 0 4.1 14h7.8a1.3 1.3 0 0 0 1.1-1.8L9 5.5V2"/>
+                    <path d="M4.6 10.5h6.8"/>
+                </svg>`
+            });
+        }
+
+        if (isEnabled('rspaceEnabled', 'rspace', 'rspace.enabled')) {
+            activeIntegrations.push({
+                name: 'RSpace',
+                svg: `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="2" width="10" height="12" rx="1.3"/>
+                    <path d="M6 5.5h4M6 8h4M6 10.5h2.5"/>
+                </svg>`
+            });
+        }
+
+        if (isEnabled('n8nEnabled', 'n8n', 'n8n.enabled')) {
+            activeIntegrations.push({
+                name: 'n8n',
+                svg: `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                    <circle cx="4" cy="8" r="1.7"/>
+                    <circle cx="12" cy="4.5" r="1.7"/>
+                    <circle cx="12" cy="11.5" r="1.7"/>
+                    <path d="M5.6 7.3l4.7-2.1M5.6 8.7l4.7 2.1"/>
+                </svg>`
+            });
+        }
+
+        const shownIntegrations = activeIntegrations.slice(0, 2);
+        shownIntegrations.forEach(item => {
+            icons.push(`
+                <span class="template-feature-icon" title="${item.name} integration enabled">
+                    ${item.svg}
+                </span>
+            `);
+        });
+
+        if (activeIntegrations.length > 2) {
+            const extraCount = activeIntegrations.length - 2;
+            const allNames = activeIntegrations.map(i => i.name).join(', ');
+            icons.push(`
+                <span class="template-feature-more" title="Active integrations: ${allNames}">+${extraCount}</span>
+            `);
+        }
+
+        return icons.join('');
+    },
+
     // NEW: Get category badge HTML for template list rendering
     getCategoryBadge(template) {
-        const category = template.category || 'category1';
+        const category = this.getTemplateCategory(template);
         const categoryConfig = window.templateTypeManager
             ? window.templateTypeManager.getCategoryConfig(category)
             : { name: category, icon: '📋', color: '#6b7280' };
@@ -745,21 +849,65 @@ const templateManager = {
     // Update template info display
     updateTemplateInfo() {
         const infoElement = document.getElementById('templateInfo');
-        if (!infoElement) return;
+        const rsDatesEl = document.getElementById('rsProjectDates');
+
+        const formatDate = (val) => {
+            if (!val) return null;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d.toLocaleDateString();
+        };
+
+        const updateRightSidebarDates = (createdVal, updatedVal, prefix = '', creatorName = null) => {
+            if (!rsDatesEl) return;
+            const c = formatDate(createdVal);
+            const u = formatDate(updatedVal);
+            const parts = [];
+            if (creatorName && creatorName !== 'Unknown') {
+                parts.push(`User: ${creatorName}`);
+            }
+            if (c) parts.push(`${prefix}Created: ${c}`);
+            if (u) parts.push(`Updated: ${u}`);
+            if (parts.length > 0) {
+                rsDatesEl.textContent = parts.join(' · ');
+                rsDatesEl.style.display = 'block';
+            } else {
+                rsDatesEl.textContent = '';
+                rsDatesEl.style.display = 'none';
+            }
+        };
 
         if (!this.currentTemplate) {
-            infoElement.textContent = 'No template selected';
-            infoElement.className = 'template-info';
+            if (infoElement) {
+                infoElement.textContent = 'No template selected';
+                infoElement.className = 'template-info';
+            }
+            updateRightSidebarDates(null, null);
             return;
         }
 
         if (this.currentTemplate.isLoadedProject) {
-            infoElement.textContent = `📂 Project: ${this.currentTemplate.name} (Loaded Metadata)`;
-            infoElement.className = 'template-info info';
+            if (infoElement) {
+                infoElement.textContent = `📂 Project: ${this.currentTemplate.name} (Loaded Metadata)`;
+                infoElement.className = 'template-info info';
+            }
+            updateRightSidebarDates(
+                this.currentTemplate.createdAt,
+                this.currentTemplate.updatedAt,
+                '',
+                this.currentTemplate.createdBy || null
+            );
             return;
         }
 
         const template = this.currentTemplate;
+        updateRightSidebarDates(
+            template.createdAt,
+            template.updatedAt,
+            'Template ',
+            template.createdBy || null
+        );
+
+        if (!infoElement) return;
         const hasStructure = template.structure && template.structure.trim() !== '';
         const hasMetadata = template.metadata && Object.keys(template.metadata).length > 0;
 
@@ -828,15 +976,13 @@ const templateManager = {
         }
 
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
-            // ENHANCED: Use category badge instead of type badge
             const badge = this.getCategoryBadge(template);
-
-            const color = this.getUserColor(template.createdBy);
-            const initials = this.getUserInitials(template.createdBy);
+            const category = this.getTemplateCategory(template);
+            const categoryConfig = (window.templateTypeManager && typeof window.templateTypeManager.getCategoryConfig === 'function')
+                ? window.templateTypeManager.getCategoryConfig(category)
+                : { color: '#7c3aed' };
+            const borderColor = categoryConfig?.color || '#7c3aed';
             const isSelected = this.selectedIndex === index;
-
-            const createdDate = new Date(template.createdAt).toLocaleDateString();
-            const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
 
             const displayName = this.searchState.isSearching ?
                 this.highlightSearchMatches(template.name, this.searchState.query) :
@@ -846,19 +992,17 @@ const templateManager = {
                 this.highlightSearchMatches(template.description, this.searchState.query) :
                 (template.description ? this.escapeHtml(template.description) : '');
 
-            // Storage indicator
-            const storageIndicator = `
-                <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
-                    <span class="storage-icon">${template.storageIcon}</span>
-                    <span class="storage-text">${template.storageDisplay}</span>
-                </div>
-            `;
+            // Only show creator when template is shared by someone else
+            const creatorMeta = !template.isOwn ?
+                `<div class="template-meta">
+                    <span class="creator-info">by ${this.escapeHtml(template.createdBy)}${template.createdByGroup ? ` (${this.escapeHtml(template.createdByGroup)})` : ''}</span>
+                </div>` : '';
 
             // Copy link for shared templates
             const copyLink = !template.isOwn && template.isShared ?
-                `<div style="margin-top: 8px;">
+                `<div style="margin-top: 4px;">
                     <span class="copy-link" data-template-index="${index}" 
-                          style="color: #10b981; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
+                          style="color: #10b981; font-size: 0.75rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
                         📋 Copy to my templates
                     </span>
                 </div>` : '';
@@ -868,28 +1012,19 @@ const templateManager = {
             return `
                 <div class="template-item ${isSelected ? 'active' : ''} ${searchResultClass}" 
                      data-is-own="${template.isOwn}"
-                     data-template-index="${index}">
+                     data-template-index="${index}"
+                     style="border-left: 3px solid ${borderColor};">
                     <div class="template-header">
-                        <div class="template-avatar" style="background-color: ${color}">
-                            ${initials}
-                        </div>
                         <div class="template-info">
                             <h3>
                                 ${displayName}
                                 ${badge}
                                 ${!template.isOwn ? '<span class="shared-badge">shared</span>' : ''}
                             </h3>
-                            <div class="template-meta">
-                                <span class="creator-info">by ${this.escapeHtml(template.createdBy)} (${this.escapeHtml(template.createdByGroup)})</span>
-                                <span class="date-info">
-                                    Created: ${createdDate}
-                                    ${updatedDate ? ` • Updated: ${updatedDate}` : ''}
-                                </span>
-                            </div>
+                            ${creatorMeta}
                             ${displayDescription ? `
                                 <p class="template-description">${displayDescription}</p>
                             ` : ''}
-                            ${storageIndicator}
                             ${copyLink}
                         </div>
                     </div>
@@ -2081,14 +2216,12 @@ const templateManager = {
 
         // CONTINUE with original renderList logic...
         listContainer.innerHTML = filteredTemplates.map((template, index) => {
-            const badge = this.getCategoryBadge(template);
-
-            const color = this.getUserColor(template.createdBy);
-            const initials = this.getUserInitials(template.createdBy);
+            const category = this.getTemplateCategory(template);
+            const categoryConfig = (window.templateTypeManager && typeof window.templateTypeManager.getCategoryConfig === 'function')
+                ? window.templateTypeManager.getCategoryConfig(category)
+                : { color: '#7c3aed', name: category };
+            const catColor = categoryConfig?.color || '#7c3aed';
             const isSelected = this.selectedIndex === index;
-
-            const createdDate = new Date(template.createdAt).toLocaleDateString();
-            const updatedDate = template.updatedAt ? new Date(template.updatedAt).toLocaleDateString() : null;
 
             const displayName = this.searchState.isSearching ?
                 this.highlightSearchMatches(template.name, this.searchState.query) :
@@ -2098,62 +2231,127 @@ const templateManager = {
                 this.highlightSearchMatches(template.description, this.searchState.query) :
                 (template.description ? this.escapeHtml(template.description) : '');
 
-            // Storage indicator
-            const storageIndicator = `
-                <div class="storage-indicator ${template.storageType}" title="${template.storageDisplay}">
-                    <span class="storage-icon">${template.storageIcon}</span>
-                    <span class="storage-text">${template.storageDisplay}</span>
-                </div>
-            `;
+            // Only show creator when template is shared by another user
+            const creatorMeta = !template.isOwn ?
+                `<div class="template-meta">
+                    <span class="creator-info">by ${this.escapeHtml(template.createdBy)}${template.createdByGroup ? ` (${this.escapeHtml(template.createdByGroup)})` : ''}</span>
+                </div>` : '';
 
             // Copy link for shared templates
             const copyLink = !template.isOwn && template.isShared ?
-                `<div style="margin-top: 8px;">
+                `<div style="margin-top: 4px;">
                     <span class="copy-link" data-template-index="${index}" 
-                        style="color: #10b981; font-size: 0.8rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
+                        style="color: #10b981; font-size: 0.75rem; text-decoration: underline; cursor: pointer; font-weight: 500;">
                         📋 Copy to my templates
                     </span>
                 </div>` : '';
 
+            const hasAccordionBody = Boolean(displayDescription || creatorMeta || copyLink);
+            const tplKey = String(template.id || `${template.name}_${index}`);
+            const isExpanded = Boolean(this.expandedTemplateKeys && this.expandedTemplateKeys.has(tplKey));
             const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
+            const featureIconsHtml = this.getTemplateFeatureIconsHtml(template);
+            const safeFullTitle = this.escapeHtml(template.name || '');
 
             return `
-                <div class="template-item ${isSelected ? 'active' : ''} ${searchResultClass}" 
+                <div class="template-item ${isSelected ? 'active' : ''} ${isExpanded ? 'expanded' : ''} ${searchResultClass}" 
                     data-is-own="${template.isOwn}"
-                    data-template-index="${index}">
+                    data-template-index="${index}"
+                    data-template-key="${this.escapeHtml(tplKey)}"
+                    oncontextmenu="event.preventDefault(); event.stopPropagation(); templateManager.toggleAllTemplateAccordions();">
                     <div class="template-header">
-                        <div class="template-avatar" style="background-color: ${color}">
-                            ${initials}
+                        <div class="template-cat-bars" title="${this.escapeHtml(categoryConfig?.name || category)}">
+                            <span style="width: 6px; background: ${catColor};"></span>
+                            <span style="width: 10px; background: ${catColor};"></span>
+                            <span style="width: 14px; background: ${catColor};"></span>
                         </div>
                         <div class="template-info">
-                            <h3>
-                                ${displayName}
-                                ${badge}
-                                ${!template.isOwn ? '<span class="shared-badge">shared</span>' : ''}
-                            </h3>
-                            <div class="template-meta">
-                                <span class="creator-info">by ${this.escapeHtml(template.createdBy)} (${this.escapeHtml(template.createdByGroup)})</span>
-                                <span class="date-info">
-                                    Created: ${createdDate}
-                                    ${updatedDate ? ` • Updated: ${updatedDate}` : ''}
-                                </span>
+                            <div class="template-title-row">
+                                <h3 title="${safeFullTitle}">
+                                    <span class="template-name-text">${displayName}</span>
+                                    ${!template.isOwn ? '<span class="shared-badge">shared</span>' : ''}
+                                </h3>
+                                <div class="template-title-actions">
+                                    ${featureIconsHtml}
+                                    ${hasAccordionBody ? `
+                                        <button type="button" class="template-accordion-btn"
+                                            onclick="event.stopPropagation(); templateManager.toggleTemplateAccordion('${this.escapeHtml(tplKey)}', this);"
+                                            oncontextmenu="event.preventDefault(); event.stopPropagation(); templateManager.toggleAllTemplateAccordions();"
+                                            title="Klick: Details ein-/ausklappen · Rechtsklick: Alle ein-/ausklappen"
+                                            aria-expanded="${isExpanded}">
+                                            ${isExpanded ? '▾' : '▸'}
+                                        </button>
+                                    ` : ''}
+                                </div>
                             </div>
-                            ${displayDescription ? `
-                                <p class="template-description">${displayDescription}</p>
+                            ${hasAccordionBody ? `
+                                <div class="template-accordion-body" style="display: ${isExpanded ? 'block' : 'none'};">
+                                    ${creatorMeta}
+                                    ${displayDescription ? `
+                                        <p class="template-description">${displayDescription}</p>
+                                    ` : ''}
+                                    ${copyLink}
+                                </div>
                             ` : ''}
-                            ${storageIndicator}
-                            ${copyLink}
                         </div>
                     </div>
-                    ${template.isOwn ? `
-                        <div class="owner-indicator" title="Your template"></div>
-                    ` : ''}
                 </div>
             `;
         }).join('');
 
         this.attachEventListeners();
         this.updateSearchStatus();
+    },
+
+    toggleTemplateAccordion(tplKey, btnEl) {
+        if (!this.expandedTemplateKeys) {
+            this.expandedTemplateKeys = new Set();
+        }
+        const item = btnEl?.closest('.template-item');
+        const body = item?.querySelector('.template-accordion-body');
+        const willExpand = !this.expandedTemplateKeys.has(tplKey);
+        if (willExpand) {
+            this.expandedTemplateKeys.add(tplKey);
+        } else {
+            this.expandedTemplateKeys.delete(tplKey);
+        }
+        if (item) item.classList.toggle('expanded', willExpand);
+        if (body) body.style.display = willExpand ? 'block' : 'none';
+        if (btnEl) {
+            btnEl.textContent = willExpand ? '▾' : '▸';
+            btnEl.setAttribute('aria-expanded', String(willExpand));
+        }
+    },
+
+    toggleAllTemplateAccordions() {
+        if (!this.expandedTemplateKeys) {
+            this.expandedTemplateKeys = new Set();
+        }
+        const items = Array.from(document.querySelectorAll('#templateList .template-item'));
+        const expandableItems = items.filter(el => el.querySelector('.template-accordion-body'));
+        if (expandableItems.length === 0) return;
+
+        const allCurrentlyExpanded = expandableItems.every(el => el.classList.contains('expanded'));
+        const willExpand = !allCurrentlyExpanded;
+
+        expandableItems.forEach(item => {
+            const key = item.getAttribute('data-template-key');
+            const body = item.querySelector('.template-accordion-body');
+            const btn = item.querySelector('.template-accordion-btn');
+            if (key) {
+                if (willExpand) {
+                    this.expandedTemplateKeys.add(key);
+                } else {
+                    this.expandedTemplateKeys.delete(key);
+                }
+            }
+            item.classList.toggle('expanded', willExpand);
+            if (body) body.style.display = willExpand ? 'block' : 'none';
+            if (btn) {
+                btn.textContent = willExpand ? '▾' : '▸';
+                btn.setAttribute('aria-expanded', String(willExpand));
+            }
+        });
     },
     // ENHANCED: Validate template before setting as current
     selectTemplate(index) {

@@ -697,7 +697,7 @@ const metadataLoader = {
             <div class="integration-option" id="elabftwOption_viewer">
                 <label class="integration-label">
                     <input type="checkbox" id="sendToElabFTW_viewer">
-                    <span class="integration-icon">🧪</span>
+                    <span class="integration-icon"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h4M7 2v3.5L3 12.2A1.3 1.3 0 0 0 4.1 14h7.8a1.3 1.3 0 0 0 1.1-1.8L9 5.5V2"/><path d="M4.6 10.5h6.8"/></svg></span>
                     <span>Send to elabFTW</span>
                 </label>
                 <p class="integration-description">Create experiment in elabFTW with this metadata</p>
@@ -728,7 +728,7 @@ const metadataLoader = {
             <div class="integration-option" id="omeroOption_viewer">
                 <label class="integration-label">
                     <input type="checkbox" id="sendToOMERO_viewer" onchange="metadataLoader.handleOMEROCheckboxChange()">
-                    <span class="integration-icon">🔬</span>
+                    <span class="integration-icon"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><circle cx="8" cy="8" r="1.9"/><circle cx="8" cy="2.6" r="1.25"/><circle cx="12.7" cy="5.3" r="1.25"/><circle cx="12.7" cy="10.7" r="1.25"/><circle cx="8" cy="13.4" r="1.25"/><circle cx="3.3" cy="10.7" r="1.25"/><circle cx="3.3" cy="5.3" r="1.25"/></svg></span>
                     <span>Send to OMERO</span>
                 </label>
                 <p class="integration-description">Create dataset in OMERO with this metadata</p>

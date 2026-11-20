@@ -248,10 +248,14 @@ const settingsManager = {
         }
 
         // ===== CRITICAL FIX: Clear existing settings before loading =====
-        // Problem: Settings könnten bereits global geladen sein von init()
-        // Lösung: Settings-Object leeren und neu laden
+        // Preserve app-wide flags across user switches so switching to a new user
+        // does not inadvertently turn off user management or the password system.
         console.log('🔄 Clearing existing settings before user-specific load...');
+        const prevUserMgmt = this.settings?.['general.user_management_enabled'];
+        const prevPwdSys = this.settings?.['security.password_system_enabled'];
         this.settings = {};
+        if (prevUserMgmt !== undefined) this._preservedUserMgmt = prevUserMgmt;
+        if (prevPwdSys !== undefined) this._preservedPwdSys = prevPwdSys;
 
         // Load user-specific settings (now from clean slate)
         this.loadSettingsUserSpecific();
@@ -326,6 +330,18 @@ const settingsManager = {
             this.saveSettingsUserSpecific() :  // User-spezifisch wenn userManager aktiv
             this.saveSettings();               // Global als Fallback
 
+        // Keep app-wide flags synchronized in global metafold_settings as well
+        if (key === 'general.user_management_enabled' || key === 'security.password_system_enabled') {
+            try {
+                const rawGlobal = localStorage.getItem('metafold_settings');
+                const parsedGlobal = rawGlobal ? JSON.parse(rawGlobal) : {};
+                parsedGlobal[key] = value;
+                localStorage.setItem('metafold_settings', JSON.stringify(parsedGlobal));
+            } catch (e) {
+                // ignore
+            }
+        }
+
         console.log(`💾 Saved using ${isUserManagerActive ? 'user-specific' : 'global'} method`);
         console.log(`   UserManager active: ${!!isUserManagerActive}`);
         console.log(`   Storage key: ${isUserManagerActive && window.storage ? window.storage.getStorageKey('settings') : 'metafold_settings'}`);
@@ -372,6 +388,9 @@ const settingsManager = {
     loadSettingsUserSpecific() {
         if (!window.storage) return false;
         try {
+            // Reset in-memory credential cache on user load/switch
+            this.secureCredentials = {};
+
             const userKey = window.storage.getStorageKey('settings');
             let stored = null;
 
@@ -388,31 +407,54 @@ const settingsManager = {
                 stored = localStorage.getItem(userKey);
             }
 
+            // Read app-wide flags (user_management_enabled & password_system_enabled) from global settings
+            let globalAppFlags = {};
+            try {
+                const rawGlobal = localStorage.getItem('metafold_settings');
+                if (rawGlobal) {
+                    const parsedGlobal = JSON.parse(rawGlobal);
+                    if (parsedGlobal['general.user_management_enabled'] !== undefined) {
+                        globalAppFlags['general.user_management_enabled'] = parsedGlobal['general.user_management_enabled'];
+                    }
+                    if (parsedGlobal['security.password_system_enabled'] !== undefined) {
+                        globalAppFlags['security.password_system_enabled'] = parsedGlobal['security.password_system_enabled'];
+                    }
+                }
+            } catch (e) {
+                // ignore parse error
+            }
+            if (this._preservedUserMgmt === true) {
+                globalAppFlags['general.user_management_enabled'] = true;
+            }
+            if (this._preservedPwdSys === true) {
+                globalAppFlags['security.password_system_enabled'] = true;
+            }
+
             if (stored) {
-                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
+                this.settings = { ...this.defaultSettings, ...JSON.parse(stored), ...globalAppFlags };
                 console.log(`📂 User settings loaded`);
                 
                 // If we loaded from localStorage, migrate to profileManager if possible
                 if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
                     const prefs = window.profileManager.getUserPreferences(window.userManager.currentUser);
                     if (!prefs) {
-                        window.profileManager.updateUserPreferences(window.userManager.currentUser, JSON.parse(stored));
+                        window.profileManager.updateUserPreferences(window.userManager.currentUser, this.settings);
                     }
                 }
             } else {
-                // Try migration
-                if (this.migrateGlobalSettingsToUser && this.migrateGlobalSettingsToUser()) {
-                    // Migration successful, settings are now in userKey (via migrate function)
-                    // But we need to reload them into this.settings
+                const isMultiUser = Boolean(
+                    globalAppFlags['general.user_management_enabled'] ||
+                    (window.userManager?.currentUser && window.userManager.currentUser !== 'User')
+                );
+                if (!isMultiUser && this.migrateGlobalSettingsToUser && this.migrateGlobalSettingsToUser()) {
                     const migrated = localStorage.getItem(userKey);
-                    this.settings = { ...this.defaultSettings, ...JSON.parse(migrated) };
-                    
-                    // Also migrate to profileManager
-                    if (window.profileManager && window.profileManager.isInitialized && window.userManager && window.userManager.currentUser) {
-                        window.profileManager.updateUserPreferences(window.userManager.currentUser, JSON.parse(migrated));
-                    }
+                    this.settings = { ...this.defaultSettings, ...JSON.parse(migrated), ...globalAppFlags };
                 } else {
-                    this.settings = { ...this.defaultSettings };
+                    this.settings = {
+                        ...this.defaultSettings,
+                        ...globalAppFlags,
+                        ...(isMultiUser ? { 'general.user_management_enabled': true } : {})
+                    };
                 }
             }
             return true;
@@ -1490,6 +1532,13 @@ const settingsManager = {
             detail: { key, value }
         }));
 
+        // Refresh template list icons whenever an integration is enabled/disabled in Settings
+        if (key === 'omero.enabled' || key === 'elabftw.enabled' || key === 'rspace.enabled' || key === 'n8n.enabled') {
+            if (window.templateManager && typeof window.templateManager.renderList === 'function') {
+                setTimeout(() => window.templateManager.renderList(), 50);
+            }
+        }
+
         switch (key) {
             case 'general.user_management_enabled':
                 // ASYNC SAFE: Don't call the handler immediately, defer it
@@ -2075,46 +2124,61 @@ const settingsManager = {
      * @returns {Object} - Complete status information
      */
     /**
-     * 🔐 Get secure credential
+     * 🔐 Build a user-scoped storage key for sensitive credentials
+     * so passwords and API keys are never shared across users.
+     */
+    getScopedCredentialKey(key) {
+        if (window.storage && typeof window.storage.getStorageKey === 'function') {
+            return window.storage.getStorageKey(`cred_${key}`);
+        }
+        const user = window.userManager?.currentUser || 'default';
+        return `metafold_${user}_cred_${key}`;
+    },
+
+    /**
+     * 🔐 Get secure credential (user-scoped)
      * @param {string} key - Credential key
      * @returns {Promise<string>} - Decrypted credential
      */
     async getSecureCredential(key) {
+        const scopedKey = this.getScopedCredentialKey(key);
         // If secure storage is available, use it
         if (this.isSecureStorageReady && window.secureStorage) {
             try {
-                return await window.secureStorage.getItem(key);
+                const val = await window.secureStorage.getItem(scopedKey);
+                return val || '';
             } catch (error) {
-                console.warn(`🔐 Failed to retrieve ${key} from secure storage:`, error);
-                // Fallback to local storage if available (legacy)
-                return this.secureCredentials[key] || '';
+                console.warn(`🔐 Failed to retrieve ${scopedKey} from secure storage:`, error);
+                // Fallback to memory store
+                return this.secureCredentials[scopedKey] || '';
             }
         }
 
         // Fallback to memory store
-        return this.secureCredentials[key] || '';
+        return this.secureCredentials[scopedKey] || '';
     },
 
     /**
-     * 🔐 Set secure credential
+     * 🔐 Set secure credential (user-scoped)
      * @param {string} key - Credential key
      * @param {string} value - Credential value
      * @returns {Promise<boolean>} - Success status
      */
     async setSecureCredential(key, value) {
+        const scopedKey = this.getScopedCredentialKey(key);
         // If secure storage is available, use it
         if (this.isSecureStorageReady && window.secureStorage) {
             try {
-                await window.secureStorage.setItem(key, value);
+                await window.secureStorage.setItem(scopedKey, value);
                 return true;
             } catch (error) {
-                console.error(`🔐 Failed to save ${key} to secure storage:`, error);
+                console.error(`🔐 Failed to save ${scopedKey} to secure storage:`, error);
                 return false;
             }
         }
 
         // Fallback to memory store
-        this.secureCredentials[key] = value;
+        this.secureCredentials[scopedKey] = value;
         return this.saveSecureCredentials();
     },
 
