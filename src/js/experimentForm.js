@@ -2184,7 +2184,15 @@ const experimentForm = {
             for (const [key, rawVal] of Object.entries(obj)) {
                 if (shouldIgnoreKey(key)) continue;
 
-                const fullKey = parentCategory ? `${parentCategory}.${key}` : key;
+                // Collapse accidental repeated group prefixes (e.g. "Microscopy.Microscopy.mode" inside "Microscopy")
+                let leafKey = key;
+                if (parentCategory) {
+                    const catPrefix = `${parentCategory}.`;
+                    while (leafKey.startsWith(catPrefix)) {
+                        leafKey = leafKey.slice(catPrefix.length);
+                    }
+                }
+                const fullKey = parentCategory ? `${parentCategory}.${leafKey}` : leafKey;
 
                 // Check if rawVal is a category/nested group (plain object without value/type)
                 if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal) && rawVal.value === undefined && rawVal.type === undefined) {
@@ -2198,8 +2206,17 @@ const experimentForm = {
                     continue;
                 }
 
+                // If this normalized key already exists (from legacy duplicate entries), keep the newest entry
+                if (fields[fullKey]) {
+                    const existingTs = fields[fullKey]._lastUpdatedAt ? new Date(fields[fullKey]._lastUpdatedAt).getTime() : 0;
+                    const incomingTs = rawVal?.lastUpdatedAt ? new Date(rawVal.lastUpdatedAt).getTime() : 0;
+                    if (incomingTs < existingTs) {
+                        continue;
+                    }
+                }
+
                 let type = 'text';
-                let label = key.replace(/_/g, ' ');
+                let label = leafKey.replace(/_/g, ' ');
                 let val = rawVal;
                 let unit = '';
                 let options = null;
@@ -2217,11 +2234,12 @@ const experimentForm = {
                 } else if (typeof rawVal === 'boolean') {
                     type = 'checkbox';
                 } else if (typeof rawVal === 'string') {
-                    if (key.toLowerCase().includes('note') || key.toLowerCase().includes('markdown') || key.toLowerCase().includes('observation') || rawVal.length > 120 || rawVal.includes('\n')) {
-                        type = key.toLowerCase().includes('note') || key.toLowerCase().includes('markdown') ? 'notes' : 'textarea';
+                    if (leafKey.toLowerCase().includes('note') || leafKey.toLowerCase().includes('markdown') || leafKey.toLowerCase().includes('observation') || rawVal.length > 120 || rawVal.includes('\n')) {
+                        type = leafKey.toLowerCase().includes('note') || leafKey.toLowerCase().includes('markdown') ? 'notes' : 'textarea';
                     }
                 }
 
+                const alreadyInOrder = Object.prototype.hasOwnProperty.call(fields, fullKey);
                 fields[fullKey] = {
                     type,
                     label: label.charAt(0).toUpperCase() + label.slice(1),
@@ -2229,13 +2247,17 @@ const experimentForm = {
                     defaultValue: val,
                     unit,
                     options,
+                    originalKey: leafKey,
+                    _lastUpdatedAt: rawVal?.lastUpdatedAt || null,
                     templateName: rawVal?.templateName || null,
                     description: rawVal?.description || '',
                     required: Boolean(rawVal?.required),
                     min: rawVal?.min,
                     max: rawVal?.max
                 };
-                fieldOrder.push(fullKey);
+                if (!alreadyInOrder) {
+                    fieldOrder.push(fullKey);
+                }
             }
         };
 
@@ -2278,6 +2300,7 @@ const experimentForm = {
         }
 
         let currentGroupObj = null;
+        let currentGroupName = null;
 
         // Collect data in the specified field order
         fieldOrder.forEach(fieldName => {
@@ -2285,7 +2308,8 @@ const experimentForm = {
 
             if (fieldInfo && fieldInfo.type === 'group') {
                 currentGroupObj = {};
-                metadata[fieldInfo.label || fieldName] = currentGroupObj;
+                currentGroupName = fieldInfo.label || fieldName.replace(/^group_/, '');
+                metadata[currentGroupName] = currentGroupObj;
                 return;
             }
 
@@ -2349,7 +2373,14 @@ const experimentForm = {
             if (fieldInfo.templateName) fieldData.templateName = fieldInfo.templateName;
 
             if (currentGroupObj) {
-                currentGroupObj[fieldName] = fieldData;
+                let leafKey = fieldInfo.originalKey || fieldName;
+                if (currentGroupName) {
+                    const groupPrefix = `${currentGroupName}.`;
+                    while (leafKey.startsWith(groupPrefix)) {
+                        leafKey = leafKey.slice(groupPrefix.length);
+                    }
+                }
+                currentGroupObj[leafKey] = fieldData;
             } else {
                 metadata[fieldName] = fieldData;
             }
