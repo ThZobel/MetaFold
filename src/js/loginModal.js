@@ -663,6 +663,12 @@ const loginModal = {
     },
 
     getUserGroupFromStorage(username) {
+        if (window.profileManager?.isInitialized && typeof window.profileManager.getUserPrimaryGroupName === 'function') {
+            const profileGroup = window.profileManager.getUserPrimaryGroupName(username);
+            if (profileGroup && profileGroup !== 'Default') {
+                return profileGroup;
+            }
+        }
         try {
             const mapping = JSON.parse(localStorage.getItem('metafold_user_group_mapping') || '{}');
             return mapping[username] || 'Default';

@@ -14,6 +14,13 @@
             <select id="uploadTemplateSelect" onchange="window.uploadModal.onTemplateSelected(this.value)" style="width: 100%; padding: 10px; background: #2d2d2d; color: #fff; border: 1px solid #404040; border-radius: 6px;">
                 <option value="">-- Choose an installed template --</option>
             </select>
+
+            <label for="uploadTargetRepo" style="font-weight: 600; color: #e0e0e0; display: block; margin-top: 12px;">
+                Target GitHub Repository:
+            </label>
+            <select id="uploadTargetRepo" style="width: 100%; padding: 9px 10px; background: #2d2d2d; color: #fff; border: 1px solid #404040; border-radius: 6px; margin-top: 4px;">
+                <option value="https://github.com/ThZobel/MetaFold-Templates/issues/new">MetaFold Community (ThZobel/MetaFold-Templates)</option>
+            </select>
         </div>
 
         <!-- Step 2: Classification & Community Tags Review/Edit -->

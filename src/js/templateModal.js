@@ -197,6 +197,11 @@ const templateModal = {
         // Reset collapsible folder structure
         const folderDetails = document.getElementById('folderStructureDetails');
         if (folderDetails) folderDetails.open = false;
+
+        const uuidRow = document.getElementById('templateUuidRow');
+        const uuidDisplay = document.getElementById('templateUuidDisplay');
+        if (uuidRow) uuidRow.style.display = 'none';
+        if (uuidDisplay) uuidDisplay.textContent = '';
         
         // Clear metadata fields
         if (window.metadataEditor && window.metadataEditor.clearFields) {
@@ -211,6 +216,13 @@ const templateModal = {
     populateForm(template) {
         document.getElementById('templateName').value = template.name || '';
         document.getElementById('templateDescription').value = template.description || '';
+
+        const uuidRow = document.getElementById('templateUuidRow');
+        const uuidDisplay = document.getElementById('templateUuidDisplay');
+        if (uuidRow && uuidDisplay) {
+            uuidRow.style.display = 'flex';
+            uuidDisplay.textContent = template.uuid || '(Assigned automatically when saving)';
+        }
         // REMOVED: templateType field (now using category only)
         
         // GEÄNDERT: Immer experimentStructure verwenden, unabhängig vom Template-Typ
@@ -690,11 +702,13 @@ const templateModal = {
         
         let existingIntegrations = null;
         let existingProjectDefaults = null;
+        let existingUuid = null;
         if (this.editingIndex >= 0 && window.templateManager && window.templateManager.templates) {
             const existingTemplate = window.templateManager.templates[this.editingIndex];
             if (existingTemplate) {
                 existingIntegrations = existingTemplate.integrations;
                 existingProjectDefaults = existingTemplate.projectDefaults;
+                existingUuid = existingTemplate.uuid || null;
             }
         } else if (window.templateManager && window.templateManager.currentTemplate) {
             existingIntegrations = window.templateManager.currentTemplate.integrations;
@@ -702,6 +716,7 @@ const templateModal = {
         }
         
         const template = {
+            uuid: window.metafoldTemplateUuid?.normalizeUuid(existingUuid) || window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
             name: name,
             description: description,
             type: type,
@@ -1085,13 +1100,22 @@ const templateModal = {
             // === STEP 4: Preserve existing integrations and project defaults ===
             let existingIntegrations = null;
             let existingProjectDefaults = null;
-            if (window.templateManager && window.templateManager.currentTemplate) {
-                existingIntegrations = window.templateManager.currentTemplate.integrations;
-                existingProjectDefaults = window.templateManager.currentTemplate.projectDefaults;
+            let sourceTemplate = null;
+            if (this.editingIndex >= 0 && window.templateManager?.templates?.[this.editingIndex]) {
+                sourceTemplate = window.templateManager.templates[this.editingIndex];
+            } else if (window.templateManager && window.templateManager.currentTemplate) {
+                sourceTemplate = window.templateManager.currentTemplate;
+            }
+            if (sourceTemplate) {
+                existingIntegrations = sourceTemplate.integrations;
+                existingProjectDefaults = sourceTemplate.projectDefaults;
             }
 
-            // === STEP 5: Create new template object ===
+            // === STEP 5: Create new template object (new UUID + derived lineage) ===
             const newTemplate = {
+                uuid: window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
+                derivedFromTemplateId: sourceTemplate?.id || null,
+                derivedFromTemplateUuid: sourceTemplate?.uuid || null,
                 name: name + ' (Copy)', // Automatically add "(Copy)" to name
                 description: description || '',
                 structure: structure,

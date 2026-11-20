@@ -97,18 +97,28 @@
     <!-- Template Search (placed below the 4 categories) -->
     <div class="template-search" style="margin-top: 10px; margin-bottom: 4px;">
         <div class="search-container" style="position: relative;">
-            <input type="text" id="templateSearchInput" placeholder="🔍 Search templates..."
-                onInput="templateManager.handleSearch()" onFocus="templateManager.showSearchSuggestions()"
-                onBlur="templateManager.hideSearchSuggestions()" style="
-           width: 100%;
-           padding: 8px 12px;
-           background: rgba(255, 255, 255, 0.08);
-           border: 1px solid rgba(255, 255, 255, 0.2);
-           border-radius: 8px;
-           color: #e0e0e0;
-           font-size: 13px;
-           transition: all 0.3s ease;
-       ">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <input type="text" id="templateSearchInput" placeholder="🔍 Search templates or scan UUID..."
+                    onInput="templateManager.handleSearch()" onFocus="templateManager.showSearchSuggestions()"
+                    onBlur="templateManager.hideSearchSuggestions()"
+                    onkeydown="templateManager.handleSearchKeydown(event)" style="
+               flex: 1;
+               min-width: 0;
+               padding: 8px 12px;
+               background: rgba(255, 255, 255, 0.08);
+               border: 1px solid rgba(255, 255, 255, 0.2);
+               border-radius: 8px;
+               color: #e0e0e0;
+               font-size: 13px;
+               transition: all 0.3s ease;
+           ">
+                <button type="button" id="scanTemplateCodeBtn" class="btn btn-secondary mf-sidebar-scan-btn"
+                    onclick="templateManager.openTemplateScanner()"
+                    title="Scan Template QR / DataMatrix Code (Camera)"
+                    aria-label="Scan Template QR or DataMatrix Code">
+                    📷
+                </button>
+            </div>
 
             <!-- Search Suggestions Dropdown -->
             <div id="searchSuggestions" style="

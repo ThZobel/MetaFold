@@ -49,6 +49,9 @@ class UploadModal {
         const tm = (typeof window !== 'undefined' && window.templateManager) ? window.templateManager : null;
         const templates = (tm && Array.isArray(tm.templates)) ? tm.templates : [];
 
+        // Populate target GitHub repository selector
+        this.populateTargetRepositories();
+
         // Populate dropdown
         const select = document.getElementById('uploadTemplateSelect');
         if (select) {
@@ -93,6 +96,41 @@ class UploadModal {
 
         this.onTemplateSelected(targetIndex);
         this.goToStep(2);
+    }
+
+    /**
+     * Populate Target GitHub Repository dropdown from CommunityManager repositories.
+     */
+    populateTargetRepositories() {
+        const repoSelect = document.getElementById('uploadTargetRepo');
+        if (!repoSelect) return;
+
+        const defaultIssuesUrl = 'https://github.com/ThZobel/MetaFold-Templates/issues/new';
+        const repos = (typeof window !== 'undefined' && window.communityManager && typeof window.communityManager.getRepositories === 'function')
+            ? window.communityManager.getRepositories().filter(r => r.enabled !== false && r.normalized && r.normalized.issuesUrl)
+            : [];
+
+        const prev = repoSelect.value;
+        repoSelect.innerHTML = '';
+
+        if (repos.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = defaultIssuesUrl;
+            opt.textContent = 'MetaFold Community (ThZobel/MetaFold-Templates)';
+            repoSelect.appendChild(opt);
+            return;
+        }
+
+        repos.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.normalized.issuesUrl;
+            opt.textContent = `${r.name}${r.normalized.owner && r.normalized.repo ? ` (${r.normalized.owner}/${r.normalized.repo})` : ''}`;
+            repoSelect.appendChild(opt);
+        });
+
+        if (prev && [...repoSelect.options].some(o => o.value === prev)) {
+            repoSelect.value = prev;
+        }
     }
 
     /**
@@ -364,10 +402,11 @@ class UploadModal {
     /**
      * Formats Markdown issue body and constructs GitHub issue URL.
      * @param {Object} template
-     * @param {Object} taxonomy Optional taxonomy overrides
+     * @param {Object} [taxonomy={}] Optional taxonomy overrides
+     * @param {Object} [options={}] Optional upload target overrides
      * @returns {Object} { title, body, url, sanitizedTemplate }
      */
-    formatIssueBody(template, taxonomy = {}) {
+    formatIssueBody(template, taxonomy = {}, options = {}) {
         const sanitizedTemplate = this.sanitizeTemplate(template);
         sanitizedTemplate.community = Object.assign({}, sanitizedTemplate.community || {}, taxonomy);
         const comm = sanitizedTemplate.community;
@@ -436,6 +475,9 @@ class UploadModal {
         if (comm.version) {
             bodyLines.push(`**Version:** ${comm.version}`);
         }
+        if (sanitizedTemplate.uuid) {
+            bodyLines.push(`**Template UUID:** \`${sanitizedTemplate.uuid}\``);
+        }
 
         // Include legacy system/discipline/organism if present for backward compatibility
         if (comm.system) bodyLines.push(`**System / Device:** ${comm.system}`);
@@ -459,7 +501,10 @@ class UploadModal {
         );
 
         const issueBody = bodyLines.join('\n');
-        const repoTarget = 'https://github.com/ThZobel/MetaFold-Templates/issues/new';
+        const repoSelectEl = (typeof document !== 'undefined') ? document.getElementById('uploadTargetRepo') : null;
+        const repoTarget = (options && options.repoIssuesUrl)
+            || (repoSelectEl && repoSelectEl.value ? repoSelectEl.value : '')
+            || 'https://github.com/ThZobel/MetaFold-Templates/issues/new';
         let issueUrl = `${repoTarget}?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
         let isTruncated = false;
 
@@ -496,6 +541,9 @@ class UploadModal {
 
             if (comm.version) {
                 safeBodyLines.push(`**Version:** ${comm.version}`);
+            }
+            if (sanitizedTemplate.uuid) {
+                safeBodyLines.push(`**Template UUID:** \`${sanitizedTemplate.uuid}\``);
             }
 
             if (comm.system) safeBodyLines.push(`**System / Device:** ${comm.system}`);
@@ -702,8 +750,11 @@ class UploadModal {
             editedCommunity.version = verInput.value.trim();
         }
 
-        // Update template description
+        // Update template description and ensure UUID exists for upload & sharing
         template.description = description;
+        if (!template.uuid && typeof window !== 'undefined' && window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.generateTemplateUuid === 'function') {
+            template.uuid = window.metafoldTemplateUuid.generateTemplateUuid();
+        }
 
         const syncCheckbox = document.getElementById('uploadSyncLocal') || document.getElementById('uploadSyncLocalCheckbox');
         if (syncCheckbox && syncCheckbox.checked) {
@@ -721,7 +772,9 @@ class UploadModal {
             }
         }
 
-        const payload = this.formatIssueBody(template, editedCommunity);
+        const repoSelectEl = (typeof document !== 'undefined') ? document.getElementById('uploadTargetRepo') : null;
+        const repoIssuesUrl = (repoSelectEl && repoSelectEl.value) ? repoSelectEl.value : undefined;
+        const payload = this.formatIssueBody(template, editedCommunity, { repoIssuesUrl });
         this.lastOpenedUrl = payload.url;
 
         // Automatically copy template JSON to clipboard

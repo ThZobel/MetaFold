@@ -589,8 +589,12 @@
                 return;
             }
 
-            const cleanId = typeof rawId === 'string' ? rawId.trim() : rawId;
+            let cleanId = typeof rawId === 'string' ? rawId.trim() : rawId;
             if (!cleanId) return;
+
+            if (isLink && typeof cleanId === 'string' && window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.extractProjectRefId === 'function') {
+                cleanId = window.metafoldTemplateUuid.extractProjectRefId(cleanId);
+            }
 
             const existing = Array.from(pillsRow.querySelectorAll('.mf-pill-item')).map(p => p.dataset.itemId);
             if (existing.includes(cleanId)) return;
@@ -759,6 +763,10 @@
                             if (!trimmed || !card) return;
 
                             if (scanMode === 'derived_from' || scanMode === 'related_to' || scanMode === 'tags') {
+                                if ((scanMode === 'derived_from' || scanMode === 'related_to') && window.metafoldTemplateUuid?.parseTemplateCode?.(trimmed)?.format === 'uri') {
+                                    alert('Dieser Code ist ein Template-Code (metafold:tpl:...), kein Projekt-/Proben-Code.');
+                                    return;
+                                }
                                 const pillContainer = card.querySelector('.mf-pill-container');
                                 if (pillContainer) {
                                     this._addPillToContainer(pillContainer, trimmed, scanMode);

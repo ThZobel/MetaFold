@@ -224,8 +224,9 @@ const storage = {
                 console.log(`💾 Templates saved to localStorage: ${savedToLocalStorage ? 'Success' : 'Failed'}`);
             }
             
-            // REPARIERT: Save to group storage for sharing (with array check)
-            if (Array.isArray(templatesWithMeta) && templatesWithMeta.length > 0) {
+            // Only mirror to localStorage group storage in non-file modes (file mode reads directly from disk)
+            if ((!this.fileStorageEnabled || this.storageMode !== 'files') &&
+                Array.isArray(templatesWithMeta) && templatesWithMeta.length > 0) {
                 this.saveToGroupStorage(templatesWithMeta);
             }
             
@@ -302,6 +303,9 @@ const storage = {
             const result = await window.electronAPI.saveTemplateToFile(cleanTemplate, templateUserInfo);
             
             if (result.success) {
+                if (result.uuid) {
+                    template.uuid = result.uuid;
+                }
                 // ===== DELETE OLD FILE IF RENAMED =====
                 if (isRename && oldFilePath && window.electronAPI.deleteTemplateFile) {
                     try {
@@ -340,6 +344,7 @@ const storage = {
                 
                 return { 
                     success: true, 
+                    uuid: result.uuid || template.uuid || null,
                     filePath: result.filePath, 
                     filename: result.filename,
                     isUpdate: !isRename,
@@ -466,6 +471,10 @@ async loadTemplatesFromFilesOnly() {
             // Update UI
             if (window.templateManager) {
                 window.templateManager.templates = templates;
+                if (typeof window.templateManager.loadGroupTemplates === 'function') {
+                    await window.templateManager.loadGroupTemplates();
+                }
+                window.templateManager.invalidateCache?.();
                 window.templateManager.renderList();
                 window.templateManager.updateTemplateInfo();
             }
@@ -634,8 +643,62 @@ async loadTemplatesFromFilesOnly() {
         }
     },
 
-    // Load group templates
-    loadGroupTemplates(groupName) {
+    // Load group templates from files on disk via IPC
+    async loadGroupTemplatesFromFiles(groupName) {
+        if (!this.fileStorageEnabled || !window.electronAPI || typeof window.electronAPI.loadGroupTemplates !== 'function' || !groupName) {
+            return [];
+        }
+
+        try {
+            const userInfo = this.getCurrentUserContext();
+            const currentUser = (window.userManager?.currentUser || userInfo?.username || '').trim();
+            const currentUserLower = currentUser.toLowerCase();
+
+            const result = await window.electronAPI.loadGroupTemplates(groupName, userInfo);
+            if (!result || !result.success) {
+                console.warn(`🤝 Failed to load group templates for "${groupName}":`, result?.message || result?.error);
+                return [];
+            }
+
+            const templates = Array.isArray(result.templates) ? result.templates : [];
+            const validTemplates = templates.filter(template => {
+                if (!template || !template._fileInfo || !template._fileInfo.filePath) {
+                    return false;
+                }
+                if (!template.name || typeof template.name !== 'string' || template.name === 'undefined' || template.name.trim() === '') {
+                    return false;
+                }
+                if (!template.type || (template.type !== 'folders' && template.type !== 'experiment')) {
+                    template.type = 'experiment';
+                }
+                if (template.createdBy === 'System') {
+                    return false;
+                }
+                if (currentUserLower && template.createdBy && String(template.createdBy).toLowerCase() === currentUserLower) {
+                    return false;
+                }
+                return true;
+            });
+
+            return validTemplates.map(template => ({
+                ...template,
+                savedLocally: true,
+                storageType: 'shared',
+                storageDisplay: 'Shared group file',
+                storageIcon: '🤝',
+                isOwn: false,
+                isShared: true,
+                userDisplayName: template.createdBy || 'Unknown',
+                groupDisplayName: template.createdByGroup || groupName
+            }));
+        } catch (error) {
+            console.warn(`Could not load group templates from files for "${groupName}":`, error);
+            return [];
+        }
+    },
+
+    // Load group templates from localStorage (browser fallback mode)
+    loadGroupTemplatesFromLocalStorage(groupName) {
         if (!this.isAvailable || !groupName) {
             return [];
         }
@@ -644,19 +707,32 @@ async loadTemplatesFromFilesOnly() {
             const groupKey = `metafold_group_${groupName}_templates`;
             const stored = localStorage.getItem(groupKey);
             let groupTemplates = stored ? JSON.parse(stored) : [];
-            
-            // Filter out current user's templates
+
             const currentUser = window.userManager?.currentUser;
             if (currentUser) {
-                groupTemplates = groupTemplates.filter(t => t.createdBy !== currentUser);
+                const currentUserLower = String(currentUser).toLowerCase();
+                groupTemplates = groupTemplates.filter(t => (t.createdBy || '').toLowerCase() !== currentUserLower);
             }
-            
-            console.log(`🤝 Loaded ${groupTemplates.length} group templates from "${groupName}"`);
+
+            console.log(`🤝 Loaded ${groupTemplates.length} group templates from localStorage for "${groupName}"`);
             return this.addTemplateMetadata(groupTemplates);
         } catch (error) {
             console.warn(`Could not load group templates for "${groupName}":`, error);
             return [];
         }
+    },
+
+    // Load group templates (files-first in Electron, localStorage fallback in browser)
+    async loadGroupTemplates(groupName) {
+        if (!this.isAvailable || !groupName) {
+            return [];
+        }
+
+        if (this.fileStorageEnabled && window.electronAPI && typeof window.electronAPI.loadGroupTemplates === 'function') {
+            return await this.loadGroupTemplatesFromFiles(groupName);
+        }
+
+        return this.loadGroupTemplatesFromLocalStorage(groupName);
     },
 
     // =================== TEMPLATE UTILITIES ===================
@@ -1151,6 +1227,9 @@ experiment_log.md`,
         // 4. Update templateManager if available
         if (window.templateManager) {
             window.templateManager.templates = templates;
+            if (typeof window.templateManager.loadGroupTemplates === 'function') {
+                await window.templateManager.loadGroupTemplates();
+            }
             window.templateManager.invalidateCache();
             window.templateManager.renderList();
             window.templateManager.updateTemplateInfo();

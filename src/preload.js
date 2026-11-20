@@ -126,6 +126,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadTemplateFromFile: (filePath) =>
         ipcRenderer.invoke('load-template-from-file', filePath),
 
+    loadTemplateDefaults: (userInfo = null) =>
+        ipcRenderer.invoke('load-template-defaults', userInfo),
+
+    saveTemplateDefaults: (defaultsMap, userInfo = null) =>
+        ipcRenderer.invoke('save-template-defaults', defaultsMap, userInfo),
+
+    fetchRepoJson: (url, options = {}) =>
+        ipcRenderer.invoke('fetch-repo-json', url, options),
+
     // =================== PROJECT ENHANCEMENT ===================
 
     // Insert links into README files

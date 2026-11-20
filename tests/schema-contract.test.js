@@ -138,6 +138,16 @@ test('schemaVersion.buildTemplateRef builds human-readable template block withou
         category: 'category1'
     });
     assert.strictEqual('hash' in ref, false, 'Template reference must not require a hash');
+
+    const refWithUuid = metafoldSchema.buildTemplateRef({
+        id: 'template_1710000000_abc123',
+        uuid: '550e8400-e29b-41d4-a716-446655440000',
+        derivedFromTemplateUuid: '11111111-1111-4111-8111-111111111111',
+        name: 'Confocal Microscopy',
+        category: 'category1'
+    });
+    assert.strictEqual(refWithUuid.uuid, '550e8400-e29b-41d4-a716-446655440000');
+    assert.strictEqual(refWithUuid.derivedFromTemplateUuid, '11111111-1111-4111-8111-111111111111');
 });
 
 // ---------------------------------------------------------------------------
@@ -205,13 +215,29 @@ test('v0.1 sidecar, template, and user-index fixtures satisfy envelope contract'
 // ---------------------------------------------------------------------------
 const modifiedJsFiles = [
     'src/js/shared/schemaVersion.js',
+    'src/js/shared/templateUuid.js',
     'src/main.js',
+    'src/preload.js',
     'src/js/main/projectMetadataStore.js',
+    'src/js/main/templateFileLoader.js',
+    'src/js/main/templateDefaultsFile.js',
+    'src/js/storage.js',
+    'src/js/settingsManager.js',
+    'src/js/communityManager.js',
+    'src/js/templateDefaultsStore.js',
+    'src/js/templateResolver.js',
+    'src/js/templateQrModal.js',
+    'src/js/templateRepositoriesSettings.js',
     'src/js/experimentForm.js',
     'src/js/projectManager.js',
     'src/js/fileScanner.js',
     'src/js/profileManager.js',
     'src/js/templateManager.js',
+    'src/js/templateModal.js',
+    'src/js/enhancedActions.js',
+    'src/js/uploadModal.js',
+    'src/js/tabFooterControl.js',
+    'src/js/app.js',
     'src/js/projectScanner.js',
     'src/js/visualizationManager.js',
     'src/js/facetSearch.js',

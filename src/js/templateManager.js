@@ -2,9 +2,12 @@
 
 const templateManager = {
     templates: [],
+    groupTemplates: [],
+    groupTemplatesLoadedFor: null,
     currentTemplate: null,
     selectedIndex: -1,
     allTemplates: [],
+    _allTemplatesCacheKey: null,
 
     // Search and filter state
     searchState: {
@@ -115,6 +118,7 @@ const templateManager = {
     invalidateCache() {
         console.log('🔄 Invalidating template cache...');
         this.allTemplates = [];
+        this._allTemplatesCacheKey = null;
         this.searchState.searchCache.clear();
         this.searchState.suggestionCache.clear();
     },
@@ -143,6 +147,7 @@ const templateManager = {
         const content = [];
 
         if (template.name) content.push(template.name);
+        if (template.uuid) content.push(template.uuid);
         if (template.description) content.push(template.description);
         if (template.createdBy) content.push(template.createdBy);
         if (template.createdByGroup) content.push(template.createdByGroup);
@@ -182,6 +187,52 @@ const templateManager = {
         }
     },
 
+    // Open camera scanner for template QR / DataMatrix code
+    openTemplateScanner() {
+        if (!window.codeScannerModal || typeof window.codeScannerModal.open !== 'function') {
+            window.app?.showError?.('Camera code scanner is not available.');
+            return;
+        }
+        window.codeScannerModal.open({
+            fieldLabel: 'Template QR / DataMatrix',
+            onDetected: async (decoded) => {
+                if (window.templateResolver && typeof window.templateResolver.resolveAndOpen === 'function') {
+                    await window.templateResolver.resolveAndOpen(decoded);
+                } else {
+                    window.app?.showError?.('Template resolver is not available.');
+                }
+            }
+        });
+    },
+
+    // Handle Enter in search field for USB/Bluetooth HID barcode scanners or pasted UUIDs
+    async handleSearchKeydown(event) {
+        if (!event || event.key !== 'Enter') return;
+        const searchInput = document.getElementById('templateSearchInput');
+        const query = searchInput ? searchInput.value.trim() : '';
+        if (!query) return;
+
+        const parsed = window.metafoldTemplateUuid?.parseTemplateCode?.(query);
+        if (parsed && parsed.matched && parsed.uuid) {
+            event.preventDefault();
+            this.hideSearchSuggestions();
+            if (window.templateResolver && typeof window.templateResolver.resolveAndOpen === 'function') {
+                const res = await window.templateResolver.resolveAndOpen(query);
+                if (res && res.success && searchInput) {
+                    searchInput.value = '';
+                }
+            }
+        }
+    },
+
+    // Select a specific template object (switches category / clears search as needed)
+    selectTemplateObject(targetTemplate) {
+        if (window.templateResolver && typeof window.templateResolver.selectTemplateObject === 'function') {
+            return window.templateResolver.selectTemplateObject(targetTemplate);
+        }
+        return false;
+    },
+
     // Handle search input
     handleSearch() {
         const searchInput = document.getElementById('templateSearchInput');
@@ -202,6 +253,10 @@ const templateManager = {
 
         this.searchState.debounceTimer = setTimeout(() => {
             this.performSearch(query);
+            const parsed = window.metafoldTemplateUuid?.parseTemplateCode?.(query);
+            if (parsed && parsed.matched) {
+                this.showSearchSuggestions();
+            }
         }, this.performance.debounceDelay);
     },
 
@@ -221,15 +276,16 @@ const templateManager = {
         }
 
         const query = searchInput.value.trim().toLowerCase();
+        const parsedCode = window.metafoldTemplateUuid?.parseTemplateCode?.(searchInput.value.trim());
 
-        // Don't show suggestions if query is empty or too short
-        if (query.length < 2) {
+        // Don't show suggestions if query is empty or too short (unless it's a valid code)
+        if (query.length < 2 && !(parsedCode && parsedCode.matched)) {
             suggestionsDiv.style.display = 'none';
             return;
         }
 
         // Generate suggestions if we have them
-        if (this.searchState.suggestions.length > 0) {
+        if (this.searchState.suggestions.length > 0 || (parsedCode && parsedCode.matched)) {
             this.renderSearchSuggestions();
             suggestionsDiv.style.display = 'block';
         } else {
@@ -263,7 +319,30 @@ const templateManager = {
         const suggestionsDiv = document.getElementById('searchSuggestions');
         if (!suggestionsDiv) return;
 
-        if (this.searchState.suggestions.length === 0) {
+        const searchInput = document.getElementById('templateSearchInput');
+        const rawQuery = searchInput ? searchInput.value.trim() : '';
+        const parsedCode = window.metafoldTemplateUuid?.parseTemplateCode?.(rawQuery);
+        let uuidActionHtml = '';
+        if (parsedCode && parsedCode.matched && parsedCode.uuid) {
+            const safeRaw = this.escapeHtml(rawQuery).replace(/'/g, '&#39;');
+            uuidActionHtml = `
+                <div class="search-suggestion-item"
+                     onclick="templateManager.resolveScannedQuery('${safeRaw}')"
+                     style="
+                         padding: 10px 12px;
+                         cursor: pointer;
+                         border-bottom: 1px solid rgba(124, 58, 237, 0.35);
+                         background: rgba(124, 58, 237, 0.16);
+                         font-size: 0.86rem;
+                         color: #ddd6fe;
+                         font-weight: 600;
+                     ">
+                    📷 Open / Fetch by UUID: <code>${this.escapeHtml(parsedCode.uuid.slice(0, 8))}…</code>
+                </div>
+            `;
+        }
+
+        if (this.searchState.suggestions.length === 0 && !uuidActionHtml) {
             suggestionsDiv.innerHTML = '<div style="padding: 12px; color: #9ca3af; text-align: center; font-size: 0.85rem;">No suggestions</div>';
             return;
         }
@@ -285,7 +364,18 @@ const templateManager = {
 			</div>
 		`).join('');
 
-        suggestionsDiv.innerHTML = suggestionsHTML;
+        suggestionsDiv.innerHTML = uuidActionHtml + suggestionsHTML;
+    },
+
+    async resolveScannedQuery(rawQuery) {
+        this.hideSearchSuggestions();
+        if (window.templateResolver && typeof window.templateResolver.resolveAndOpen === 'function') {
+            const res = await window.templateResolver.resolveAndOpen(rawQuery);
+            const searchInput = document.getElementById('templateSearchInput');
+            if (res && res.success && searchInput) {
+                searchInput.value = '';
+            }
+        }
     },
 
     // Apply suggestion to search input
@@ -482,10 +572,22 @@ const templateManager = {
             console.error('❌ Error saving shared templates preference:', error);
         }
 
-        // Cache leeren und neu rendern
-        this.searchState.searchCache.clear();
-        this.renderList();
-        this.updateSearchStatus();
+        if (newValue === true) {
+            await this.loadGroupTemplates();
+        } else if (this.currentTemplate && !this.currentTemplate.isOwn) {
+            this.deselectTemplate();
+        }
+
+        // Cache leeren, Suchindex aktualisieren und neu rendern
+        this.invalidateCache();
+        this.buildSearchIndex();
+
+        if (this.searchState.isSearching && this.searchState.query) {
+            this.performSearch(this.searchState.query);
+        } else {
+            this.renderList();
+            this.updateSearchStatus();
+        }
     },
 
     async loadSharedTemplatesPreference() {
@@ -526,8 +628,14 @@ const templateManager = {
     async refreshUserPreferences() {
         console.log('👥 Refreshing user-specific preferences...');
         await this.loadSharedTemplatesPreference();
+        await this.loadGroupTemplates();
+        if (window.templateDefaultsStore && typeof window.templateDefaultsStore.init === 'function') {
+            await window.templateDefaultsStore.init();
+        }
 
         // Liste neu rendern mit neuen Einstellungen
+        this.invalidateCache();
+        this.buildSearchIndex();
         this.renderList();
         this.updateSearchStatus();
     },
@@ -558,19 +666,104 @@ const templateManager = {
     },
 
 
+    // Resolve all group names the current user belongs to
+    getCurrentUserGroupNames() {
+        const userManagementEnabled = window.userManager?.isEnabled?.() || false;
+        const currentUser = window.userManager?.currentUser;
+        const currentGroup = window.userManager?.currentGroup;
+
+        if (!userManagementEnabled || !currentUser || currentUser === 'Unknown' || currentUser === 'User') {
+            return [];
+        }
+
+        const groupNames = new Set();
+        if (currentGroup && currentGroup !== 'Unknown' && currentGroup !== 'Default') {
+            groupNames.add(currentGroup);
+        }
+
+        if (window.profileManager?.isInitialized && typeof window.profileManager.getUserByUsername === 'function') {
+            const profile = window.profileManager.getUserByUsername(currentUser);
+            if (profile && Array.isArray(profile.groupIds)) {
+                for (const gid of profile.groupIds) {
+                    const grp = window.profileManager.getGroupById?.(gid);
+                    if (grp?.name && grp.name !== 'Unknown' && grp.name !== 'Default') {
+                        groupNames.add(grp.name);
+                    }
+                }
+            }
+        }
+
+        return Array.from(groupNames);
+    },
+
+    // Load shared templates for all groups of the current user (async IPC / localStorage)
+    async loadGroupTemplates() {
+        const groupNames = this.getCurrentUserGroupNames();
+        const currentUser = window.userManager?.currentUser || '';
+
+        if (groupNames.length === 0 || !window.storage || typeof window.storage.loadGroupTemplates !== 'function') {
+            this.groupTemplates = [];
+            this.groupTemplatesLoadedFor = null;
+            this.invalidateCache();
+            return [];
+        }
+
+        const loaded = [];
+        const seen = new Set();
+
+        for (const groupName of groupNames) {
+            try {
+                const rawGroupTemplates = await Promise.resolve(window.storage.loadGroupTemplates(groupName));
+                if (!Array.isArray(rawGroupTemplates)) continue;
+
+                for (const t of rawGroupTemplates) {
+                    if (!t || !t.name || t.name === 'undefined') continue;
+                    if (t.createdBy === 'System') continue;
+                    if (currentUser && t.createdBy && String(t.createdBy).toLowerCase() === currentUser.toLowerCase()) {
+                        continue;
+                    }
+
+                    const dedupeKey = t._fileInfo?.filePath
+                        ? t._fileInfo.filePath.toLowerCase()
+                        : `${String(t.name).toLowerCase()}::${String(t.createdBy || '').toLowerCase()}::${String(t.createdByGroup || groupName).toLowerCase()}`;
+
+                    if (seen.has(dedupeKey)) continue;
+                    seen.add(dedupeKey);
+
+                    loaded.push({
+                        ...t,
+                        isOwn: false,
+                        isShared: true,
+                        originalIndex: -1,
+                        userDisplayName: t.createdBy || 'Unknown',
+                        groupDisplayName: t.createdByGroup || groupName || 'Unknown',
+                        category: t.category || 'category1'
+                    });
+                }
+            } catch (error) {
+                console.warn(`⚠️ Failed to load group templates for "${groupName}":`, error);
+            }
+        }
+
+        this.groupTemplates = loaded;
+        this.groupTemplatesLoadedFor = `${currentUser}::${groupNames.join(',')}`;
+        this.invalidateCache();
+        console.log(`🤝 Cached ${this.groupTemplates.length} shared group templates for ${currentUser} (${groupNames.join(', ')})`);
+        return this.groupTemplates;
+    },
+
     // Get all templates (ENHANCED for better Group Template Loading; supports cross-category lookup)
     getAllTemplates(includeAllCategories = false) {
         const currentType = this.getCurrentType();
+        const currentUser = window.userManager?.currentUser || '';
+        const currentGroup = window.userManager?.currentGroup || '';
+        const userManagementEnabled = window.userManager?.isEnabled?.() || false;
+        const groupNames = this.getCurrentUserGroupNames();
+        const expectedLoadedKey = `${currentUser}::${groupNames.join(',')}`;
+        const cacheKey = `${currentType}|${currentUser}|${currentGroup}|${this.templates.length}|${this.groupTemplates.length}|${this.groupTemplatesLoadedFor || ''}`;
 
-        if (!includeAllCategories && this.allTemplates.length > 0) {
-            const firstTemplate = this.allTemplates[0];
-            const cacheValidForType = (firstTemplate.category || 'category1') === currentType;
-
-            if (cacheValidForType) {
-                return this.allTemplates;
-            } else {
-                this.allTemplates = [];
-            }
+        if (!includeAllCategories && this._allTemplatesCacheKey === cacheKey && this.allTemplates.length > 0) {
+            return this.allTemplates;
         }
 
         // 1. Get own templates first (Filter by category unless includeAllCategories is true)
@@ -582,53 +775,38 @@ const templateManager = {
                 return templateCategory === currentType;
             });
 
-        // 2. Load group templates with enhanced error handling
+        // 2. Get group templates (preloaded asynchronously into this.groupTemplates, with sync browser fallback)
         let groupTemplates = [];
         try {
-            // ENHANCED: Better user context checking
-            const currentUser = window.userManager?.currentUser;
-            const currentGroup = window.userManager?.currentGroup;
-            const userManagementEnabled = window.userManager?.isEnabled();
-
-            console.log(`👤 Group template context: ${currentUser} (${currentGroup}), Enabled: ${userManagementEnabled}`);
-
-            if (userManagementEnabled && currentUser && currentUser !== 'Unknown' && currentUser !== 'User' &&
-                currentGroup && currentGroup !== 'Unknown' && currentGroup !== 'Default') {
-
-                console.log(`🤝 Loading group templates for group: ${currentGroup}`);
-
-                // Load from storage with better error handling
-                if (window.storage && typeof window.storage.loadGroupTemplates === 'function') {
-                    const rawGroupTemplates = window.storage.loadGroupTemplates(currentGroup);
-
-                    // Filter out current user's templates and invalid templates
-                    groupTemplates = rawGroupTemplates.filter(t => {
-                        if (!t || !t.name || t.name === 'undefined') {
-                            console.log('🗑️ Filtered out invalid group template:', t);
-                            return false;
-                        }
-                        if (t.createdBy === currentUser || t.createdBy === 'System') {
-                            return false;
-                        }
-
-                        // ENHANCED: Apply category filter unless searching across all categories
-                        if (!includeAllCategories) {
-                            const templateCategory = t.category || 'category1';
-                            if (templateCategory !== currentType) {
-                                return false;
-                            }
-                        }
-
-                        return true;
-                    });
-
-                    console.log(`🤝 Loaded ${groupTemplates.length} group templates after filtering`);
-                } else {
-                    console.warn('⚠️ loadGroupTemplates function not available');
+            let rawGroupTemplates = [];
+            if (userManagementEnabled && groupNames.length > 0) {
+                if (this.groupTemplatesLoadedFor === expectedLoadedKey || this.groupTemplates.length > 0) {
+                    rawGroupTemplates = this.groupTemplates;
+                } else if (window.storage && !window.storage.fileStorageEnabled && typeof window.storage.loadGroupTemplatesFromLocalStorage === 'function') {
+                    for (const g of groupNames) {
+                        rawGroupTemplates.push(...window.storage.loadGroupTemplatesFromLocalStorage(g));
+                    }
                 }
-            } else {
-                console.log('🚫 Group template loading skipped - invalid user context or disabled');
             }
+
+            const currentUserLower = currentUser.toLowerCase();
+            groupTemplates = rawGroupTemplates.filter(t => {
+                if (!t || !t.name || t.name === 'undefined') {
+                    return false;
+                }
+                if (t.createdBy === 'System' || (currentUserLower && t.createdBy && String(t.createdBy).toLowerCase() === currentUserLower)) {
+                    return false;
+                }
+
+                if (!includeAllCategories) {
+                    const templateCategory = t.category || 'category1';
+                    if (templateCategory !== currentType) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
         } catch (error) {
             console.warn('Could not load group templates:', error);
             groupTemplates = [];
@@ -639,8 +817,8 @@ const templateManager = {
             ...t,
             isOwn: true,
             originalIndex: i,
-            userDisplayName: t.createdBy || window.userManager?.currentUser || 'Unknown',
-            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+            userDisplayName: t.createdBy || currentUser || 'Unknown',
+            groupDisplayName: t.createdByGroup || currentGroup || 'Unknown',
             category: t.category || 'category1'  // Ensure category field exists
         }));
 
@@ -650,7 +828,7 @@ const templateManager = {
             originalIndex: -1,
             isShared: true,
             userDisplayName: t.createdBy || 'Unknown',
-            groupDisplayName: t.createdByGroup || window.userManager?.currentGroup || 'Unknown',
+            groupDisplayName: t.createdByGroup || currentGroup || 'Unknown',
             category: t.category || 'category1'  // Ensure category field exists
         }));
 
@@ -662,6 +840,7 @@ const templateManager = {
 
         // 4. Combine and cache for current category
         this.allTemplates = combinedTemplates;
+        this._allTemplatesCacheKey = cacheKey;
 
         console.log(`📂 Total templates loaded: ${this.allTemplates.length} (${ownTemplatesMarked.length} own + ${groupTemplatesMarked.length} shared)`);
 
@@ -1093,7 +1272,7 @@ const templateManager = {
     },
 
     // Copy template
-    copyTemplate(index) {
+    async copyTemplate(index) {
         try {
             const filteredTemplates = this.getFilteredTemplates();
             const template = filteredTemplates[index];
@@ -1108,7 +1287,9 @@ const templateManager = {
                 schemaVersion: '0.1',
                 schemaType: 'metafold-template',
                 id: 'template_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                uuid: window.metafoldTemplateUuid?.generateTemplateUuid?.() || undefined,
                 derivedFromTemplateId: template.id || null,
+                derivedFromTemplateUuid: template.uuid || null,
                 name: `${template.name} (Copy)`,
                 description: `${template.description || ''} (Copied from ${template.createdBy})`.trim(),
                 createdBy: window.userManager?.currentUser || 'Unknown',
@@ -1129,8 +1310,15 @@ const templateManager = {
 
             this.templates.push(copiedTemplate);
 
-            if (window.storage) {
-                window.storage.saveTemplates(this.templates);
+            if (window.storage?.fileStorageEnabled && typeof window.storage.saveTemplateToFileImmediately === 'function') {
+                const saveResult = await window.storage.saveTemplateToFileImmediately(copiedTemplate);
+                if (!saveResult || !saveResult.success) {
+                    const idx = this.templates.indexOf(copiedTemplate);
+                    if (idx >= 0) this.templates.splice(idx, 1);
+                    throw new Error(saveResult?.message || 'Failed to save copied template');
+                }
+            } else if (window.storage) {
+                await window.storage.saveTemplates(this.templates);
             }
 
             this.invalidateCache();
@@ -1342,14 +1530,23 @@ const templateManager = {
             btnCreateProject.innerHTML = (isWriteFilesOnly || isMultiFolder) ? '<span>📝</span> Write Files' : '<span>🚀</span> Create Project';
         }
 
-        // NEW: Load elabFTW category and settings from template
-        if (this.currentTemplate.integrations?.elabftw) {
-            console.log(`📂 Loading elabFTW category from template: ${this.currentTemplate.integrations.elabftw.defaultCategory}`);
-            this.setElabFTWCategoryInUI(this.currentTemplate.integrations.elabftw.defaultCategory);
+        // Load personal per-UUID overrides (works for both own and shared templates)
+        const personalDefaults = (this.currentTemplate.uuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.getDefaults === 'function')
+            ? window.templateDefaultsStore.getDefaults(this.currentTemplate.uuid)
+            : null;
+
+        // NEW: Load elabFTW category and settings from template (with personal UUID overrides)
+        const effectiveElabftw = personalDefaults?.integrations?.elabftw
+            ? { ...(this.currentTemplate.integrations?.elabftw || {}), ...personalDefaults.integrations.elabftw }
+            : this.currentTemplate.integrations?.elabftw;
+
+        if (effectiveElabftw) {
+            console.log(`📂 Loading elabFTW category from template: ${effectiveElabftw.defaultCategory}`);
+            this.setElabFTWCategoryInUI(effectiveElabftw.defaultCategory);
             
             const fetchNextIdInput = document.getElementById('elabftwFetchNextId');
             if (fetchNextIdInput) {
-                fetchNextIdInput.checked = this.currentTemplate.integrations.elabftw.fetchNextId || false;
+                fetchNextIdInput.checked = effectiveElabftw.fetchNextId || false;
             }
         } else if (this.currentTemplate.elabftwCategory !== undefined) {
             // Legacy support for direct property
@@ -1366,20 +1563,27 @@ const templateManager = {
         }
 
         // If Extend Mode is active, preserve Extend target path/name & prefill matching fields;
-        // otherwise restore template project defaults (Path & Name)
+        // otherwise restore template project defaults (layered with personal UUID defaults)
         if (window.projectManager?.extendContext?.active && typeof window.projectManager.applyExtendContextToForm === 'function') {
             window.projectManager.applyExtendContextToForm();
-        } else if (this.currentTemplate.projectDefaults) {
+        } else {
+            const tplProj = this.currentTemplate.projectDefaults || {};
+            const persProj = personalDefaults?.projectDefaults || {};
+            const resolvedPath = persProj.targetPath !== undefined ? persProj.targetPath
+                : (persProj.basePath !== undefined ? persProj.basePath
+                : (tplProj.targetPath !== undefined ? tplProj.targetPath : tplProj.basePath));
+            const resolvedName = persProj.projectName !== undefined ? persProj.projectName : tplProj.projectName;
+
             const targetPathEl = document.getElementById('targetPath');
             const projectNameEl = document.getElementById('projectName');
             
-            if (targetPathEl && this.currentTemplate.projectDefaults.targetPath !== undefined) {
-                targetPathEl.value = this.currentTemplate.projectDefaults.targetPath;
+            if (targetPathEl && resolvedPath !== undefined) {
+                targetPathEl.value = resolvedPath;
                 // Dispatch input event to update previews
                 targetPathEl.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            if (projectNameEl && this.currentTemplate.projectDefaults.projectName !== undefined) {
-                projectNameEl.value = this.currentTemplate.projectDefaults.projectName;
+            if (projectNameEl && resolvedName !== undefined) {
+                projectNameEl.value = resolvedName;
                 projectNameEl.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }
@@ -1563,17 +1767,17 @@ const templateManager = {
     updateActionButtons() {
         const editBtn = document.querySelector('.actions button[onclick*="editCurrentTemplate"]');
         const deleteBtn = document.querySelector('.actions button[onclick*="deleteCurrentTemplate"]');
+        const canEdit = Boolean(this.currentTemplate && this.currentTemplate.isOwn);
 
-        if (editBtn && deleteBtn) {
-            const canEdit = this.currentTemplate && this.currentTemplate.isOwn;
-
+        if (editBtn) {
             editBtn.disabled = !canEdit;
-            deleteBtn.disabled = !canEdit;
-
             editBtn.style.opacity = canEdit ? '1' : '0.5';
-            deleteBtn.style.opacity = canEdit ? '1' : '0.5';
-
             editBtn.title = canEdit ? 'Edit this template' : 'Can only edit your own templates';
+        }
+
+        if (deleteBtn) {
+            deleteBtn.disabled = !canEdit;
+            deleteBtn.style.opacity = canEdit ? '1' : '0.5';
             deleteBtn.title = canEdit ? 'Delete this template' : 'Can only delete your own templates';
         }
     },
@@ -1591,6 +1795,7 @@ const templateManager = {
             const enhancedTemplate = {
                 ...template,
                 id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                uuid: window.metafoldTemplateUuid?.normalizeUuid(template.uuid) || window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
                 createdBy: window.userManager?.currentUser || 'Unknown',
                 createdByGroup: window.userManager?.currentGroup || 'Unknown',
                 createdAt: template.createdAt || new Date().toISOString(),
@@ -1674,10 +1879,16 @@ const templateManager = {
                 console.log(`🏷️ Template rename detected: "${oldTemplateName}" -> "${newTemplateName}"`);
             }
 
-            // Preserve original metadata but update content
+            // Preserve original metadata & UUID (or assign UUID on save if legacy template lacked one)
+            const preservedUuid = window.metafoldTemplateUuid?.normalizeUuid(existingTemplate.uuid)
+                || window.metafoldTemplateUuid?.normalizeUuid(updatedTemplate.uuid)
+                || window.metafoldTemplateUuid?.generateTemplateUuid()
+                || existingTemplate.uuid
+                || updatedTemplate.uuid;
             const finalTemplate = {
                 ...updatedTemplate,
                 id: existingTemplate.id,                    // Keep original ID
+                uuid: preservedUuid,                        // Keep existing UUID or assign once on save
                 createdBy: existingTemplate.createdBy,      // Keep original creator
                 createdByGroup: existingTemplate.createdByGroup, // Keep original group
                 createdAt: existingTemplate.createdAt,      // Keep original creation time
@@ -1794,6 +2005,9 @@ const templateManager = {
 
             // Update template
             this.update(templateIndex, clearedTemplate);
+            if (clearedTemplate.uuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.clearDefaults === 'function') {
+                window.templateDefaultsStore.clearDefaults(clearedTemplate.uuid).catch(() => {});
+            }
             this.currentTemplate = clearedTemplate;
 
             // Refresh the form if it's showing
@@ -1918,6 +2132,10 @@ const templateManager = {
         try {
             console.log('🔄 Refreshing templates from files...');
             this.templates = await this.loadTemplates();
+            await this.loadGroupTemplates();
+            if (window.templateDefaultsStore && typeof window.templateDefaultsStore.init === 'function') {
+                await window.templateDefaultsStore.init();
+            }
             this.invalidateCache();
             this.buildSearchIndex();
             this.renderList();
@@ -2247,7 +2465,7 @@ const templateManager = {
                 </div>` : '';
 
             const hasAccordionBody = Boolean(displayDescription || creatorMeta || copyLink);
-            const tplKey = String(template.id || `${template.name}_${index}`);
+            const tplKey = String(`${template.isOwn ? 'own' : 'shared'}_${template.createdBy || ''}_${template.id || template.name}_${index}`);
             const isExpanded = Boolean(this.expandedTemplateKeys && this.expandedTemplateKeys.has(tplKey));
             const searchResultClass = this.searchState.isSearching ? 'search-result' : '';
             const featureIconsHtml = this.getTemplateFeatureIconsHtml(template);
@@ -2436,6 +2654,9 @@ const templateManager = {
             this.templates = await this.loadTemplates();
             console.log(`📂 Reloaded ${this.templates.length} own templates`);
 
+            // 2b. Reload shared group templates from storage
+            await this.loadGroupTemplates();
+
             // 3. Force update shared toggle visibility
             this.updateSharedToggleVisibility();
 
@@ -2547,6 +2768,11 @@ const templateManager = {
             } else {
                 console.warn('⚠️ Storage cleanup not available');
                 this.templates = await this.loadTemplates();
+            }
+
+            await this.loadGroupTemplates();
+            if (window.templateDefaultsStore && typeof window.templateDefaultsStore.init === 'function') {
+                await window.templateDefaultsStore.init();
             }
 
             // Update UI
@@ -2720,6 +2946,16 @@ const templateManager = {
         console.log('🔄 Initializing template manager...');
 
         try {
+            this.currentTemplate = null;
+            this.selectedIndex = -1;
+            this.groupTemplates = [];
+            this.groupTemplatesLoadedFor = null;
+            this.invalidateCache();
+
+            if (window.storage && !window.storage.fileStorageEnabled && window.electronAPI?.getTemplatesDirectory) {
+                await window.storage.initFileStorage();
+            }
+
             // Load templates
             this.templates = await this.loadTemplates();
 
@@ -2730,15 +2966,21 @@ const templateManager = {
             this.filteredTemplates = [...this.templates];
             this.initializeSearchState();
             await this.loadSharedTemplatesPreference();
+            await this.loadGroupTemplates();
+            if (window.templateDefaultsStore && typeof window.templateDefaultsStore.init === 'function') {
+                await window.templateDefaultsStore.init();
+            }
             this.buildSearchIndex();
             this.renderList();
             this.updateTemplateInfo();
             this.updateSharedToggleVisibility();
 
-            console.log(`✅ Template manager initialized with ${this.templates.length} templates`);
+            console.log(`✅ Template manager initialized with ${this.templates.length} own + ${this.groupTemplates.length} shared templates`);
         } catch (error) {
             console.error('❌ Error initializing template manager:', error);
-            this.showErrorMessage('Failed to initialize templates: ' + error.message);
+            if (typeof this.showErrorMessage === 'function') {
+                this.showErrorMessage('Failed to initialize templates: ' + error.message);
+            }
         }
     },
 

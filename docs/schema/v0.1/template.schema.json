@@ -20,9 +20,18 @@
       "type": "string",
       "description": "Unique identifier of the template."
     },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      "description": "Stable RFC 4122 UUID shared across QR/DataMatrix labels, installations, and edits."
+    },
     "derivedFromTemplateId": {
       "type": ["string", "null"],
       "description": "If this template was duplicated from another template, stores the source template ID."
+    },
+    "derivedFromTemplateUuid": {
+      "type": ["string", "null"],
+      "description": "If this template was duplicated from another template, stores the source template UUID."
     },
     "name": {
       "type": "string",

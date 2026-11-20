@@ -25,6 +25,7 @@ const settingsManager = {
         'general.auto_save': true,
         'general.show_tips': true,
         'general.user_management_enabled': true,
+        'general.show_shared_templates': true,
         'security.password_system_enabled': false,
         'security.auto_migrate': true,
         'elabftw.enabled': false,
@@ -56,6 +57,8 @@ const settingsManager = {
         'n8n.instance_id': '',
         'n8n.verify_ssl': true,
         'templates.active_category': 'category1',
+        'templates.repository_url': 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json',
+        'templates.repositories': '',
         'templates.category1_name': 'Main-Project',
         'templates.category1_icon': '🎯',
         'templates.category1_color': '#8b5cf6',
@@ -2197,6 +2200,49 @@ const settingsManager = {
             console.error('Error saving secure credentials:', error);
             return false;
         }
+    },
+
+    /**
+     * 🔐 Retrieve an encrypted template repository access token (user-scoped).
+     * @param {string} repoId
+     * @returns {Promise<string>}
+     */
+    async getTemplateRepoToken(repoId) {
+        if (!repoId) return '';
+        try {
+            const token = await this.getSecureCredential(`templates.repo_token_${repoId}`);
+            return token ? String(token).trim() : '';
+        } catch (error) {
+            console.warn(`⚠️ Could not read repo token for ${repoId}:`, error.message);
+            return '';
+        }
+    },
+
+    /**
+     * 🔐 Store or clear an encrypted template repository access token (user-scoped).
+     * Never writes tokens to plaintext settings or templates.repositories.
+     * @param {string} repoId
+     * @param {string} token
+     * @returns {Promise<boolean>}
+     */
+    async setTemplateRepoToken(repoId, token) {
+        if (!repoId) return false;
+        const clean = token ? String(token).trim() : '';
+        const key = `templates.repo_token_${repoId}`;
+        const scopedKey = this.getScopedCredentialKey(key);
+
+        if (!clean) {
+            if (window.secureStorage && typeof window.secureStorage.removeItem === 'function') {
+                window.secureStorage.removeItem(scopedKey);
+            }
+            if (this.secureCredentials && Object.prototype.hasOwnProperty.call(this.secureCredentials, scopedKey)) {
+                delete this.secureCredentials[scopedKey];
+                this.saveSecureCredentials();
+            }
+            return true;
+        }
+
+        return await this.setSecureCredential(key, clean);
     },
 
 

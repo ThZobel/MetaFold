@@ -319,6 +319,16 @@ const app = {
             }
         }
 
+        // Initialize template defaults store if not already initialized during login
+        if (window.templateDefaultsStore && !window.templateDefaultsStore.isInitialized && typeof window.templateDefaultsStore.init === 'function') {
+            try {
+                await window.templateDefaultsStore.init();
+                console.log('✅ templateDefaultsStore initialized');
+            } catch (error) {
+                console.warn('⚠️ Error initializing templateDefaultsStore:', error);
+            }
+        }
+
         // Initialize project manager if available
         if (window.projectManager && typeof window.projectManager.init === 'function') {
             try {
@@ -437,9 +447,11 @@ const app = {
     async openTemplateHub(customIndexData = null) {
         try {
             console.log('Fetching templates index...');
-            const repoUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) 
-                            ? window.settingsManager.settings['templates.repository_url'] 
-                            : 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+            const repoUrl = (window.communityManager && typeof window.communityManager.getIndexUrl === 'function')
+                ? window.communityManager.getIndexUrl()
+                : ((window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url'])
+                    ? window.settingsManager.settings['templates.repository_url']
+                    : 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json');
             
             if (window.facetSearch) {
                 await window.facetSearch.closeSearch();
@@ -447,12 +459,16 @@ const app = {
                 
                 let indexData = customIndexData;
                 if (!indexData) {
-                    const response = await fetch(repoUrl);
-                    if (!response.ok) throw new Error('Could not fetch templates index');
-                    indexData = await response.json();
+                    if (window.communityManager && typeof window.communityManager.fetchAllIndexes === 'function') {
+                        indexData = await window.communityManager.fetchAllIndexes(true);
+                    } else {
+                        const response = await fetch(repoUrl);
+                        if (!response.ok) throw new Error('Could not fetch templates index');
+                        indexData = await response.json();
+                    }
                 }
                 
-                const formattedData = indexData.map(item => {
+                const formattedData = (Array.isArray(indexData) ? indexData : []).map(item => {
                     const community = item.community || {};
                     const rawCat = community.category || community.type || item.type || 'Experiments';
                     const catNormalized = ['Systems', 'Protocols', 'Experiments', 'Workflows'].find(
@@ -464,6 +480,7 @@ const app = {
                     item.organism = community.organism || item.organism || '';
                     item.collection = item.collection || community.collection || 'General';
                     item.description = item.description || community.description || '';
+                    item.repository = item.repository || item._repoName || 'MetaFold Community';
                     if (community.tags) {
                         item.tags = Array.isArray(community.tags) ? community.tags : String(community.tags).split(',').map(s => s.trim()).filter(Boolean);
                     } else if (item.tags) {
@@ -476,13 +493,13 @@ const app = {
 
                     const flatMeta = {};
                     Object.keys(item).forEach(key => {
-                        if (key !== 'id' && key !== 'path' && key !== 'fields' && key !== 'community') {
+                        if (key !== 'id' && key !== 'path' && key !== 'fields' && key !== 'community' && !key.startsWith('_')) {
                             flatMeta[key] = item[key];
                         }
                     });
 
                     // Ensure all taxonomy keys are present in flatMeta with defaults
-                    const keysToUnpack = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
+                    const keysToUnpack = ['category', 'repository', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism', 'uuid'];
                     for (const key of keysToUnpack) {
                         if (flatMeta[key] === undefined) {
                             flatMeta[key] = key === 'tags' ? [] : '';
@@ -492,16 +509,25 @@ const app = {
                     return {
                         _type: 'template_hub',
                         id: item.id,
+                        uuid: item.uuid || '',
                         name: item.name || 'Unnamed Template',
                         path: item.path,
+                        _repoId: item._repoId || 'official',
+                        _repoName: item._repoName || item.repository || 'MetaFold Community',
+                        _repoRawBaseUrl: item._repoRawBaseUrl || null,
                         flatMeta: flatMeta,
                         rawFields: item.fields || []
                     };
                 });
                 
+                const uniqueRepos = new Set(formattedData.map(r => r._repoName));
+                const defaultCols = uniqueRepos.size > 1
+                    ? ['category', 'repository', 'collection', 'tags', 'description', 'author']
+                    : ['category', 'collection', 'tags', 'description', 'author'];
+
                 window.facetSearch.masterData = formattedData;
-                window.facetSearch.allAvailableKeys = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
-                await window.facetSearch._restoreSessionTableState(['category', 'collection', 'tags', 'description', 'author']);
+                window.facetSearch.allAvailableKeys = ['category', 'repository', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism', 'uuid'];
+                await window.facetSearch._restoreSessionTableState(defaultCols);
                 window.facetSearch.renderColumnSelector();
                 window.facetSearch.closeRightPanel();
                 
@@ -515,11 +541,13 @@ const app = {
         }
     },
     
-    async downloadAndInstallTemplate(repoPath, customUserInfo = undefined) {
+    async downloadAndInstallTemplate(repoPath, customUserInfo = undefined, repoContext = null) {
         try {
             let templateData;
             if (repoPath && typeof repoPath === 'object') {
                 templateData = JSON.parse(JSON.stringify(repoPath));
+            } else if (window.communityManager && typeof window.communityManager.fetchTemplateJson === 'function') {
+                templateData = await window.communityManager.fetchTemplateJson(repoPath, repoContext);
             } else {
                 const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url'])
                                 ? window.settingsManager.settings['templates.repository_url']
@@ -553,11 +581,18 @@ const app = {
                 delete templateData._fileInfo;
             }
             
+            const preservedUuid = (window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.normalizeUuid === 'function')
+                ? (window.metafoldTemplateUuid.normalizeUuid(templateData.uuid) || window.metafoldTemplateUuid.generateTemplateUuid())
+                : templateData.uuid;
+
             templateData.name = templateData.name || 'Unnamed Template';
             templateData.category = templateData.category || 'category1';
             templateData.originalCreator = userInfo.username || 'User';
             templateData.originalGroup = userInfo.groupname || 'Default';
             templateData.id = 'template_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            if (preservedUuid) {
+                templateData.uuid = preservedUuid;
+            }
             templateData.savedLocally = true;
 
             this.lastInstalledTemplate = templateData;
@@ -565,6 +600,7 @@ const app = {
             if (window.electronAPI && window.electronAPI.saveTemplateToFile) {
                 const result = await window.electronAPI.saveTemplateToFile(templateData, userInfo);
                 if (result.success) {
+                    if (result.uuid) templateData.uuid = result.uuid;
                     this.showSuccess(`Template "${templateData.name}" installed successfully!`);
                     if (window.templateManager) {
                         if (typeof window.templateManager.refreshFromFiles === 'function') {
@@ -578,7 +614,7 @@ const app = {
                             }
                         }
                     }
-                    return result;
+                    return { ...result, template: templateData };
                 } else {
                     this.showError('Failed to install template: ' + (result.error || 'Unknown error'));
                     return result;
@@ -586,6 +622,7 @@ const app = {
             } else if (window.storage && window.storage.saveTemplateToFileImmediately) {
                 const result = await window.storage.saveTemplateToFileImmediately(templateData);
                 if (result.success) {
+                    if (result.uuid) templateData.uuid = result.uuid;
                     this.showSuccess(`Template "${templateData.name}" installed successfully!`);
                     if (window.templateManager) {
                         if (typeof window.templateManager.refreshFromFiles === 'function') {
@@ -596,7 +633,7 @@ const app = {
                             }
                         }
                     }
-                    return result;
+                    return { ...result, template: templateData };
                 } else {
                     this.showError('Failed to install template: ' + (result.error || 'Unknown error'));
                     return result;

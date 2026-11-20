@@ -44,6 +44,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.templateManager && window.templateManager.renderList) {
             window.templateManager.renderList();
             window.templateManager.updateTemplateInfo();
+            window.templateManager.updateSharedToggleVisibility?.();
+            const sharedCb = document.getElementById('showSharedTemplates');
+            if (sharedCb && window.templateManager.searchState) {
+                sharedCb.checked = window.templateManager.searchState.showSharedTemplates !== false;
+            }
         }
 
         console.log('✅ All components initialized');

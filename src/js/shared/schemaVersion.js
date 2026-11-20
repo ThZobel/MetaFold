@@ -27,7 +27,8 @@
         SCAN_SUMMARY: 'metafold-scan-summary',
         LINEAGE_EXPORT: 'metafold-lineage-export',
         VISUALIZATION_EXPORT: 'metafold-visualization-export',
-        ID_DICTIONARY: 'metafold-id-dictionary'
+        ID_DICTIONARY: 'metafold-id-dictionary',
+        TEMPLATE_DEFAULTS: 'metafold-template-defaults'
     });
 
     /**
@@ -106,7 +107,7 @@
      *
      * @param {Object} [template]
      * @param {string} [fallbackName]
-     * @returns {{ id: string|null, name: string, category: string|null, derivedFromTemplateId?: string }}
+     * @returns {{ id: string|null, uuid?: string|null, name: string, category: string|null, derivedFromTemplateId?: string, derivedFromTemplateUuid?: string }}
      */
     function buildTemplateRef(template, fallbackName) {
         const tpl = template && typeof template === 'object' ? template : {};
@@ -115,8 +116,14 @@
             name: tpl.name || fallbackName || 'Unknown Template',
             category: tpl.category || null
         };
+        if (tpl.uuid) {
+            ref.uuid = tpl.uuid;
+        }
         if (tpl.derivedFromTemplateId) {
             ref.derivedFromTemplateId = tpl.derivedFromTemplateId;
+        }
+        if (tpl.derivedFromTemplateUuid) {
+            ref.derivedFromTemplateUuid = tpl.derivedFromTemplateUuid;
         }
         return ref;
     }

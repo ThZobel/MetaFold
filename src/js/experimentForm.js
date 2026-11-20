@@ -81,10 +81,11 @@ const experimentForm = {
         }
     },
 
-    // NEW: Generate template-specific cache key
+    // NEW: Generate template-specific cache key (prefers stable UUID when present)
     getTemplateSpecificKey(fieldName) {
-        const templateId = window.templateManager?.currentTemplate?.id || 'unknown';
-        return `${templateId}_${fieldName}`;
+        const current = window.templateManager?.currentTemplate;
+        const templateKey = current?.uuid || current?.id || 'unknown';
+        return `${templateKey}_${fieldName}`;
     },
 
     // UPDATED: Template-specific saved field value getter
@@ -148,18 +149,19 @@ const experimentForm = {
 
     // NEW: Clear values for specific template only
     clearSavedFieldValuesForCurrentTemplate() {
-        if (!window.templateManager?.currentTemplate?.id) return;
+        const current = window.templateManager?.currentTemplate;
+        const templateKey = current?.uuid || current?.id;
+        if (!templateKey) return;
 
-        const templateId = window.templateManager.currentTemplate.id;
         const keysToDelete = Object.keys(this.savedFieldValues).filter(key =>
-            key.startsWith(templateId + '_')
+            key.startsWith(templateKey + '_')
         );
 
         keysToDelete.forEach(key => {
             delete this.savedFieldValues[key];
         });
 
-        console.log(`🧹 Cleared ${keysToDelete.length} cached values for template: ${templateId}`);
+        console.log(`🧹 Cleared ${keysToDelete.length} cached values for template: ${templateKey}`);
     },
 
     // REPARIERTE Enhanced render experiment form with validation
@@ -187,17 +189,27 @@ const experimentForm = {
         const container = document.getElementById('experimentFields');
         container.innerHTML = '';
 
-        // Load saved paths if available in template
-        if (templateManager.currentTemplate && templateManager.currentTemplate.projectDefaults) {
-            const defaults = templateManager.currentTemplate.projectDefaults;
+        // Load saved paths (template projectDefaults layered with personal per-UUID defaults)
+        const currentUuid = templateManager.currentTemplate?.uuid || null;
+        const personalDefaults = (currentUuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.getDefaults === 'function')
+            ? window.templateDefaultsStore.getDefaults(currentUuid)
+            : null;
+        const tplProj = templateManager.currentTemplate?.projectDefaults || {};
+        const persProj = personalDefaults?.projectDefaults || {};
+        const mergedBasePath = persProj.targetPath !== undefined ? persProj.targetPath
+            : (persProj.basePath !== undefined ? persProj.basePath
+            : (tplProj.targetPath !== undefined ? tplProj.targetPath : tplProj.basePath));
+        const mergedProjectName = persProj.projectName !== undefined ? persProj.projectName : tplProj.projectName;
+
+        if (mergedBasePath !== undefined || mergedProjectName !== undefined) {
             const targetPathEl = document.getElementById('targetPath');
             const projectNameEl = document.getElementById('projectName');
 
-            if (targetPathEl && defaults.basePath !== undefined) {
-                targetPathEl.value = defaults.basePath;
+            if (targetPathEl && mergedBasePath !== undefined) {
+                targetPathEl.value = mergedBasePath;
             }
-            if (projectNameEl && defaults.projectName !== undefined) {
-                projectNameEl.value = defaults.projectName;
+            if (projectNameEl && mergedProjectName !== undefined) {
+                projectNameEl.value = mergedProjectName;
             }
 
             // Update path preview
@@ -310,9 +322,13 @@ const experimentForm = {
             this.filenameState.isSwitchingTemplate = false;
             console.log('✅ Template switch complete, auto-save re-enabled');
 
-            // NEW: Restore integration states from template
-            if (templateManager.currentTemplate && templateManager.currentTemplate.integrations) {
-                const ints = templateManager.currentTemplate.integrations;
+            // NEW: Restore integration states from template (layered with personal UUID defaults)
+            const curTmpl = templateManager.currentTemplate;
+            const personalInts = (curTmpl?.uuid && window.templateDefaultsStore?.getDefaults)
+                ? window.templateDefaultsStore.getDefaults(curTmpl.uuid)?.integrations
+                : null;
+            if (curTmpl && (curTmpl.integrations || personalInts)) {
+                const ints = { ...(curTmpl.integrations || {}), ...(personalInts || {}) };
 
                 const elabToggle = document.getElementById('sendToElabFTW');
                 const omeroToggle = document.getElementById('sendToOMERO');
@@ -423,10 +439,16 @@ const experimentForm = {
         const requiredMark = isRequired ? ' <span style="color: #ef4444;">*</span>' : '';
         const safeFieldId = 'field_' + this.createSafeId(fieldName);
 
-        // FIX: Robust check for saved values to handle false/0/empty array properly
+        // Resolve initial field value: session cache -> personal UUID defaults -> template defaultValue -> template value
         let savedValue = this.getSavedFieldValue(fieldName);
         if (savedValue === undefined || savedValue === null) {
-            if (fieldInfo.defaultValue !== undefined) {
+            const currentUuid = templateManager.currentTemplate?.uuid || null;
+            const personalFields = (currentUuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.getDefaults === 'function')
+                ? window.templateDefaultsStore.getDefaults(currentUuid)?.fields
+                : null;
+            if (personalFields && personalFields[fieldName] !== undefined) {
+                savedValue = personalFields[fieldName];
+            } else if (fieldInfo.defaultValue !== undefined) {
                 savedValue = fieldInfo.defaultValue;
             } else if (fieldInfo.value !== undefined) {
                 savedValue = fieldInfo.value;
@@ -1070,6 +1092,10 @@ const experimentForm = {
                 if (!trimmed) return;
 
                 if (mode === 'derived_from' || mode === 'related_to' || mode === 'tags') {
+                    if ((mode === 'derived_from' || mode === 'related_to') && window.metafoldTemplateUuid?.parseTemplateCode?.(trimmed)?.format === 'uri') {
+                        alert('Dieser Code ist ein Template-Code (metafold:tpl:...), kein Projekt-/Proben-Code.');
+                        return;
+                    }
                     this.addTagToField(fieldId, fieldName, trimmed);
                     return;
                 }
@@ -1288,13 +1314,22 @@ const experimentForm = {
             const omeroToggle = document.getElementById('sendToOMERO');
             const rspaceToggle = document.getElementById('sendToRSpace');
             const n8nToggle = document.getElementById('sendToN8n');
+            const elabCatInput = document.getElementById('elabftwProjectCategory');
+            const elabFetchNextInput = document.getElementById('elabftwFetchNextId');
 
             if (elabToggle) updatedTemplate.integrations.elabftwEnabled = elabToggle.checked;
             if (omeroToggle) updatedTemplate.integrations.omeroEnabled = omeroToggle.checked;
             if (rspaceToggle) updatedTemplate.integrations.rspaceEnabled = rspaceToggle.checked;
             if (n8nToggle) updatedTemplate.integrations.n8nEnabled = n8nToggle.checked;
+            if (elabCatInput || elabFetchNextInput) {
+                updatedTemplate.integrations.elabftw = {
+                    ...(updatedTemplate.integrations.elabftw || {}),
+                    ...(elabCatInput ? { defaultCategory: elabCatInput.value || '' } : {}),
+                    ...(elabFetchNextInput ? { fetchNextId: elabFetchNextInput.checked } : {})
+                };
+            }
 
-            // NEW: Save project defaults (Project Name and Target Path)
+            // Save project defaults (store both targetPath and basePath for full compatibility)
             if (!updatedTemplate.projectDefaults) updatedTemplate.projectDefaults = {};
 
             const projectNameEl = document.getElementById('projectName');
@@ -1305,15 +1340,56 @@ const experimentForm = {
                 console.log('💾 Saving project name to template:', projectNameEl.value);
             }
             if (targetPathEl) {
+                updatedTemplate.projectDefaults.targetPath = targetPathEl.value;
                 updatedTemplate.projectDefaults.basePath = targetPathEl.value;
                 console.log('💾 Saving base path to template:', targetPathEl.value);
             }
 
+            const isOwnTemplate = templateManager.currentTemplate.isOwn !== false;
+            const resolvedUuid = window.metafoldTemplateUuid?.normalizeUuid(updatedTemplate.uuid)
+                || (isOwnTemplate ? window.metafoldTemplateUuid?.generateTemplateUuid() : null);
+
+            if (!isOwnTemplate) {
+                if (!resolvedUuid) {
+                    const msg = 'This shared template does not have a UUID yet. Copy it to your own templates or ask the owner to save it once before storing personal defaults.';
+                    if (window.app?.showError) {
+                        window.app.showError(msg);
+                    } else {
+                        alert(msg);
+                    }
+                    return;
+                }
+                if (window.templateDefaultsStore && typeof window.templateDefaultsStore.saveDefaults === 'function') {
+                    await window.templateDefaultsStore.saveDefaults(resolvedUuid, {
+                        templateName: updatedTemplate.name,
+                        fields: formData || {},
+                        projectDefaults: updatedTemplate.projectDefaults,
+                        integrations: updatedTemplate.integrations
+                    });
+                    this.showSaveMessage(`✅ Personal defaults saved locally for "${updatedTemplate.name}"!`);
+                }
+                return;
+            }
+
+            updatedTemplate.uuid = resolvedUuid || updatedTemplate.uuid;
+
             // Find index
-            const index = templateManager.templates.findIndex(t => t.id === updatedTemplate.id);
+            const index = templateManager.templates.findIndex(t =>
+                (t.id && t.id === updatedTemplate.id) ||
+                (t.uuid && updatedTemplate.uuid && t.uuid === updatedTemplate.uuid)
+            );
 
             if (index >= 0) {
-                await templateManager.update(index, updatedTemplate);
+                const savedTpl = await templateManager.update(index, updatedTemplate);
+                const persistedUuid = savedTpl?.uuid || updatedTemplate.uuid;
+                if (persistedUuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.saveDefaults === 'function') {
+                    await window.templateDefaultsStore.saveDefaults(persistedUuid, {
+                        templateName: updatedTemplate.name,
+                        fields: formData || {},
+                        projectDefaults: updatedTemplate.projectDefaults,
+                        integrations: updatedTemplate.integrations
+                    });
+                }
                 this.showSaveMessage('✅ Template saved successfully!');
 
                 // Trigger sidebar update
@@ -2407,7 +2483,7 @@ const experimentForm = {
 
 
     // NEW: Clear template values without additional confirmation (already confirmed in menu)
-    clearTemplateValuesNoConfirm() {
+    async clearTemplateValuesNoConfirm() {
         console.log('🧹 Starting permanent template values clear (no additional confirm)...');
 
         if (!templateManager.currentTemplate) {
@@ -2415,8 +2491,25 @@ const experimentForm = {
             return;
         }
 
-        if (!templateManager.currentTemplate.isOwn) {
-            alert('You can only clear your own templates. Please copy this template first.');
+        const currentTmpl = templateManager.currentTemplate;
+        if (!currentTmpl.isOwn) {
+            if (currentTmpl.uuid && window.templateDefaultsStore && typeof window.templateDefaultsStore.clearDefaults === 'function') {
+                if (window.templateDefaultsStore.hasDefaults(currentTmpl.uuid)) {
+                    await window.templateDefaultsStore.clearDefaults(currentTmpl.uuid);
+                    this.clearAllFormInputs();
+                    this.clearSavedFieldValuesForCurrentTemplate();
+                    const targetPathEl = document.getElementById('targetPath');
+                    const projectNameEl = document.getElementById('projectName');
+                    if (targetPathEl) targetPathEl.value = '';
+                    if (projectNameEl) projectNameEl.value = '';
+                    if (window.projectManager && window.projectManager.updatePathPreview) {
+                        window.projectManager.updatePathPreview();
+                    }
+                    this.showSaveMessage(`🧹 Personal local defaults cleared for "${currentTmpl.name}"!`);
+                    return;
+                }
+            }
+            alert('You can only clear your own templates or saved personal defaults. Please copy this template first.');
             return;
         }
 
@@ -2523,6 +2616,7 @@ const experimentForm = {
             // Create new template object with proper user info
             const newTemplate = {
                 id: this.generateTemplateId(templateName),
+                uuid: window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
                 name: templateName.trim(),
                 description: templateDescription.trim(),
                 type: 'experiment',
@@ -2809,6 +2903,10 @@ const experimentForm = {
             displayLabel = value;
             const modeAttr = document.getElementById(containerId)?.getAttribute('data-autocomplete-mode') || '';
             if (value && (modeAttr === 'derived_from' || modeAttr === 'related_to')) {
+                if (window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.extractProjectRefId === 'function') {
+                    value = window.metafoldTemplateUuid.extractProjectRefId(value);
+                    displayLabel = value;
+                }
                 const resolvedProj = (window.facetSearch && typeof window.facetSearch._resolveProjectByRef === 'function')
                     ? window.facetSearch._resolveProjectByRef(value)
                     : (window.projectScanner?.projects || []).find(p =>

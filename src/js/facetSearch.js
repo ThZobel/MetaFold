@@ -1093,7 +1093,7 @@ const facetSearch = {
     // Map a metadata key (e.g. OME.Pixels.SizeX, File.Extension, Project.Condition, community taxonomy) to a category name
     _getCategoryForKey(key, isTemplateHub = this.isTemplateHub) {
         if (isTemplateHub) {
-            const communityKeys = ['category', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism'];
+            const communityKeys = ['category', 'repository', 'collection', 'tags', 'description', 'author', 'version', 'system', 'discipline', 'organism', 'uuid'];
             if (communityKeys.includes(key)) {
                 return '🌐 Community Taxonomy';
             }
@@ -2291,7 +2291,7 @@ const facetSearch = {
             field: '_actions',
             download: false,
             headerSort: false,
-            width: 118,
+            width: 146,
             formatter: (cell) => {
                 const row = cell.getRow().getData();
                 const path = (row.path || '').replace(/"/g, '&quot;');
@@ -2306,8 +2306,15 @@ const facetSearch = {
                         html += ` <button class="btn btn-small facet-act-open-sidecar" data-sidecar-path="${sidecarPath}" title="Open Sidecar JSON (${sidecarPath})">📄</button>`;
                     }
                 } else {
+                    const rawUuid = row.projectId || row.metafold_project_id || row.metadata?.metafold_project_id || '';
+                    const projUuid = window.metafoldTemplateUuid?.normalizeUuid
+                        ? window.metafoldTemplateUuid.normalizeUuid(rawUuid)
+                        : rawUuid;
                     html += `<button class="btn btn-small facet-act-open" data-path="${path}" title="Open Project Folder">📁</button>`;
                     html += ` <button class="btn btn-small facet-act-add-note" data-path="${path}" title="Add Note / Observation">➕</button>`;
+                    if (projUuid) {
+                        html += ` <button class="btn btn-small facet-act-qr" data-path="${path}" title="Project QR / DataMatrix &amp; Zebra ZPL Label">📱</button>`;
+                    }
                 }
                 if (row.omero_url) {
                     const u = row.omero_url.replace(/"/g, '&quot;');
@@ -2320,7 +2327,7 @@ const facetSearch = {
                 return html;
             },
             cellClick: (e, cell) => {
-                const target = e.target.closest('.facet-act-open, .facet-act-add-note, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install');
+                const target = e.target.closest('.facet-act-open, .facet-act-add-note, .facet-act-qr, .facet-act-show-file, .facet-act-open-sidecar, .facet-act-link, .facet-act-install');
                 if (!target) return;
                 e.preventDefault();
                 e.stopPropagation();
@@ -2334,10 +2341,24 @@ const facetSearch = {
                     return;
                 }
 
+                if (target.classList.contains('facet-act-qr')) {
+                    const p = target.dataset.path;
+                    const proj = this.masterData.find(m => m.path === p) || cell.getRow().getData();
+                    if (proj && window.templateQrModal && typeof window.templateQrModal.openForProject === 'function') {
+                        window.templateQrModal.openForProject(proj);
+                    }
+                    return;
+                }
+
                 if (target.classList.contains('facet-act-install')) {
-                    const repoPath = target.dataset.path;
+                    const rowData = cell.getRow().getData();
+                    const repoPath = rowData?.path || target.dataset.path;
                     if (repoPath && window.app?.downloadAndInstallTemplate) {
-                        window.app.downloadAndInstallTemplate(repoPath);
+                        window.app.downloadAndInstallTemplate(repoPath, undefined, {
+                            repoId: rowData?._repoId,
+                            repoName: rowData?._repoName,
+                            rawBaseUrl: rowData?._repoRawBaseUrl
+                        });
                     }
                     return;
                 }
@@ -3487,8 +3508,11 @@ const facetSearch = {
     // Resolve a project name, path, previous_name, or id_anchor to a project in masterData
     _resolveProjectByRef(rawRef) {
         if (!rawRef) return null;
-        const clean = String(rawRef).replace(/^\[\[|\]\]$/g, '').trim();
+        let clean = String(rawRef).replace(/^\[\[|\]\]$/g, '').trim();
         if (!clean || !Array.isArray(this.masterData)) return null;
+        if (window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.extractProjectRefId === 'function') {
+            clean = window.metafoldTemplateUuid.extractProjectRefId(clean);
+        }
         const lower = clean.toLowerCase();
 
         // 1. Exact path, UUID, or exact project name / provides_id match
@@ -3839,6 +3863,14 @@ const facetSearch = {
         };
         if (addNoteBtn) addNoteBtn.onclick = openAddNote;
         if (addNoteInlineBtn) addNoteInlineBtn.onclick = openAddNote;
+
+        const openProjectQr = () => {
+            if (window.templateQrModal && typeof window.templateQrModal.openForProject === 'function') {
+                window.templateQrModal.openForProject(project);
+            }
+        };
+        const qrBtn = document.getElementById('facetBtnProjectQr');
+        if (qrBtn) qrBtn.onclick = openProjectQr;
 
         contentArea.querySelectorAll('.mf-btn-edit-note').forEach(btn => {
             btn.onclick = () => {
@@ -4570,6 +4602,11 @@ const facetSearch = {
         }
 
         const projectId = project.projectId || project.metafold_project_id || (project.metadata && project.metadata.metafold_project_id) || '';
+        const hasValidProjectUuid = Boolean(
+            window.metafoldTemplateUuid?.normalizeUuid
+                ? window.metafoldTemplateUuid.normalizeUuid(projectId)
+                : projectId
+        );
 
         let html = `
             <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(139, 92, 246, 0.25);">
@@ -4595,6 +4632,10 @@ const facetSearch = {
                 <button class="facet-detail-action-btn facet-action-note" id="facetBtnAddNote" title="Add a structured observation or note">
                     <span class="btn-icon">➕</span> Add Note
                 </button>
+                ${hasValidProjectUuid ? `
+                <button class="facet-detail-action-btn facet-action-qr" id="facetBtnProjectQr" title="Show Project QR / DataMatrix Code &amp; Zebra ZPL Label">
+                    <span class="btn-icon">📱</span> Label / ZPL
+                </button>` : ''}
                 ${project.hasReadme ? `
                 <button class="facet-detail-action-btn facet-action-readme" onclick="window.projectScanner.openReadme('${escapedPath}', '${escapedName}')" title="Open formatted README.html">
                     <span class="btn-icon">📖</span> README.html
@@ -4804,23 +4845,48 @@ const facetSearch = {
 
         try {
             const repoPath = data.path || data._path;
-            let templateData = this._templateCache[repoPath];
+            const repoContext = {
+                repoId: data._repoId || null,
+                repoName: data._repoName || null,
+                rawBaseUrl: data._repoRawBaseUrl || null
+            };
+            const cacheKey = `${repoContext.repoId || 'default'}::${repoPath}`;
+            let templateData = this._templateCache[cacheKey];
 
             if (!templateData) {
-                const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
-                const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Fetch failed');
-                templateData = await response.json();
-                this._templateCache[repoPath] = templateData;
+                if (window.communityManager && typeof window.communityManager.fetchTemplateJson === 'function') {
+                    templateData = await window.communityManager.fetchTemplateJson(repoPath, repoContext);
+                } else {
+                    const baseUrl = (window.settingsManager && window.settingsManager.settings && window.settingsManager.settings['templates.repository_url']) || 'https://raw.githubusercontent.com/ThZobel/MetaFold-Templates/main/templates-index.json';
+                    const url = baseUrl.replace('/templates-index.json', '') + '/' + repoPath;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Fetch failed');
+                    templateData = await response.json();
+                }
+                this._templateCache[cacheKey] = templateData;
             }
 
-            let html = `<h3 style="margin: 0 0 8px 0; color: #a855f7;">${templateData.name}</h3>`;
+            this._currentPreviewContext = { repoPath, ...repoContext };
+
+            const escHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            let html = `<h3 style="margin: 0 0 8px 0; color: #a855f7;">${escHtml(templateData.name)}</h3>`;
+            const sourceRepoName = data._repoName || data.flatMeta?.repository;
+            const previewUuid = templateData.uuid || data.uuid;
+            if (sourceRepoName || previewUuid) {
+                html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; font-size:0.74rem;">`;
+                if (sourceRepoName) {
+                    html += `<span style="background:rgba(59,130,246,0.16); color:#93c5fd; border:1px solid rgba(59,130,246,0.35); padding:2px 8px; border-radius:10px;">📦 ${escHtml(sourceRepoName)}</span>`;
+                }
+                if (previewUuid) {
+                    html += `<span style="background:rgba(124,58,237,0.18); color:#d8b4fe; border:1px solid rgba(124,58,237,0.35); padding:2px 8px; border-radius:10px; font-family:monospace;" title="${escHtml(previewUuid)}">🆔 ${escHtml(previewUuid.slice(0, 8))}…</span>`;
+                }
+                html += `</div>`;
+            }
             if (templateData.description) {
-                html += `<p style="color: #9ca3af; font-size: 0.86rem; line-height: 1.4; margin-bottom: 14px;">${templateData.description}</p>`;
+                html += `<p style="color: #9ca3af; font-size: 0.86rem; line-height: 1.4; margin-bottom: 14px;">${escHtml(templateData.description)}</p>`;
             }
 
-            html += `<button onclick="window.app.downloadAndInstallTemplate('${repoPath}')" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 18px;">📥 Install Template</button>`;
+            html += `<button onclick="window.facetSearch.installCurrentPreviewTemplate()" style="width:100%; padding:10px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom: 18px;">📥 Install Template</button>`;
 
             html += `<div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #a78bfa; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 12px;">Fields &amp; Options</div>`;
 
@@ -4874,6 +4940,16 @@ const facetSearch = {
         } catch (error) {
             contentArea.innerHTML = `<div style="color:#ef4444; padding:20px;">Error loading template details: ${error.message}</div>`;
         }
+    },
+
+    installCurrentPreviewTemplate() {
+        const ctx = this._currentPreviewContext;
+        if (!ctx || !ctx.repoPath || !window.app?.downloadAndInstallTemplate) return;
+        window.app.downloadAndInstallTemplate(ctx.repoPath, undefined, {
+            repoId: ctx.repoId,
+            repoName: ctx.repoName,
+            rawBaseUrl: ctx.rawBaseUrl
+        });
     },
 
     // Open the facet search modal

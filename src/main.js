@@ -4,12 +4,15 @@ const path = require('path');
 const zlib = require('zlib');
 const OMEROProxyServer = require('./js/proxyManager.js');
 const metafoldSchema = require('./js/shared/schemaVersion.js');
+const metafoldTemplateUuid = require('./js/shared/templateUuid.js');
 const markdownLite = require('./js/shared/markdownLite.js');
 const {
     createProjectMetadataStore,
     syncMentionsWithRelatedTo,
     collectAllMarkdownAndFieldText
 } = require('./js/main/projectMetadataStore.js');
+const templateFileLoader = require('./js/main/templateFileLoader.js');
+const templateDefaultsFile = require('./js/main/templateDefaultsFile.js');
 
 let mainWindow;
 
@@ -710,6 +713,7 @@ function cleanTemplateForFileStorage(template) {
         schemaType: metafoldSchema.SCHEMA_TYPES.TEMPLATE,
         ...clean,
         id: clean.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        uuid: metafoldTemplateUuid.normalizeUuid(clean.uuid) || metafoldTemplateUuid.generateTemplateUuid(),
         name: clean.name || 'Unnamed Template',
         type: clean.type || 'experiment',
         createdBy: clean.createdBy || 'Unknown',
@@ -2026,6 +2030,7 @@ ipcMain.handle('save-template-to-file', async (event, template, userInfo = null)
 
         return {
             success: true,
+            uuid: cleanTemplate.uuid,
             filePath: filePath,
             filename: filename,
             directory: templatesDir,
@@ -2267,6 +2272,34 @@ ipcMain.handle('load-all-templates', async (event, userInfo = null) => {
     }
 });
 
+// Load shared templates from other users in the specified group directory
+ipcMain.handle('load-group-templates', async (event, groupName, userInfo = null) => {
+    try {
+        const baseTemplatesDir = path.join(app.getPath('home'), 'MetaFold', 'Templates');
+        const result = await templateFileLoader.loadGroupTemplatesFromBaseDir(
+            baseTemplatesDir,
+            groupName,
+            userInfo,
+            {
+                schemaVersion: metafoldSchema.SCHEMA_VERSION,
+                legacySchemaVersion: metafoldSchema.LEGACY_SCHEMA_VERSION
+            }
+        );
+        console.log(`🤝 Loaded ${result.loadedCount} group templates from group "${groupName}" (${result.directory || 'n/a'})`);
+        return result;
+    } catch (error) {
+        console.error('❌ Error loading group templates:', error);
+        return {
+            success: false,
+            error: error.message,
+            templates: [],
+            loadedCount: 0,
+            errorCount: 1,
+            errors: [{ file: 'system', error: error.message }]
+        };
+    }
+});
+
 
 // Update template file
 // Diese Funktion ist für explizite Updates von bestehenden Templates
@@ -2313,6 +2346,7 @@ ipcMain.handle('update-template-file', async (event, templateData) => {
 
         return {
             success: true,
+            uuid: cleanTemplate.uuid,
             filename: cleanTemplate._fileInfo.filename,
             filePath: filePath,
             fileSize: stats.size,
@@ -2405,6 +2439,152 @@ ipcMain.handle('get-metafold-directory', async (event) => {
             error: error.message
         };
     }
+});
+
+// =================== PER-USER TEMPLATE DEFAULTS (UUID-KEYED) ===================
+
+ipcMain.handle('load-template-defaults', async (event, userInfo = null) => {
+    try {
+        const metafoldDir = path.join(app.getPath('home'), 'MetaFold');
+        const username = userInfo?.username || 'default';
+        const doc = await templateDefaultsFile.loadUserTemplateDefaults(metafoldDir, username);
+        return {
+            success: true,
+            ...doc
+        };
+    } catch (error) {
+        console.warn('⚠️ Error loading template defaults:', error.message);
+        return {
+            success: false,
+            error: error.message,
+            defaults: {}
+        };
+    }
+});
+
+ipcMain.handle('save-template-defaults', async (event, defaultsMap = {}, userInfo = null) => {
+    try {
+        const metafoldDir = path.join(app.getPath('home'), 'MetaFold');
+        const username = userInfo?.username || 'default';
+        return await templateDefaultsFile.saveUserTemplateDefaults(metafoldDir, username, defaultsMap);
+    } catch (error) {
+        console.error('❌ Error saving template defaults:', error.message);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+// =================== REPOSITORY JSON FETCH (SUPPORTS TOKENS & PRIVATE REPOS) ===================
+
+function fetchRepoJsonOnce(targetUrl, options = {}, redirectCount = 0, originalOrigin = null) {
+    return new Promise((resolve) => {
+        try {
+            const { URL } = require('url');
+            const urlObj = new URL(targetUrl);
+            if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
+                return resolve({ success: false, status: 0, error: `Unsupported protocol: ${urlObj.protocol}` });
+            }
+
+            const baseOrigin = originalOrigin || urlObj.origin;
+            const mod = urlObj.protocol === 'https:' ? require('https') : require('http');
+            const inputHeaders = (options.headers && typeof options.headers === 'object') ? { ...options.headers } : {};
+            // Strip Authorization header if redirected to a different origin (e.g. GitHub pre-signed raw S3 URL)
+            if (urlObj.origin !== baseOrigin) {
+                delete inputHeaders.Authorization;
+                delete inputHeaders.authorization;
+            }
+
+            const requestHeaders = {
+                'User-Agent': 'MetaFold-App',
+                'Accept': 'application/json, text/plain, */*',
+                ...inputHeaders
+            };
+
+            const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000;
+            const req = mod.request(urlObj, {
+                method: 'GET',
+                headers: requestHeaders,
+                timeout: timeoutMs,
+                rejectUnauthorized: options.verifySsl !== false
+            }, (res) => {
+                const status = res.statusCode || 0;
+
+                if ([301, 302, 303, 307, 308].includes(status) && res.headers.location && redirectCount < 5) {
+                    res.resume();
+                    const nextUrl = new URL(res.headers.location, urlObj).toString();
+                    return resolve(fetchRepoJsonOnce(nextUrl, options, redirectCount + 1, baseOrigin));
+                }
+
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
+                res.on('end', () => {
+                    const rawText = Buffer.concat(chunks).toString('utf8');
+                    if (status < 200 || status >= 300) {
+                        let detail = '';
+                        try {
+                            const errObj = JSON.parse(rawText);
+                            if (errObj && errObj.message) detail = ` (${errObj.message})`;
+                        } catch (_) {}
+                        return resolve({
+                            success: false,
+                            status,
+                            error: `HTTP ${status}${detail}`,
+                            rawText
+                        });
+                    }
+
+                    try {
+                        const data = JSON.parse(rawText);
+                        return resolve({
+                            success: true,
+                            status,
+                            data,
+                            rawText
+                        });
+                    } catch (parseErr) {
+                        return resolve({
+                            success: false,
+                            status,
+                            error: `Invalid JSON response: ${parseErr.message}`,
+                            rawText
+                        });
+                    }
+                });
+            });
+
+            req.on('timeout', () => {
+                req.destroy(new Error(`Request timed out after ${timeoutMs}ms`));
+            });
+
+            req.on('error', (err) => {
+                resolve({
+                    success: false,
+                    status: 0,
+                    error: err.message,
+                    code: err.code
+                });
+            });
+
+            req.end();
+        } catch (err) {
+            resolve({
+                success: false,
+                status: 0,
+                error: err.message
+            });
+        }
+    });
+}
+
+ipcMain.handle('fetch-repo-json', async (event, targetUrl, options = {}) => {
+    if (!targetUrl || typeof targetUrl !== 'string') {
+        return { success: false, status: 0, error: 'Missing repository URL' };
+    }
+    const cleanUrlForLog = String(targetUrl).replace(/([?&]token=)[^&]+/gi, '$1***');
+    console.log(`🌐 [RepoFetch] GET ${cleanUrlForLog}`);
+    return await fetchRepoJsonOnce(targetUrl.trim(), options, 0, null);
 });
 
 // =================== LIVING USER INDEX APIS ===================
@@ -5044,8 +5224,34 @@ function logProxyActivity(activity, details = {}) {
     console.log(`[${timestamp}] 🔬 OMERO Proxy: ${activity}`, details);
 }
 
+// Render compact offline inline SVG QR badge for README.html header (derived solely from metafold_project_id)
+function renderProjectQrSvgForReadme(projectId) {
+    try {
+        const uuid = metafoldTemplateUuid.normalizeUuid(typeof projectId === 'string' ? projectId : String(projectId || ''));
+        if (!uuid) return null;
+        const uri = metafoldTemplateUuid.formatProjectUri(uuid);
+        if (!uri) return null;
+        const qrHelper = require('./js/templateQrModal.js');
+        const matrix = qrHelper.encodeMatrix(uri, 'qr');
+        const svg = qrHelper.renderMatrixSvg(matrix, {
+            quietZone: 2,
+            sizePx: 96,
+            darkColor: '#111827',
+            lightColor: '#ffffff',
+            ariaLabel: `MetaFold Project QR Code (${uri})`
+        });
+        return { uuid, uri, svg };
+    } catch (err) {
+        console.warn('⚠️ Could not render inline QR SVG for README.html:', err.message);
+        return null;
+    }
+}
+
 // Generate HTML README with metadata info instead of Markdown
 function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null, omeroUrl = null, options = {}) {
+    const resolvedProjectId = options?.projectId || metadata?.metafold_project_id || metadata?.projectId || null;
+    const projectQr = renderProjectQrSvgForReadme(resolvedProjectId);
+    const escHtmlHeader = markdownLite.escapeHtml;
     const currentDate = new Date();
     const formattedDate = currentDate.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -5092,6 +5298,54 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                 background: linear-gradient(135deg, #7c3aed, #a855f7);
                 padding: 30px;
                 text-align: center;
+            }
+
+            .header-has-qr {
+                text-align: left;
+            }
+
+            .header-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+            }
+
+            .header-qr-card {
+                background: #ffffff;
+                color: #111827;
+                padding: 8px;
+                border-radius: 10px;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+                text-align: center;
+                flex-shrink: 0;
+            }
+
+            .header-qr-card svg {
+                display: block;
+            }
+
+            .header-qr-caption {
+                font-family: monospace;
+                font-size: 0.68rem;
+                color: #374151;
+                margin-top: 4px;
+                max-width: 112px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .project-id-pill {
+                display: inline-block;
+                margin-top: 8px;
+                padding: 2px 10px;
+                border-radius: 999px;
+                background: rgba(0, 0, 0, 0.22);
+                font-family: monospace;
+                font-size: 0.78rem;
+                color: rgba(255, 255, 255, 0.92);
+                word-break: break-all;
             }
 
             .project-title {
@@ -5233,6 +5487,15 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                 .header {
                     padding: 20px;
                 }
+
+                .header-has-qr {
+                    text-align: center;
+                }
+
+                .header-inner {
+                    flex-direction: column;
+                    text-align: center;
+                }
                 
                 .project-title {
                     font-size: 1.8rem;
@@ -5261,13 +5524,32 @@ function generateReadmeHtmlWithMetadata(metadata, projectName, elabftwUrl = null
                     padding-left: 0;
                 }
             }
+
+            @media print {
+                .header-qr-card {
+                    border: 1px solid #d1d5db;
+                    box-shadow: none;
+                }
+            }
         </style>
     </head>
     <body>
         <div class="container">
-            <header class="header">
+            <header class="header${projectQr ? ' header-has-qr' : ''}">
+                ${projectQr ? `
+                <div class="header-inner">
+                    <div>
+                        <h1 class="project-title">🧬 ${projectName}</h1>
+                        <p class="project-subtitle">MetaFold Laboratory Project</p>
+                        <div class="project-id-pill" title="Compact Scan URI: ${escHtmlHeader(projectQr.uri)}">🆔 ${escHtmlHeader(projectQr.uuid)}</div>
+                    </div>
+                    <div class="header-qr-card" title="MetaFold Scan Code: ${escHtmlHeader(projectQr.uri)}">
+                        ${projectQr.svg}
+                        <div class="header-qr-caption">${escHtmlHeader(projectQr.uuid.slice(0, 8))}</div>
+                    </div>
+                </div>` : `
                 <h1 class="project-title">🧬 ${projectName}</h1>
-                <p class="project-subtitle">MetaFold Laboratory Project</p>
+                <p class="project-subtitle">MetaFold Laboratory Project</p>`}
             </header>
 
             <main class="content">`;
@@ -5733,7 +6015,9 @@ async function createMetadataFiles(projectPath, metadata, projectName = null) {
     // 2. <Project Name>-README.html with metadata info
     const readmeFilename = `${sanitizedProjectName}-README.html`;
     const readmePath = path.join(projectPath, readmeFilename);
-    const readmeContent = generateReadmeHtmlWithMetadata(metadata, projectName);
+    const readmeContent = generateReadmeHtmlWithMetadata(metadata, projectName, null, null, {
+        projectId: metadataContent.metafold_project_id
+    });
 
     await fs.writeFile(readmePath, readmeContent, 'utf8');
     console.log(`📄 Enhanced README created: ${readmePath}`);

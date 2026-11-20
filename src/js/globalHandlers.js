@@ -579,6 +579,11 @@ window.showSettingsModal = async function () {
             initializeCategorySettings();
         }
 
+        // Initialize template repositories settings list
+        if (typeof window.initializeTemplateRepositoriesSettings === 'function') {
+            await window.initializeTemplateRepositoriesSettings();
+        }
+
         modal.style.display = 'block';
 
     } catch (error) {
@@ -1972,6 +1977,21 @@ window.testOMEROConnectionInline = async function () {
 
 // =================== EVENT LISTENERS & INITIALIZATION ===================
 
+window.showTemplateQrModal = async function () {
+    try {
+        if (typeof window.closeMoreMenu === 'function') {
+            window.closeMoreMenu();
+        }
+        if (window.templateQrModal && typeof window.templateQrModal.open === 'function') {
+            await window.templateQrModal.open();
+        } else {
+            alert('QR Code modal is not available.');
+        }
+    } catch (error) {
+        console.error('Error opening template QR modal:', error);
+    }
+};
+
 // Close settings modal on click outside
 window.addEventListener('click', function (event) {
     try {
@@ -2167,8 +2187,11 @@ window.showProjectMetadataInSidebar = function (projectPath) {
             : esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
         const resolveSidebarProject = (rawRef) => {
-            const clean = String(rawRef || '').replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
+            let clean = String(rawRef || '').replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
             if (!clean) return null;
+            if (window.metafoldTemplateUuid && typeof window.metafoldTemplateUuid.extractProjectRefId === 'function') {
+                clean = window.metafoldTemplateUuid.extractProjectRefId(clean);
+            }
             const cleanLower = clean.toLowerCase();
             const scannerList = window.projectScanner?.projects || [];
             const foundInScanner = scannerList.find(p =>

@@ -624,3 +624,143 @@ body.light-mode {
     background: #ffffff !important;
     border-color: rgba(124, 58, 237, 0.35) !important;
 }
+
+/* =========================================
+   TEMPLATE UUID, QR MODAL, SCANNER & REPO SETTINGS (LIGHT MODE)
+   ========================================= */
+.light-mode .mf-sidebar-scan-btn {
+    background: rgba(124, 58, 237, 0.1) !important;
+    border-color: rgba(124, 58, 237, 0.35) !important;
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-sidebar-scan-btn:hover {
+    background: rgba(124, 58, 237, 0.18) !important;
+}
+
+.light-mode .mf-template-uuid-row {
+    background: #f5f3ff !important;
+    border-color: #ddd6fe !important;
+}
+
+.light-mode .mf-template-uuid-label {
+    color: #4b5563 !important;
+}
+
+.light-mode .mf-template-uuid-value {
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-qr-modal-card {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border-color: #d1d5db !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2) !important;
+}
+
+.light-mode .mf-qr-modal-subtitle {
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-qr-close-btn {
+    color: #4b5563 !important;
+}
+
+.light-mode .mf-qr-mode-btn {
+    background: #f3f4f6 !important;
+    border-color: #d1d5db !important;
+    color: #374151 !important;
+}
+
+.light-mode .mf-qr-mode-btn.active {
+    background: rgba(124, 58, 237, 0.12) !important;
+    border-color: #7c3aed !important;
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-qr-label-toggle {
+    color: #374151 !important;
+}
+
+.light-mode .mf-qr-copy-row {
+    background: #f9fafb !important;
+    border-color: #e5e7eb !important;
+}
+
+.light-mode .mf-qr-copy-key {
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-qr-copy-val {
+    color: #111827 !important;
+}
+
+.light-mode .mf-qr-zpl-box {
+    background: #f5f3ff !important;
+    border-color: #ddd6fe !important;
+}
+
+.light-mode .mf-qr-zpl-header {
+    color: #6d28d9 !important;
+}
+
+.light-mode .mf-qr-zpl-hint {
+    color: #4b5563 !important;
+}
+
+.light-mode .mf-qr-zpl-select {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    color: #111827 !important;
+}
+
+.light-mode .mf-repo-card,
+.light-mode .mf-repo-add-box {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+}
+
+.light-mode .mf-repo-toggle-label {
+    color: #111827 !important;
+}
+
+.light-mode .mf-repo-field-label,
+.light-mode .mf-repo-resolved-hint {
+    color: #4b5563 !important;
+}
+
+.light-mode .mf-repo-input {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    color: #111827 !important;
+}
+
+.light-mode .mf-repo-badge.official {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    border-color: #93c5fd !important;
+}
+
+.light-mode .mf-repo-badge.custom {
+    background: #d1fae5 !important;
+    color: #047857 !important;
+    border-color: #6ee7b7 !important;
+}
+
+.light-mode .mf-repo-badge.token-set {
+    background: #fef3c7 !important;
+    color: #b45309 !important;
+    border-color: #fcd34d !important;
+}
+
+.light-mode .mf-repo-test-status {
+    color: #4b5563 !important;
+}
+
+.light-mode .mf-repo-test-status.ok {
+    color: #047857 !important;
+}
+
+.light-mode .mf-repo-test-status.err {
+    color: #dc2626 !important;
+}

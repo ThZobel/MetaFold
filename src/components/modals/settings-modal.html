@@ -45,7 +45,60 @@
                 <small>When disabled, the app runs in simple mode without user selection at startup.</small>
             </div>
 
+            <!-- =================== TEMPLATE REPOSITORIES SETTINGS UI =================== -->
+            <div class="settings-section" id="templateRepositoriesSettings" style="margin-top: 26px;">
+                <h3
+                    style="font-size: 1.15rem; font-weight: 600; margin-bottom: 10px; color: #e0e0e0; border-bottom: 2px solid rgba(124, 58, 237, 0.3); padding-bottom: 8px;">
+                    📦 Template Repositories
+                </h3>
+                <p style="color: #9ca3af; margin-bottom: 14px; font-size: 0.88rem; line-height: 1.45;">
+                    Configure additional lab/institute GitHub repositories (or custom index URLs) alongside the official MetaFold Community repo.
+                    When scanning a template UUID, MetaFold checks <strong>local own</strong> → <strong>local shared</strong> → <strong>custom repositories (top to bottom)</strong> → <strong>official repository</strong>.
+                </p>
 
+                <div id="templateRepositoriesList" class="mf-repo-list">
+                    <!-- Populated by templateRepositoriesSettings.js -->
+                </div>
+
+                <div class="mf-repo-add-box">
+                    <div class="mf-repo-add-header">
+                        <strong>➕ Add Custom Repository</strong>
+                        <button type="button" class="btn btn-secondary btn-small"
+                            onclick="window.templateRepoSettings && window.templateRepoSettings.resetOfficialDefault()"
+                            title="Reset the official MetaFold Community repository URL back to default">
+                            ↺ Reset Official Default
+                        </button>
+                    </div>
+                    <div class="mf-repo-fields-grid">
+                        <div>
+                            <label class="mf-repo-field-label" for="newRepoName">Repository Name</label>
+                            <input type="text" class="mf-repo-input" id="newRepoName" placeholder="e.g. Lab Microscopy Templates">
+                        </div>
+                        <div>
+                            <label class="mf-repo-field-label" for="newRepoUrl">GitHub Repo URL or templates-index.json URL *</label>
+                            <input type="text" class="mf-repo-input" id="newRepoUrl" placeholder="https://github.com/MyLab/MetaFold-Templates">
+                        </div>
+                        <div>
+                            <label class="mf-repo-field-label" for="newRepoBranch">Branch</label>
+                            <input type="text" class="mf-repo-input" id="newRepoBranch" value="main" placeholder="main">
+                        </div>
+                    </div>
+                    <div class="mf-repo-token-row">
+                        <input type="password" class="mf-repo-input" id="newRepoToken"
+                            placeholder="Optional GitHub Access Token (for private repos — stored encrypted)"
+                            autocomplete="off">
+                        <button type="button" class="btn btn-secondary btn-small"
+                            onclick="window.templateRepoSettings && window.templateRepoSettings.testNewRepo()">
+                            🔌 Test
+                        </button>
+                        <button type="button" class="btn btn-small"
+                            onclick="window.templateRepoSettings && window.templateRepoSettings.addCustomRepo()">
+                            ➕ Add
+                        </button>
+                    </div>
+                    <div id="newRepoTestStatus" class="mf-repo-test-status" style="margin-top: 6px;"></div>
+                </div>
+            </div>
 
             <!-- =================== TEMPLATE CATEGORIES SETTINGS UI =================== -->
             <div class="settings-section" id="templateCategoriesSettings" style="margin-top: 30px;">
@@ -515,6 +568,9 @@
                                     }
                                     if (typeof initializeGroupCategoryStatus === 'function') {
                                         initializeGroupCategoryStatus();
+                                    }
+                                    if (typeof window.initializeTemplateRepositoriesSettings === 'function') {
+                                        window.initializeTemplateRepositoriesSettings();
                                     }
                                 }
                             }

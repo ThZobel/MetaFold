@@ -901,6 +901,18 @@ body.light-mode .discovery-tile-option label strong {
     color: #ffffff;
 }
 
+.facet-detail-action-btn.facet-action-qr {
+    background: rgba(6, 182, 212, 0.22);
+    border-color: #06b6d4;
+    color: #ecfeff;
+}
+
+.facet-detail-action-btn.facet-action-qr:hover {
+    background: #06b6d4;
+    border-color: #22d3ee;
+    color: #ffffff;
+}
+
 /* Light theme overrides for maximum legibility */
 body.light-mode .facet-detail-action-btn {
     text-shadow: none;
@@ -981,6 +993,17 @@ body.light-mode .facet-detail-action-btn.facet-action-rspace {
 
 body.light-mode .facet-detail-action-btn.facet-action-rspace:hover {
     background: #f97316;
+    color: #ffffff;
+}
+
+body.light-mode .facet-detail-action-btn.facet-action-qr {
+    background: #cffafe;
+    border-color: #06b6d4;
+    color: #164e63;
+}
+
+body.light-mode .facet-detail-action-btn.facet-action-qr:hover {
+    background: #0891b2;
     color: #ffffff;
 }
 

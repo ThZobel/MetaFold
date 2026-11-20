@@ -124,10 +124,12 @@ window.importTemplatesFromFile = async function () {
             // Process each imported template
             for (const template of result.templates) {
                 try {
-                    // Check if template already exists
+                    const currentUser = window.userManager?.currentUser || 'Unknown';
+                    const importedUuid = window.metafoldTemplateUuid?.normalizeUuid(template.uuid);
+                    // Check if template already exists (match UUID or name+creator)
                     const exists = window.templateManager.templates.some(t =>
-                        t.name === template.name &&
-                        t.createdBy === template.createdBy
+                        (importedUuid && t.uuid && t.uuid.toLowerCase() === importedUuid && t.createdBy === currentUser) ||
+                        (t.name === template.name && t.createdBy === (template.createdBy || currentUser))
                     );
 
                     if (exists) {
@@ -140,7 +142,8 @@ window.importTemplatesFromFile = async function () {
                     const cleanTemplate = {
                         ...template,
                         id: template.id || `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                        createdBy: window.userManager?.currentUser || 'Unknown',
+                        uuid: importedUuid || window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
+                        createdBy: currentUser,
                         createdByGroup: window.userManager?.currentGroup || 'Unknown',
                         originalCreator: template.createdBy,
                         originalGroup: template.createdByGroup,
@@ -473,6 +476,10 @@ const enhancedActions = {
             stats.push(`<span>💾 Storage: ${window.storage.storageMode}</span>`);
         }
 
+        if (template.uuid) {
+            stats.push(`<span title="${this.escapeHtml(template.uuid)}">🆔 UUID: ${this.escapeHtml(template.uuid.slice(0, 8))}…</span>`);
+        }
+
         statsEl.innerHTML = stats.join('');
     },
 
@@ -480,6 +487,7 @@ const enhancedActions = {
     updateActionStates(template) {
         const duplicateAction = document.getElementById('duplicateAction');
         const exportAction = document.getElementById('exportAction');
+        const qrCodeAction = document.getElementById('qrCodeAction');
         const deleteAction = document.getElementById('deleteActionPanel');
         const importAction = document.getElementById('importAction');
         const storageAction = document.getElementById('storageAction');
@@ -509,6 +517,18 @@ const enhancedActions = {
             exportAction.classList.add('needs-template');
             exportAction.style.opacity = '0.5';
             exportAction.style.pointerEvents = 'auto'; // Keep clickable for warning
+        }
+
+        // QR / DataMatrix code action - needs template (works for own and shared)
+        if (qrCodeAction) {
+            if (hasTemplate) {
+                qrCodeAction.classList.remove('needs-template');
+                qrCodeAction.style.opacity = '1';
+            } else {
+                qrCodeAction.classList.add('needs-template');
+                qrCodeAction.style.opacity = '0.5';
+            }
+            qrCodeAction.style.pointerEvents = 'auto';
         }
 
         // Delete action - needs own template
@@ -628,9 +648,13 @@ window.duplicateCurrentTemplate = async function () {
     try {
         console.log('📋 Duplicating template:', template.name);
 
-        // Create duplicated template
+        // Create duplicated template with its own fresh ID and UUID
         const duplicatedTemplate = {
             ...template,
+            id: `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            uuid: window.metafoldTemplateUuid?.generateTemplateUuid() || undefined,
+            derivedFromTemplateId: template.id || null,
+            derivedFromTemplateUuid: template.uuid || null,
             name: `${template.name} (Copy)`,
             description: `${template.description || ''} (Copy of original)`.trim(),
             createdBy: window.userManager?.currentUser || 'Unknown',
